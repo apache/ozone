@@ -36,7 +36,7 @@ export const mockModels = rest.get(CHATBOT_ENDPOINTS.MODELS, (req, res, ctx) => 
   return res(
     ctx.status(200),
     ctx.json({
-      models: ['gemini-2.5-flash', 'gemini-2.5-pro']
+      models: ['gpt-4.1-nano', 'gemini-2.5-flash', 'gemini-2.5-pro', 'claude-opus-4-6']
     })
   );
 });

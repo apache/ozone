@@ -19,7 +19,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AxiosPostHelper } from '@/utils/axiosRequestHelper';
 import { ChatMessage, ChatbotChatRequest, ChatbotChatResponse, ChatbotErrorResponse } from '@/v2/types/chatbot.types';
-import { CHATBOT_ENDPOINTS, DEFAULT_MODEL_SENTINEL } from '@/v2/constants/chatbot.constants';
+import {
+  CHATBOT_ENDPOINTS,
+  DEFAULT_MODEL_SENTINEL,
+  getLlmProviderFailureMessage,
+  isMaskedLlmProcessingError,
+  RECON_LOGS_HINT
+} from '@/v2/constants/chatbot.constants';
 import axios, { AxiosError } from 'axios';
 
 export const useChat = () => {
@@ -152,11 +158,10 @@ export const useChat = () => {
         } else if (status === 504) {
           displayError = errorText || 'Request timed out. The query took too long to process. Please try a different or faster model.';
         } else if (status === 500) {
-          // Clean up the OpenAI stack trace if present
-          if (errorText && errorText.includes('dev.ai4j.openai4j.OpenAiHttpException')) {
-            displayError = 'Failed to connect to OpenAI API. Please verify your API key configuration in ozone-site.xml.';
+          if (isMaskedLlmProcessingError(errorText)) {
+            displayError = getLlmProviderFailureMessage(provider, model);
           } else {
-            displayError = errorText || 'An internal error occurred while processing your request. Please try again.';
+            displayError = `${errorText}\n\n${RECON_LOGS_HINT}`;
           }
         } else if (status === 400) {
           displayError = errorText || 'Invalid request. Please check your query.';

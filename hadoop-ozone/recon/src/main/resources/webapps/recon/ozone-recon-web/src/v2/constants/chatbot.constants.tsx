@@ -39,6 +39,56 @@ export const getProviderForModel = (model: string): string => {
   return 'other';
 };
 
+export const RECON_LOGS_HINT = 'For more details, check the Recon server logs.';
+
+const GENERIC_BACKEND_PROCESSING_ERROR = 'An error occurred processing your request.';
+
+export const resolveRequestProvider = (provider?: string, model?: string): string | undefined => {
+  if (provider && provider !== DEFAULT_MODEL_SENTINEL) {
+    return provider;
+  }
+  if (model && model !== DEFAULT_MODEL_SENTINEL) {
+    return getProviderForModel(model);
+  }
+  return undefined;
+};
+
+export const isMaskedLlmProcessingError = (errorText?: string): boolean => {
+  if (!errorText) {
+    return true;
+  }
+  if (errorText === GENERIC_BACKEND_PROCESSING_ERROR) {
+    return true;
+  }
+  return (
+    errorText.includes('OpenAiHttpException')
+    || errorText.includes('LLM request failed')
+    || errorText.includes('An internal error occurred while processing your request')
+  );
+};
+
+export const getLlmProviderFailureMessage = (provider?: string, model?: string): string => {
+  const resolved = resolveRequestProvider(provider, model);
+
+  let main: string;
+  switch (resolved) {
+    case 'openai':
+      main = 'OpenAI could not complete this request. Check your API key and model settings in ozone-site.xml, or try another provider such as Google Gemini.';
+      break;
+    case 'gemini':
+      main = 'Google Gemini could not complete this request. Check your API key and model settings in ozone-site.xml, or try another provider such as OpenAI.';
+      break;
+    case 'anthropic':
+      main = 'Anthropic Claude could not complete this request. Check your API key and model settings in ozone-site.xml, or try another provider such as OpenAI.';
+      break;
+    default:
+      main = 'An error occurred while processing your request. Please try again or switch to a different model or provider.';
+      break;
+  }
+
+  return `${main}\n\n${RECON_LOGS_HINT}`;
+};
+
 export const LOADING_STAGES = [
   { maxSeconds: 3, text: "Understanding query..." },
   { maxSeconds: 10, text: "Searching cluster data..." },

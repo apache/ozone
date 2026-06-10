@@ -159,7 +159,8 @@ test.describe('Recon AI Error Handling Scenarios', () => {
     await page.fill('textarea', 'Hello');
     await page.keyboard.press('Enter');
     
-    await expect(page.locator('text=An error occurred processing your request.')).toBeVisible();
+    await expect(page.locator('text=An error occurred while processing your request')).toBeVisible();
+    await expect(page.locator('text=For more details, check the Recon server logs.')).toBeVisible();
     await page.screenshot({ path: 'e2e/screenshots/chat-500-internal.png' });
   });
 

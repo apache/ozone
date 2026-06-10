@@ -154,7 +154,71 @@ describe('Assistant Tests', () => {
     await userEvent.click(sendButton);
 
     await waitFor(() => {
-      expect(screen.getByText('An error occurred processing your request.')).toBeVisible();
+      expect(screen.getByText(/An error occurred while processing your request/)).toBeVisible();
+      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+    });
+  });
+
+  it('shows provider-specific error bubble on 500 error for OpenAI', async () => {
+    assistantServer.use(mockHealthEnabled, mockModels, mockChatError);
+    render(<WrappedAssistantComponent />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to Recon AI')).toBeVisible();
+    });
+
+    await userEvent.click(screen.getByText('Default Provider'));
+    await userEvent.click(screen.getByText('OpenAI'));
+
+    const input = screen.getByPlaceholderText('Ask Recon AI about your cluster...');
+    await userEvent.type(input, 'Hello');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/OpenAI could not complete this request/)).toBeVisible();
+      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+    });
+  });
+
+  it('shows provider-specific error bubble on 500 error for Gemini', async () => {
+    assistantServer.use(mockHealthEnabled, mockModels, mockChatError);
+    render(<WrappedAssistantComponent />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to Recon AI')).toBeVisible();
+    });
+
+    await userEvent.click(screen.getByText('Default Provider'));
+    await userEvent.click(screen.getByText('Google Gemini'));
+
+    const input = screen.getByPlaceholderText('Ask Recon AI about your cluster...');
+    await userEvent.type(input, 'Hello');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Google Gemini could not complete this request/)).toBeVisible();
+      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+    });
+  });
+
+  it('shows provider-specific error bubble on 500 error for Anthropic', async () => {
+    assistantServer.use(mockHealthEnabled, mockModels, mockChatError);
+    render(<WrappedAssistantComponent />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to Recon AI')).toBeVisible();
+    });
+
+    await userEvent.click(screen.getByText('Default Provider'));
+    await userEvent.click(screen.getByText('Anthropic Claude'));
+
+    const input = screen.getByPlaceholderText('Ask Recon AI about your cluster...');
+    await userEvent.type(input, 'Hello');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Anthropic Claude could not complete this request/)).toBeVisible();
+      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
     });
   });
 
