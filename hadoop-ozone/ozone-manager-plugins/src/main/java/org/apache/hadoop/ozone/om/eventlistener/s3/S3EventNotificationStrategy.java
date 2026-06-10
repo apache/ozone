@@ -150,8 +150,11 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       }
       eventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), trxLogIndex);
 
+      String sequencer = String.format("%016X", trxLogIndex);
+
       S3EventNotification event =
           new S3EventNotificationBuilder(objectKey, bucketName, bucketArn, eventName, eventTime, etag)
+              .setObjectSequencer(sequencer)
               .addAllEventData(eventData)
               .build();
 

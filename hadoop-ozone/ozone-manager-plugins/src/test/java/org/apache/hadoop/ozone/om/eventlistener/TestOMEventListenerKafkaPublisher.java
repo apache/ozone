@@ -113,6 +113,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 1L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateKey");
@@ -131,6 +132,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1_commit");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 8L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CommitKey");
@@ -152,6 +154,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key2");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 2L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
@@ -173,6 +176,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key3");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 3L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), true);
@@ -192,6 +196,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectRenamed:Rename");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key_RENAMED");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 4L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.RENAME_FROM_KEY.toString(), "vol1/bucket1/some/key4");
@@ -202,10 +207,7 @@ public class TestOMEventListenerKafkaPublisher {
 
   @Test
   public void testCreateVolumeRequestProducesOzoneVolumeCreatedEvent() throws IOException {
-    OmCompletedRequestInfo createRequest = buildCompletedRequestInfo(6L, Type.CreateVolume, null,
-        new OperationArgs.NoArgs());
-    // override volume/bucket to simulate volume-only op
-    createRequest = new OmCompletedRequestInfo.Builder()
+    OmCompletedRequestInfo createRequest = new OmCompletedRequestInfo.Builder()
         .setTrxLogIndex(6L)
         .setCmdType(Type.CreateVolume)
         .setVolumeName(VOLUME_NAME)
@@ -221,6 +223,7 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(record.getEventName()).isEqualTo("OzoneVolumeCreated:Put");
     assertThat(record.getS3().getBucket().getName()).isNull();
     assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME);
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 6L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 6);
@@ -246,6 +249,7 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(record.getEventName()).isEqualTo("OzoneBucketCreated:Put");
     assertThat(record.getS3().getBucket().getName()).isEqualTo(BUCKET_NAME);
     assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME + "/" + BUCKET_NAME);
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 7L));
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 7);
