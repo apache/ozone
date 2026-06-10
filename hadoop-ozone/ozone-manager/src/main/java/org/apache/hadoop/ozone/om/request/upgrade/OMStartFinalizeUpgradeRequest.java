@@ -55,7 +55,7 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     ozoneManager.getScmClient().getContainerClient().finalizeUpgrade();
-    LOG.info("Successfully trigger the finalize upgrade process in SCM");
+    LOG.info("Successfully triggered the finalize upgrade process in SCM");
     return super.preExecute(ozoneManager);
   }
 
