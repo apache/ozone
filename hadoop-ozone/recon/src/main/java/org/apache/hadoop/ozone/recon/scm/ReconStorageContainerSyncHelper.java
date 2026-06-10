@@ -93,6 +93,7 @@ class ReconStorageContainerSyncHelper {
    * (DELETED ID list).
    */
   private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
+  private static final long DELETED_SYNC_TRANSITION_LOG_SAMPLE_INTERVAL = 1000L;
 
   /**
    * Conservative wire-size upper bound for one {@code ContainerWithPipeline}
@@ -391,6 +392,7 @@ class ReconStorageContainerSyncHelper {
           OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT);
       int batchSize = (int) getContainerCountPerCall(configuredBatch);
       int retiredCount = 0;
+      long processedCount = 0;
 
       // Existing Recon containers need only the ID to retire to DELETED. Fetch
       // full ContainerInfo only for IDs absent from Recon, where we must add a
@@ -406,7 +408,8 @@ class ReconStorageContainerSyncHelper {
         if (page == null || page.isEmpty()) {
           break;
         }
-        retiredCount += processDeletedPage(page);
+        retiredCount += processDeletedPage(page, processedCount);
+        processedCount += page.size();
         start = ContainerID.valueOf(
             page.get(page.size() - 1).getId() + 1);
       }
@@ -454,9 +457,12 @@ class ReconStorageContainerSyncHelper {
    *   <li>If already DELETED in Recon: no-op.</li>
    * </ul>
    */
-  private int processDeletedPage(List<ContainerID> page) {
+  private int processDeletedPage(List<ContainerID> page,
+                                 long processedCountBeforePage) {
     int retiredCount = 0;
+    long processedCount = processedCountBeforePage;
     for (ContainerID containerID : page) {
+      processedCount++;
       if (!containerManager.containerExist(containerID)) {
         if (addContainerInfoFallback(containerID,
             HddsProtos.LifeCycleState.DELETED, "DELETED sync")) {
@@ -468,7 +474,7 @@ class ReconStorageContainerSyncHelper {
         ContainerInfo reconInfo = containerManager.getContainer(containerID);
         if (reconInfo.getState() != HddsProtos.LifeCycleState.DELETED) {
           retireContainerToDeleted(containerID, reconInfo,
-              HddsProtos.LifeCycleState.DELETED);
+              HddsProtos.LifeCycleState.DELETED, processedCount);
           retiredCount++;
         }
         // reconState == DELETED: already terminal, nothing to do.
@@ -515,10 +521,13 @@ class ReconStorageContainerSyncHelper {
    * @param reconInfo   current Recon snapshot of the container (used for
    *                    OPEN→CLOSING transition and log messages)
    * @param scmState    always DELETED (passed through to log messages)
+   * @param processedCount current number of SCM DELETED IDs scanned in this
+   *                       sync cycle
    */
   private void retireContainerToDeleted(ContainerID containerID,
                                         ContainerInfo reconInfo,
-                                        HddsProtos.LifeCycleState scmState) {
+                                        HddsProtos.LifeCycleState scmState,
+                                        long processedCount) {
     try {
       HddsProtos.LifeCycleState reconState = reconInfo.getState();
 
@@ -537,9 +546,11 @@ class ReconStorageContainerSyncHelper {
       // DELETING → DELETED.
       containerManager.updateContainerState(containerID, CLEANUP);
 
-      LOG.info("DELETED sync: container {} transitioned "
-          + "{} → DELETED in Recon (SCM state: {}).",
-          containerID, reconInfo.getState(), scmState);
+      if (processedCount % DELETED_SYNC_TRANSITION_LOG_SAMPLE_INTERVAL == 0) {
+        LOG.debug("DELETED sync: container {} transitioned "
+            + "{} → DELETED in Recon (SCM state: {}).",
+            containerID, reconInfo.getState(), scmState);
+      }
     } catch (InvalidStateTransitionException | IOException e) {
       LOG.warn("DELETED sync: failed to retire container {} "
           + "from {} toward DELETED.", containerID, reconInfo.getState(), e);

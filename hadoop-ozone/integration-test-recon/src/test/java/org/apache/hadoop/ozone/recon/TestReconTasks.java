@@ -604,7 +604,7 @@ public class TestReconTasks {
     DatanodeDetails primaryDn = pipeline.getFirstNode();
     DatanodeDetails secondDn = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails)
-        .filter(dd -> !dd.getUuid().equals(primaryDn.getUuid()))
+        .filter(dd -> !dd.getID().equals(primaryDn.getID()))
         .findFirst()
         .orElseThrow(() -> new AssertionError("No second datanode available"));
 
