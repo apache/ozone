@@ -154,7 +154,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | Option                              | Description                                                                                                                                                                                                                                                                                                                                                           | Example                                        |
 |-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
 | `<datanode-address>`                | One or more datanode addresses as positional arguments. Addresses can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (19864)<br>- Hostname with port (e.g., `DN-1:19864`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:19864`)<br>- Stdin (`-`) - reads datanode addresses from standard input, one per line | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
-| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                                  | `--in-service-datanodes`                       |
+| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE and HEALTHY datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                     | `--in-service-datanodes`                       |
 | `--json`                            | Format output as JSON.                                                                                                                                                                                                                                                                                                                                                | `--json`                                       |
 | `-t/--threshold-percentage`        | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                         | `-t 5`<br>`--threshold-percentage 5.0`         |
 | `-b/--bandwidth-in-mb`              | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                | `-b 20`<br>`--bandwidth-in-mb 50`              |
@@ -169,7 +169,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 # Start DiskBalancer on multiple datanodes
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
 
-# Start DiskBalancer on all IN_SERVICE datanodes
+# Start DiskBalancer on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer start --in-service-datanodes
 
 # Start DiskBalancer with configuration parameters
@@ -189,7 +189,7 @@ ozone admin datanode diskbalancer start DN-1 --json
 # Stop DiskBalancer on multiple datanodes
 ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
 
-# Stop DiskBalancer on all IN_SERVICE datanodes
+# Stop DiskBalancer on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer stop --in-service-datanodes
 
 # Stop DiskBalancer with json output
@@ -202,7 +202,7 @@ ozone admin datanode diskbalancer stop DN-1 --json
 # Update multiple parameters
 ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
 
-# Update on all IN_SERVICE datanodes
+# Update on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer update --in-service-datanodes -t 5
 # Or using the long form:
 ozone admin datanode diskbalancer update --in-service-datanodes --threshold-percentage 5
@@ -216,7 +216,7 @@ ozone admin datanode diskbalancer update DN-1 -b 50 --json
 # Get status from multiple datanodes
 ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
 
-# Get status from all IN_SERVICE datanodes
+# Get status from all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer status --in-service-datanodes
 
 # Get status as JSON
@@ -228,7 +228,7 @@ ozone admin datanode diskbalancer status --in-service-datanodes --json
 # Get report from multiple datanodes
 ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
 
-# Get report from all IN_SERVICE datanodes
+# Get report from all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer report --in-service-datanodes
 
 # Get report as JSON

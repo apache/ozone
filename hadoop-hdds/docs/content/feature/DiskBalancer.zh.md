@@ -149,7 +149,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | Option                              | Description                                                                                                                                                                                                      | Example                                        |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
 | `<datanode-address>`                | 一个或多个数据节点地址作为位置参数。地址可以是：<br>- 主机名（例如，`DN-1`）- 使用默认的 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如，`DN-1:19864`）<br>- IP 地址（例如，`192.168.1.10`）<br>- 带端口的 IP 地址（例如，`192.168.1.10:19864`）<br>- 标准输入 (`-`) - 从标准输入读取数据节点地址，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
-| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
+| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 且 HEALTHY 的数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
 | `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
 | `-t/--threshold-percentage`         | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
 | `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
@@ -164,7 +164,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 # 在多个数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
 
-# 在所有运行中的数据节点上启动 DiskBalancer
+# 在所有 IN_SERVICE 且 HEALTHY 的数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start --in-service-datanodes
 
 # 使用配置参数启动 DiskBalancer
@@ -183,7 +183,7 @@ ozone admin datanode diskbalancer start DN-1 --json
 # 在多个数据节点上停止 DiskBalancer
 ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
 
-# 在所有运行中的数据节点上停止 DiskBalancer
+# 在所有 IN_SERVICE 且 HEALTHY 的数据节点上停止 DiskBalancer
 ozone admin datanode diskbalancer stop --in-service-datanodes
 
 # 停止 DiskBalancer 并输出 JSON 信息
@@ -195,7 +195,7 @@ ozone admin datanode diskbalancer stop DN-1 --json
 # 更新多个参数
 ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
 
-# 更新所有 IN_SERVICE 数据节点
+# 更新所有 IN_SERVICE 且 HEALTHY 的数据节点
 ozone admin datanode diskbalancer update --in-service-datanodes -t 5
 
 # 更新并输出 JSON 格式
@@ -208,7 +208,7 @@ ozone admin datanode diskbalancer update DN-1 -b 50 --json
 # 从多个数据节点获取状态
 ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
 
-# 从所有处于服务状态的数据节点获取状态
+# 从所有 IN_SERVICE 且 HEALTHY 的数据节点获取状态
 ozone admin datanode diskbalancer status --in-service-datanodes
 
 # 以 JSON 格式获取状态
@@ -220,7 +220,7 @@ ozone admin datanode diskbalancer status --in-service-datanodes --json
 # 从多个数据节点获取报告
 ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
 
-# 从所有处于服务状态的数据节点获取报告
+# 从所有 IN_SERVICE 且 HEALTHY 的数据节点获取报告
 ozone admin datanode diskbalancer report --in-service-datanodes
 
 # 以 JSON 格式获取报告
