@@ -25,9 +25,13 @@ import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBuffer;
 import org.apache.ozone.test.GenericTestUtils;
 
 /**
- * Test Recon Utility methods.
+ * Utility methods for Recon OM metadata manager integration tests.
  */
-public class TestReconOmMetaManagerUtils {
+public final class ReconOmMetaManagerTestUtils {
+
+  private ReconOmMetaManagerTestUtils() {
+    // no instances
+  }
 
   /**
    * Wait for all currently buffered events to be processed asynchronously.
@@ -36,7 +40,8 @@ public class TestReconOmMetaManagerUtils {
    *
    * @return CompletableFuture that completes when buffer is empty
    */
-  public CompletableFuture<Void> waitForEventBufferEmpty(OMUpdateEventBuffer eventBuffer) {
+  public static CompletableFuture<Void> waitForEventBufferEmpty(
+      OMUpdateEventBuffer eventBuffer) {
     return CompletableFuture.runAsync(() -> {
       try {
         GenericTestUtils.waitFor(() -> eventBuffer.getQueueSize() == 0, 100, 30000);
