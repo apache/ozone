@@ -30,7 +30,6 @@ import org.apache.ozone.test.GenericTestUtils;
 public final class ReconOmMetaManagerTestUtils {
 
   private ReconOmMetaManagerTestUtils() {
-    // no instances
   }
 
   /**
