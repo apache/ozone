@@ -18,8 +18,12 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -36,7 +40,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestReconStorageContainerSyncHelper {
@@ -47,14 +54,49 @@ class TestReconStorageContainerSyncHelper {
   private final ReconContainerManager mockContainerManager =
       mock(ReconContainerManager.class);
 
-  private final ReconStorageContainerSyncHelper syncHelper;
+  private ReconScmContainerSyncMetrics metrics;
+  private ReconStorageContainerSyncHelper syncHelper;
 
-  TestReconStorageContainerSyncHelper() {
+  @BeforeEach
+  void setUp() {
+    metrics = ReconScmContainerSyncMetrics.create();
     syncHelper = new ReconStorageContainerSyncHelper(
         mockScmServiceProvider,
         new OzoneConfiguration(),
-        mockContainerManager
+        mockContainerManager,
+        metrics
     );
+  }
+
+  @AfterEach
+  void tearDown() {
+    metrics.unRegister();
+  }
+
+  @Test
+  void testContainerSyncMetricsTrackPreSyncDriftAndDuration() throws Exception {
+    when(mockScmServiceProvider.getContainerCount(OPEN)).thenReturn(5L);
+    when(mockScmServiceProvider.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
+    when(mockScmServiceProvider.getContainerCount(CLOSED)).thenReturn(8L);
+    when(mockScmServiceProvider.getContainerCount(DELETED)).thenReturn(9L);
+    when(mockContainerManager.getContainerStateCount(OPEN)).thenReturn(3);
+    when(mockContainerManager.getContainerStateCount(QUASI_CLOSED)).thenReturn(1);
+    when(mockContainerManager.getContainerStateCount(CLOSED)).thenReturn(10);
+    when(mockContainerManager.getContainerStateCount(DELETED)).thenReturn(7);
+    when(mockScmServiceProvider.getListOfContainerIDs(
+        any(), any(Integer.class), any())).thenReturn(Collections.emptyList());
+
+    boolean result = syncHelper.syncWithSCMContainerInfo();
+
+    assertTrue(result);
+    assertEquals(2L, metrics.getContainerCountDrift(OPEN));
+    assertEquals(0L, metrics.getContainerCountDrift(QUASI_CLOSED));
+    assertEquals(-2L, metrics.getContainerCountDrift(CLOSED));
+    assertEquals(2L, metrics.getContainerCountDrift(DELETED));
+    assertTrue(metrics.getContainerSyncDurationMs(OPEN) >= 0);
+    assertTrue(metrics.getContainerSyncDurationMs(QUASI_CLOSED) >= 0);
+    assertTrue(metrics.getContainerSyncDurationMs(CLOSED) >= 0);
+    assertTrue(metrics.getContainerSyncDurationMs(DELETED) >= 0);
   }
 
   @Test
@@ -92,7 +134,7 @@ class TestReconStorageContainerSyncHelper {
     OzoneConfiguration pagedConf = new OzoneConfiguration();
     pagedConf.setLong(OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE, 2L);
     ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
-        mockScmServiceProvider, pagedConf, mockContainerManager);
+        mockScmServiceProvider, pagedConf, mockContainerManager, metrics);
 
     // Page 1: containers 1 and 2 (both missing from Recon)
     ContainerID cid1 = ContainerID.valueOf(1L);

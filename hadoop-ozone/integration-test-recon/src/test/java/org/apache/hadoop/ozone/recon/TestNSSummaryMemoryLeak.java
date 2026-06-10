@@ -240,7 +240,7 @@ public class TestNSSummaryMemoryLeak {
     // This simulates the background process that hard deletes entries
     simulateHardDelete(omMetadataManager);
     
-    // Verify cleanup after hard delete simulation.
+    // Verify memory leak fix - NSSummary entries should be cleaned up
     verifyNSSummaryCleanup(omMetadataManager, "memoryLeakTest");
     
     LOG.info("NSSummary memory leak fix test completed successfully");
@@ -309,8 +309,9 @@ public class TestNSSummaryMemoryLeak {
     
     // Simulate hard delete
     simulateHardDelete(omMetadataManager);
+    syncDataFromOM();
 
-    // Verify cleanup after hard delete simulation.
+    // Verify NSSummary cleanup
     verifyNSSummaryCleanup(omMetadataManager, "largeMemoryLeakTest");
     
     LOG.info("Large structure memory leak test completed successfully");
