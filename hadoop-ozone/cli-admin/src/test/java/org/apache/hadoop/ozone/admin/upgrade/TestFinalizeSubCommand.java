@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -67,12 +69,30 @@ public class TestFinalizeSubCommand {
 
   @Test
   public void testCommandRunsAndPrintsOutput() throws Exception {
-
     new CommandLine(cmd).parseArgs();
     cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Cluster finalization has been started"));
     verify(omClient).finalizeUpgrade();
+  }
+
+  @Test
+  public void testClientIsClosedAfterSuccessfulCall() throws Exception {
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    verify(omClient).close();
+  }
+
+  @Test
+  public void testExceptionFromServerIsPropagated() throws Exception {
+    doThrow(new IOException("OM unavailable")).when(omClient).finalizeUpgrade();
+
+    new CommandLine(cmd).parseArgs();
+    assertThrows(IOException.class, cmd::call);
+
+    // Client must still be closed even when finalizeUpgrade() throws.
+    verify(omClient).close();
   }
 }
