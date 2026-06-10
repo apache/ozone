@@ -3642,6 +3642,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    // unused, but must be defined for the interface
+  }
+
+  @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String unusedUpgradeClientId, boolean unusedTakeover, boolean unusedReadonly)
       throws IOException {
