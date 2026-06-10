@@ -72,7 +72,7 @@ class TestOMUpgradeFinalization {
   @Test
   void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.serialize());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     try (MiniOzoneHAClusterImpl cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();

@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.common.Storage;
  */
 public class SCMStorageConfig extends Storage {
 
-  public static final String TESTING_INIT_LAYOUT_VERSION_KEY = "testing.hdds.scm.init.layout.version";
+  public static final String TESTING_INIT_APPARENT_VERSION_KEY = "testing.hdds.scm.init.apparent.version";
 
   /**
    * Construct SCMStorageConfig.
@@ -47,7 +47,7 @@ public class SCMStorageConfig extends Storage {
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
     super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
-        getInitApparentVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY,
             HDDSVersion.SOFTWARE_VERSION::serialize));
   }
 
