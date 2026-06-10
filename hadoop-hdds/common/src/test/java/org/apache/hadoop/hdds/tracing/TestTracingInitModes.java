@@ -80,13 +80,11 @@ public class TestTracingInitModes {
     Service proxy = createProxy(impl, Service.class, config);
     assertThat(proxy).isNotSameAs(impl);
 
-    // No app trace active → must not start a root span.
     proxy.normalMethod();
     assertThat(impl.wasSpanActive())
         .as("application-aware client must not root-trace alone")
         .isFalse();
 
-    // App trace active → child span is created.
     Span appSpan = GlobalOpenTelemetry.get().getTracer("app").spanBuilder("app-op").startSpan();
     try (Scope ignored = appSpan.makeCurrent()) {
       impl = new ServiceImpl();
@@ -117,7 +115,6 @@ public class TestTracingInitModes {
 
     tearDown();
 
-    // Opposite: ozone tracing enabled → full OZONE mode with root spans.
     MutableConfigurationSource onConfig = conf(true, true);
     TracingUtil.initClientTracing("client", onConfig);
     assertThat(TracingUtil.shouldInstallTraceProxy(onConfig))
@@ -136,7 +133,6 @@ public class TestTracingInitModes {
 
   @Test
   public void testServiceIncomingOnlyVsOzoneRoots() throws Exception {
-    // Step 1: build a real W3C carrier in OZONE mode (must happen before INCOMING_ONLY init).
     TracingUtil.initServiceTracing("parent-export", tracingConfig(true, false));
     String parentCarrier;
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("parent")) {
@@ -147,11 +143,10 @@ public class TestTracingInitModes {
         .isNotEmpty();
     tearDown();
 
-    // Step 2: INCOMING_ONLY — reject roots, accept imported client context.
     TracingUtil.initServiceTracing("scm", tracingConfig(false, true));
     assertThat(TracingUtil.shouldInstallTraceProxy(conf(false, true)))
-        .as("incoming-only init should enable trace proxy")
-        .isTrue();
+        .as("server incoming-only alone must not wrap client RPC proxies")
+        .isFalse();
 
     assertThat(TracingUtil.importAndCreateSpan("server-op", "").getSpanContext().isValid())
         .as("incoming-only must not start root spans without client trace context")
@@ -171,7 +166,6 @@ public class TestTracingInitModes {
 
     tearDown();
 
-    // Step 3: OZONE — opposite: root spans without incoming context are allowed.
     TracingUtil.initServiceTracing("scm", tracingConfig(true, false));
     Span root = TracingUtil.importAndCreateSpan("root", null);
     assertThat(root.getSpanContext().isValid())
