@@ -103,9 +103,6 @@ public final class TracingUtil {
    */
   public static synchronized void initClientTracing(
       String serviceName, ConfigurationSource conf) {
-    if (isInit) {
-      return;
-    }
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
 
     if (tracingConfig.isClientApplicationAware() && isGlobalTracerConfigured()) {
@@ -115,6 +112,10 @@ public final class TracingUtil {
       LOG.info("Ozone client tracing is application-aware: continuing the "
           + "application's traces using the globally-registered OpenTelemetry "
           + "tracer (service={}).", serviceName);
+      return;
+    }
+
+    if (isInit) {
       return;
     }
 
@@ -239,13 +240,13 @@ public final class TracingUtil {
   }
 
   /**
-   * A trace proxy should be installed when tracing is active.
-   * This function checks if either ozone-tracing or client-aware tracing is active.
+   * True when tracing is initialized and can record or continue spans in this.
    */
+  private static boolean isTracingActive() {
+    return isInit && mode != Mode.NOOP;
+  }
+
   public static boolean shouldInstallTraceProxy(ConfigurationSource conf) {
-    if (isInit && mode != Mode.NOOP) {
-      return true;
-    }
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     if (tracingConfig.isTracingEnabled()) {
       return true;
@@ -532,7 +533,7 @@ public final class TracingUtil {
 
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
-    if (conf == null || !shouldInstallTraceProxy(conf)) {
+    if (conf == null || !(isTracingActive() || shouldInstallTraceProxy(conf))) {
       return () -> { };
     }
 
