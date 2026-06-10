@@ -51,17 +51,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         OzoneConsts.APPARENT_VERSION_KEY, String.valueOf(versionManager.getApparentVersion().serialize()));
   }
 
-  @Override
-  public void setUpgradeContext(SCMUpgradeFinalizationContext context) {
-    // Retained for compile compatibility with SCMUpgradeFinalizer until it is removed in a follow-up PR.
-  }
-
-  @Override
-  public void finalizeLayoutFeatures(Integer toLayoutVersion) throws IOException {
-    throw new UnsupportedOperationException(
-        "Layout feature finalization was removed; use finalizeUpgrade() instead.");
-  }
-
   /**
    * Called on snapshot installation, which is coordinated by Ratis.
    */

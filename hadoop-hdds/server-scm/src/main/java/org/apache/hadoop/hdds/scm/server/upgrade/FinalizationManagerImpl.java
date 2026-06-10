@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -26,17 +25,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 /**
  * Class to initiate SCM finalization and query its progress.
  */
-public class FinalizationManagerImpl implements FinalizationManager {
+public final class FinalizationManagerImpl implements FinalizationManager {
   private final FinalizationStateManager finalizationStateManager;
-
-  /**
-   * For test classes to inject their own state manager.
-   */
-  @VisibleForTesting
-  protected FinalizationManagerImpl(Builder builder,
-      FinalizationStateManager stateManager) throws IOException {
-    this.finalizationStateManager = stateManager;
-  }
 
   private FinalizationManagerImpl(Builder builder) throws IOException {
     this.finalizationStateManager = new FinalizationStateManagerImpl.Builder()
