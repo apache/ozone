@@ -699,5 +699,22 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       return Long.compare(this.containerId, other.containerId);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      RecoveringContainer that = (RecoveringContainer) o;
+      return timeout == that.timeout && containerId == that.containerId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(timeout, containerId);
+    }
   }
 }
