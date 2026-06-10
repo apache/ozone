@@ -21,14 +21,14 @@
 
 load ozone-functions_test_helper
 
-@test "HTTP request logger: client default is propagated to OZONE_OPTS" {
-  export OZONE_HTTP_REQUEST_LOGGER="INFO,console"
+@test "HTTP request logger: value is propagated to OZONE_OPTS" {
+  export OZONE_HTTP_REQUEST_LOGGER="ERROR,console"
   export OZONE_OPTS=""
 
   ozone_finalize_opts
 
   echo "$OZONE_OPTS"
-  [[ "$OZONE_OPTS" =~ "-Dozone.http.request.logger=INFO,console" ]]
+  [[ "$OZONE_OPTS" =~ "-Dozone.http.request.logger=ERROR,console" ]]
 }
 
 @test "HTTP request logger: defaults are set by ozone_basic_init" {
