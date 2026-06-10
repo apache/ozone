@@ -1258,6 +1258,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         try {
           KeyValidate kv = validationQueue.poll(5, TimeUnit.SECONDS);
           if (kv != null) {
+            long validationStartTime = System.nanoTime();
             try (OzoneInputStream is = kv.bucket.readKey(kv.keyName)) {
               dig.getMessageDigest().reset();
               byte[] curDigest = dig.digest(is);
@@ -1271,6 +1272,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
                 LOG.warn("Expected checksum: {}, Actual checksum: {}",
                     kv.digest, curDigest);
               }
+              keyReadTime.addAndGet(System.nanoTime() - validationStartTime);
             }
           }
         } catch (IOException ex) {
