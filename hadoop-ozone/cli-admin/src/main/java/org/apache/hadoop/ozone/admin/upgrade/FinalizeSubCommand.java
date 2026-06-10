@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
 /**
- * Handler for the ozone admin upgrade finalize command
+ * Handler for the ozone admin upgrade finalize command.
  */
 @CommandLine.Command(
     name = "finalize",
