@@ -26,9 +26,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provider;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -38,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -53,7 +49,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,25 +219,15 @@ public class TestUnhealthyContainersDerbyPerformance {
   private String inMemoryDbName;
 
   /**
-   * Initialises the embedded Derby database and creates the Recon schema.
+   * Initialises the embedded in-memory Derby database and creates the Recon schema.
    * Data population is done in dedicated test methods.
    *
-   * <p>The {@code @TempDir} is injected as a <em>method parameter</em> rather
-   * than a class field.  With {@code @TestInstance(PER_CLASS)}, a field-level
-   * {@code @TempDir} is populated by JUnit's {@code TempDirExtension} in its
-   * own {@code beforeAll} callback, which may run <em>after</em> the user's
-   * {@code @BeforeAll} — leaving it null when needed here.  A method
-   * parameter is resolved by JUnit before the method body executes.</p>
-   *
-   * <h3>Performance settings applied here</h3>
-   * <ul>
-   *   <li><b>In-memory database</b>: The test uses an in-memory Derby database
-   *       ({@code jdbc:derby:memory:...}) to eliminate disk I/O and fsync overhead
-   *       during the 1-million-row benchmark.</li>
-   * </ul>
+   * <p>Uses {@code jdbc:derby:memory:...} to keep all 1M rows in RAM and eliminate
+   * disk I/O (fsync) overhead across the benchmark's insert, replace, and delete
+   * transactions.</p>
    */
   @BeforeAll
-  public void setUpDatabase(@TempDir Path tempDir) throws Exception {
+  public void setUpDatabase() throws Exception {
     inMemoryDbName = "reconPerf_" + java.util.UUID.randomUUID().toString();
     LOG.info("=== Derby Performance Benchmark — Setup ===");
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
