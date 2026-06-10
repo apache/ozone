@@ -897,19 +897,6 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  public boolean syncWithSCMContainerInfo() {
-    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      try {
-        return runScmContainerSyncWithMetrics();
-      } finally {
-        isSyncDataFromSCMRunning.compareAndSet(true, false);
-      }
-    } else {
-      LOG.debug("SCM DB sync is already running.");
-      return false;
-    }
-  }
-
   private boolean runScmContainerSyncWithMetrics() {
     long startTime = Time.monotonicNow();
     containerSyncMetrics.setScmContainerSyncStatus(

@@ -187,7 +187,7 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
       metrics.put(state, Interns.info(
           CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, stateName)
               + "ContainerCountDrift",
-          "Container count drift observed at start of sync pass "
+          "Last successfully observed container count drift at start of sync pass "
               + "(SCM count minus Recon count for " + stateName + " state)."));
     }
     return Collections.unmodifiableMap(metrics);
