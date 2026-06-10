@@ -96,10 +96,6 @@ public abstract class AbstractContainerSafeModeRuleTest {
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
     assertEquals(2, rule.getTotalNumberOfContainers(), "Total number of containers should be 2");
-    containers.add(mockContainer(LifeCycleState.CLOSED, 2L));
-    containers.add(mockContainer(LifeCycleState.OPEN, 3L));
-    containers.add(mockContainer(LifeCycleState.CLOSED, 4L));
-    containers.removeIf(c -> c.containerID().equals(ContainerID.valueOf(8L)));
     deletedContainers.add(mockContainer(LifeCycleState.DELETED, 8L));
     rule.refresh(true);
 
