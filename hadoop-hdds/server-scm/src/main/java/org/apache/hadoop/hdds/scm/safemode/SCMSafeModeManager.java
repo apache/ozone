@@ -134,7 +134,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (!enabled) {
       return;
     }
-    final String name = "safemode-refreshing(" + refreshIntervalMs + "ms)-thread";
+    final String name = "safemode-refresh-thread";
     final Thread t = new Thread(() -> {
       try {
         while (getInSafeMode()) {

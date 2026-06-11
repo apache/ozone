@@ -60,10 +60,10 @@ public abstract class AbstractContainerSafeModeRuleTest {
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
-    final ContainerManager containerManager = mock(ContainerManager.class);
-    final ConfigurationSource conf = mock(ConfigurationSource.class);
-    final EventQueue eventQueue = mock(EventQueue.class);
-    SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    containerManager = mock(ContainerManager.class);
+    conf = mock(ConfigurationSource.class);
+    eventQueue = mock(EventQueue.class);
+    safeModeManager = mock(SCMSafeModeManager.class);
     final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
