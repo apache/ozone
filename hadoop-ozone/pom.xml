@@ -27,6 +27,7 @@
   <modules>
     <module>cli-admin</module>
     <module>cli-debug</module>
+    <module>cli-interactive</module>
     <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>

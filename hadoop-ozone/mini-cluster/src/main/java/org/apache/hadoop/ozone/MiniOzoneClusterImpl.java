@@ -245,7 +245,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -256,7 +256,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -710,6 +710,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
           localhostWithFreePort());
+      // Bind SCM servers to 127.0.0.1 instead of the default 0.0.0.0.
+      // Without this, the bind address (0.0.0.0) leaks into OZONE_SCM_NAMES
+      // via updateListenAddress/getSCMAddresses, causing DataNodes to connect
+      // to 0.0.0.0 which gets routed to unreachable addresses on VPN.
+      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "127.0.0.1");
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());

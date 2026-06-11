@@ -22,7 +22,6 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -118,17 +117,21 @@ public final class DiskBalancerVolumeCalculation {
     }
     
     try {
-      // If there is only one volume, return 0.0 as there's no imbalance to measure
-      if (volumeSet.size() <= 1) {
+      final List<VolumeFixedUsage> usableVolumes = volumeSet.stream()
+          .filter(v -> v.getUsage().getCapacity() > 0)
+          .collect(Collectors.toList());
+
+      // If there is only one usable volume, return 0.0 as there's no imbalance to measure
+      if (usableVolumes.size() <= 1) {
         return 0.0;
       }
 
       // Calculate ideal usage using the same immutable volume snapshot
-      final double idealUsage = getIdealUsage(volumeSet);
+      final double idealUsage = getIdealUsage(usableVolumes);
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot
-      for (VolumeFixedUsage volumeUsage : volumeSet) {
+      for (VolumeFixedUsage volumeUsage : usableVolumes) {
         final double currentUsage = volumeUsage.getUtilization();
 
         // Calculate density as absolute difference from ideal usage
@@ -163,13 +166,15 @@ public final class DiskBalancerVolumeCalculation {
     private final HddsVolume volume;
     private final SpaceUsageSource.Fixed usage;
     private final long effectiveUsed;
-    private final Double utilization;
+    private final double utilization;
 
     private VolumeFixedUsage(HddsVolume volume, long delta) {
       this.volume = volume;
       this.usage = volume.getCurrentUsage();
       this.effectiveUsed = computeEffectiveUsage(usage, volume.getCommittedBytes(), delta);
-      this.utilization = usage.getCapacity() > 0 ? computeUtilization(usage, volume.getCommittedBytes(), delta) : null;
+      this.utilization = usage.getCapacity() > 0
+          ? computeUtilization(usage, volume.getCommittedBytes(), delta)
+          : 0.0;
     }
 
     public HddsVolume getVolume() {
@@ -185,7 +190,7 @@ public final class DiskBalancerVolumeCalculation {
     }
 
     public double getUtilization() {
-      return Objects.requireNonNull(utilization,  "utilization == null");
+      return utilization;
     }
 
     public long computeUsableSpace() {

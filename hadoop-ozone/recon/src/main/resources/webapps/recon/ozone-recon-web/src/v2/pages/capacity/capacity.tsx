@@ -38,9 +38,9 @@ import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/capacity.constants';
 import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
-  isDNPending: boolean;
   lastUpdated: number;
 };
 
@@ -51,7 +51,6 @@ const Capacity: React.FC<object> = () => {
   const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
   const [state, setState] = React.useState<CapacityState>({
-    isDNPending: true,
     lastUpdated: 0
   });
 
@@ -87,7 +86,6 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_DN_PENDING_DELETION,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -108,20 +106,23 @@ const Capacity: React.FC<object> = () => {
     omPendingDeletes.refetch();
     dnPendingDeletes.refetch();
     setState({
-      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
       lastUpdated: Number(moment())
     })
   }
 
-  const loadDNData = () => {
-    dnPendingDeletes.refetch();
-    setState({
-      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
-      lastUpdated: Number(moment())
-    })
-  } 
+  const loadDataIfIdle = () => {
+    if (
+      storageDistribution.loading ||
+      scmPendingDeletes.loading ||
+      omPendingDeletes.loading ||
+      dnPendingDeletes.loading
+    ) {
+      return;
+    }
+    loadData();
+  };
 
-  const autoReload = useAutoReload(loadDNData, PENDING_POLL_INTERVAL);
+  const autoReload = useAutoReload(loadDataIfIdle);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
@@ -192,24 +193,19 @@ const Capacity: React.FC<object> = () => {
     }
   };
 
-  // Poll every 5s until status is FINISHED, then stop
+  // Adjust the polling interval based on DN scan status:
+  // fast (5s) while a scan is running, normal (60s) once finished.
+  // Honors the auto-reload toggle: if polling is OFF, do nothing.
   React.useEffect(() => {
-    if (dnPendingDeletes.data.status !== "FINISHED") {
-      if (!autoReload.isPolling) {
-        autoReload.startPolling(PENDING_POLL_INTERVAL);
-      }
+    if (!autoReload.isPolling) {
       return;
     }
-
-    if (autoReload.isPolling) {
-      autoReload.stopPolling();
-    }
-  }, [
-    dnPendingDeletes.data.status,
-    autoReload.isPolling,
-    autoReload.startPolling,
-    autoReload.stopPolling
-  ]);
+    autoReload.startPolling(
+      dnPendingDeletes.data.status === "FINISHED"
+        ? AUTO_RELOAD_INTERVAL_DEFAULT
+        : PENDING_POLL_INTERVAL
+    );
+  }, [dnPendingDeletes.data.status, autoReload.isPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
@@ -303,6 +299,16 @@ const Capacity: React.FC<object> = () => {
     </span>
   );
 
+  const hasSCMPendingDeletionError = (
+    scmPendingDeletes.data.totalBlocksize < 0
+    || scmPendingDeletes.data.totalReplicatedBlockSize < 0
+    || scmPendingDeletes.data.totalBlocksCount < 0
+  );
+
+  const scmReplicatedPendingDeletionSize = hasSCMPendingDeletionError
+    ? 0
+    : scmPendingDeletes.data.totalReplicatedBlockSize;
+
   return (
     <>
       <div className='page-header-v2'>
@@ -381,7 +387,7 @@ const Capacity: React.FC<object> = () => {
             ),
             value: (
               omPendingDeletes.data.totalSize
-              + scmPendingDeletes.data.totalReplicatedBlockSize
+              + scmReplicatedPendingDeletionSize
               + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
             ),
             color: "#10073b"
@@ -406,7 +412,10 @@ const Capacity: React.FC<object> = () => {
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: scmPendingDeletes.data.totalReplicatedBlockSize,
+              size: hasSCMPendingDeletionError ? 0 : scmPendingDeletes.data.totalReplicatedBlockSize,
+              hasError: hasSCMPendingDeletionError,
+              errorMessage: 'SCM pending deletion details are currently unavailable.',
+              errorTestId: 'pending-deletion-scm-error',
               breakdown: [{
                 label: 'BLOCKS',
                 value: scmPendingDeletes.data.totalReplicatedBlockSize,

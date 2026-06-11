@@ -27,10 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.core.UriBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.AdminOnly;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAdminFilter;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAuthFilter;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.jersey.internal.inject.InjectionManager;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -54,6 +56,8 @@ public class ReconRestServletModule extends ServletModule {
       "v1").build().toString();
   public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
+  public static final String CHATBOT_API_PACKAGE = "org.apache.hadoop.ozone.recon.chatbot.api";
+
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconRestServletModule.class);
 
@@ -65,7 +69,12 @@ public class ReconRestServletModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    configureApi(BASE_API_PATH, API_PACKAGE);
+    if (conf instanceof OzoneConfiguration
+        && ChatbotConfigKeys.isChatbotEnabled((OzoneConfiguration) conf)) {
+      configureApi(BASE_API_PATH, API_PACKAGE, CHATBOT_API_PACKAGE);
+    } else {
+      configureApi(BASE_API_PATH, API_PACKAGE);
+    }
   }
 
   private void configureApi(String baseApiPath, String... packages) {
@@ -117,7 +126,7 @@ public class ReconRestServletModule extends ServletModule {
 
       boolean authorizationEnabled = OzoneSecurityUtil.isAuthorizationEnabled(conf);
       if (authorizationEnabled) {
-        for (String path: adminSubPaths) {
+        for (String path : adminSubPaths) {
           String adminPath =
               UriBuilder.fromPath(basePath).path(path + "*").build().toString();
           filter(adminPath).through(ReconAdminFilter.class);
