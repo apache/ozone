@@ -48,12 +48,12 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,18 +244,65 @@ public class TestUnhealthyContainersDerbyPerformance {
 
     // Reuse DerbyDataSourceConfigurationProvider settings but point to an in-memory DB.
     Provider<DataSourceConfiguration> configProvider = () -> new DataSourceConfiguration() {
-      @Override public String getDriverClass() { return base.getDriverClass(); }
-      @Override public String getJdbcUrl() { return "jdbc:derby:memory:" + inMemoryDbName; }
-      @Override public String getUserName() { return base.getUserName(); }
-      @Override public String getPassword() { return base.getPassword(); }
-      @Override public boolean setAutoCommit() { return base.setAutoCommit(); }
-      @Override public long getConnectionTimeout() { return base.getConnectionTimeout(); }
-      @Override public String getSqlDialect() { return base.getSqlDialect(); }
-      @Override public Integer getMaxActiveConnections() { return base.getMaxActiveConnections(); }
-      @Override public long getMaxConnectionAge() { return base.getMaxConnectionAge(); }
-      @Override public long getMaxIdleConnectionAge() { return base.getMaxIdleConnectionAge(); }
-      @Override public String getConnectionTestStatement() { return base.getConnectionTestStatement(); }
-      @Override public long getIdleConnectionTestPeriod() { return base.getIdleConnectionTestPeriod(); }
+      @Override
+      public String getDriverClass() {
+        return base.getDriverClass();
+      }
+
+      @Override
+      public String getJdbcUrl() {
+        return "jdbc:derby:memory:" + inMemoryDbName;
+      }
+
+      @Override
+      public String getUserName() {
+        return base.getUserName();
+      }
+
+      @Override
+      public String getPassword() {
+        return base.getPassword();
+      }
+
+      @Override
+      public boolean setAutoCommit() {
+        return base.setAutoCommit();
+      }
+
+      @Override
+      public long getConnectionTimeout() {
+        return base.getConnectionTimeout();
+      }
+
+      @Override
+      public String getSqlDialect() {
+        return base.getSqlDialect();
+      }
+
+      @Override
+      public Integer getMaxActiveConnections() {
+        return base.getMaxActiveConnections();
+      }
+
+      @Override
+      public long getMaxConnectionAge() {
+        return base.getMaxConnectionAge();
+      }
+
+      @Override
+      public long getMaxIdleConnectionAge() {
+        return base.getMaxIdleConnectionAge();
+      }
+
+      @Override
+      public String getConnectionTestStatement() {
+        return base.getConnectionTestStatement();
+      }
+
+      @Override
+      public long getIdleConnectionTestPeriod() {
+        return base.getIdleConnectionTestPeriod();
+      }
     };
 
     Injector injector = Guice.createInjector(
@@ -282,7 +329,7 @@ public class TestUnhealthyContainersDerbyPerformance {
     if (inMemoryDbName != null) {
       try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
           "jdbc:derby:memory:" + inMemoryDbName + ";drop=true")) {
-        // Database is dropped when this connection closes.
+        conn.isValid(1);
       } catch (java.sql.SQLException e) {
         if (!"08006".equals(e.getSQLState())) {
           LOG.warn("Unexpected SQLState while dropping in-memory Derby DB: {}", e.getSQLState(), e);
