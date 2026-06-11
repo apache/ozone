@@ -171,6 +171,12 @@ public class TestSCMSafeModeManager {
 
   @Test
   public void testSafeModeExitWithPeriodicContainerRuleRefresh() throws Exception {
+    /*
+     * Start SCM with 5 closed Ratis containers.
+     * Mark 2 containers as deleted in ContainerManager.
+     * Wait until the rule’s total drops from 5 to 3.
+     * Fires DN reports and checks safemode exits using the refreshed count.
+     */
     config.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "100ms");
 
     List<ContainerInfo> ratisContainers = new ArrayList<>();
@@ -197,14 +203,13 @@ public class TestSCMSafeModeManager {
     assertEquals(5, ratisRule.getTotalNumberOfContainers(),
         "initial Ratis container count from ContainerManager");
 
-    ratisContainers.addAll(HddsTestUtils.getContainerInfo(5));
-    for (int i = 5; i < ratisContainers.size(); i++) {
-      ratisContainers.get(i).setState(HddsProtos.LifeCycleState.CLOSED);
+    for (int i = 3; i < ratisContainers.size(); i++) {
+      ratisContainers.get(i).setState(HddsProtos.LifeCycleState.DELETED);
       ratisContainers.get(i).setNumberOfKeys(10);
     }
 
     GenericTestUtils.waitFor(
-        () -> ratisRule.getTotalNumberOfContainers() == 10,
+        () -> ratisRule.getTotalNumberOfContainers() == 3,
         100,
         15000);
 
@@ -213,7 +218,7 @@ public class TestSCMSafeModeManager {
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, report);
     queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, report);
 
-    long cutOff = (long) Math.ceil(10 * config.getDouble(
+    long cutOff = (long) Math.ceil(3 * config.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT));
 
