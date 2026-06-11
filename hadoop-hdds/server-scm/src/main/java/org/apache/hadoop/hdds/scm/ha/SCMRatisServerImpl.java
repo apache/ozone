@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -222,13 +221,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public void registerStateMachineHandler(final RequestType handlerType,
-                                          final Object handler) {
-    if (handler instanceof ScmInvoker) {
-      stateMachine.registerInvoker(handlerType, (ScmInvoker) handler);
-    } else {
-      stateMachine.registerHandler(handlerType, handler);
-    }
+  public void registerStateMachineHandler(final ScmInvoker<?> handler) {
+    stateMachine.registerInvoker(handler.getType(), handler);
   }
 
   @Override

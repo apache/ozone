@@ -45,10 +45,13 @@ import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
 import * as CONSTANTS from '@/v2/constants/overview.constants';
 
 import {
+  Container,
   ContainersPaginationResponse,
   ContainerState,
   ExpandedRow,
   ExportJob,
+  QuasiClosedContainer,
+  QuasiClosedContainersResponse,
   TabPaginationState,
 } from "@/v2/types/container.types";
 import { ClusterStateResponse } from "@/v2/types/overview.types";
@@ -64,6 +67,8 @@ const TAB_STATE_MAP: Record<string, string> = {
   '3': 'OVER_REPLICATED',
   '4': 'MIS_REPLICATED',
   '5': 'REPLICA_MISMATCH',
+  // '6' (Quasi Closed) intentionally absent — it uses /quasiClosed, not /unhealthy/:state
+  // '7' (Export) intentionally absent — it has no container data to fetch
 };
 
 const EXPORT_STATE_OPTIONS = [
@@ -99,6 +104,26 @@ const DEFAULT_TAB_STATE: TabPaginationState = {
 
 const POLL_INTERVAL_MS = 3000;
 
+/**
+ * Maps a QuasiClosedContainer (from the /quasiClosed API) to the shared
+ * Container type so it can be displayed in the existing ContainerTable.
+ * Explicit field mapping ensures TypeScript catches any upstream renames.
+ */
+function toContainer(qc: QuasiClosedContainer): Container {
+  return {
+    containerID: qc.containerID,
+    pipelineID: qc.pipelineID,
+    keys: qc.keys,
+    containerState: 'QUASI_CLOSED',
+    unhealthySince: qc.stateEnterTime,
+    expectedReplicaCount: qc.expectedReplicaCount,
+    actualReplicaCount: qc.actualReplicaCount,
+    replicaDeltaCount: qc.actualReplicaCount - qc.expectedReplicaCount,
+    reason: '',
+    replicas: qc.replicas,
+  };
+}
+
 const Containers: React.FC<{}> = () => {
   const [state, setState] = useState<ContainerState>({
     lastUpdated: 0,
@@ -109,6 +134,7 @@ const Containers: React.FC<{}> = () => {
     overReplicatedCount: 0,
     misReplicatedCount: 0,
     replicaMismatchCount: 0,
+    quasiClosedCount: 0,
   });
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [tabStates, setTabStates] = useState<Record<string, TabPaginationState>>({
@@ -117,6 +143,7 @@ const Containers: React.FC<{}> = () => {
     '3': { ...DEFAULT_TAB_STATE },
     '4': { ...DEFAULT_TAB_STATE },
     '5': { ...DEFAULT_TAB_STATE },
+    '6': { ...DEFAULT_TAB_STATE },
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
@@ -179,7 +206,7 @@ const Containers: React.FC<{}> = () => {
 
   // Start polling when Export tab is active; stop when leaving if no active jobs.
   useEffect(() => {
-    if (selectedTab === '6') {
+    if (selectedTab === '7') {
       startPolling();
     } else {
       const hasActive = exportJobs.some(
@@ -272,14 +299,78 @@ const Containers: React.FC<{}> = () => {
   };
 
   // ── Container data fetching ───────────────────────────────────────────────
+
+  // Fetches the quasi-closed count independently to populate Highlights on page load.
+  const fetchQuasiClosedCount = async () => {
+    try {
+      const response = await fetchData<QuasiClosedContainersResponse>(
+        '/api/v1/containers/quasiClosed',
+        'GET',
+        { limit: 0, minContainerId: 0 }
+      );
+      setState(prev => ({
+        ...prev,
+        quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
+      }));
+    } catch (_) {
+      // Non-critical: count stays 0 until the tab is opened.
+    }
+  };
+
   const fetchTabData = async (
     tabKey: string,
     minContainerId: number,
     currentPageSize: number
   ) => {
-    const containerStateName = TAB_STATE_MAP[tabKey];
-    if (!containerStateName) return; // skip Export tab (key='6') or unknown keys
     const fetchSize = currentPageSize + 1;
+
+    if (tabKey === '6') {
+      // Quasi-closed uses its own dedicated in-memory endpoint, not /unhealthy/:state.
+      setTabStates(prev => ({
+        ...prev,
+        [tabKey]: { ...prev[tabKey], loading: true },
+      }));
+      try {
+        const response = await fetchData<QuasiClosedContainersResponse>(
+          '/api/v1/containers/quasiClosed',
+          'GET',
+          { limit: fetchSize, minContainerId }
+        );
+        const allContainers = response.containers ?? [];
+        const hasNextPage = allContainers.length > currentPageSize;
+        const pageContainers = allContainers.slice(0, currentPageSize);
+        const mapped: Container[] = pageContainers.map(toContainer);
+        const lastKey = mapped.length > 0 ? Math.max(...mapped.map(c => c.containerID)) : 0;
+        const firstKey = mapped.length > 0 ? Math.min(...mapped.map(c => c.containerID)) : 0;
+        setTabStates(prev => ({
+          ...prev,
+          [tabKey]: {
+            ...prev[tabKey],
+            data: mapped,
+            loading: false,
+            firstKey,
+            lastKey,
+            currentMinContainerId: minContainerId,
+            hasNextPage,
+          },
+        }));
+        setState(prev => ({
+          ...prev,
+          quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
+          lastUpdated: Number(moment()),
+        }));
+      } catch (error) {
+        setTabStates(prev => ({
+          ...prev,
+          [tabKey]: { ...prev[tabKey], loading: false },
+        }));
+        showDataFetchError(error);
+      }
+      return;
+    }
+
+    const containerStateName = TAB_STATE_MAP[tabKey];
+    if (!containerStateName) return; // skips tab '7' (Export) and any unknown keys
 
     setTabStates(prev => ({
       ...prev,
@@ -318,11 +409,11 @@ const Containers: React.FC<{}> = () => {
 
       setState(prev => ({
         ...prev,
-        missingCount: response.missingCount ?? 0,
-        underReplicatedCount: response.underReplicatedCount ?? 0,
-        overReplicatedCount: response.overReplicatedCount ?? 0,
-        misReplicatedCount: response.misReplicatedCount ?? 0,
-        replicaMismatchCount: response.replicaMismatchCount ?? 0,
+        missingCount: response.missingCount ?? prev.missingCount,
+        underReplicatedCount: response.underReplicatedCount ?? prev.underReplicatedCount,
+        overReplicatedCount: response.overReplicatedCount ?? prev.overReplicatedCount,
+        misReplicatedCount: response.misReplicatedCount ?? prev.misReplicatedCount,
+        replicaMismatchCount: response.replicaMismatchCount ?? prev.replicaMismatchCount,
         lastUpdated: Number(moment()),
       }));
     } catch (error) {
@@ -336,6 +427,7 @@ const Containers: React.FC<{}> = () => {
 
   useEffect(() => {
     fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
+    fetchQuasiClosedCount();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleColumnChange(selected: ValueType<Option, true>) {
@@ -344,7 +436,7 @@ const Containers: React.FC<{}> = () => {
 
   function handleTabChange(key: string) {
     setSelectedTab(key);
-    if (key !== '6' && tabStates[key]?.data.length === 0 && !tabStates[key]?.loading) {
+    if (key !== '7' && tabStates[key]?.data.length === 0 && !tabStates[key]?.loading) {
       fetchTabData(key, 0, pageSize);
     }
   }
@@ -382,6 +474,7 @@ const Containers: React.FC<{}> = () => {
       '3': { ...DEFAULT_TAB_STATE },
       '4': { ...DEFAULT_TAB_STATE },
       '5': { ...DEFAULT_TAB_STATE },
+      '6': { ...DEFAULT_TAB_STATE },
     };
     setTabStates(reset);
     fetchTabData(selectedTab, 0, newSize);
@@ -394,8 +487,10 @@ const Containers: React.FC<{}> = () => {
       '3': { ...DEFAULT_TAB_STATE },
       '4': { ...DEFAULT_TAB_STATE },
       '5': { ...DEFAULT_TAB_STATE },
+      '6': { ...DEFAULT_TAB_STATE },
     });
     fetchTabData(selectedTab, 0, pageSize);
+    fetchQuasiClosedCount();
     clusterState.refetch();
   };
 
@@ -410,6 +505,7 @@ const Containers: React.FC<{}> = () => {
     overReplicatedCount,
     misReplicatedCount,
     replicaMismatchCount,
+    quasiClosedCount,
   } = state;
 
   const currentTabState = tabStates[selectedTab] ?? DEFAULT_TAB_STATE;
@@ -606,6 +702,10 @@ const Containers: React.FC<{}> = () => {
         Mismatched Replicas <br/>
         <span className='highlight-content-value'>{replicaMismatchCount ?? 'N/A'}</span>
       </div>
+      <div className='highlight-content'>
+        Quasi Closed <br/>
+        <span className='highlight-content-value'>{quasiClosedCount ?? 'N/A'}</span>
+      </div>
     </div>
   );
 
@@ -681,9 +781,54 @@ const Containers: React.FC<{}> = () => {
               </Tabs.TabPane>
             ))}
 
+            {/* ── Quasi-Closed tab ──────────────────────────────────────── */}
+            <Tabs.TabPane key='6' tab='Quasi Closed'>
+              <div className='table-header-section'>
+                <div className='table-filter-section'>
+                  <MultiSelect
+                    options={columnOptions}
+                    defaultValue={selectedColumns}
+                    selected={selectedColumns}
+                    placeholder='Columns'
+                    onChange={handleColumnChange}
+                    fixedColumn='containerID'
+                    onTagClose={() => {}}
+                    columnLength={columnOptions.length} />
+                </div>
+                <Search
+                  disabled={tabStates['6'].data.length === 0}
+                  searchOptions={SearchableColumnOpts}
+                  searchInput={searchTerm}
+                  searchColumn={searchColumn}
+                  onSearchChange={
+                    (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+                  }
+                  onChange={(value) => {
+                    setSearchTerm('');
+                    setSearchColumn(value as 'containerID' | 'pipelineID');
+                  }} />
+              </div>
+              <ContainerTable
+                data={tabStates['6'].data}
+                loading={tabStates['6'].loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+                onNextPage={() => handleNextPage('6')}
+                onPrevPage={() => handlePrevPage('6')}
+                hasNextPage={tabStates['6'].hasNextPage}
+                hasPrevPage={tabStates['6'].pageHistory.length > 0}
+                pageSize={pageSize}
+                onPageSizeChange={handlePageSizeChange}
+                sinceColumnTitle='State Enter Time'
+              />
+            </Tabs.TabPane>
+
             {/* ── Export tab ────────────────────────────────────────────── */}
             <Tabs.TabPane
-              key='6'
+              key='7'
               tab={
                 <span>
                   <ExportOutlined />

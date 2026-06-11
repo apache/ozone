@@ -218,11 +218,9 @@
   </property>
   <property>
     <name>hdds.datanode.disk.balancer.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, DATANODE, DISKBALANCER</tag>
-    <description>If this property is set to true, then the Disk Balancer
-      feature is enabled on Datanodes, and users can use
-      this service. By default, this is disabled.
+    <description>By default Disk Balancer feature is enabled on Datanodes.
     </description>
   </property>
   <property>
@@ -431,7 +429,7 @@
   <property>
     <name>ozone.block.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Time interval of the block deleting service.
       The block deleting service runs on each datanode periodically and
       deletes blocks queued for deletion. Unit could be defined with
@@ -441,7 +439,7 @@
   <property>
     <name>ozone.block.deleting.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>A timeout value of block deletion service. If this is set
       greater than 0,
       the service will stop waiting for the block deleting completion after this
@@ -454,7 +452,7 @@
   <property>
     <name>ozone.block.deleting.service.workers</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Number of workers executed of block deletion service. This
       configuration should be set to greater than 0.
     </description>
@@ -496,7 +494,7 @@
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>50000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
       per time interval in OM. Those keys are sent to delete metadata and
@@ -507,7 +505,7 @@
   <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       The maximum number of deleted keys to be scanned by Snapshot
       Deleting Service per snapshot run.
@@ -706,7 +704,7 @@
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
     <value>20000</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.
     </description>
@@ -793,7 +791,7 @@
   <property>
     <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
     <value>8</value>
-    <tag>OZONE, SCM</tag>
+    <tag>OZONE, SCM, DELETION</tag>
     <description>
       Factor with which number of delete blocks sent to each datanode in every interval.
       If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
@@ -910,7 +908,7 @@
   <property>
     <name>ozone.scm.keyvalue.container.deletion-choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy</value>
-    <tag>OZONE, MANAGEMENT</tag>
+    <tag>OZONE, MANAGEMENT, DELETION</tag>
     <description>
       The policy used for choosing desired keyvalue containers for block deletion.
       Datanode selects some containers to process block deletion
@@ -1035,6 +1033,17 @@
       creates less SCM metadata, but recovery time will be more. 5GB is a number
       that maps to quick replication times in gigabit networks, but still
       balances the amount of metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pending.container.roll.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The interval at which the two-window tumbling bucket for pending
+      container allocations rolls over per DataNode. Pending containers
+      that have not been confirmed within two intervals are automatically
+      aged out. Default is 5 minutes.
     </description>
   </property>
   <property>
@@ -3516,24 +3525,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.scm.connection.request.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection request timeout in milliseconds for HTTP call made by Recon to
-      request SCM DB snapshot.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.connection.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection timeout for HTTP call in milliseconds made by Recon to request
-      SCM snapshot.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.scmclient.rpc.timeout</name>
     <value>1m</value>
     <tag>OZONE, RECON, SCM</tag>
@@ -3625,11 +3616,11 @@
   </property>
   <property>
     <name>ozone.recon.scm.container.threshold</name>
-    <value>100</value>
+    <value>1000000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
-      Threshold value for the difference in number of containers
-      in SCM and RECON.
+      Container-count drift threshold used during initial SCM DB setup to decide
+      whether Recon should refresh from an SCM snapshot before serving requests.
     </description>
   </property>
   <property>
@@ -3675,6 +3666,16 @@
     <description>
       Maximum time taken for the api to complete.
       If it exceeds pending tasks will be cancelled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.thread.count</name>
+    <value>0</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Size of the thread pool Recon uses to collect JMX metrics from DataNodes.
+      A value of 0 (or any non-positive value) means "auto" and selects
+      2 x Runtime.availableProcessors() at startup.
     </description>
   </property>
   <property>
@@ -3915,7 +3916,7 @@
   <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the directory deleting service. It runs on OM
       periodically and cleanup orphan directory and its sub-tree. For every
       orphan directory it deletes the sub-path tree structure(dirs/files). It
@@ -3926,7 +3927,7 @@
   <property>
     <name>ozone.snapshot.filtering.limit.per.task</name>
     <value>2</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A maximum number of snapshots to be filtered by
       sst filtering service per time interval.
     </description>
@@ -3934,7 +3935,7 @@
   <property>
     <name>ozone.snapshot.deleting.limit.per.task</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>The maximum number of snapshots that would be reclaimed by
       Snapshot Deleting Service per run.
     </description>
@@ -3950,7 +3951,7 @@
   <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
     </description>
   </property>
@@ -3973,14 +3974,14 @@
   <property>
     <name>ozone.sst.filtering.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE,OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A timeout value of sst filtering service.
     </description>
   </property>
   <property>
     <name>ozone.snapshot.defrag.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE,OM</tag>
+    <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Timeout value of a run of snapshot defragmentation service.
     </description>
   </property>
@@ -4008,7 +4009,7 @@
   <property>
     <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Timeout value for SnapshotDeletingService.
     </description>
@@ -4017,7 +4018,7 @@
   <property>
     <name>ozone.snapshot.deleting.service.interval</name>
     <value>30s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       The time interval between successive SnapshotDeletingService
       thread run.
@@ -4045,8 +4046,8 @@
 
   <property>
     <name>ozone.snapshot.deep.cleaning.enabled</name>
-    <value>false</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <value>true</value>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Flag to enable/disable snapshot deep cleaning.
     </description>
@@ -4218,12 +4219,6 @@
     <description>The duration at which we periodically fetch the updated network
       topology cluster tree from SCM.
     </description>
-  </property>
-  <property>
-    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
-    <value>1024</value>
-    <tag>SCM, OZONE</tag>
-    <description>Raft snapshot gap index after which snapshot can be taken.</description>
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
@@ -4411,8 +4406,9 @@
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
-      Ozone namespace should follow S3 naming rule by default.
-      However this parameter allows the namespace to support non-S3 compatible characters.
+      When `true` (the default), volume and bucket names follow strict S3 naming rules.
+      When `false`, S3 rules still apply except that underscore (`_`) is additionally
+      allowed in volume and bucket names; no other non-S3 characters are permitted.
     </description>
   </property>
 
@@ -4607,20 +4603,34 @@
   </property>
 
   <property>
-    <name>ozone.recon.scm.snapshot.task.initial.delay</name>
+    <name>ozone.recon.scm.container.sync.task.initial.delay</name>
     <value>1m</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
     <description>
-      Initial delay in MINUTES by Recon to request SCM DB Snapshot.
+      Initial delay before Recon starts the incremental SCM container sync task.
+      This gives Recon startup enough time to initialize the SCM DB before the
+      first incremental sync runs.
     </description>
   </property>
-
   <property>
-    <name>ozone.recon.scm.snapshot.task.interval.delay</name>
-    <value>24h</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <name>ozone.recon.scm.container.sync.task.interval.delay</name>
+    <value>6h</value>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
     <description>
-      Interval in MINUTES by Recon to request SCM DB Snapshot.
+      Interval between incremental SCM container sync runs in Recon. Each cycle
+      evaluates drift between SCM and Recon and either runs the targeted
+      multi-pass sync or takes no action.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.deleted.container.check.batch.size</name>
+    <value>1000000</value>
+    <tag>OZONE, RECON, SCM, PERFORMANCE</tag>
+    <description>
+      Maximum number of SCM DELETED containers fetched per page during targeted
+      Recon container sync. DELETED sync reads SCM's DELETED list and reconciles
+      Recon forward to DELETED; the configured value is capped by the Hadoop IPC
+      message-size limit.
     </description>
   </property>
   <property>
@@ -4776,7 +4786,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
-    <value>1m</value>
+    <value>60m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.
