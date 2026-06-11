@@ -42,7 +42,7 @@ public class FinalizeSubCommand extends AbstractSubcommand implements Callable<V
   public Void call() throws Exception {
     try (OzoneManagerProtocol client = getClient()) {
       client.finalizeUpgrade();
-      out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status");
+      out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
     }
     return null;
   }
