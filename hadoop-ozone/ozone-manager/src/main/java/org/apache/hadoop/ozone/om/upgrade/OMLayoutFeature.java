@@ -25,14 +25,13 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
  * List of OM Layout Features. All version management has been migrated to {@link OzoneManagerVersion} and no new
  * additions should be made to this class. Existing versions are kept here for backwards compatibility when upgrading
  * to this version from older versions.
  */
-public enum OMLayoutFeature implements LayoutFeature {
+public enum OMLayoutFeature implements ComponentVersion {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
 
@@ -72,7 +71,7 @@ public enum OMLayoutFeature implements LayoutFeature {
   }
 
   @Override
-  public int layoutVersion() {
+  public int serialize() {
     return layoutVersion;
   }
 

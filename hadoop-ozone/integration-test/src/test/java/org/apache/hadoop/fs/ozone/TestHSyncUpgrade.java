@@ -111,7 +111,7 @@ public class TestHSyncUpgrade {
     conf.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.MULTITENANCY_SCHEMA.serialize());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)

@@ -121,7 +121,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(dataVolume.getDbVolume());
@@ -159,7 +159,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(dataVolume.getDbParentDir());
@@ -202,7 +202,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set layout version.
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
         ContainerTestUtils.createDatanodeDetails(), conf);
@@ -219,7 +219,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Restart DN and finalize upgrade
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize(), true);
     dsm.getVersionManager().finalizeUpgrade();
 
     // RocksDB is created by upgrade action
@@ -249,7 +249,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     dsm.getVersionManager().finalizeUpgrade();
 
     DbVolume dbVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
@@ -276,13 +276,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     dsm.getVersionManager().finalizeUpgrade();
 
     // Add a new HddsVolume. It should have DB created after DN restart.
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize(),
         false);
     for (StorageVolume vol:
         dsm.getContainer().getVolumeSet().getVolumesList()) {
@@ -310,7 +310,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(hddsVolume.getDbParentDir());
@@ -323,7 +323,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Add a new DbVolume
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize(),
         false);
 
     // HddsVolume should still use the rocksDB under it's volume
@@ -353,13 +353,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     dsm.getVersionManager().finalizeUpgrade();
 
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
     File newDataVolume = UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize(),
         false);
 
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
@@ -422,7 +422,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Disable Schema V3
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     dsm.getVersionManager().finalizeUpgrade();
 
@@ -442,7 +442,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         enable);
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize(),
         false);
     dispatcher = dsm.getContainer().getDispatcher();
 
@@ -471,7 +471,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
@@ -516,7 +516,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set layout version.
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
         ContainerTestUtils.createDatanodeDetails(), conf);
@@ -532,7 +532,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Restart DN
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize(), true);
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
 
     // Write some data.
@@ -572,7 +572,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // SchemaV3 is not finalized, so still ERASURE_CODED_STORAGE_SUPPORT
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.serialize(), true);
     dispatcher = dsm.getContainer().getDispatcher();
 
     // Old data is readable after DN restart

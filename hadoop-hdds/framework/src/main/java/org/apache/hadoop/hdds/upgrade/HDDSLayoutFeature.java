@@ -25,14 +25,13 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
  * List of HDDS Layout Features. All version management has been migrated to {@link HDDSVersion} and no new additions
  * should be made to this class. Existing versions are kept here for backwards compatibility when upgrading to this
  * version from older versions.
  */
-public enum HDDSLayoutFeature implements LayoutFeature {
+public enum HDDSLayoutFeature implements ComponentVersion {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
@@ -70,7 +69,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   }
 
   @Override
-  public int layoutVersion() {
+  public int serialize() {
     return layoutVersion;
   }
 

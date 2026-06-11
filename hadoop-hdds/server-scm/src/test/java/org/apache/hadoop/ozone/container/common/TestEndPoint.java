@@ -120,7 +120,7 @@ public class TestEndPoint {
     dnDetails = randomDatanodeDetails();
     DatanodeStorage layoutStorage = new DatanodeStorage(ozoneConf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
     layoutStorage.initialize();
     scmServer = SCMTestUtils.startScmRpcServer(ozoneConf, scmServerImpl);
     serverAddress = scmServer.getListenerAddress();

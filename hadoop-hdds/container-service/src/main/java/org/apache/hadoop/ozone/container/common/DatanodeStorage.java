@@ -46,11 +46,10 @@ public class DatanodeStorage extends Storage {
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultApparentVersion(conf));
   }
 
-  public DatanodeStorage(OzoneConfiguration conf, String dataNodeId,
-                         int layoutVersion)
+  public DatanodeStorage(OzoneConfiguration conf, String dataNodeId, int apparentVersion)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, layoutVersion);
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, apparentVersion);
   }
 
   public DatanodeStorage(ConfigurationSource conf)
@@ -99,7 +98,7 @@ public class DatanodeStorage extends Storage {
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
     if (dnIdFile.exists()) {
-      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.serialize();
     }
 
     return defaultApparentVersion;
