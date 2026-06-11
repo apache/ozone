@@ -30,7 +30,7 @@
     <docker.hadoop.image.flavor />
     <docker.ozone-runner.client.version>20260207-1-jdk8</docker.ozone-runner.client.version>
     <docker.ozone-runner.version>20260206-2-jdk21</docker.ozone-runner.version>
-    <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
+    <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20260507-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
@@ -43,6 +43,13 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.jacoco</groupId>
+      <artifactId>org.jacoco.cli</artifactId>
+      <version>${jacoco.version}</version>
+      <classifier>nodeps</classifier>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
@@ -255,6 +262,19 @@
     </plugins>
   </build>
   <profiles>
+    <profile>
+      <id>jdk11-with-iceberg</id>
+      <activation>
+        <jdk>[11,)</jdk>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.ozone</groupId>
+          <artifactId>ozone-iceberg</artifactId>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+    </profile>
     <profile>
       <id>build-with-ozonefs</id>
       <activation>

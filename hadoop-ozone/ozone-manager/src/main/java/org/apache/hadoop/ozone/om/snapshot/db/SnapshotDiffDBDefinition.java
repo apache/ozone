@@ -51,7 +51,7 @@ public final class SnapshotDiffDBDefinition extends DBDefinition.WithMap {
   public static final String SNAP_DIFF_JOB_TABLE_NAME = "snap-diff-job-table";
 
   public static final DBColumnFamilyDefinition<String, SnapshotDiffJob> SNAP_DIFF_JOB_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(SNAP_DIFF_JOB_TABLE_NAME, StringCodec.get(), SnapshotDiffJob.getCodec());
+      = new DBColumnFamilyDefinition<>(SNAP_DIFF_JOB_TABLE_NAME, StringCodec.get(), SnapshotDiffJob.codec());
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobId
    * to improve look up and clean up. JobId comes from snap-diff-job-table.

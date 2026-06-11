@@ -21,6 +21,9 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -34,11 +37,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
@@ -79,25 +84,30 @@ public class StorageDistributionEndpoint {
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
+  private final ReconContext reconContext;
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm'Z'");
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
                                      ReconGlobalMetricsService reconGlobalMetricsService,
-                                     DataNodeMetricsService dataNodeMetricsService) {
+                                     DataNodeMetricsService dataNodeMetricsService,
+                                     ReconContext reconContext) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
     this.dataNodeMetricsService = dataNodeMetricsService;
+    this.reconContext = reconContext;
   }
 
   @GET
   public Response getStorageDistribution() {
     try {
       List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
-      GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
+      GlobalStorageReport globalStorageReport = calculateGlobalStorageReport(nodeStorageReports);
       OpenKeyBytesInfo totalOpenKeySize;
       try {
         totalOpenKeySize = calculateOpenKeySizes();
@@ -140,7 +150,12 @@ public class StorageDistributionEndpoint {
    * The CSV includes the following headers: HostName, Datanode UUID, Filesystem Capacity,
    * Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used Space,
    * Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free
-   * Space, and Pending Block Size.
+   * Space, and Pending Block Size. The values for all size-related headers are represented
+   * in bytes.
+   *
+   * The downloaded csv file is dynamically named using the cluster ID and a UTC timestamp,
+   * to ensure clear timezone-independent record keeping.
+   * Example: Datanode_Insights_<clusterId>_yyyyMMdd_HHmmZ.csv
    *
    * @return A Response object. Depending on the state of metrics collection, this can be:
    *         - An HTTP 202 (Accepted) response with a status and metrics data if the
@@ -190,16 +205,16 @@ public class StorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity",
-        "Filesystem Used Space",
-        "Filesystem Remaining Space",
-        "Ozone Capacity",
-        "Ozone Used Space",
-        "Ozone Remaining Space",
-        "PreAllocated Container Space",
-        "Reserved Space",
-        "Minimum Free Space",
-        "Pending Block Size"
+        "Filesystem Capacity (Bytes)",
+        "Filesystem Used Space (Bytes)",
+        "Filesystem Remaining Space (Bytes)",
+        "Ozone Capacity (Bytes)",
+        "Ozone Used Space (Bytes)",
+        "Ozone Remaining Space (Bytes)",
+        "PreAllocated Container Space (Bytes)",
+        "Reserved Space (Bytes)",
+        "Minimum Free Space (Bytes)",
+        "Pending Block Size (Bytes)"
     );
 
     List<Function<DataNodeStoragePendingDeletionView, Object>> columns =
@@ -215,34 +230,50 @@ public class StorageDistributionEndpoint {
             v -> v.getReport() != null ? v.getReport().getCommitted() : -1,
             v -> v.getReport() != null ? v.getReport().getReserved() : -1,
             v -> v.getReport() != null ? v.getReport().getMinimumFreeSpace() : -1,
-            v -> v.getReport() != null ? v.getMetric().getPendingBlockSize() : -1
+            v -> v.getMetric() != null ? v.getMetric().getPendingBlockSize() : -1
         );
 
-    return ReconUtils.downloadCsv("datanode_storage_and_pending_deletion_stats.csv", headers, data, columns);
+    String timestamp = LocalDateTime.now(ZoneOffset.UTC).format(TIMESTAMP_FORMATTER);
+    String clusterId = "UnknownCluster";
+    if (StringUtils.isNotBlank(reconContext.getClusterId())) {
+      clusterId = reconContext.getClusterId();
+    }
+    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterId, timestamp);
+
+    return ReconUtils.downloadCsv(fileName, headers, data, columns);
   }
 
-  private GlobalStorageReport calculateGlobalStorageReport() {
-    GlobalStorageReport.Builder globalStorageBuilder = GlobalStorageReport.newBuilder();
-    try {
-      SCMNodeStat stats = nodeManager.getStats();
-      if (stats == null) {
-        LOG.warn("Node manager stats are null, returning default values");
-        return globalStorageBuilder.build();
-      }
+  /**
+   * Aggregates the global storage report by summing fields from the already-collected
+   * per-DN list. This guarantees that {@code globalStorage} and {@code dataNodeUsage}
+   * always reflect the same in-memory snapshot, eliminating the race window that existed
+   * when a separate {@code nodeManager.getStats()} call was made after the DN list was read.
+   */
+  private GlobalStorageReport calculateGlobalStorageReport(List<DatanodeStorageReport> reports) {
+    long capacity = 0L;
+    long used = 0L;
+    long remaining = 0L;
+    long committed = 0L;
+    long minFreeSpace = 0L;
+    long reserved = 0L;
 
-      return globalStorageBuilder
-          .setTotalOzoneCapacity(stats.getCapacity() != null ? stats.getCapacity().get() : 0L)
-          .setTotalReservedSpace(stats.getReserved() != null ? stats.getReserved().get() : 0L)
-          .setTotalOzoneFreeSpace(stats.getRemaining() != null ? stats.getRemaining().get() : 0L)
-          .setTotalOzoneUsedSpace(stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L)
-          .setTotalOzoneCommittedSpace(stats.getCommitted() != null ? stats.getCommitted().get() : 0L)
-          .setTotalMinimumFreeSpace(stats.getFreeSpaceToSpare() != null ? stats.getFreeSpaceToSpare().get() : 0L)
-          .build();
-
-    } catch (Exception e) {
-      LOG.error("Error calculating global storage report", e);
-      return globalStorageBuilder.build();
+    for (DatanodeStorageReport report : reports) {
+      capacity += report.getCapacity();
+      used += report.getUsed();
+      remaining += report.getRemaining();
+      committed += report.getCommitted();
+      minFreeSpace += report.getMinimumFreeSpace();
+      reserved += report.getReserved();
     }
+
+    return GlobalStorageReport.newBuilder()
+        .setTotalOzoneCapacity(capacity)
+        .setTotalReservedSpace(reserved)
+        .setTotalOzoneFreeSpace(remaining)
+        .setTotalOzoneUsedSpace(used)
+        .setTotalOzoneCommittedSpace(committed)
+        .setTotalMinimumFreeSpace(minFreeSpace)
+        .build();
   }
 
   private Map<String, Long> calculateNamespaceMetrics(OpenKeyBytesInfo totalOpenKeySize) throws IOException {

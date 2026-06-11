@@ -154,6 +154,12 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
+   * <p>
+   * If {@link ContainerBalancerConfiguration#getIncludeNonStandardContainers()}
+   * is enabled, non-standard containers will also be included:
+   * - OVER_REPLICATED CLOSED containers (subject to minimum CLOSED replica checks)
+   * - OVER_REPLICATED and HEALTHY QUASI_CLOSED containers (subject to all QUASI_CLOSED 
+   *   replica checks and non-empty source replicas)
    * @param node DatanodeDetails for which to find candidate containers.
    * @return true if the container should be excluded, else false
    */
@@ -190,9 +196,15 @@ public class ContainerBalancerSelectionCriteria {
       return true;
     }
 
-    return !isContainerClosed(container, node, replicas) ||
-        !isContainerHealthyForMove(container, replicas) ||
-        isContainerReplicatingOrDeleting(containerID);
+    if (balancerConfiguration.getIncludeNonStandardContainers()) {
+      return !isContainerClosedRelaxed(container, node, replicas) ||
+          !isContainerHealthyForMoveRelaxed(container, replicas) ||
+          isContainerReplicatingOrDeleting(containerID);
+    } else {
+      return !isContainerClosed(container, node, replicas) ||
+          !isContainerHealthyForMove(container, replicas) ||
+          isContainerReplicatingOrDeleting(containerID);
+    }
   }
 
   /**
@@ -240,6 +252,95 @@ public class ContainerBalancerSelectionCriteria {
     }
 
     return true;
+  }
+
+  /**
+   * Relaxed version of isContainerClosed used when includeNonStandardContainers is enabled.
+   * <p>
+   * - CLOSED container, CLOSED replica: if replication health is OVER_REPLICATED, requires
+   *   minimum CLOSED replicas; otherwise allows.
+   * - CLOSED container, QUASI_CLOSED replica: requires minimum CLOSED replicas and a non-empty
+   *   replica on the source datanode.
+   * - QUASI_CLOSED container: all replicas must be QUASI_CLOSED; replica on source must be
+   *   non-empty.
+   *
+   * @param container container to check
+   * @param datanodeDetails datanode on which a replica of the container is present
+   * @param replicas all replicas of the container
+   * @return true if container and replica are eligible for balancing, else false
+   */
+  private boolean isContainerClosedRelaxed(ContainerInfo container,
+                                           DatanodeDetails datanodeDetails,
+                                           Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState replicationHealth =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    HddsProtos.LifeCycleState containerState = container.getState();
+    // Find the specific replica on this datanode
+    ContainerReplica targetReplica = replicas.stream()
+        .filter(r -> r.getDatanodeDetails().equals(datanodeDetails))
+        .findFirst()
+        .orElse(null);
+    if (targetReplica == null) {
+      return false;
+    }
+    ContainerReplicaProto.State replicaState = targetReplica.getState();
+    
+    // Case 1: Container is CLOSED
+    if (containerState == HddsProtos.LifeCycleState.CLOSED) {
+      if (replicaState == ContainerReplicaProto.State.CLOSED) {
+        if (replicationHealth == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+          return hasMinClosedReplicas(container, replicas);
+        }
+        return true;
+      }
+      
+      if (replicaState == ContainerReplicaProto.State.QUASI_CLOSED) {
+        if (!hasMinClosedReplicas(container, replicas)) {
+          return false;
+        }
+        return !targetReplica.isEmpty();
+      }
+      return false;
+    }
+    
+    // Case 2: Container is QUASI_CLOSED
+    if (containerState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      boolean allReplicasQuasiClosed = replicas.stream()
+          .allMatch(r -> r.getState() == ContainerReplicaProto.State.QUASI_CLOSED);
+      if (!allReplicasQuasiClosed) {
+        return false;
+      }
+      return !targetReplica.isEmpty();
+    }
+    return false;
+  }
+
+  private static boolean hasMinClosedReplicas(ContainerInfo container, Set<ContainerReplica> replicas) {
+    long count = replicas.stream()
+        .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+        .count();
+    return count >= container.getReplicationConfig().getRequiredNodes();
+  }
+
+  /**
+   * Relaxed version of isContainerHealthyForMove used when includeNonStandardContainers is enabled.
+   * <p>
+   * - OVER_REPLICATED CLOSED and QUASI_CLOSED containers are allowed.
+   *
+   * @param container container to check
+   * @param replicas the container's replicas
+   * @return false if it should not be moved, true otherwise
+   */
+  private boolean isContainerHealthyForMoveRelaxed(ContainerInfo container, Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState state =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    if (state == ContainerHealthResult.HealthState.HEALTHY ||
+        state == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+      return true;
+    }
+
+    LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
+    return false;
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,

@@ -155,6 +155,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
 | `-p/--parallel-thread`              | 并行线程数（默认值：1）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
 | `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：false）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+| `-c/--container-states`             | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states OPEN,CLOSED` |
 
 ### 示例
 **启动 DiskBalancer：**
@@ -239,7 +240,8 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 | `hdds.datanode.disk.balancer.service.interval`              | `60s`                                  | Datanode DiskBalancer 服务检查不平衡并更新其配置的时间间隔。                                                             |
 | `hdds.datanode.disk.balancer.stop.after.disk.even`          | `true`                                 | 如果为真，则一旦磁盘被视为平衡（即所有卷密度都在阈值内），DiskBalancer 将自动停止其平衡活动。           |
 | `hdds.datanode.disk.balancer.replica.deletion.delay`       | `5m`                                   | 容器成功从源卷移动到目标卷后，源容器副本被删除前的延迟时间。这种延迟删除机制旨在避免旧副本的即时删除导致持有旧容器副本的线程数据读取失败。单位：ns、ms、s、m、h、d。|
-| `hdds.datanode.disk.balancer.volume.container.choosing.policy` | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | 用于选择源/目标卷以及要移动的容器的策略。                                                                             |
+| `hdds.datanode.disk.balancer.container.states`              | `CLOSED,QUASI_CLOSED`                  | 以逗号分隔的容器生命周期状态名称列表，指定了允许在不同磁盘之间移动的容器状态（须与枚举名完全一致，使用大写）。默认包含 **CLOSED** 和 **QUASI_CLOSED**；若需对更多状态的容器进行负载均衡，请扩展此列表。所有已定义的容器状态包括：OPEN、CLOSING、QUASI_CLOSED、CLOSED、UNHEALTHY、INVALID、DELETED 和 RECOVERING。 |
+| `hdds.datanode.disk.balancer.container.choosing.policy` | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | 用于选择源/目标卷以及要移动的容器的策略。                                                                             |
 | `hdds.datanode.disk.balancer.service.timeout`               | `300s`                                 | Datanode DiskBalancer 服务操作超时。                                                                                                                    |
 | `hdds.datanode.disk.balancer.should.run.default`            | `false`                                | 如果平衡器无法读取其持久配置，则该值决定服务是否应默认运行。                                                       |
 

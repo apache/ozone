@@ -127,6 +127,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -139,7 +141,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -445,6 +447,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
       throws IOException {
+    return listContainer(startContainerID, count, state, replicationType, replicationConfig, null);
+  }
+
+  @Override
+  public ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -454,6 +466,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (suppressed != null) {
+      builder.setSuppressed(suppressed);
+    }
     if (state != null) {
       builder.setState(state);
     }
@@ -1310,6 +1325,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress)
+      throws IOException {
+    SuppressContainerRequestProto request = SuppressContainerRequestProto.newBuilder()
+        .addAllContainerIDs(containerIds)
+        .setSuppress(suppress)
+        .build();
+    SuppressContainerResponseProto response =
+        submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request))
+            .getSuppressContainerResponse();
+    return response.getFailedContainerIDsList();
   }
 
   /**

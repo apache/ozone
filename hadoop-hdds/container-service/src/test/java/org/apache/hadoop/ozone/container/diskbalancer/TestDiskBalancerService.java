@@ -33,7 +33,10 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -41,6 +44,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -118,7 +122,7 @@ public class TestDiskBalancerService {
    * Creates stale diskBalancer directories to simulate leftover directories
    * from previous failed container moves.
    *
-   * @param volumeSet the volume set containing volumes to create stale dirs for
+   * @param volSet the volume set containing volumes to create stale dirs for
    * @param clusterId the cluster ID to use when constructing paths for uninitialized volumes
    * @throws IOException if directory creation fails
    */
@@ -172,7 +176,7 @@ public class TestDiskBalancerService {
 
     // Set a low bandwidth to delay job
     DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 1L, 5,
-        true, DiskBalancerVersion.DEFAULT_VERSION);
+        true, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(initialInfo);
 
     svc.start();
@@ -193,6 +197,38 @@ public class TestDiskBalancerService {
     assertFalse(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
     svc.shutdown();
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidDiskBalancerInfo")
+  public void testRefreshRejectsInvalidDiskBalancerInfo(
+      ContainerTestVersionInfo versionInfo, DiskBalancerInfo diskBalancerInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> svc.refresh(diskBalancerInfo));
+
+    svc.shutdown();
+  }
+
+  public static Stream<Arguments> invalidDiskBalancerInfo() {
+    return ContainerTestVersionInfo.getLayoutList().stream()
+        .flatMap(versionInfo -> Stream.of(
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true))));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -313,7 +349,7 @@ public class TestDiskBalancerService {
     // Set operational state to RUNNING
     DiskBalancerInfo info = new DiskBalancerInfo(
         DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, parallelThread,
-        false, DiskBalancerVersion.DEFAULT_VERSION);
+        false, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
     ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
@@ -328,7 +364,7 @@ public class TestDiskBalancerService {
     when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
     when(containerData.getBytesUsed()).thenReturn(100L);
 
-    when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble()))
+    when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble(), any()))
         .thenReturn(new ContainerCandidate(containerData, source, dest));
 
     // Test when no tasks are in progress, it should schedule up to the limit
@@ -507,4 +543,53 @@ public class TestDiskBalancerService {
     svc.shutdown();
     testVolumeSet.shutdown();
   }
+
+  private static Stream<Arguments> movableContainerStatesCases() {
+    return Stream.of(
+        Arguments.of("CLOSED,QUASI_CLOSED", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of(" CLOSED , QUASI_CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED  ", true,
+            new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
+        Arguments.of("CLOSING,CLOSED", false, new HashSet<>(Arrays.
+                asList(State.CLOSING, State.CLOSED)), "State CLOSING is not movable"),
+        Arguments.of("  QUASI_CLOSED,CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED , CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of(null, false, null, "must not be empty"),
+        Arguments.of("", false, null, "must not be empty"),
+        Arguments.of("   ", false, null, "must not be empty"),
+        Arguments.of(",,,", false, null, "at least one valid"),
+        Arguments.of("closed", false, null, "uppercase"),
+        Arguments.of("NOT_A_STATE", false, null, "Invalid container state"),
+        Arguments.of("OPEN", false, null, "State OPEN is not movable"),
+        Arguments.of("RECOVERING", false, null, "State RECOVERING is not movable"),
+        Arguments.of("DELETED", false, null, "State DELETED is not movable")
+    );
+  }
+
+  /**
+   * {@link DiskBalancerConfiguration#setContainerStates(String)} accepts only exact enum names;
+   * blank input, empty token lists, wrong casing, and unknown names fail with an error.
+   */
+  @ParameterizedTest(name = "containerStates={0}")
+  @MethodSource("movableContainerStatesCases")
+  public void testMovableContainerStates(String containerStates, boolean expectSuccess,
+      Set<State> expectedStates, String messageMustContain) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+    if (expectSuccess) {
+      config.setContainerStates(containerStates);
+      assertEquals(expectedStates, config.getMovableContainerStates());
+    } else {
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> config.setContainerStates(containerStates));
+      if (messageMustContain != null) {
+        assertTrue(ex.getMessage().contains(messageMustContain),
+            () -> "Expected message to contain '" + messageMustContain + "': " + ex.getMessage());
+      }
+    }
+  }
+
 }

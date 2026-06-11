@@ -38,6 +38,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import java.io.IOException;
 import java.util.OptionalInt;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -164,6 +165,10 @@ public class GrpcOzoneManagerServer {
             sslClientContextBuilder,
             SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
                 HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
+        sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(
+            secConf.getGrpcTlsCiphers(),
+            SupportedCipherSuiteFilter.INSTANCE);
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure Om S3g GRPC channel.", ex);

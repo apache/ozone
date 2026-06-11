@@ -26,6 +26,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -36,6 +37,7 @@ import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -51,6 +53,7 @@ public final class TracingUtil {
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
+  private static SdkTracerProvider sdkTracerProvider;
 
   private TracingUtil() {
   }
@@ -58,14 +61,14 @@ public final class TracingUtil {
   /**
    * Initialize the tracing with the given service name.
    */
-  public static void initTracing(
-      String serviceName, ConfigurationSource conf) {
-    if (!isTracingEnabled(conf) || isInit) {
+  public static synchronized void initTracing(
+      String serviceName, TracingConfig tracingConfig) {
+    if (!tracingConfig.isTracingEnabled() || isInit) {
       return;
     }
 
     try {
-      initialize(serviceName, conf);
+      initialize(serviceName, tracingConfig);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -73,9 +76,36 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName, ConfigurationSource conf) {
+  /**
+   * Receives serviceName and configurationSource.
+   * Delegates tracing initiation to {@link #initTracing(String, TracingConfig)}.
+   */
+  public static synchronized void initTracing(
+      String serviceName, ConfigurationSource conf) {
+    initTracing(serviceName, conf.getObject(TracingConfig.class));
+  }
+
+  /**
+   * Shuts down and re-initializes tracing.
+   * Called after tracing-related keys are reconfigured on OM/SCM/DN.
+   */
+  public static synchronized void reconfigureTracing(
+      String serviceName, TracingConfig tracingConfig) {
+    shutdownTracing();
+    initTracing(serviceName, tracingConfig);
+  }
+
+  private static void shutdownTracing() {
+    if (sdkTracerProvider != null) {
+      sdkTracerProvider.shutdown();
+      sdkTracerProvider = null;
+    }
+    tracer = OpenTelemetry.noop().getTracer("noop");
+    isInit = false;
+  }
+
+  private static void initialize(String serviceName, TracingConfig tracingConfig) {
     //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
-    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     String otelEndPoint = tracingConfig.getTracingEndpoint();
     double samplerRatio = tracingConfig.getTraceSamplerRatio();
     LOG.info("Sampling Trace Config = '{}'", samplerRatio);
@@ -106,10 +136,17 @@ public final class TracingUtil {
         .setResource(resource)
         .setSampler(sampler)
         .build();
-    OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
-        .setTracerProvider(tracerProvider)
-        .build();
-    tracer = openTelemetry.getTracer(serviceName);
+
+    try {
+      OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+          .setTracerProvider(tracerProvider)
+          .build();
+      tracer = openTelemetry.getTracer(serviceName);
+      sdkTracerProvider = tracerProvider;
+    } catch (RuntimeException e) {
+      tracerProvider.shutdown();
+      throw e;
+    }
   }
 
   /**
@@ -351,5 +388,47 @@ public final class TracingUtil {
     } else {
       return tracer.spanBuilder(spanName).setNoParent().startSpan();
     }
+  }
+
+  /**
+   * A TextMapGetter implementation to extract tracing info from getHeader.
+   */
+  public static class HttpHeaderGetter implements TextMapGetter<Function<String, String>> {
+
+    @Override
+    public Iterable<String> keys(Function<String, String> carrier) {
+      // Not used during the extract call, so returning an empty list.
+      return Collections.emptyList();
+    }
+
+    @Override
+    public String get(Function<String, String> carrier, String key) {
+      return carrier == null ? null : carrier.apply(key);
+    }
+  }
+
+  public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
+      String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
+    if (conf == null || !isTracingEnabled(conf)) {
+      return () -> { };
+    }
+
+    Context remote = W3CTraceContextPropagator.getInstance()
+        .extract(Context.current(), getHeader, new HttpHeaderGetter());
+
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
+      return createActivatedSpan(spanName);
+    }
+
+    Span span = tracer.spanBuilder(spanName)
+        .setParent(remote)
+        .startSpan();
+
+    Scope scope = span.makeCurrent();
+
+    return () -> {
+      scope.close();
+      span.end();
+    };
   }
 }

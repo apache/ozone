@@ -202,6 +202,7 @@ message Node {
     repeated NodeOperationalState nodeOperationalStates = 3;
     optional int32 totalVolumeCount = 4;
     optional int32 healthyVolumeCount = 5;
+    repeated string failedVolumes = 6;
 }
 
 message NodePool {
@@ -271,6 +272,7 @@ message ContainerInfoProto {
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
+    optional bool suppressed = 13;
 }
 
 message ContainerWithPipeline {
@@ -504,6 +506,7 @@ message ContainerBalancerConfigurationProto {
     optional int32 nextIterationIndex = 19;
     optional int64 moveReplicationTimeout = 20;
     optional string includeContainers = 21;
+    optional bool includeNonStandardContainers = 22;
 }
 
 message TransferLeadershipRequestProto {
@@ -571,6 +574,7 @@ message DiskBalancerConfigurationProto {
     optional uint64 diskBandwidthInMB = 2;
     optional int32 parallelThread = 3;
     optional bool stopAfterDiskEven = 4;
+    optional string containerStates = 5;
 }
 
 enum DiskBalancerRunningStatus {
