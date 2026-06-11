@@ -21,17 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Test;
@@ -40,7 +44,7 @@ import org.junit.jupiter.api.Test;
  * Tests for OMStartFinalizeUpgradeRequest.
  */
 public class TestOMStartFinalizeUpgradeRequest extends TestOMKeyRequest {
-
+  
   @Test
   public void testPreExecuteCallsScmFinalizeUpgrade() throws IOException {
     doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
@@ -73,17 +77,26 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMKeyRequest {
 
   @Test
   public void testAccessDeniedWhenUserIsNotAdmin() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any())).thenReturn(false);
 
-    OMClientResponse response = submitRequest();
+    OzoneManagerProtocolProtos.OMRequest original = buildRequest();
+    OMStartFinalizeUpgradeRequest request = new OMStartFinalizeUpgradeRequest(original);
+    // In the test environment there is no live RPC thread, so
+    // ProtobufRpcEngine.Server.getRemoteUser() returns null and super.preExecute()
+    // cannot resolve a username. setUGI() pre-seeds the identity so that
+    // createUGIForApi() succeeds without needing the RPC thread-local.
+    request.setUGI(UserGroupInformation.createRemoteUser("testuser"));
 
-    // ResultCodes.ACCESS_DENIED maps to Status.UNAUTHORIZED via the ordinal-based
-    // exceptionToResponseStatus conversion used by createErrorOMResponse.
-    assertEquals(OzoneManagerProtocolProtos.Status.UNAUTHORIZED,
-        response.getOMResponse().getStatus(),
-        "non-admin user should receive an authorization-failure status");
+    // With auth in preExecute(), a non-admin is rejected before the request
+    // reaches Raft or touches SCM.
+    OMException ex = assertThrows(OMException.class,
+        () -> request.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.ACCESS_DENIED, ex.getResult(),
+        "non-admin user should receive ACCESS_DENIED from preExecute");
+
+    // SCM must NOT have been called — auth is checked before the SCM call.
+    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
   }
 
   private OMClientResponse submitRequest() throws IOException {

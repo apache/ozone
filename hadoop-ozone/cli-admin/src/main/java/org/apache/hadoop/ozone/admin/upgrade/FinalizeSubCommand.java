@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.admin.upgrade;
 
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -32,7 +33,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class FinalizeSubCommand implements Callable<Void> {
+public class FinalizeSubCommand extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
@@ -41,7 +42,7 @@ public class FinalizeSubCommand implements Callable<Void> {
   public Void call() throws Exception {
     try (OzoneManagerProtocol client = getClient()) {
       client.finalizeUpgrade();
-      System.out.println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
+      out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status");
     }
     return null;
   }

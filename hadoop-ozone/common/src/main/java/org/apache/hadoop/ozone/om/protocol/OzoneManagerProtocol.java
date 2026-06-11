@@ -494,12 +494,12 @@ public interface OzoneManagerProtocol
   /**
    * Initiate metadata upgrade finalization.
    * This method when called, performs two actions. First, it will result in OM making a call to SCM to start
-   * finalizing the HDDS layer. After that call completes successfully, the HDDS finaliztion will be in progress.
+   * finalizing the HDDS layer. After that call completes successfully, the HDDS finalization will be in progress.
    * Second, a key will be written to the OM database to persist the fact that OM finalization is pending. It will
    * complete once the HDDS layer has completed. OM will poll SCM periodically to check the status of the SCM
-   * finaliztion progress, and OM will only finalize when SCM indicates it is OK for it to do so.
+   * finaliaztion progress, and OM will only finalize when SCM indicates it is OK for it to do so.
    *
-   * This command is async, and will return before finalization is complete. The caller must issue a Query Finalzation
+   * This command is async, and will return before finalization is complete. The caller must issue a Query Finalization
    * Progress command to monitor the progress.
    *
    * @throws IOException If any error occurs. If this happens finalization is not in progress and the command must be

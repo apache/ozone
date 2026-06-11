@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMStartFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -54,9 +53,17 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      UserGroupInformation ugi = createUGIForApi();
+      if (!ozoneManager.isAdmin(ugi)) {
+        throw new OMException("Access denied for user " + ugi + ". "
+            + "Superuser privilege is required to start finalize upgrade.", OMException.ResultCodes.ACCESS_DENIED);
+      }
+    }
     ozoneManager.getScmClient().getContainerClient().finalizeUpgrade();
     LOG.info("Successfully triggered the finalize upgrade process in SCM");
-    return super.preExecute(ozoneManager);
+    return omRequest;
   }
 
   @Override
@@ -70,14 +77,6 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
     Exception exception = null;
 
     try {
-      if (ozoneManager.isAdminAuthorizationEnabled()) {
-        UserGroupInformation ugi = createUGIForApi();
-        if (!ozoneManager.isAdmin(ugi)) {
-          throw new OMException("Access denied for user " + ugi + ". "
-              + "Superuser privilege is required to start finalize upgrade.", OMException.ResultCodes.ACCESS_DENIED);
-        }
-      }
-
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex(), "ignored"));
@@ -89,10 +88,9 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
       responseBuilder.setStartFinalizeUpgradeResponse(omResponse);
       response = new OMStartFinalizeUpgradeResponse(responseBuilder.build());
       LOG.trace("Returning response: {}", response);
-    } catch (IOException e) {
+    } catch (Exception e) {
       exception = e;
-      response = new OMFinalizeUpgradeResponse(
-          createErrorOMResponse(responseBuilder, e), -1);
+      response = new OMStartFinalizeUpgradeResponse(createErrorOMResponse(responseBuilder, e));
     }
 
     markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_FINALIZE, new HashMap<>(), exception, userInfo));

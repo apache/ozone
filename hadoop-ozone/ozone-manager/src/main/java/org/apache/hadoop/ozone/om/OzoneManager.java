@@ -3643,7 +3643,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    // unused, but must be defined for the interface
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequest
+    throw new UnsupportedOperationException();
   }
 
   @Override
