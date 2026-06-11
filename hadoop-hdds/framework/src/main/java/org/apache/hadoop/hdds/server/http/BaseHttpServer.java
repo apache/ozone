@@ -328,6 +328,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         DefaultMetricsSystem.instance()
             .register("prometheus", "Hadoop metrics prometheus exporter",
                 prometheusMetricsSink);
+        BuildInfoMetrics.create(name);
       }
       updateConnectorAddress();
     }
