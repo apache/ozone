@@ -260,7 +260,7 @@ public abstract class EndpointBase {
       s3Auth.setS3Action(originalS3Action);
     }
   }
-  
+
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
   }

@@ -1585,6 +1585,7 @@ message CommitKeyRequest {
 }
 
 message CommitKeyResponse {
+
 }
 
 message AllocateBlockRequest {
