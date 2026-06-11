@@ -59,9 +59,7 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  // Codec for openKeyTable (includes fields only used in openKeyTable)
   private static final Codec<OmKeyInfo> CODEC = newCodec(true);
-  // Codec for keyTable (excludes fields only used in openKeyTable)
   private static final Codec<OmKeyInfo> CODEC_KEY_TABLE = newCodec(false);
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
@@ -111,7 +109,7 @@ public final class OmKeyInfo extends WithParentObjectId
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-  private Long expectedDataGeneration = null;
+  private final Long expectedDataGeneration;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -204,10 +202,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getFileName() {
     return fileName;
-  }
-
-  public void setExpectedDataGeneration(Long generation) {
-    this.expectedDataGeneration = generation;
   }
 
   public Long getExpectedDataGeneration() {
