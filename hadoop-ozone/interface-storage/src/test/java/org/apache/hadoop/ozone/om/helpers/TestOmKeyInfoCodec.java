@@ -42,7 +42,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test {@link OmKeyInfo#getCodec(boolean)} .
+ * Test {@link OmKeyInfo#getCodec()} .
  */
 public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   private static final String VOLUME = "hadoop";
@@ -54,7 +54,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Override
   public Codec<OmKeyInfo> getCodec() {
-    return OmKeyInfo.getCodec(false);
+    return OmKeyInfo.getCodec();
   }
 
   private static FileChecksum createEmptyChecksum() {
@@ -135,13 +135,11 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   public void test() throws IOException {
     testOmKeyInfoCodecWithoutPipeline(1);
     testOmKeyInfoCodecWithoutPipeline(2);
-    testOmKeyInfoCodecCompatibility(1);
-    testOmKeyInfoCodecCompatibility(2);
   }
 
   public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
       throws IOException {
-    final Codec<OmKeyInfo> codec = OmKeyInfo.getCodec(true);
+    final Codec<OmKeyInfo> codec = OmKeyInfo.getCodec();
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     byte[] rawData = codec.toPersistedFormat(originKey);
     OmKeyInfo key = codec.fromPersistedFormat(rawData);
@@ -153,21 +151,9 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(key.getFileChecksum(), checksum);
   }
 
-  public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
-    final Codec<OmKeyInfo> codecWithoutPipeline = OmKeyInfo.getCodec(true);
-    final Codec<OmKeyInfo> codecWithPipeline = OmKeyInfo.getCodec(false);
-    OmKeyInfo originKey = getKeyInfo(chunkNum);
-    byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
-    OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
-    System.out.println("Chunk number = " + chunkNum +
-        ", Serialized key size with pipeline = " + rawData.length);
-    assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
-        .getPipeline());
-  }
-
   @Test
   public void testOpenKeyTableCodecIncludesOpenKeyFields() throws IOException {
-    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec(true);
+    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec();
     OmKeyInfo originKey = getKeyInfoWithOpenKeyFields(1);
 
     assertEquals(12345L, originKey.getExpectedDataGeneration());
@@ -185,7 +171,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void testKeyTableCodecExcludesOpenKeyFields() throws IOException {
-    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable(true);
+    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable();
     OmKeyInfo originKey = getKeyInfoWithOpenKeyFields(1);
     assertEquals(12345L, originKey.getExpectedDataGeneration());
 
@@ -206,8 +192,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void testKeyTableCodecCanReadOpenKeyTableData() throws IOException {
-    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec(true);
-    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable(true);
+    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec();
+    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable();
 
     OmKeyInfo originKey = getKeyInfoWithOpenKeyFields(1);
     byte[] rawData = openKeyCodec.toPersistedFormat(originKey);
@@ -220,8 +206,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void testCodecsWithKeyWithoutOpenKeyFields() throws IOException {
-    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec(true);
-    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable(true);
+    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec();
+    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable();
 
     OmKeyInfo originKey = getKeyInfo(1);
     assertNull(originKey.getExpectedDataGeneration());
@@ -242,8 +228,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void testKeyTableCodecProducesSmallerOutput() throws IOException {
-    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec(true);
-    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable(true);
+    final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getCodec();
+    final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable();
 
     OmKeyInfo keyWithOpenFields = getKeyInfoWithOpenKeyFields(1);
 

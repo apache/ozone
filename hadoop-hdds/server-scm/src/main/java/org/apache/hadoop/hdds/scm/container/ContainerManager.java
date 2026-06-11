@@ -125,6 +125,24 @@ public interface ContainerManager {
   int getContainerStateCount(LifeCycleState state);
 
   /**
+   * Returns the total number of containers across all lifecycle states.
+   *
+   * <p>Default implementation sums {@link #getContainerStateCount(LifeCycleState)}
+   * for every {@link LifeCycleState} value — each call is O(1), so the total
+   * is O(number of states) rather than O(total containers). Automatically
+   * includes any new states added to the enum in the future.
+   *
+   * @return total container count
+   */
+  default long getTotalContainerCount() {
+    long total = 0;
+    for (LifeCycleState state : LifeCycleState.values()) {
+      total += getContainerStateCount(state);
+    }
+    return total;
+  }
+
+  /**
    * Returns true if the container exist, false otherwise.
    * @param id Container ID
    * @return true if container exist, else false

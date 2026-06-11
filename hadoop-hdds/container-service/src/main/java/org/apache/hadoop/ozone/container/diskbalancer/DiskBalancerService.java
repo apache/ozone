@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -40,7 +41,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -94,6 +95,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
+  private final Clock clock;
 
   private double threshold;
   private long bandwidthInMB;
@@ -135,10 +137,19 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
+    this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit,
+        workerSize, conf, new SlidingWindow.MonotonicClock());
+  }
+
+  DiskBalancerService(OzoneContainer ozoneContainer,
+      long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
+      int workerSize, ConfigurationSource conf, Clock clock)
+      throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
     this.ozoneContainer = ozoneContainer;
     this.conf = conf;
+    this.clock = Objects.requireNonNull(clock, "clock");
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
     Objects.requireNonNull(diskBalancerInfoPath);
@@ -255,13 +266,7 @@ public class DiskBalancerService extends BackgroundService {
     setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
     setContainerStates(validated.getMovableContainerStates());
-
-    // Default executorService is ScheduledThreadPoolExecutor, so we can
-    // update the poll size by setting corePoolSize.
-    if ((getExecutorService() instanceof ScheduledThreadPoolExecutor)) {
-      ((ScheduledThreadPoolExecutor) getExecutorService())
-          .setCorePoolSize(parallelThread);
-    }
+    setPoolSize(parallelThread);
   }
 
   /**
@@ -443,8 +448,7 @@ public class DiskBalancerService extends BackgroundService {
               destVolume);
           queue.add(task);
           inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-              - toBalanceContainer.getBytesUsed());
+          deltaSizes.merge(sourceVolume, -toBalanceContainer.getBytesUsed(), Long::sum);
         }
       }
     }
@@ -635,7 +639,8 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
+          pendingDeletionContainers.put(clock.millis() + replicaDeletionDelay,
+              container);
           ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
@@ -654,8 +659,7 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall(boolean success, long startTime) {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
-      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
-          containerData.getBytesUsed());
+      deltaSizes.merge(sourceVolume, containerData.getBytesUsed(), Long::sum);
       destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {
@@ -693,7 +697,7 @@ public class DiskBalancerService extends BackgroundService {
   private boolean tryCleanupOnePendingDeletionContainer() {
     Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
     if (entry != null) {
-      if (entry.getKey() <= System.currentTimeMillis()) {
+      if (entry.getKey() <= clock.millis()) {
         // entry container is expired
         deleteContainer(entry.getValue());
         return true;
@@ -746,6 +750,7 @@ public class DiskBalancerService extends BackgroundService {
       VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
           .setTotalCapacity(v.getUsage().getCapacity())
+          .setOzoneAvailable(v.getUsage().getAvailable())
           .setUsedSpace(v.getUsage().getUsedSpace())
           .setCommittedBytes(volume.getCommittedBytes())
           .setEffectiveUsedSpace(v.getEffectiveUsed())

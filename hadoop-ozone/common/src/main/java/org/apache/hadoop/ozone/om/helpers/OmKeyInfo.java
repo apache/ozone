@@ -59,13 +59,10 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  // Codecs for openKeyTable
-  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true, true);
-  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false, true);
-
-  // Codecs for keyTable
-  private static final Codec<OmKeyInfo> CODEC_KEY_TABLE_TRUE = newCodec(true, false);
-  private static final Codec<OmKeyInfo> CODEC_KEY_TABLE_FALSE = newCodec(false, false);
+  // Codec for openKeyTable (includes fields only used in openKeyTable)
+  private static final Codec<OmKeyInfo> CODEC = newCodec(true);
+  // Codec for keyTable (excludes fields only used in openKeyTable)
+  private static final Codec<OmKeyInfo> CODEC_KEY_TABLE = newCodec(false);
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
    * The flag is set when a committed key is deleted from AOS but still held in
@@ -139,17 +136,16 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Creates a new codec for OmKeyInfo.
    *
-   * @param ignorePipeline whether to ignore pipeline info during serialization
    * @param includeOpenKeyFields whether to include fields only used in openKeyTable
    *                             (expectedDataGeneration) in serialization.
    *                             Use true for openKeyTable, false for keyTable.
    * @return the codec
    */
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline, boolean includeOpenKeyFields) {
+  private static Codec<OmKeyInfo> newCodec(boolean includeOpenKeyFields) {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION, includeOpenKeyFields),
+        k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION, includeOpenKeyFields),
         OmKeyInfo.class);
   }
 
@@ -157,24 +153,20 @@ public final class OmKeyInfo extends WithParentObjectId
    * Gets the codec for openKeyTable. This codec includes expectedDataGeneration
    * field during serialization.
    *
-   * @param ignorePipeline whether to ignore pipeline info
    * @return the codec for openKeyTable
    */
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  public static Codec<OmKeyInfo> getCodec() {
+    return CODEC;
   }
 
   /**
-   * Gets the codec for keyTable. This codec excludes fields are only
+   * Gets the codec for keyTable. This codec excludes fields that are only
    * meaningful for open keys.
    *
-   * @param ignorePipeline whether to ignore pipeline info
    * @return the codec for keyTable
    */
-  public static Codec<OmKeyInfo> getCodecForKeyTable(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodecForKeyTable ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_KEY_TABLE_TRUE : CODEC_KEY_TABLE_FALSE;
+  public static Codec<OmKeyInfo> getCodecForKeyTable() {
+    return CODEC_KEY_TABLE;
   }
 
   public String getVolumeName() {

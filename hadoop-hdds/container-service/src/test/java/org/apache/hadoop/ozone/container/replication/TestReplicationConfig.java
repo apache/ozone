@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_DEFAULT;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_MIN;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_MAX_STREAMS_DEFAULT;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_OUTOFSERVICE_FACTOR_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
@@ -52,14 +54,11 @@ public class TestReplicationConfig {
   }
 
   @Test
-  public void overridesInvalidValues() {
+  public void overridesInvalidReplicationLimit() {
     // GIVEN
     int invalidReplicationLimit = -5;
-    double invalidOutOfServiceFactor = 0.5;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, invalidReplicationLimit);
-    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
-        invalidOutOfServiceFactor);
 
     // WHEN
     ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
@@ -67,7 +66,62 @@ public class TestReplicationConfig {
     // THEN
     assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
         subject.getReplicationMaxStreams());
-    assertEquals(OUTOFSERVICE_FACTOR_DEFAULT,
+  }
+
+  @Test
+  public void clampsOutOfServiceFactorBelowMinToMin() {
+    // GIVEN
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MIN - 0.5);
+
+    // WHEN
+    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MIN,
+        subject.getOutOfServiceFactor(), 0.001);
+  }
+
+  @Test
+  public void clampsOutOfServiceFactorAboveMaxToMax() {
+    // GIVEN
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MAX + 10);
+
+    // WHEN
+    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MAX,
+        subject.getOutOfServiceFactor(), 0.001);
+  }
+
+  @Test
+  public void acceptsOutOfServiceFactorBoundaryValues() {
+    // GIVEN
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MIN);
+
+    // WHEN
+    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MIN,
+        subject.getOutOfServiceFactor(), 0.001);
+
+    // GIVEN
+    conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MAX);
+
+    // WHEN
+    subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MAX,
         subject.getOutOfServiceFactor(), 0.001);
   }
 

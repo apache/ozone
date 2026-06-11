@@ -31,56 +31,70 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 class ScmInvokerCodeGeneratorMains {
 
   static class GenerateDeletedBlockLogStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(DeletedBlockLogStateManager.class, true);
     }
   }
 
   static class GenerateContainerStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(ContainerStateManager.class, true);
     }
   }
 
   static class GeneratePipelineStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(PipelineStateManager.class, true);
     }
   }
 
   static class GenerateRootCARotationHandler {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(RootCARotationHandler.class, true);
     }
   }
 
   static class GenerateFinalizationStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
     }
   }
 
   static class GenerateSecretKeyState {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(SecretKeyState.class, true);
     }
   }
 
   static class GenerateSequenceIdGeneratorStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(SequenceIdGenerator.StateManager.class, true);
     }
   }
 
   static class GenerateStatefulServiceStateManager {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(StatefulServiceStateManager.class, true);
     }
   }
 
   static class GenerateCertificateStore {
-    public static void main(String[] args) {
+    public static void main(String... args) {
       ScmInvokerCodeGenerator.generate(CertificateStore.class, true);
+    }
+  }
+
+  static class All {
+    public static void main(String... args) {
+      GenerateCertificateStore.main();
+      GenerateContainerStateManager.main();
+      GenerateDeletedBlockLogStateManager.main();
+      GenerateFinalizationStateManager.main();
+      GeneratePipelineStateManager.main();
+      GenerateRootCARotationHandler.main();
+      GenerateSecretKeyState.main();
+      GenerateSequenceIdGeneratorStateManager.main();
+      GenerateStatefulServiceStateManager.main();
     }
   }
 }

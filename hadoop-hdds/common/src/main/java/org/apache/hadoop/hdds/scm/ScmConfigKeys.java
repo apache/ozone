@@ -269,6 +269,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_STALENODE_INTERVAL_DEFAULT =
       "5m";
 
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL =
+      "ozone.scm.pending.container.roll.interval";
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT =
+      "5m";
+
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
@@ -584,15 +589,6 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
-  /**
-   * the config will transfer value to ratis config
-   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
-   * when manual trigger using api.
-   */
-  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
-  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
-      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 

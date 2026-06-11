@@ -256,6 +256,13 @@ public class SCMClientProtocolServer implements
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, owner);
+      if (container == null) {
+        throw new SCMException(
+            "Could not allocate container for replication " + replicationConfig
+                + ", owner=" + owner
+                + ": no suitable open pipeline with enough space",
+            ResultCodes.FAILED_TO_ALLOCATE_CONTAINER);
+      }
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
@@ -417,8 +424,13 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        //not found , just go ahead
-        LOG.error("Container with common pipeline not found: {}", ex);
+        // ContainerWithPipeline.pipeline is required in the protobuf response,
+        // so this RPC cannot return container metadata with a null pipeline.
+        // Keep the "exist" semantics by excluding only this container from the
+        // batch result instead of failing the entire request.
+        LOG.warn("Container {} exists but its pipeline could not be resolved; "
+            + "excluding it from getExistContainerWithPipelinesInBatch result. "
+            + "Cause: {}", containerID, ex.getMessage());
       }
     }
     return cpList;
@@ -1530,7 +1542,7 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     try {
-      long count = scm.getContainerManager().getContainers().size();
+      long count = scm.getContainerManager().getTotalContainerCount();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, null));
       return count;
