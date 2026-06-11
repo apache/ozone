@@ -37,6 +37,7 @@ import {Link, useLocation} from 'react-router-dom';
 import logo from '@/logo.png';
 import {showDataFetchError} from '@/utils/common';
 import {useApiData} from '@/v2/hooks/useAPIData.hook';
+import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
 import './navBar.less';
 
@@ -61,16 +62,19 @@ const NavBar: React.FC<NavBarProps> = ({
     }
   );
 
-  const { data: chatbotHealth } = useApiData<{ enabled: boolean; llmClientAvailable: boolean }>(
-    '/api/v1/chatbot/health',
+  const { data: chatbotHealth, success: chatbotHealthLoaded } = useApiData<{
+    enabled: boolean;
+    llmClientAvailable: boolean;
+  }>(
+    CHATBOT_ENDPOINTS.HEALTH,
     { enabled: false, llmClientAvailable: false },
     {
-      onError: (error) => showDataFetchError(error)
+      retryAttempts: 0,
     }
   );
 
   const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
-  const isChatbotEnabled = chatbotHealth.enabled;
+  const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
     <Menu.Item key='/Overview'

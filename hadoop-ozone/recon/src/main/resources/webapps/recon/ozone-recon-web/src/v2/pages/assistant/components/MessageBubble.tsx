@@ -23,6 +23,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '@/v2/types/chatbot.types';
 import classNames from 'classnames';
+import { copyToClipboard } from '@/utils/clipboard';
 import ReconAIMark from './ReconAIMark';
 
 interface MessageBubbleProps {
@@ -32,11 +33,19 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRegenerate }) => {
   const [copied, setCopied] = React.useState(false);
+  const [copyFailed, setCopyFailed] = React.useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    const didCopy = await copyToClipboard(message.text);
+    if (didCopy) {
+      setCopyFailed(false);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setCopied(false);
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   };
 
   const isUser = message.role === 'user';
@@ -61,7 +70,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRegenerate }) 
       </div>
       {!isUser && (
         <div className="message-actions">
-          <Tooltip title={copied ? 'Copied!' : 'Copy'}>
+          <Tooltip title={copied ? 'Copied!' : copyFailed ? 'Copy failed' : 'Copy'}>
             <Button 
               type="text" 
               size="small" 
