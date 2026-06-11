@@ -20,9 +20,9 @@ import React from 'react';
 import { SEED_PROMPTS } from '@/v2/constants/chatbot.constants';
 import { 
   HeartOutlined, 
-  FolderOpenOutlined, 
   PieChartOutlined, 
   DatabaseOutlined, 
+  ScheduleOutlined,
   ClusterOutlined, 
   DeploymentUnitOutlined,
   ArrowRightOutlined
@@ -36,9 +36,9 @@ interface EmptyStateProps {
 const getIcon = (iconName: string) => {
   switch (iconName) {
     case 'heart': return <HeartOutlined />;
-    case 'folder': return <FolderOpenOutlined />;
-    case 'pie-chart': return <PieChartOutlined />;
     case 'database': return <DatabaseOutlined />;
+    case 'pie-chart': return <PieChartOutlined />;
+    case 'schedule': return <ScheduleOutlined />;
     case 'cluster': return <ClusterOutlined />;
     case 'deployment-unit': return <DeploymentUnitOutlined />;
     default: return <ReconAIMark size={20} />;

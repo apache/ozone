@@ -103,9 +103,9 @@ export const SEED_PROMPTS = [
     prompt: "How many unhealthy containers are there?"
   },
   {
-    icon: 'folder',
-    label: 'Browse Keys',
-    prompt: "List keys in /vol1/bucket1"
+    icon: 'database',
+    label: 'Volumes & Buckets',
+    prompt: 'Give me a high-level summary of volumes and buckets in the cluster'
   },
   {
     icon: 'pie-chart',
@@ -113,7 +113,7 @@ export const SEED_PROMPTS = [
     prompt: "What is the current cluster capacity?"
   },
   {
-    icon: 'database',
+    icon: 'schedule',
     label: 'OM Tasks',
     prompt: "Show me the status of OM tasks"
   },
