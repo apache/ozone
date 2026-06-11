@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.server.SCMSecurityProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -92,7 +93,7 @@ public class TestRootCARotationManager {
   private File testDir;
   private String cID = UUID.randomUUID().toString();
   private String scmID = UUID.randomUUID().toString();
-  private BigInteger certID = new BigInteger("1");
+  private BigInteger certID = BigInteger.ONE;
 
   @BeforeEach
   public void init() throws IOException, TimeoutException,
@@ -125,7 +126,7 @@ public class TestRootCARotationManager {
     when(scm.getScmHAManager()).thenReturn(scmhaManager);
     when(scmhaManager.getRatisServer()).thenReturn(mock(SCMRatisServerImpl.class));
     when(scm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
-    when(sequenceIdGenerator.getNextId(anyString())).thenReturn(2L);
+    when(sequenceIdGenerator.getNextId(any(SequenceIdType.class))).thenReturn(2L);
     when(scm.getScmStorageConfig()).thenReturn(scmStorageConfig);
     when(scm.getSecurityProtocolServer()).thenReturn(scmSecurityProtocolServer);
     doNothing().when(scmSecurityProtocolServer).setRootCertificateServer(any());

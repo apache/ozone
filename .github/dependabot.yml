@@ -23,5 +23,15 @@ updates:
       interval: "weekly"
       day: "saturday"
       time: "07:00" # UTC
+    cooldown:
+      default-days: 7
     pull-request-branch-name:
       separator: "-"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      # 'daily' only runs on weekdays
+      interval: "cron"
+      cronjob: "15 6 * * *"
+    cooldown:
+      default-days: 7

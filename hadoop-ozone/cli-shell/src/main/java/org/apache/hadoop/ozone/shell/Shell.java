@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -34,21 +35,21 @@ import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
 public abstract class Shell extends GenericCli {
 
   public static final String OZONE_URI_DESCRIPTION =
-      "Ozone URI could either be a full URI or short URI.\n" +
-          "Full URI should start with o3://, in case of non-HA\nclusters it " +
-          "should be followed by the host name and\noptionally the port " +
-          "number. In case of HA clusters\nthe service id should be used. " +
-          "Service id provides a\nlogical name for multiple hosts and it is " +
-          "defined\nin the property ozone.om.service.ids.\n" +
-          "Example of a full URI with host name and port number\nfor a key:" +
-          "\no3://omhostname:9862/vol1/bucket1/key1\n" +
+      "Ozone URI could either be a full URI or short URI.%n" +
+          "Full URI should start with o3://, in case of non-HA%nclusters it " +
+          "should be followed by the host name and%noptionally the port " +
+          "number. In case of HA clusters%nthe service id should be used. " +
+          "Service id provides a%nlogical name for multiple hosts and it is " +
+          "defined%nin the property ozone.om.service.ids.%n" +
+          "Example of a full URI with host name and port number%nfor a key:" +
+          "%no3://omhostname:9862/vol1/bucket1/key1%n" +
           "With a service id for a volume:" +
-          "\no3://omserviceid/vol1/\n" +
+          "%no3://omserviceid/vol1/%n" +
           "Short URI should start from the volume." +
-          "\nExample of a short URI for a bucket:" +
-          "\nvol1/bucket1\n" +
-          "Any unspecified information will be identified from\n" +
-          "the config files.\n";
+          "%nExample of a short URI for a bucket:" +
+          "%nvol1/bucket1%n" +
+          "Any unspecified information will be identified from%n" +
+          "the config files.%n";
 
   private String name;
 
@@ -80,13 +81,21 @@ public abstract class Shell extends GenericCli {
     return name();
   }
 
+  /**
+   * Lines printed once when entering interactive mode (empty by default).
+   */
+  protected List<String> interactiveWelcomeLines() {
+    return Collections.emptyList();
+  }
+
   private int execute(CommandLine.ParseResult parseResult) {
     name = spec.name();
 
     if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
       installBatchExceptionHandler();
-      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
+      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(),
+          executionMode.command, interactiveWelcomeLines());
       return 0;
     }
 

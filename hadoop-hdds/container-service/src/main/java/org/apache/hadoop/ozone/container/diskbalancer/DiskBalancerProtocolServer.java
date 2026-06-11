@@ -76,12 +76,15 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
                 .setThreshold(info.getThreshold())
                 .setDiskBandwidthInMB(info.getBandwidthInMB())
                 .setParallelThread(info.getParallelThread())
-                .setStopAfterDiskEven(info.isStopAfterDiskEven()))
+                .setStopAfterDiskEven(info.isStopAfterDiskEven())
+                .setContainerStates(info.getContainerStates()))
         .setSuccessMoveCount(info.getSuccessCount())
         .setFailureMoveCount(info.getFailureCount())
         .setBytesToMove(info.getBytesToMove())
         .setBytesMoved(info.getBalancedBytes())
         .setRunningStatus(info.getOperationalState())
+        .setIdealUsage(info.getIdealUsage())
+        .addAllVolumeInfo(info.getVolumeInfo())
         .build();
   }
 

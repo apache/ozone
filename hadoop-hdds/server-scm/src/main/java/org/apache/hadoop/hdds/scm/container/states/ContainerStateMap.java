@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -98,7 +98,7 @@ public class ContainerStateMap {
    * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
    */
   private static class ContainerMap {
-    private final NavigableMap<ContainerID, ContainerEntry> map = new TreeMap<>();
+    private final NavigableMap<ContainerID, ContainerEntry> map = new ConcurrentSkipListMap<>();
 
     boolean contains(ContainerID id) {
       return map.containsKey(id);
@@ -258,6 +258,20 @@ public class ContainerStateMap {
     lifeCycleStateMap.update(currentState, newState, containerID);
     LOG.trace("Updated the container {} from {} to {}", containerID, currentState, newState);
     currentInfo.setState(newState);
+  }
+
+  /**
+   *
+   * @param state the state of the containers
+   * @param start the start id
+   * @param count the maximum size of the returned list
+   * @return a list of sorted {@link ContainerID}s
+   */
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+    Preconditions.assertTrue(count >= 0, "count < 0");
+    return lifeCycleStateMap.tailMap(state, start).keySet().stream()
+        .limit(count)
+        .collect(Collectors.toList());
   }
 
   public List<ContainerInfo> getContainerInfos(ContainerID start, int count) {

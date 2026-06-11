@@ -890,6 +890,8 @@ function ozone_basic_init
   OZONE_PID_DIR=${OZONE_PID_DIR:-/tmp}
   OZONE_ROOT_LOGGER=${OZONE_ROOT_LOGGER:-${OZONE_LOGLEVEL},console}
   OZONE_DAEMON_ROOT_LOGGER=${OZONE_DAEMON_ROOT_LOGGER:-${OZONE_LOGLEVEL},RFA}
+  OZONE_HTTP_REQUEST_LOGGER=${OZONE_HTTP_REQUEST_LOGGER:-INFO,console}
+  OZONE_DAEMON_HTTP_REQUEST_LOGGER=${OZONE_DAEMON_HTTP_REQUEST_LOGGER:-INFO,HttpAccess}
   OZONE_SECURITY_LOGGER=${OZONE_SECURITY_LOGGER:-INFO,NullAppender}
   OZONE_SSH_OPTS=${OZONE_SSH_OPTS-"-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10s"}
   OZONE_SECURE_LOG_DIR=${OZONE_SECURE_LOG_DIR:-${OZONE_LOG_DIR}}
@@ -1420,6 +1422,17 @@ function ozone_java_setup
     RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
   fi
 
+  # Opt-in caps on Netty's pooled direct-memory arena (HDDS-11234). Two
+  # properties are needed because Ozone runs both the unshaded io.netty
+  # *and* the Ratis-shaded copy in the same JVM, each with its own
+  # independent ceiling.
+  if [[ -n "${OZONE_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    OZONE_OPTS="-Dio.netty.maxDirectMemory=${OZONE_NETTY_MAX_DIRECT_MEMORY} ${OZONE_OPTS}"
+  fi
+  if [[ -n "${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.maxDirectMemory=${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY} ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -1520,17 +1533,15 @@ function ozone_translate_cygwin_path
 ## @replaceable  yes
 function ozone_add_default_gc_opts
 {
-  java_major_version=$(ozone_get_java_major_version)
   if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
-    if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
-      OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
-      if [[ "$java_major_version" -lt 15 ]]; then
-        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
-      else
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
-      fi
+    local gc_opts
+    local java_major_version
+    java_major_version=$(ozone_get_java_major_version)
+    gc_opts="-XX:ParallelGCThreads=8"
+    if [[ "$java_major_version" -lt 15 ]]; then
+      gc_opts="${gc_opts} -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
+    ozone_add_param OZONE_OPTS XX "${gc_opts}"
   fi
 }
 
@@ -1590,6 +1601,7 @@ function ozone_finalize_opts
   ozone_add_param OZONE_OPTS hadoop.home.dir "-Dhadoop.home.dir=${OZONE_HOME}"
   ozone_add_param OZONE_OPTS hadoop.id.str "-Dhadoop.id.str=${OZONE_IDENT_STRING}"
   ozone_add_param OZONE_OPTS hadoop.root.logger "-Dhadoop.root.logger=${OZONE_ROOT_LOGGER}"
+  ozone_add_param OZONE_OPTS ozone.http.request.logger "-Dozone.http.request.logger=${OZONE_HTTP_REQUEST_LOGGER}"
   ozone_add_param OZONE_OPTS hadoop.policy.file "-Dhadoop.policy.file=${OZONE_POLICYFILE}"
   ozone_add_param OZONE_OPTS hadoop.security.logger "-Dhadoop.security.logger=${OZONE_SECURITY_LOGGER}"
 }
@@ -2721,6 +2733,7 @@ function ozone_generic_java_subcmd_handler
   # if yes, use the daemon logger and the appropriate log file.
   if [[ "${OZONE_DAEMON_MODE}" != "default" ]]; then
     OZONE_ROOT_LOGGER="${OZONE_DAEMON_ROOT_LOGGER}"
+    OZONE_HTTP_REQUEST_LOGGER="${OZONE_DAEMON_HTTP_REQUEST_LOGGER}"
     if [[ "${OZONE_SUBCMD_SECURESERVICE}" = true ]]; then
       OZONE_LOGFILE="ozone-${OZONE_SECURE_USER}-${OZONE_IDENT_STRING}-${OZONE_SUBCMD}-${HOSTNAME}.log"
     else

@@ -120,6 +120,7 @@ public class VersionEndpointTask implements
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
         if (!result) {
+          LOG.error("Marking volume {} as failed", volume.getStorageDir().getPath());
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }

@@ -40,6 +40,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -254,6 +256,13 @@ public class SCMClientProtocolServer implements
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, owner);
+      if (container == null) {
+        throw new SCMException(
+            "Could not allocate container for replication " + replicationConfig
+                + ", owner=" + owner
+                + ": no suitable open pipeline with enough space",
+            ResultCodes.FAILED_TO_ALLOCATE_CONTAINER);
+      }
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
@@ -388,8 +397,8 @@ public class SCMClientProtocolServer implements
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
-        strContainerIDs.append(ContainerID.valueOf(containerID).toString());
-        strContainerIDs.append(',');
+        strContainerIDs.append(ContainerID.valueOf(containerID).toString())
+            .append(',');
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -415,8 +424,13 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        //not found , just go ahead
-        LOG.error("Container with common pipeline not found: {}", ex);
+        // ContainerWithPipeline.pipeline is required in the protobuf response,
+        // so this RPC cannot return container metadata with a null pipeline.
+        // Keep the "exist" semantics by excluding only this container from the
+        // batch result instead of failing the entire request.
+        LOG.warn("Container {} exists but its pipeline could not be resolved; "
+            + "excluding it from getExistContainerWithPipelinesInBatch result. "
+            + "Cause: {}", containerID, ex.getMessage());
       }
     }
     return cpList;
@@ -451,7 +465,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null, null, null);
+    return listContainer(startContainerID, count, null, null, null, null);
   }
 
   /**
@@ -468,7 +482,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null, null);
+    return listContainer(startContainerID, count, state, null, null, null);
   }
 
   /**
@@ -487,23 +501,31 @@ public class SCMClientProtocolServer implements
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
-    return listContainerInternal(startContainerID, count, state, factor, null, null);
+    return listContainerInternal(startContainerID, count, state, factor, null, null, null);
   }
 
   private ContainerListResult listContainerInternal(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) throws IOException {
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, replicationType, repConfig);
+    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, 
+        replicationType, repConfig, suppressed);
 
     try {
       Stream<ContainerInfo> containerStream =
           buildContainerStream(factor, replicationType, repConfig, getBaseContainerStream(state));
+      
+      // Filter by suppressed flag only if explicitly specified
+      if (suppressed != null) {
+        containerStream = containerStream.filter(info -> info.isSuppressed() == suppressed);
+      }
+      
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
-              .sorted().collect(Collectors.toList());
+              .sorted(Comparator.comparing(ContainerInfo::containerID)).collect(Collectors.toList());
       List<ContainerInfo> limitedContainers =
           containerInfos.stream().limit(count).collect(Collectors.toList());
       long totalCount = (long) containerInfos.size();
@@ -552,7 +574,8 @@ public class SCMClientProtocolServer implements
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig,
+      Boolean suppressed) {
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
@@ -567,6 +590,9 @@ public class SCMClientProtocolServer implements
     }
     if (repConfig != null) {
       auditMap.put("replicationConfig", repConfig.toString());
+    }
+    if (suppressed != null) {
+      auditMap.put("suppressed", suppressed.toString());
     }
 
     return auditMap;
@@ -588,7 +614,28 @@ public class SCMClientProtocolServer implements
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
-    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig);
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param repConfig Replication Config for the container.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  @Override
+  public ContainerListResult listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, suppressed);
   }
 
   @Override
@@ -655,6 +702,7 @@ public class SCMClientProtocolServer implements
         if (datanodeInfo != null) {
           nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
           nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+          addFailedVolumes(nodeBuilder, datanodeInfo);
         }
         result.add(nodeBuilder.build());
       }
@@ -687,6 +735,7 @@ public class SCMClientProtocolServer implements
         if (datanodeInfo != null) {
           nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
           nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+          addFailedVolumes(nodeBuilder, datanodeInfo);
         }
         result = nodeBuilder.build();
       }
@@ -700,6 +749,15 @@ public class SCMClientProtocolServer implements
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
     return result;
+  }
+
+  private static void addFailedVolumes(HddsProtos.Node.Builder nodeBuilder,
+      DatanodeInfo datanodeInfo) {
+    for (StorageReportProto report : datanodeInfo.getStorageReports()) {
+      if (report.hasFailed() && report.getFailed()) {
+        nodeBuilder.addFailedVolumes(report.getStorageLocation());
+      }
+    }
   }
 
   @Override
@@ -1484,7 +1542,7 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     try {
-      long count = scm.getContainerManager().getContainers().size();
+      long count = scm.getContainerManager().getTotalContainerCount();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, null));
       return count;
@@ -1502,7 +1560,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("state", String.valueOf(state));
 
     try {
-      long count = scm.getContainerManager().getContainers(state).size();
+      long count = scm.getContainerManager().getContainerStateCount(state);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, auditMap));
       return count;
@@ -1514,8 +1572,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
 
     final Map<String, String> auditMap = Maps.newHashMap();
@@ -1523,14 +1581,14 @@ public class SCMClientProtocolServer implements
     auditMap.put("count", String.valueOf(count));
     auditMap.put("state", String.valueOf(state));
     try {
-      List<ContainerInfo> results = scm.getContainerManager().getContainers(
-          ContainerID.valueOf(startContainerID), count, state);
+      List<ContainerID> results = scm.getContainerManager().getContainerIDs(
+          startContainerID, count, state);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.LIST_CONTAINER, auditMap));
+          SCMAction.LIST_CONTAINER_IDS, auditMap));
       return results;
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.LIST_CONTAINER, auditMap, ex));
+          SCMAction.LIST_CONTAINER_IDS, auditMap, ex));
       throw ex;
     }
   }
@@ -1692,6 +1750,38 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.RECONCILE_CONTAINER, auditMap));
     } catch (SCMException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    SCMAction action = suppress ? SCMAction.SUPPRESS_CONTAINER : SCMAction.UNSUPPRESS_CONTAINER;
+    List<Long> failedContainerIDs = new ArrayList<>();
+    for (long containerId : containerIds) {
+      try {
+        persistContainerSuppression(containerId, suppress, action);
+      } catch (IOException ex) {
+        failedContainerIDs.add(containerId);
+      }
+    }
+    return failedContainerIDs;
+  }
+
+  private void persistContainerSuppression(long longContainerID, boolean suppress, SCMAction action)
+      throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerID", containerID.toString());
+    auditMap.put("suppress", String.valueOf(suppress));
+    try {
+      ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
+      containerInfo.setSuppressed(suppress);
+      scm.getContainerManager().updateContainerInfo(containerID, containerInfo.getProtobuf());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(action, auditMap));
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(action, auditMap, ex));
       throw ex;
     }
   }

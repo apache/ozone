@@ -54,9 +54,11 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -95,6 +97,26 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     reconTaskController.start();
   }
 
+  @AfterEach
+  public void tearDown() {
+    if (reconTaskController != null) {
+      reconTaskController.stop();
+    }
+  }
+
+  @Test
+  public void testStopCompletesPromptly() {
+    // stop() must not block on the graceful shutdown timeout. The event
+    // processing loop only exits on interrupt, so a plain shutdown() can never
+    // drain it and awaitTermination would otherwise burn the full 30s timeout.
+    long start = Time.monotonicNow();
+    reconTaskController.stop();
+    long elapsed = Time.monotonicNow() - start;
+    assertThat(elapsed)
+        .as("stop() should return promptly, not wait out the shutdown timeout")
+        .isLessThan(5000L);
+  }
+
   @Test
   public void testRegisterTask() {
     String taskName = "Dummy_" + System.currentTimeMillis();
@@ -108,15 +130,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
-    // Use CountDownLatch to wait for async processing
-    CountDownLatch taskCompletionLatch = new CountDownLatch(1);
-    
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
     when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
-        .thenAnswer(invocation -> {
-          taskCompletionLatch.countDown(); // Signal task completion
-          return new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build();
-        });
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("MockTask").setTaskSuccess(true).build());
     reconTaskController.registerTask(reconOmTaskMock);
     
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
@@ -131,10 +148,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
-    // Wait for async processing to complete using latch
-    boolean completed = taskCompletionLatch.await(10, TimeUnit.SECONDS);
-    assertThat(completed).isTrue();
-    
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status = reconTaskStatusDao.findById("MockTask");
+        return status != null
+            && status.getLastTaskRunStatus() == 0
+            && status.getLastUpdatedSeqNumber() == 100L;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
     verify(reconOmTaskMock, times(1))
         .process(any(), anyMap());
     long endTime = System.currentTimeMillis();
@@ -222,9 +246,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
     
-    // Wait for async processing to complete
-    Thread.sleep(3000); // Increase timeout for retry logic
-    
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status = reconTaskStatusDao.findById(taskName);
+        return status != null
+            && status.getLastTaskRunStatus() == 0
+            && status.getLastUpdatedSeqNumber() == 100L;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
     assertThat(reconTaskController.getRegisteredTasks()).isNotEmpty();
     assertEquals(dummyReconDBTask, reconTaskController.getRegisteredTasks()
         .get(dummyReconDBTask.getTaskName()));
@@ -336,6 +368,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
+    reconTaskController.stop();
     
     // Test successful queueing - the checkpoint creation should work with proper mocks
     ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
@@ -363,6 +396,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
+    reconTaskController.stop();
     
     // Create a spy of the controller to mock checkpoint creation failure
     ReconTaskControllerImpl controllerSpy = spy((ReconTaskControllerImpl) reconTaskController);
@@ -457,6 +491,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     // Update with first manager
     reconTaskController.updateOMMetadataManager(mockManager1);
+    reconTaskController.stop();
     
     // Test that the manager was updated correctly by attempting to queue a reinitialization event
     ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
@@ -481,6 +516,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
+    reconTaskController.stop();
     
     // This test verifies the successful path - in practice, queue failure after clear is very rare
     // since we clear the buffer before queueing the reinitialization event
@@ -510,6 +546,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
     controllerImpl.updateOMMetadataManager(mockOMMetadataManager);
+    controllerImpl.stop();
     
     // Reset any previous retry state
     controllerImpl.resetRetryCounters();
@@ -531,6 +568,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
     controllerImpl.updateOMMetadataManager(mockOMMetadataManager);
+    controllerImpl.stop();
     
     // Reset any previous retry state
     controllerImpl.resetRetryCounters();
@@ -596,9 +634,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         .thenReturn(false)  // First call fails
         .thenReturn(true);  // Second call succeeds
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create and manually process a reinitialization event
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES,
@@ -732,9 +772,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(controllerSpy.reInitializeTasks(any(ReconOMMetadataManager.class), any()))
         .thenReturn(true);  // Succeed
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create reinitialization event with checkpointed manager
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW,

@@ -303,19 +303,31 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           if (keyValueContainer.
               writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
             try {
-              String schemaVersion = containerData
-                  .getSupportedSchemaVersionOrDefault();
-              if (getSchemaHandlers().containsKey(schemaVersion)) {
-                schemaHandlers.get(schemaVersion).handle(containerData, tx);
+              // Re-fetch the container after acquiring the lock. DiskBalancer may have relocated
+              // this container to a different disk while we waited — in that case, the container
+              // object in ContainerSet has changed and containerData points to the old replica.
+              Container<?> current = containerSet.getContainer(containerId);
+              if (current == null || current.getContainerData() != containerData) {
+                LOG.debug("DeleteBlocks: containerData for container {} is stale "
+                    + ", Will retry on the new replica.",
+                    containerId);
+                lockAcquisitionFailed = true;
+                txResultBuilder.setContainerID(containerId).setSuccess(false);
               } else {
-                throw new UnsupportedOperationException(
-                    "Only schema version 1,2,3 are supported.");
+                String schemaVersion = containerData
+                    .getSupportedSchemaVersionOrDefault();
+                if (getSchemaHandlers().containsKey(schemaVersion)) {
+                  schemaHandlers.get(schemaVersion).handle(containerData, tx);
+                } else {
+                  throw new UnsupportedOperationException(
+                      "Only schema version 1,2,3 are supported.");
+                }
+                txResultBuilder.setContainerID(containerId)
+                    .setSuccess(true);
               }
             } finally {
               keyValueContainer.writeUnlock();
             }
-            txResultBuilder.setContainerID(containerId)
-                .setSuccess(true);
           } else {
             lockAcquisitionFailed = true;
             txResultBuilder.setContainerID(containerId)
@@ -649,16 +661,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
       // Persist pending bytes only if the feature is finalized.
       if (VersionedDatanodeFeatures.isFinalized(
-          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalSizePerReplica()) {
         long pendingBytes = containerData.getBlockPendingDeletionBytes();
-        pendingBytes += delTX.getTotalBlockSize();
+        pendingBytes += delTX.getTotalSizePerReplica();
         metadataTable
             .putWithBatch(batchOperation,
                 containerData.getPendingDeleteBlockBytesKey(),
                 pendingBytes);
       }
       containerData.incrPendingDeletionBlocks(newDeletionBlocks,
-          delTX.hasTotalBlockSize() ? delTX.getTotalBlockSize() : 0);
+          delTX.hasTotalSizePerReplica() ? delTX.getTotalSizePerReplica() : 0);
       containerData.updateDeleteTransactionId(delTX.getTxID());
     }
   }

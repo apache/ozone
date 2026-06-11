@@ -582,8 +582,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       validateLongRunningWrite();
     } catch (StorageContainerException e) {
-      ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, e, requestProto);
-      return CompletableFuture.completedFuture(result::toByteString);
+      return completeExceptionally(e);
     }
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
@@ -632,11 +631,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             // see the stateMachine is marked unhealthy by other parallel thread
             unhealthyContainers.add(write.getBlockID().getContainerID());
             stateMachineHealthy.set(false);
-            StorageContainerException sce = new StorageContainerException("Failed to write chunk data",
-                e, ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
-            ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, sce, requestProto);
-            raftFuture.complete(result::toByteString);
-            return result;
+            raftFuture.completeExceptionally(e);
+            throw e;
           } finally {
             // Remove the future once it finishes execution from the
             writeChunkFutureMap.remove(entryIndex);
@@ -661,6 +657,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
         // that should not crash the pipeline.
         && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
+      StorageContainerException sce =
+          new StorageContainerException(r.getMessage(), r.getResult());
       LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
           write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
           write.getChunkData().getChunkName() + " Error message: " +
@@ -671,7 +669,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // handling the entry for the write chunk in cache.
       stateMachineHealthy.set(false);
       unhealthyContainers.add(write.getBlockID().getContainerID());
-      raftFuture.complete(r::toByteString);
+      raftFuture.completeExceptionally(sce);
     } else {
       metrics.incNumBytesWrittenCount(
           requestProto.getWriteChunk().getChunkData().getLen());
@@ -792,26 +790,45 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
     try {
-      metrics.incNumWriteStateMachineOps();
-      long writeStateMachineStartTime = Time.monotonicNowNanos();
-      final Context context = (Context) trx.getStateMachineContext();
-      Objects.requireNonNull(context, "context == null");
-      final ContainerCommandRequestProto requestProto = context.getRequestProto();
-      final Type cmdType = requestProto.getCmdType();
-
-      // For only writeChunk, there will be writeStateMachineData call.
-      // CreateContainer will happen as a part of writeChunk only.
-      switch (cmdType) {
-      case WriteChunk:
-        return writeStateMachineData(requestProto, entry.getIndex(),
-            entry.getTerm(), writeStateMachineStartTime);
-      default:
-        throw new IllegalStateException("Cmd Type:" + cmdType
-            + " should not have state machine data");
-      }
-    } catch (Exception e) {
-      metrics.incNumWriteStateMachineFails();
+      return writeImpl(entry, trx).whenComplete((r, e) -> {
+        if (e != null) {
+          closeServer(e);
+        }
+      });
+    } catch (Throwable e) {
+      closeServer(e);
       return completeExceptionally(e);
+    }
+  }
+
+  private CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
+    metrics.incNumWriteStateMachineOps();
+    long writeStateMachineStartTime = Time.monotonicNowNanos();
+    final Context context = (Context) trx.getStateMachineContext();
+    Objects.requireNonNull(context, "context == null");
+    final ContainerCommandRequestProto requestProto = context.getRequestProto();
+    final Type cmdType = requestProto.getCmdType();
+
+    // For only writeChunk, there will be writeStateMachineData call.
+    // CreateContainer will happen as a part of writeChunk only.
+    switch (cmdType) {
+    case WriteChunk:
+      return writeStateMachineData(requestProto, entry.getIndex(),
+          entry.getTerm(), writeStateMachineStartTime);
+    default:
+      throw new IllegalStateException("Cmd Type:" + cmdType
+          + " should not have state machine data");
+    }
+  }
+
+  private void closeServer(Throwable e) {
+    metrics.incNumWriteStateMachineFails();
+    try {
+      LOG.error("{}: Failed to writeStateMachineData, close server", getId(), e);
+      getServer().get().getDivision(getGroupId()).close();
+    } catch (Throwable t) {
+      e.addSuppressed(t);
+      LOG.error("{}: Failed to close server", getId(), t);
     }
   }
 
@@ -1230,7 +1247,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache.removeIf(k -> k <= index);
   }
 
-  private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
+  private static <T> CompletableFuture<T> completeExceptionally(Throwable e) {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;
@@ -1330,13 +1347,13 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        builder.append(", container path=");
-        builder.append(location);
+        builder.append(", container path=")
+            .append(location);
       }
     } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
-      builder.append("smProtoToString failed with ");
-      builder.append(t.getMessage());
+      builder.append("smProtoToString failed with ")
+          .append(t.getMessage());
     }
     return builder.toString();
   }

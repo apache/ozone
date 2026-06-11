@@ -508,7 +508,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
-   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   * @param existingKeyGeneration The positive generation of the existing key which is checked for changes at key create
    *                              and commit time.
    * @param replicationConfig The replication configuration for the key to be rewritten.
    * @param metadata custom key value metadata
@@ -518,6 +518,44 @@ public class OzoneBucket extends WithMetadata {
   public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
       ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
     return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
+  }
+
+  /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  /**
+   * Rewrites a key only if its ETag matches (S3 If-Match semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
+        expectedETag, replicationConfig, metadata, tags);
   }
 
   /**
@@ -573,6 +611,52 @@ public class OzoneBucket extends WithMetadata {
     }
     return proxy.createStreamKey(volumeName, name, key, size,
         replicationConfig, keyMetadata, tags);
+  }
+
+  /**
+   * Creates a key with datastream only if it does not exist already
+   * (S3 If-None-Match: * semantics).
+   *
+   * @param key Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags);
+  }
+
+  /**
+   * Rewrites a key with datastream only if its ETag matches
+   * (S3 If-Match semantics).
+   *
+   * @param key Name of the key to be rewritten.
+   * @param size Size of the data the key will point to.
+   * @param expectedETag The ETag value the existing key must have.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags);
   }
 
   /**
@@ -867,6 +951,27 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Complete Multipart upload with conditional write support.
+   * This will combine all the parts and make the key visible in ozone,
+   * but only if the specified preconditions are met.
+   *
+   * @param key key name
+   * @param uploadID multipart upload ID
+   * @param partsMap map of part numbers to ETags
+   * @param expectedDataGeneration expected data generation for conditional write
+   *        (use OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS for If-None-Match: *)
+   * @param expectedETag expected ETag for conditional write (for If-Match)
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException if precondition fails or other I/O error occurs
+   */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
+        partsMap, expectedDataGeneration, expectedETag);
+  }
+
+  /**
    * Abort multipart upload request.
    * @param keyName
    * @param uploadID
@@ -1047,8 +1152,8 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param prefix Optional string to filter for the selected keys.
    */
-  public OzoneMultipartUploadList listMultipartUploads(String prefix, 
-      String keyMarker, String uploadIdMarker, int maxUploads) 
+  public OzoneMultipartUploadList listMultipartUploads(String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads)
       throws IOException {
     return proxy.listMultipartUploads(volumeName, getName(), prefix, keyMarker, uploadIdMarker, maxUploads);
   }

@@ -286,7 +286,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       BlockGroup blockGroup1 = BlockGroup.newBuilder().setKeyName("key1/1")
           .addAllDeletedBlocks(new ArrayList<>()).build();
       //Create a BlockGroup with non-empty deleted blocks
-      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1, 3));
+      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1),
+          1, 3, 1));
       BlockGroup blockGroup2 = BlockGroup.newBuilder().setKeyName("key2/2")
           .addAllDeletedBlocks(deletedBlocks).build();
       Map<String, PurgedKey> blockGroups = new HashMap<>();
@@ -892,7 +893,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
             .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
-                new BlockID(1, 1), 1, 3))).build();
+                new BlockID(1, 1), 1, 3, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
             "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
@@ -1166,18 +1167,19 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     private void customizeConfig() {
-      // Define a small Ratis limit to force multiple batches for testing
-      // The actual byte size of protobuf messages depends on content.
-      // A small value like 1KB or 2KB should ensure batching for ~10-20 keys.
-      final int testRatisLimitBytes = 1024; // 2 KB to encourage multiple batches, 90% of the actualRatisLimitBytes.
-      // Set the specific Ratis limit for this test
+      // Define a small Ratis limit to force multiple batches for testing.
+      // With 50 keys and 1024 bytes limit (90% = ~921 bytes effective), this
+      // produces ~7 batches, confirming the batching logic works correctly.
+      final int testRatisLimitBytes = 1024;
       conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
           testRatisLimitBytes, StorageUnit.BYTES);
+      // Use a very large service interval so the background thread never fires
+      // during the test, preventing concurrent processing with runPeriodicalTaskNow().
+      conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.DAYS);
     }
 
     @Test
     @DisplayName("Verify PurgeKeysRequest is batched according to Ratis byte limit")
-    @Flaky("HDDS-13661")
     void testPurgeKeysRequestBatching() throws Exception {
       keyDeletingService.suspend();
 
@@ -1191,20 +1193,19 @@ class TestKeyDeletingService extends OzoneTestBase {
         // Mock submitRequest to capture requests and return success
         mockedRatisUtils.when(() -> OzoneManagerRatisUtils.submitRequest(
                 any(OzoneManager.class),
-                requestCaptor.capture(), // Capture the OMRequest here
+                requestCaptor.capture(),
                 any(),
                 anyLong()))
-            .thenAnswer(invocation -> {
-              // Return a successful OMResponse for each captured request
-              return OzoneManagerProtocolProtos.OMResponse.newBuilder()
-                  .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
-                  .setStatus(OzoneManagerProtocolProtos.Status.OK)
-                  .build();
-            });
+            .thenAnswer(invocation -> OzoneManagerProtocolProtos.OMResponse.newBuilder()
+                .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+                .setStatus(OzoneManagerProtocolProtos.Status.OK)
+                .build());
 
-        final int numKeysToCreate = 50; // Create enough keys to ensure multiple batches
-        // Create and delete keys using the test-specific managers
+        final int numKeysToCreate = 50;
         createAndDeleteKeys(numKeysToCreate, 1);
+        // Wait for all delete operations to be flushed from the DoubleBuffer to
+        // RocksDB, so that getPendingDeletionKeys() can see all 50 entries.
+        om.awaitDoubleBufferFlush();
 
         keyDeletingService.resume();
 

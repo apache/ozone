@@ -22,6 +22,9 @@ x-common-config:
     - ../../../common/security.conf
   image: ${OZONE_TEST_IMAGE}
   dns_search: .
+  depends_on:
+    kdc:
+      condition: service_healthy
 
 x-environment:
   &environment
@@ -29,7 +32,6 @@ x-environment:
   OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
   OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
   OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-  WAITFOR: kdc:88
 
 x-datanode:
   &datanode

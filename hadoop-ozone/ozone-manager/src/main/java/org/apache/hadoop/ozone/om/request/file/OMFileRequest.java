@@ -192,13 +192,13 @@ public final class OMFileRequest {
     List<OzoneAcl> acls = omBucketInfo.getAcls();
 
     long lastKnownParentId = omBucketInfo.getObjectID();
-    String dbDirName = ""; // absolute path for trace logs
+    StringBuilder dbDirName = new StringBuilder(); // absolute path for trace logs
     // for better logging
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      fullKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(fileName);
       if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
@@ -219,7 +219,7 @@ public final class OMFileRequest {
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
               get(dbNodeName);
       if (omDirInfo != null) {
-        dbDirName += omDirInfo.getName() + OzoneConsts.OZONE_URI_DELIMITER;
+        dbDirName.append(omDirInfo.getName()).append(OzoneConsts.OZONE_URI_DELIMITER);
         if (elements.hasNext()) {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           lastKnownParentId = omDirInfo.getObjectID();
@@ -264,7 +264,7 @@ public final class OMFileRequest {
     }
 
     String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
-            bucketName, dbDirName);
+        bucketName, dbDirName.toString());
     LOG.trace("Acls from parent {} are : {}", dbDirKeyName, acls);
 
     return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,

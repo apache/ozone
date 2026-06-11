@@ -31,22 +31,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -55,6 +59,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -67,7 +72,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -91,6 +95,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
+  private final Clock clock;
 
   private double threshold;
   private long bandwidthInMB;
@@ -127,13 +132,24 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
 
+  private Set<State> movableContainerStates;
+
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
+    this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit,
+        workerSize, conf, new SlidingWindow.MonotonicClock());
+  }
+
+  DiskBalancerService(OzoneContainer ozoneContainer,
+      long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
+      int workerSize, ConfigurationSource conf, Clock clock)
+      throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
     this.ozoneContainer = ozoneContainer;
     this.conf = conf;
+    this.clock = Objects.requireNonNull(clock, "clock");
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
     Objects.requireNonNull(diskBalancerInfoPath);
@@ -150,8 +166,9 @@ public class DiskBalancerService extends BackgroundService {
       throw new IOException(e);
     }
 
-    replicaDeletionDelay = conf.getObject(DiskBalancerConfiguration.class)
-        .getReplicaDeletionDelay();
+    DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
+    replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
+    setContainerStates(diskBalancerConfiguration.getMovableContainerStates());
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -237,23 +254,19 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
+    DiskBalancerConfiguration validated = diskBalancerInfo.toConfiguration();
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
     updateOperationalStateFromInfo(diskBalancerInfo);
 
-    setThreshold(diskBalancerInfo.getThreshold());
-    setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
-    setParallelThread(diskBalancerInfo.getParallelThread());
-    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setThreshold(validated.getThreshold());
+    setBandwidthInMB(validated.getDiskBandwidthInMB());
+    setParallelThread(validated.getParallelThread());
+    setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
-
-    // Default executorService is ScheduledThreadPoolExecutor, so we can
-    // update the poll size by setting corePoolSize.
-    if ((getExecutorService() instanceof ScheduledThreadPoolExecutor)) {
-      ((ScheduledThreadPoolExecutor) getExecutorService())
-          .setCorePoolSize(parallelThread);
-    }
+    setContainerStates(validated.getMovableContainerStates());
+    setPoolSize(parallelThread);
   }
 
   /**
@@ -298,7 +311,7 @@ public class DiskBalancerService extends BackgroundService {
    * Read {@link DiskBalancerInfo} from a local info file.
    *
    * @param path DiskBalancerInfo file local path
-   * @return {@link DatanodeDetails}
+   * @return parsed {@link DiskBalancerInfo}
    * @throws IOException If the conf file is malformed or other I/O exceptions
    */
   private synchronized DiskBalancerInfo readDiskBalancerInfoFile(
@@ -324,17 +337,27 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    if (path.exists()) {
-      if (!path.delete() || !path.createNewFile()) {
-        throw new IOException("Unable to overwrite the DiskBalancerInfo file.");
-      }
-    } else {
-      if (!path.getParentFile().exists() &&
-          !path.getParentFile().mkdirs()) {
-        throw new IOException("Unable to create DiskBalancerInfo directories.");
-      }
+    Path target = path.toPath().toAbsolutePath();
+    Path parent = target.getParent();
+    if (parent == null) {
+      throw new IOException(
+          "Unable to determine parent directory for DiskBalancerInfo file: "
+              + target);
     }
-    DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
+    try {
+      Files.createDirectories(parent);
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to create DiskBalancerInfo directories: " + parent, e);
+    }
+
+    try {
+      DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo,
+          target.toFile());
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to write DiskBalancerInfo file: " + target, e);
+    }
   }
 
   public void setThreshold(double threshold) {
@@ -355,6 +378,27 @@ public class DiskBalancerService extends BackgroundService {
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
+  }
+
+  /**
+   * Applies container-state configuration.
+   * <p>
+   * Only the parsed set of {@link State} values is stored in memory. Status and YAML use a
+   * canonical comma-separated list (enum names sorted lexically), which may differ from the
+   * original input string.
+   */
+  public void setContainerStates(Set<State> containerStateSet) {
+    this.movableContainerStates = containerStateSet;
+  }
+
+  /**
+   * Stable comma-separated {@link State} names for persistence and RPC.
+   */
+  private static String formatContainerStates(Set<State> states) {
+    return states.stream()
+        .sorted(Comparator.comparing(State::name))
+        .map(State::name)
+        .collect(Collectors.joining(","));
   }
 
   @Override
@@ -394,7 +438,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       ContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
-          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold);
+          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold, movableContainerStates);
       if (candidate != null) {
         HddsVolume sourceVolume = candidate.getSourceVolume();
         HddsVolume destVolume = candidate.getDestVolume();
@@ -404,8 +448,7 @@ public class DiskBalancerService extends BackgroundService {
               destVolume);
           queue.add(task);
           inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-              - toBalanceContainer.getBytesUsed());
+          deltaSizes.merge(sourceVolume, -toBalanceContainer.getBytesUsed(), Long::sum);
         }
       }
     }
@@ -469,7 +512,8 @@ public class DiskBalancerService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
-      boolean moveSucceeded = true;
+      boolean moveSucceeded = false;
+      Container newContainer = null;
       long containerId = containerData.getContainerID();
       Container container = ozoneContainer.getContainerSet().getContainer(containerId);
       boolean readLockReleased = false;
@@ -481,23 +525,18 @@ public class DiskBalancerService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection. Only CLOSED containers can be moved.
-      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
-      // these containers are rejected.
-      State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
-      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
-        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
-            containerId, containerState);
-        postCall(false, startTime);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
       try {
+        // Double check container state after acquiring lock to start move process.
+        // Container state may have changed after selection.
+        State containerState = container.getContainerData().getState();
+        if (!movableContainerStates.contains(containerState)) {
+          LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
@@ -545,7 +584,7 @@ public class DiskBalancerService extends BackgroundService {
         }
 
         // Import the container. importContainer will reset container back to original state
-        Container newContainer = ozoneContainer.getController().importContainer(tempContainerData);
+        newContainer = ozoneContainer.getController().importContainer(tempContainerData);
 
         // Step 4: Update container for containerID and mark old container for deletion
         // first, update the in-memory set to point to the new replica.
@@ -553,8 +592,13 @@ public class DiskBalancerService extends BackgroundService {
         // old caller can still hold the old Container object.
         ozoneContainer.getContainerSet().updateContainer(newContainer);
         destVolume.incrementUsedSpace(containerSize);
+
+        // Test injector: ContainerSet now references newContainer while this thread still holds
+        // readLock on the old replica.
+        pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
+        moveSucceeded = true;
         container.readUnlock();
         readLockReleased = true;
         try {
@@ -569,15 +613,8 @@ public class DiskBalancerService extends BackgroundService {
         balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
-      } catch (IOException e) {
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // do nothing
-          }
-        }
-        moveSucceeded = false;
+      } catch (Throwable e) {
+        pauseInjector();
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
           try {
@@ -600,13 +637,14 @@ public class DiskBalancerService extends BackgroundService {
         if (!readLockReleased) {
           container.readUnlock();
         }
-        if (moveSucceeded) {
+        if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
-          ContainerLogger.logMoveSuccess(containerId, sourceVolume,
+          pendingDeletionContainers.put(clock.millis() + replicaDeletionDelay,
+              container);
+          ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
-        postCall(moveSucceeded, startTime);
+        postCall(moveSucceeded && newContainer != null, startTime);
 
         // pick one expired container from pendingDeletionContainers to delete
         tryCleanupOnePendingDeletionContainer();
@@ -621,8 +659,7 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall(boolean success, long startTime) {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
-      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
-          containerData.getBytesUsed());
+      deltaSizes.merge(sourceVolume, containerData.getBytesUsed(), Long::sum);
       destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {
@@ -660,7 +697,7 @@ public class DiskBalancerService extends BackgroundService {
   private boolean tryCleanupOnePendingDeletionContainer() {
     Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
     if (entry != null) {
-      if (entry.getKey() <= System.currentTimeMillis()) {
+      if (entry.getKey() <= clock.millis()) {
         // entry container is expired
         deleteContainer(entry.getValue());
         return true;
@@ -685,9 +722,45 @@ public class DiskBalancerService extends BackgroundService {
       bytesToMove = calculateBytesToMove(volumeUsages);
     }
 
-    return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
+    DiskBalancerInfo info = new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
+        parallelThread, stopAfterDiskEven, version, formatContainerStates(movableContainerStates),
+        metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
+    info.setIdealUsage(getIdealUsage(volumeUsages));
+    info.setVolumeInfo(buildVolumeReportProto(volumeUsages));
+    return info;
+  }
+
+  /**
+   * Build a list of VolumeReportProto from a list of VolumeFixedUsage.
+   * VolumeReportProto consists of information like StorageID,
+   * volume utilization and committed bytes to the client.
+   *
+   * @param volumeSet snapshot of VolumeFixedUsage which contains the usage information of each volume
+   * @return a list of VolumeReportProto which will be sent to clients for reporting volume status
+   */
+  public static List<VolumeReportProto> buildVolumeReportProto(List<VolumeFixedUsage> volumeSet) {
+    if (volumeSet == null || volumeSet.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<VolumeReportProto> result = new ArrayList<>();
+    for (VolumeFixedUsage v : volumeSet) {
+      HddsVolume volume = v.getVolume();
+      VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
+          .setStorageId(volume.getStorageID())
+          .setTotalCapacity(v.getUsage().getCapacity())
+          .setOzoneAvailable(v.getUsage().getAvailable())
+          .setUsedSpace(v.getUsage().getUsedSpace())
+          .setCommittedBytes(volume.getCommittedBytes())
+          .setEffectiveUsedSpace(v.getEffectiveUsed())
+          .setUtilization(v.getUtilization());
+      if (volume.getStorageDir() != null) {
+        builder.setStoragePath(volume.getStorageDir().getPath());
+      }
+      result.add(builder.build());
+    }
+    return result;
   }
 
   public long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet) {
@@ -797,6 +870,17 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  // call FaultInjector#pause when an injector is registered; ignore IOException.
+  private static void pauseInjector() {
+    if (injector != null) {
+      try {
+        injector.pause();
+      } catch (IOException ex) {
+        // do nothing
+      }
+    }
   }
 
   @VisibleForTesting

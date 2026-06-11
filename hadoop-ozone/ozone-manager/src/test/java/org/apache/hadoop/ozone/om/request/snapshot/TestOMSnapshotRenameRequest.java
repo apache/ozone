@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getFromProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
@@ -26,6 +27,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.renameSnapsh
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameSnapshot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,6 +40,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -67,6 +70,8 @@ public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse 
   public void setup() throws Exception {
     snapshotName1 = UUID.randomUUID().toString();
     snapshotName2 = UUID.randomUUID().toString();
+    getOzoneManager().getConfiguration().setBoolean(
+        OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
   }
 
   @ValueSource(strings = {
@@ -85,6 +90,21 @@ public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse 
     OzoneManagerProtocolProtos.OMRequest omRequest = renameSnapshotRequest(getVolumeName(),
         getBucketName(), currentSnapshotName, toSnapshotName);
     doPreExecute(omRequest);
+  }
+
+  @Test
+  public void testPreExecuteFailsWhenSnapshotRenameNotAllowed() {
+    assertFalse(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT);
+    getOzoneManager().getConfiguration().unset(
+        OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY);
+
+    OzoneManagerProtocolProtos.OMRequest omRequest = renameSnapshotRequest(
+        getVolumeName(), getBucketName(), snapshotName1, snapshotName2);
+    OMException omException = assertThrows(OMException.class,
+        () -> doPreExecute(omRequest));
+    assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
+    assertEquals("Ozone snapshot rename feature is not allowed per Ozone Manager server config",
+        omException.getMessage());
   }
 
   @ValueSource(strings = {
