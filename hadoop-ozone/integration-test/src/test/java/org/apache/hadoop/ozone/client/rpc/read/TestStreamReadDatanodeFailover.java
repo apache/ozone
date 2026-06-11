@@ -29,9 +29,11 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -54,7 +57,12 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * Verifies that streaming block reads fail over to a healthy replica when the
@@ -64,36 +72,65 @@ import org.junit.jupiter.api.Test;
  * <p>With {@code ozone.client.stream.readblock.enable=true}, reads currently
  * do not fail over correctly when the streaming datanode stops responding.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestStreamReadDatanodeFailover {
 
   private static final Duration STREAM_READ_TIMEOUT = Duration.ofSeconds(3);
+  private static final int PIPELINE_READY_TIMEOUT_MS = 30_000;
+
+  private MiniOzoneCluster cluster;
+  private final Set<DatanodeDetails> stoppedDatanodes = new HashSet<>();
+
+  @BeforeAll
+  void setup() throws Exception {
+    cluster = newCluster();
+    cluster.waitForClusterToBeReady();
+  }
+
+  @BeforeEach
+  void waitForPipeline() throws Exception {
+    cluster.waitForPipelineTobeReady(THREE, PIPELINE_READY_TIMEOUT_MS);
+  }
+
+  @AfterEach
+  void resetDatanodes() throws Exception {
+    if (stoppedDatanodes.isEmpty()) {
+      return;
+    }
+    List<DatanodeDetails> toRestart = new ArrayList<>(stoppedDatanodes);
+    stoppedDatanodes.clear();
+    for (DatanodeDetails dn : toRestart) {
+      cluster.restartHddsDatanode(dn, false);
+    }
+    cluster.waitForClusterToBeReady();
+  }
+
+  @AfterAll
+  void cleanup() {
+    IOUtils.closeQuietly(cluster);
+  }
 
   /**
-   * Legacy chunk reads succeed after stopping one pipeline datanode.
+   * Legacy (Async) chunk reads succeed after stopping one pipeline datanode.
    */
   @Test
-  void testLegacyReadFailoverWhenDatanodeStopped() throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
-      cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady(THREE, 180_000);
+  void testAsyncReadFailoverWhenDatanodeStopped() throws Exception {
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore store = client.getObjectStore();
+      OzoneBucket bucket = createBucket(store);
+      String keyName = newKeyName();
+      byte[] content = RandomUtils.secure().randomBytes(32 * 1024);
+      TestDataUtil.createKey(bucket, keyName,
+          RatisReplicationConfig.getInstance(THREE), content);
 
-      try (OzoneClient client = cluster.newClient()) {
-        ObjectStore store = client.getObjectStore();
-        OzoneBucket bucket = createBucket(store);
-        String keyName = newKeyName();
-        byte[] content = RandomUtils.secure().randomBytes(32 * 1024);
-        TestDataUtil.createKey(bucket, keyName,
-            RatisReplicationConfig.getInstance(THREE), content);
+      List<DatanodeDetails> datanodes = getPipelineDatanodes(cluster, bucket, keyName);
+      assertEquals(3, datanodes.size());
 
-        List<DatanodeDetails> datanodes = getPipelineDatanodes(cluster, bucket, keyName);
-        assertEquals(3, datanodes.size());
+      stopDatanode(datanodes.get(0));
+      assertKeyContent(bucket, keyName, content);
 
-        cluster.shutdownHddsDatanode(datanodes.get(0));
-        assertKeyContent(bucket, keyName, content);
-
-        cluster.shutdownHddsDatanode(datanodes.get(1));
-        assertKeyContent(bucket, keyName, content);
-      }
+      stopDatanode(datanodes.get(1));
+      assertKeyContent(bucket, keyName, content);
     }
   }
 
@@ -103,31 +140,26 @@ class TestStreamReadDatanodeFailover {
    */
   @Test
   void testStreamReadFailoverWhenDatanodesStopped() throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
-      cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady(THREE, 180_000);
+    OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(streamConf)) {
+      ObjectStore store = client.getObjectStore();
+      OzoneBucket bucket = createBucket(store);
+      String keyName = newKeyName();
+      byte[] content = RandomUtils.secure().randomBytes(32 * 1024);
+      TestDataUtil.createKey(bucket, keyName,
+          RatisReplicationConfig.getInstance(THREE), content);
 
-      OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
-      try (OzoneClient client = OzoneClientFactory.getRpcClient(streamConf)) {
-        ObjectStore store = client.getObjectStore();
-        OzoneBucket bucket = createBucket(store);
-        String keyName = newKeyName();
-        byte[] content = RandomUtils.secure().randomBytes(32 * 1024);
-        TestDataUtil.createKey(bucket, keyName,
-            RatisReplicationConfig.getInstance(THREE), content);
+      List<DatanodeDetails> datanodes = getPipelineDatanodes(cluster, bucket, keyName);
+      assertEquals(3, datanodes.size());
 
-        List<DatanodeDetails> datanodes = getPipelineDatanodes(cluster, bucket, keyName);
-        assertEquals(3, datanodes.size());
+      // Sanity check: streaming read works with all datanodes up.
+      assertKeyContent(bucket, keyName, content);
 
-        // Sanity check: streaming read works with all datanodes up.
-        assertKeyContent(bucket, keyName, content);
+      stopDatanode(datanodes.get(0));
+      assertKeyContent(bucket, keyName, content);
 
-        cluster.shutdownHddsDatanode(datanodes.get(0));
-        assertKeyContent(bucket, keyName, content);
-
-        cluster.shutdownHddsDatanode(datanodes.get(1));
-        assertKeyContent(bucket, keyName, content);
-      }
+      stopDatanode(datanodes.get(1));
+      assertKeyContent(bucket, keyName, content);
     }
   }
 
@@ -138,51 +170,51 @@ class TestStreamReadDatanodeFailover {
    */
   @Test
   void testStreamReadFailoverAfterActiveDatanodeStopped() throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
-      cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady(THREE, 180_000);
+    OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
+    try (OzoneClient streamClient = OzoneClientFactory.getRpcClient(streamConf);
+         OzoneClient legacyClient = cluster.newClient()) {
+      TestBucket streamBucket = TestBucket.newBuilder(streamClient).build();
+      OzoneBucket legacyBucket = legacyClient.getObjectStore()
+          .getVolume(streamBucket.delegate().getVolumeName())
+          .getBucket(streamBucket.delegate().getName());
 
-      OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
-      try (OzoneClient streamClient = OzoneClientFactory.getRpcClient(streamConf);
-           OzoneClient legacyClient = cluster.newClient()) {
-        TestBucket streamBucket = TestBucket.newBuilder(streamClient).build();
-        OzoneBucket legacyBucket = legacyClient.getObjectStore()
-            .getVolume(streamBucket.delegate().getVolumeName())
-            .getBucket(streamBucket.delegate().getName());
+      String keyName = newKeyName();
+      byte[] content = streamBucket.writeRandomBytes(keyName, 32 * 1024);
 
-        String keyName = newKeyName();
-        byte[] content = streamBucket.writeRandomBytes(keyName, 32 * 1024);
+      List<DatanodeDetails> datanodes =
+          getPipelineDatanodes(cluster, streamBucket.delegate(), keyName);
+      assertEquals(3, datanodes.size());
 
-        List<DatanodeDetails> datanodes =
-            getPipelineDatanodes(cluster, streamBucket.delegate(), keyName);
-        assertEquals(3, datanodes.size());
+      // Legacy control: stopping one pipeline datanode mid-read still succeeds.
+      try (InputStream legacyIn = legacyBucket.readKey(keyName)) {
+        assertNotEquals(-1, legacyIn.read());
+        stopDatanode(datanodes.get(0));
+        readRemaining(legacyIn, content, 1);
+      }
 
-        // Legacy control: stopping one pipeline datanode mid-read still succeeds.
-        try (InputStream legacyIn = legacyBucket.readKey(keyName)) {
-          assertNotEquals(-1, legacyIn.read());
-          cluster.shutdownHddsDatanode(datanodes.get(0));
-          readRemaining(legacyIn, content, 1);
-        }
-
-        // Streaming read: stop the datanode actively serving the stream.
-        // This fails today without a proper streaming read failover fix.
-        try (KeyInputStream streamIn = streamBucket.getKeyInputStream(keyName)) {
-          assertNotEquals(-1, streamIn.read());
-          StreamBlockInputStream blockStream =
-              (StreamBlockInputStream) streamIn.getPartStreams().get(0);
-          DatanodeDetails activeDatanode = getActiveStreamingDatanode(blockStream);
-          assertTrue(datanodes.contains(activeDatanode),
-              "Active streaming datanode should belong to the key pipeline");
-          cluster.shutdownHddsDatanode(activeDatanode);
-          readRemaining(streamIn, content, 1);
-        }
+      // Streaming read: stop the datanode actively serving the stream.
+      // This fails today without a proper streaming read failover fix.
+      try (KeyInputStream streamIn = streamBucket.getKeyInputStream(keyName)) {
+        assertNotEquals(-1, streamIn.read());
+        StreamBlockInputStream blockStream =
+            (StreamBlockInputStream) streamIn.getPartStreams().get(0);
+        DatanodeDetails activeDatanode = getActiveStreamingDatanode(blockStream);
+        assertTrue(datanodes.contains(activeDatanode),
+            "Active streaming datanode should belong to the key pipeline");
+        stopDatanode(activeDatanode);
+        readRemaining(streamIn, content, 1);
       }
     }
   }
 
+  private void stopDatanode(DatanodeDetails dn) throws IOException {
+    cluster.shutdownHddsDatanode(dn);
+    stoppedDatanodes.add(dn);
+  }
+
   private static void readRemaining(InputStream in, byte[] expected, int offset)
       throws IOException {
-    byte[] actual = IOUtils.readFully(in, expected.length - offset);
+    byte[] actual = org.apache.commons.io.IOUtils.readFully(in, expected.length - offset);
     assertArrayEquals(
         java.util.Arrays.copyOfRange(expected, offset, expected.length),
         actual);
@@ -214,6 +246,8 @@ class TestStreamReadDatanodeFailover {
   private static MiniOzoneCluster newCluster() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 5);
     return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
