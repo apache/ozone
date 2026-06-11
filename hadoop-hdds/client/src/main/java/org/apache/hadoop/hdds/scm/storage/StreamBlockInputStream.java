@@ -411,9 +411,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         checkError();
-        if (future.isDone()) {
-          return null; // Stream ended
-        }
 
         final ReadBlockResponseProto proto;
         try {
@@ -424,6 +421,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         if (proto != null) {
           return proto;
+        }
+
+        // Check isDone only after confirming the queue is empty. If isDone() were
+        // checked first, an item delivered by onNext() just before onCompleted()
+        // fired would be silently dropped, causing data corruption.
+        if (future.isDone()) {
+          return null; // Stream ended, queue is empty
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
@@ -438,24 +442,34 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     private ByteBuffer read(int length, boolean preRead) throws IOException {
       checkError();
       if (future.isDone()) {
-        return null; // Stream ended
+        // Don't return null while items remain in the queue. onNext() may have delivered items just before
+        // onCompleted() fired.
+        return responseQueue.isEmpty() ? null : readFromQueue();
       }
 
       readBlock(length, preRead);
 
       while (true) {
         final ByteBuffer buf = readFromQueue();
-        if (buf != null && buf.hasRemaining()) {
+        if (buf == null) {
+          return null; // Stream ended
+        }
+        if (buf.hasRemaining()) {
           return buf;
         }
+        // buf is empty: the server aligned its response to a checksum boundary
+        // before our current position and all bytes were skipped. Fetch the next
+        // response, which should start at or after our position.
       }
     }
 
     ByteBuffer readFromQueue() throws IOException {
       final ReadBlockResponseProto readBlock = poll();
+      if (readBlock == null) {
+        return null; // Stream ended
+      }
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
-      // If the reader position is behind
       final ByteString data = readBlock.getData();
       final ByteBuffer dataBuffer = data.asReadOnlyByteBuffer();
       final long blockOffset = readBlock.getOffset();
