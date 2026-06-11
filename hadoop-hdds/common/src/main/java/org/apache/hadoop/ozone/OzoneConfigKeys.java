@@ -616,6 +616,16 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT =
           true;
 
+  /**
+   * Number of consecutive heartbeat failures the DN tolerates against the
+   * same SCM endpoint before re-resolving its hostname. Only consulted when
+   * {@link #OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY} is true. Conservative
+   * default avoids re-resolution on transient blips while still recovering
+   * from a peer pod IP change within seconds.
+   */
+  public static final String OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY =
+          "ozone.datanode.scm.heartbeat.address.refresh.threshold";
+  public static final int OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT = 3;
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
       "ozone.client.required.om.version.min";
 

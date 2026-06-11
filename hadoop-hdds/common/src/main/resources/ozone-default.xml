@@ -3954,6 +3954,19 @@
   </property>
 
   <property>
+    <name>ozone.datanode.scm.heartbeat.address.refresh.threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Number of consecutive heartbeat failures the
+      DataNode tolerates against the same SCM endpoint before
+      attempting a DNS re-resolution. Only consulted when
+      ozone.client.failover.resolve-needed is true. Conservative
+      default avoids re-resolution on transient blips while still
+      recovering from a peer pod IP change within seconds.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
