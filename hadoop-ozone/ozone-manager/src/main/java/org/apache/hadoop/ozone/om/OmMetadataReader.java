@@ -606,16 +606,16 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .setVolumeName(vol)
         .setBucketName(bucket)
         .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(owner)
-        .build();
+        .setOwnerName(owner);
+    maybeAddToContextFromThreadLocal(contextBuilder);
 
-    return checkAcls(obj, context, throwIfPermissionDenied);
+    return checkAcls(obj, contextBuilder.build(), throwIfPermissionDenied);
   }
 
   /**
@@ -628,11 +628,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public boolean checkAcls(OzoneObj obj, RequestContext context,
       boolean throwIfPermissionDenied) throws OMException {
 
-    final RequestContext normalizedRequestContext = maybeAttachS3ActionFromThreadLocal(
-        maybeAttachSessionPolicyFromThreadLocal(context));
-
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
-        () -> accessAuthorizer.checkAccess(obj, normalizedRequestContext))) {
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -642,7 +639,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                 "Key:" + obj.getKeyName() : "";
         // For STS tokens, make clear that the user is using an assumed role, otherwise the access denied
         // message could be confusing
-        String user = normalizedRequestContext.getClientUgi().getShortUserName();
+        String user = context.getClientUgi().getShortUserName();
         final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
         if (stsTokenIdentifier != null) {
           final StringBuilder builder = new StringBuilder(user)
@@ -655,11 +652,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
             user,
-            normalizedRequestContext.getAclRights(),
+            context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
             "User " + user +
-            " doesn't have " + normalizedRequestContext.getAclRights() +
+            " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
       }
@@ -670,37 +667,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   /**
-   * Attaches session policy to RequestContext if an STSTokenIdentifier is found in the Ozone Manager thread local
-   * (meaning this is an STS request), and the STSTokenIdentifier has a session policy.  Otherwise, returns the
-   * RequestContext as it was before.
-   * @param context the original RequestContext
-   * @return RequestContext as before or with sessionPolicy embedded
+   * Enriches the given {@link RequestContext.Builder} with per-request fields from the Ozone Manager
+   * thread locals: the session policy from {@link STSTokenIdentifier} (set on STS requests) and the
+   * S3 action from {@link S3Authentication} (set on S3 requests). Either or both may be absent, in
+   * which case the corresponding field is left untouched on the builder.
+   * @param contextBuilder the builder to enrich in-place
    */
-  private RequestContext maybeAttachSessionPolicyFromThreadLocal(RequestContext context) {
+  public static void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
     final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
-    if (stsTokenIdentifier == null) {
-      return context;
+    if (stsTokenIdentifier != null) {
+      contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
     }
 
-    return context.toBuilder()
-        .setSessionPolicy(stsTokenIdentifier.getSessionPolicy())
-        .build();
-  }
-
-  /**
-   * Attaches s3 action to RequestContext if an S3Authentication is found in the Ozone Manager thread local,
-   * and it has an s3 action.  Otherwise, returns the RequestContext as it was before.
-   * @param context the original RequestContext
-   * @return RequestContext as before or with s3 action embedded
-   */
-  private RequestContext maybeAttachS3ActionFromThreadLocal(RequestContext context) {
     final S3Authentication s3Authentication = OzoneManager.getS3Auth();
-    if (s3Authentication == null || !s3Authentication.hasS3Action()) {
-      return context;
+    if (s3Authentication != null && s3Authentication.hasS3Action() && !s3Authentication.getS3Action().isEmpty()) {
+      contextBuilder.setS3Action(s3Authentication.getS3Action());
     }
-    return context.toBuilder()
-        .setS3Action(s3Authentication.getS3Action())
-        .build();
   }
 
   static String getClientAddress() {
