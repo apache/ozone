@@ -914,6 +914,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         }
       } else {
         final long putLength;
+        // We don't need runWithS3ActionString("PutObject"...) here because the action in this else branch is
+        // S3GAction.CREATE_MULTIPART_KEY and this has a mapping in S3GActionIamMapper to "PutObject", so it's covered.
+        // In the if branch of the code, the request action is set to S3GAction.CREATE_MULTIPART_KEY_BY_COPY which is
+        // mapped to null in S3GActionIamMapper (by design, since it needs "GetObject" on the source and "PutObject"
+        // on the destination).
         final OzoneOutputStream ozoneOutputStream = getClientProtocol()
             .createMultipartKey(volume.getName(), bucketName, key, length,
                 partNumber, uploadID);
