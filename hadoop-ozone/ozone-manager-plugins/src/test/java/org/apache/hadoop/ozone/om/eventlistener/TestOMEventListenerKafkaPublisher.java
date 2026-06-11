@@ -22,10 +22,18 @@ import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification;
+import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification.OzoneEventDataKey;
+import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification.S3EventNotificationRecord;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo.OperationArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -48,20 +56,6 @@ public class TestOMEventListenerKafkaPublisher {
 
   @Mock
   private OMEventListenerPluginContext pluginContext;
-
-  // helper to create json key/val string for non exhaustive JSON
-  // attribute checking
-  private static String toJsonKeyVal(String key, String val) {
-    return new StringBuilder()
-      .append('\"')
-      .append(key)
-      .append('\"')
-      .append(':')
-      .append('\"')
-      .append(val)
-      .append('\"')
-      .toString();
-  }
 
   private static OmCompletedRequestInfo buildCompletedRequestInfo(
           long trxLogIndex, Type cmdType, String keyName, OperationArgs opArgs) {
@@ -101,17 +95,50 @@ public class TestOMEventListenerKafkaPublisher {
     return events;
   }
 
+  private S3EventNotificationRecord getFirstRecord(List<String> events) throws IOException {
+    assertThat(events).hasSize(1);
+    S3EventNotification notification = JsonUtils.getDefaultMapper()
+        .readValue(events.get(0), S3EventNotification.class);
+    assertThat(notification.getRecords()).hasSize(1);
+    return notification.getRecords().get(0);
+  }
+
   @Test
   public void testCreateKeyRequestProducesS3CreatedEvent() throws InterruptedException, IOException {
     OmCompletedRequestInfo createRequest = buildCompletedRequestInfo(1L, Type.CreateKey, "some/key1",
         new OperationArgs.NoArgs());
 
     List<String> events = captureEventsProducedByOperation(createRequest, 1);
-    assertThat(events).hasSize(1);
+    S3EventNotificationRecord record = getFirstRecord(events);
 
-    assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key1"))
-        .contains(toJsonKeyVal("type", "CreateKey"));
+    assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 1L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateKey");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 1);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
+  }
+
+  @Test
+  public void testCommitKeyRequestProducesS3CreatedEvent() throws InterruptedException, IOException {
+    OmCompletedRequestInfo commitRequest = buildCompletedRequestInfo(8L, Type.CommitKey, "some/key1_commit",
+        new OperationArgs.NoArgs());
+
+    List<String> events = captureEventsProducedByOperation(commitRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1_commit");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 8L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CommitKey");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 8);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
@@ -123,11 +150,20 @@ public class TestOMEventListenerKafkaPublisher {
         new OperationArgs.CreateFileArgs(recursive, overwrite));
 
     List<String> events = captureEventsProducedByOperation(createRequest, 1);
-    assertThat(events).hasSize(1);
+    S3EventNotificationRecord record = getFirstRecord(events);
 
-    assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key2"))
-        .contains(toJsonKeyVal("type", "CreateFile"));
+    assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key2");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 2L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
+    expectedEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(), false);
+    expectedEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(), true);
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateFile");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 2);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
@@ -136,23 +172,138 @@ public class TestOMEventListenerKafkaPublisher {
         new OperationArgs.NoArgs());
 
     List<String> events = captureEventsProducedByOperation(createRequest, 1);
-    assertThat(events).hasSize(1);
+    S3EventNotificationRecord record = getFirstRecord(events);
 
-    assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key3"))
-        .contains(toJsonKeyVal("type", "CreateDirectory"));
+    assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key3");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 3L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), true);
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateDirectory");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 3);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
-  public void testRenameRequestProducesRenameKeyEvent() throws InterruptedException, IOException {
+  public void testRenameRequestProducesS3RenamedEvent() throws InterruptedException, IOException {
     OmCompletedRequestInfo renameRequest = buildCompletedRequestInfo(4L, Type.RenameKey, "some/key4",
         new OperationArgs.RenameKeyArgs("some/key_RENAMED"));
 
     List<String> events = captureEventsProducedByOperation(renameRequest, 1);
-    assertThat(events).hasSize(1);
+    S3EventNotificationRecord record = getFirstRecord(events);
 
-    assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key4"))
-        .contains(toJsonKeyVal("type", "RenameKey"));
+    assertThat(record.getEventName()).isEqualTo("ObjectRenamed:Rename");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key_RENAMED");
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 4L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.RENAME_FROM_KEY.toString(), "vol1/bucket1/some/key4");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 4);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
+  }
+
+  @Test
+  public void testCreateVolumeRequestProducesOzoneVolumeCreatedEvent() throws IOException {
+    OmCompletedRequestInfo createRequest = new OmCompletedRequestInfo.Builder()
+        .setTrxLogIndex(6L)
+        .setCmdType(Type.CreateVolume)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(null)
+        .setKeyName(null)
+        .setCreationTime(Time.now())
+        .setOpArgs(new OperationArgs.NoArgs())
+        .build();
+
+    List<String> events = captureEventsProducedByOperation(createRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("OzoneVolumeCreated:Put");
+    assertThat(record.getS3().getBucket().getName()).isNull();
+    assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME);
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 6L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 6);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
+  }
+
+  @Test
+  public void testCreateBucketRequestProducesOzoneBucketCreatedEvent() throws IOException {
+    OmCompletedRequestInfo createRequest = new OmCompletedRequestInfo.Builder()
+        .setTrxLogIndex(7L)
+        .setCmdType(Type.CreateBucket)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(null)
+        .setCreationTime(Time.now())
+        .setOpArgs(new OperationArgs.NoArgs())
+        .build();
+
+    List<String> events = captureEventsProducedByOperation(createRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("OzoneBucketCreated:Put");
+    assertThat(record.getS3().getBucket().getName()).isEqualTo(BUCKET_NAME);
+    assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME + "/" + BUCKET_NAME);
+    assertThat(record.getS3().getObject().getSequencer()).isEqualTo(String.format("%016X", 7L));
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 7);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
+  }
+
+  @Test
+  public void testEventDateFormatIsIso8601() throws IOException {
+    OmCompletedRequestInfo createRequest = buildCompletedRequestInfo(5L, Type.CreateKey, "date/test",
+        new OperationArgs.NoArgs());
+
+    List<String> events = captureEventsProducedByOperation(createRequest, 1);
+    String rawJson = events.get(0);
+
+    // Parse raw JSON to extract the eventTime string exactly as it appears in the message
+    JsonNode root = JsonUtils.readTree(rawJson);
+    String eventTimeStr = root.path("Records").get(0).path("eventTime").asText();
+
+    // Validate that it matches ISO-8601 offset format (e.g., 2026-05-20T13:45:00Z or +01:00)
+    // This ensures our DateTimeJsonSerializer is working as expected.
+    assertThat(eventTimeStr).matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*");
+
+    // Also ensure it is actually parsable by the standard Java 8 API
+    java.time.OffsetDateTime.parse(eventTimeStr);
+  }
+
+  @Test
+  public void testInitializeFailsWhenStrategyInstantiationThrows() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setClass("ozone.om.plugin.kafka.notification.strategy",
+        ThrowingStrategy.class, OMEventListenerNotificationStrategy.class);
+
+    OMEventListenerKafkaPublisher plugin = new OMEventListenerKafkaPublisher();
+    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockedKafkaClientWrapper =
+             mockConstruction(OMEventListenerKafkaPublisher.KafkaClientWrapper.class)) {
+
+      org.junit.jupiter.api.Assertions.assertThrows(OzoneIllegalArgumentException.class, () -> {
+        plugin.initialize(conf, pluginContext);
+      });
+    }
+  }
+
+  /**
+   * A mock strategy that throws an exception during instantiation for testing.
+   */
+  public static class ThrowingStrategy implements OMEventListenerNotificationStrategy {
+    public ThrowingStrategy() {
+      throw new RuntimeException("Simulated instantiation failure");
+    }
+
+    @Override
+    public List<String> determineEventsForOperation(OmCompletedRequestInfo completedRequestInfo) {
+      return null;
+    }
   }
 }
