@@ -25,7 +25,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -43,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -175,12 +179,103 @@ public class TestReconContainerManager
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
-    // First report with "CLOSED" replica state moves container state to
+    // First report with "CLOSING" replica state moves container state to
     // "CLOSING".
-    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSING,
         datanodeDetails);
     assertEquals(CLOSING,
         getContainerManager().getContainer(containerID).getState());
+    assertFalse(getContainerManager().getPipelineToOpenContainer()
+        .containsKey(containerWithPipeline.getPipeline().getId()));
+  }
+
+  @Test
+  public void testOpenContainerTransitionsToClosingWithoutScmLookup()
+      throws Exception {
+    ContainerWithPipeline openContainer =
+        getTestContainer(113L, LifeCycleState.OPEN);
+    ContainerID containerID = openContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(openContainer);
+
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+        randomDatanodeDetails());
+
+    assertEquals(CLOSING,
+        getContainerManager().getContainer(containerID).getState());
+    assertFalse(getContainerManager().getPipelineToOpenContainer()
+        .containsKey(openContainer.getPipeline().getId()));
+    verify(getContainerManager().getScmClient(), never())
+        .getContainerWithPipeline(containerID.getId());
+  }
+
+  @Test
+  public void testTransitionOpenToClosingDoesNotDecrementCountOnFailure()
+      throws Exception {
+    ContainerWithPipeline missingContainer =
+        getTestContainer(114L, LifeCycleState.OPEN);
+    ContainerID containerID =
+        missingContainer.getContainerInfo().containerID();
+    Pipeline pipeline = missingContainer.getPipeline();
+    getContainerManager().getPipelineToOpenContainer().put(pipeline.getId(), 1);
+
+    assertThrows(ContainerNotFoundException.class,
+        () -> getContainerManager().transitionOpenToClosing(containerID,
+            missingContainer.getContainerInfo()));
+
+    assertEquals(1,
+        getContainerManager().getPipelineToOpenContainer()
+            .get(pipeline.getId()));
+  }
+
+  @Test
+  public void testOpenContainerNotUpdatedFromUnhealthyReplicaReports()
+      throws Exception {
+    for (State replicaState : new State[] {
+        State.UNHEALTHY, State.INVALID, State.DELETED}) {
+      ContainerWithPipeline containerWithPipeline =
+          getTestContainer(120L + replicaState.ordinal(), LifeCycleState.OPEN);
+      ContainerID containerID =
+          containerWithPipeline.getContainerInfo().containerID();
+      getContainerManager().addNewContainer(containerWithPipeline);
+
+      getContainerManager().checkAndAddNewContainer(containerID, replicaState,
+          randomDatanodeDetails());
+
+      assertEquals(LifeCycleState.OPEN,
+          getContainerManager().getContainer(containerID).getState());
+      assertTrue(getContainerManager().getPipelineToOpenContainer()
+          .containsKey(containerWithPipeline.getPipeline().getId()));
+    }
+  }
+
+  @Test
+  public void testClosingContainerNotUpdatedFromUnhealthyReplicaReport()
+      throws Exception {
+    ContainerWithPipeline closingContainer = getTestContainer(105L, CLOSING);
+    ContainerID containerID = closingContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(closingContainer);
+
+    getContainerManager().checkAndAddNewContainer(containerID, State.UNHEALTHY,
+        randomDatanodeDetails());
+
+    assertEquals(CLOSING,
+        getContainerManager().getContainer(containerID).getState());
+  }
+
+  @Test
+  public void testOtherReconStatesDoNotInferDnReplicaTransition()
+      throws Exception {
+    ContainerWithPipeline closedContainer = getTestContainer(112L, CLOSED);
+    ContainerID containerID = closedContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(closedContainer);
+
+    getContainerManager().checkAndAddNewContainer(containerID,
+        State.CLOSING, randomDatanodeDetails());
+
+    assertEquals(CLOSED,
+        getContainerManager().getContainer(containerID).getState());
+    verify(getContainerManager().getScmClient(), never())
+        .getContainerWithPipeline(containerID.getId());
   }
 
   ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {

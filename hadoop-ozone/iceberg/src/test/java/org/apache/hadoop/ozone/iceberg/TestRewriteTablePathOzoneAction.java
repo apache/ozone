@@ -23,11 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFile;
@@ -78,6 +81,7 @@ import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.Pair;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -102,6 +106,11 @@ class TestRewriteTablePathOzoneAction {
   private String targetPrefix = null;
   private Table table = null;
 
+  private ByteArrayOutputStream outContent;
+  private ByteArrayOutputStream errContent;
+  private PrintStream originalOut;
+  private PrintStream originalErr;
+
   @TempDir
   private Path tableDir;
   @TempDir
@@ -115,14 +124,24 @@ class TestRewriteTablePathOzoneAction {
     this.table = createTable(tableLocation + "/");
     this.sourcePrefix = tableLocation;
     this.targetPrefix = targetDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
+
+    outContent = new ByteArrayOutputStream();
+    errContent = new ByteArrayOutputStream();
+    originalOut = System.out;
+    originalErr = System.err;
+    System.setOut(new PrintStream(outContent, true, StandardCharsets.UTF_8));
+    System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
+  }
+
+  @AfterEach
+  public void restoreStreams() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
   void fullTablePathRewrite() throws Exception {
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table, 2)
-        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
-        .stagingLocation(stagingDir.toString() + "/")
-        .execute();
+    String fileListLocation = executeRewriteCommand("--threads", "2");
 
     List<String> metadataPaths = metadataLogEntryPaths(table);
     Set<String> expectedTargets = new HashSet<>();
@@ -130,7 +149,7 @@ class TestRewriteTablePathOzoneAction {
       expectedTargets.add(RewriteTablePathUtil.newPath(path, sourcePrefix, targetPrefix));
     }
 
-    Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
+    Set<Pair<String, String>> csvPairs = readCsvPairs(table, fileListLocation);
     Set<String> actualTargets = csvPairs.stream().map(Pair::second)
         .filter(p -> p.endsWith(".metadata.json"))
         .collect(Collectors.toSet());
@@ -146,11 +165,7 @@ class TestRewriteTablePathOzoneAction {
     List<String> metadataPaths = metadataLogEntryPaths(table);
     String startName = RewriteTablePathUtil.fileName(metadataPaths.get(2));
 
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
-        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
-        .stagingLocation(stagingDir.toString() + "/")
-        .startVersion(startName)
-        .execute();
+    String fileListLocation = executeRewriteCommand("--start-version", startName);
 
     List<String> expectedPaths = new ArrayList<>();
     for (int i = metadataPaths.size() - 1; i >= 3; i--) {
@@ -162,7 +177,7 @@ class TestRewriteTablePathOzoneAction {
       expectedTargets.add(RewriteTablePathUtil.newPath(versionPath, sourcePrefix, targetPrefix));
     }
 
-    Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
+    Set<Pair<String, String>> csvPairs = readCsvPairs(table, fileListLocation);
     Set<String> actualTargets = csvPairs.stream().map(Pair::second)
         .filter(p -> p.endsWith(".metadata.json"))
         .collect(Collectors.toSet());
@@ -178,11 +193,7 @@ class TestRewriteTablePathOzoneAction {
     List<String> metadataPaths = metadataLogEntryPaths(table);
     String endName = RewriteTablePathUtil.fileName(metadataPaths.get(2));
 
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
-        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
-        .stagingLocation(stagingDir.toString() + "/")
-        .endVersion(endName)
-        .execute();
+    String fileListLocation = executeRewriteCommand("--end-version", endName);
 
     List<String> expectedPaths = new ArrayList<>();
     for (int i = 2; i >= 0; i--) {
@@ -194,7 +205,7 @@ class TestRewriteTablePathOzoneAction {
       expectedTargets.add(RewriteTablePathUtil.newPath(versionPath, sourcePrefix, targetPrefix));
     }
 
-    Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
+    Set<Pair<String, String>> csvPairs = readCsvPairs(table, fileListLocation);
     Set<String> actualTargets = csvPairs.stream().map(Pair::second)
         .filter(p -> p.endsWith(".metadata.json"))
         .collect(Collectors.toSet());
@@ -211,12 +222,9 @@ class TestRewriteTablePathOzoneAction {
     String startName = RewriteTablePathUtil.fileName(metadataPaths.get(1));
     String endName = RewriteTablePathUtil.fileName(metadataPaths.get(3));
 
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
-        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
-        .stagingLocation(stagingDir.toString() + "/")
-        .startVersion(startName)
-        .endVersion(endName)
-        .execute();
+    String fileListLocation = executeRewriteCommand(
+        "--start-version", startName,
+        "--end-version", endName);
 
     List<String> expectedPaths = new ArrayList<>();
     for (int i = 3; i >= 2; i--) {
@@ -228,7 +236,7 @@ class TestRewriteTablePathOzoneAction {
       expectedTargets.add(RewriteTablePathUtil.newPath(versionPath, sourcePrefix, targetPrefix));
     }
 
-    Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
+    Set<Pair<String, String>> csvPairs = readCsvPairs(table, fileListLocation);
     Set<String> actualTargets = csvPairs.stream().map(Pair::second)
         .filter(p -> p.endsWith(".metadata.json"))
         .collect(Collectors.toSet());
@@ -242,7 +250,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void executeRejectsMissingLocationPrefix() {
     NullPointerException exception = assertThrows(NullPointerException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .stagingLocation(stagingDir.toString() + "/")
             .execute());
 
@@ -252,7 +260,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void executeRejectsMissingTargetPrefix() {
     NullPointerException exception = assertThrows(NullPointerException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, null));
 
     assertEquals("Target prefix is null", exception.getMessage());
@@ -261,7 +269,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void rewriteLocationPrefixRejectsSameSourceAndTarget() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, sourcePrefix)
             .execute());
 
@@ -272,7 +280,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void startVersionRejectsUnknownVersion() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .startVersion("missing.metadata.json")
             .execute());
@@ -288,7 +296,7 @@ class TestRewriteTablePathOzoneAction {
     table.io().deleteFile(metadataPaths.get(0));
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .startVersion(existingName)
             .execute());
@@ -299,7 +307,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void endVersionRejectsUnknownVersion() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .endVersion("missing.metadata.json")
             .execute());
@@ -315,7 +323,7 @@ class TestRewriteTablePathOzoneAction {
     table.io().deleteFile(metadataPaths.get(0));
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .endVersion(existingName)
             .execute());
@@ -326,7 +334,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void usesCurrentMetadataIfEndVersionNotProvided() {
     String currentMetadata = ((HasTableOperations) table).operations().current().metadataFileLocation();
-    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table);
+    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table, 2);
     action.rewriteLocationPrefix(sourcePrefix, targetPrefix).stagingLocation(stagingDir + "/");
     RewriteTablePath.Result result = action.execute();
     assertThat(result.latestVersion()).isEqualTo(RewriteTablePathUtil.fileName(currentMetadata));
@@ -335,7 +343,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void defaultStagingDirIsUnderTableMetadataLocation() {
     String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .execute();
 
@@ -409,7 +417,7 @@ class TestRewriteTablePathOzoneAction {
     TableOperations ops = ((HasTableOperations) table).operations();
     ops.commit(baseMetadata, metadataWithStats);
 
-    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .stagingLocation(stagingDir + "/");
 
@@ -488,7 +496,7 @@ class TestRewriteTablePathOzoneAction {
     String manifestListLocation = snapshot.manifestListLocation();
     table.io().deleteFile(manifestListLocation);
 
-    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .stagingLocation(stagingDir + "/");
     
@@ -497,7 +505,49 @@ class TestRewriteTablePathOzoneAction {
     assertThat(exception.getCause()).hasMessageContaining("Failed to read manifests for snapshot " +
         snapshot.snapshotId());
   }
-  
+
+  private String executeRewriteCommand(String... optionalArgs) {
+    List<String> args = new ArrayList<>();
+    args.add("rewrite-path");
+    args.add("-l");
+    args.add(table.location());
+    args.add("-s");
+    args.add(sourcePrefix);
+    args.add("-t");
+    args.add(targetPrefix);
+    args.add("--staging");
+    args.add(stagingDir + "/");
+    args.addAll(Arrays.asList(optionalArgs));
+
+    int exitCode = new IcebergCommand().getCmd().execute(args.toArray(new String[0]));
+    assertEquals(0, exitCode,
+        "Command failed.\nstdout:\n" + stdout() + "\nstderr:\n" + stderr());
+    assertThat(stdout())
+        .contains("Starting Iceberg table path rewrite")
+        .contains("Table loaded: " + table.location())
+        .contains("Staging location: " + stagingDir + "/")
+        .contains("File list location:");
+    return parseFileListLocation(stdout());
+  }
+
+  private String stdout() {
+    return outContent.toString(StandardCharsets.UTF_8);
+  }
+
+  private String stderr() {
+    return errContent.toString(StandardCharsets.UTF_8);
+  }
+
+  private static String parseFileListLocation(String output) {
+    for (String line : output.split("\n")) {
+      if (line.contains("File list location:")) {
+        return line.substring(line.indexOf("File list location:") + "File list location:".length())
+            .trim();
+      }
+    }
+    throw new IllegalStateException("File list location not found in command output: " + output);
+  }
+
   /**
    * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
    * to the target prefix:
@@ -724,7 +774,7 @@ class TestRewriteTablePathOzoneAction {
   }
 
   private Table createTable(String location) throws IOException {
-    HadoopTables tables = new HadoopTables(new Configuration());
+    HadoopTables tables = new HadoopTables(new OzoneConfiguration());
     Table tbl = tables.create(SCHEMA, PartitionSpec.unpartitioned(), new HashMap<>(), location);
     for (int i = 0; i < COMMITS; i++) {
       String dataPath = location + "data/batch-" + i + ".parquet";
