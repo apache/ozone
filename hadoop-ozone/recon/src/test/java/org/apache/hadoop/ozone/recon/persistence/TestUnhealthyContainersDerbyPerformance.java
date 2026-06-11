@@ -26,6 +26,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provider;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -35,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -44,6 +48,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -222,78 +227,35 @@ public class TestUnhealthyContainersDerbyPerformance {
    * Initialises the embedded in-memory Derby database and creates the Recon schema.
    * Data population is done in dedicated test methods.
    *
-   * <p>Uses {@code jdbc:derby:memory:...} to keep all 1M rows in RAM and eliminate
-   * disk I/O (fsync) overhead across the benchmark's insert, replace, and delete
-   * transactions.</p>
+   * <p>Reuses {@link DerbyDataSourceConfigurationProvider} for all connection settings
+   * and overrides only {@code getJdbcUrl()} to use an in-memory Derby database
+   * ({@code jdbc:derby:memory:...}), eliminating disk I/O and fsync overhead across
+   * the benchmark's insert, replace, and delete transactions.</p>
    */
   @BeforeAll
-  public void setUpDatabase() throws Exception {
+  public void setUpDatabase(@TempDir Path tempDir) throws Exception {
     inMemoryDbName = "reconPerf_" + java.util.UUID.randomUUID().toString();
     LOG.info("=== Derby Performance Benchmark — Setup ===");
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
         TESTED_STATES.size(), CONTAINER_ID_RANGE, TOTAL_RECORDS);
 
-    // ----- Guice wiring (mirrors AbstractReconSqlDBTest) -----
+    File configDir = Files.createDirectory(tempDir.resolve("Config")).toFile();
+    DataSourceConfiguration base = new DerbyDataSourceConfigurationProvider(configDir).get();
+
+    // Reuse DerbyDataSourceConfigurationProvider settings but point to an in-memory DB.
     Provider<DataSourceConfiguration> configProvider = () -> new DataSourceConfiguration() {
-      @Override
-      public String getDriverClass() {
-        return org.apache.ozone.recon.schema.SqlDbUtils.DERBY_DRIVER_CLASS;
-      }
-
-      @Override
-      public String getJdbcUrl() {
-        return "jdbc:derby:memory:" + inMemoryDbName;
-      }
-
-      @Override
-      public String getUserName() {
-        return null;
-      }
-
-      @Override
-      public String getPassword() {
-        return null;
-      }
-
-      @Override
-      public boolean setAutoCommit() {
-        return true;
-      }
-
-      @Override
-      public long getConnectionTimeout() {
-        return 10000;
-      }
-
-      @Override
-      public String getSqlDialect() {
-        return org.jooq.SQLDialect.DERBY.toString();
-      }
-
-      @Override
-      public Integer getMaxActiveConnections() {
-        return 2;
-      }
-
-      @Override
-      public long getMaxConnectionAge() {
-        return 120;
-      }
-
-      @Override
-      public long getMaxIdleConnectionAge() {
-        return 120;
-      }
-
-      @Override
-      public String getConnectionTestStatement() {
-        return "SELECT 1";
-      }
-
-      @Override
-      public long getIdleConnectionTestPeriod() {
-        return 30;
-      }
+      @Override public String getDriverClass() { return base.getDriverClass(); }
+      @Override public String getJdbcUrl() { return "jdbc:derby:memory:" + inMemoryDbName; }
+      @Override public String getUserName() { return base.getUserName(); }
+      @Override public String getPassword() { return base.getPassword(); }
+      @Override public boolean setAutoCommit() { return base.setAutoCommit(); }
+      @Override public long getConnectionTimeout() { return base.getConnectionTimeout(); }
+      @Override public String getSqlDialect() { return base.getSqlDialect(); }
+      @Override public Integer getMaxActiveConnections() { return base.getMaxActiveConnections(); }
+      @Override public long getMaxConnectionAge() { return base.getMaxConnectionAge(); }
+      @Override public long getMaxIdleConnectionAge() { return base.getMaxIdleConnectionAge(); }
+      @Override public String getConnectionTestStatement() { return base.getConnectionTestStatement(); }
+      @Override public long getIdleConnectionTestPeriod() { return base.getIdleConnectionTestPeriod(); }
     };
 
     Injector injector = Guice.createInjector(
