@@ -1575,18 +1575,25 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       long length = status.getLength();
       long spaceConsumed = status.getDiskConsumed();
 
-      return new ContentSummary.Builder().length(length).
-          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+      ContentSummary.Builder builder = new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+      applyEcPolicy(builder, status.getErasureCodingPolicy());
+      return builder.build();
     }
     // f is a directory
     long[] summary = {0, 0, 0, 1};
-    int i = 0;
     for (FileStatusAdapter s : listStatusAdapter(f, true)) {
       long length = s.getLength();
       long spaceConsumed = s.getDiskConsumed();
-      ContentSummary c = s.isDir() ? getContentSummary(s.getPath()) :
-          new ContentSummary.Builder().length(length).
-          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+      ContentSummary c;
+      if (s.isDir()) {
+        c = getContentSummary(s.getPath());
+      } else {
+        ContentSummary.Builder childBuilder = new ContentSummary.Builder().length(length).
+            fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+        applyEcPolicy(childBuilder, s.getErasureCodingPolicy());
+        c = childBuilder.build();
+      }
 
       summary[0] += c.getLength();
       summary[1] += c.getSpaceConsumed();
@@ -1594,9 +1601,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       summary[3] += c.getDirectoryCount();
     }
 
-    return new ContentSummary.Builder().length(summary[0]).
+    ContentSummary.Builder builder = new ContentSummary.Builder().length(summary[0]).
         fileCount(summary[2]).directoryCount(summary[3]).
-        spaceConsumed(summary[1]).build();
+        spaceConsumed(summary[1]);
+    applyEcPolicy(builder, status.getErasureCodingPolicy());
+    return builder.build();
+  }
+
+  /**
+   * Apply the erasure coding policy on the {@link ContentSummary.Builder}.
+   * Default implementation is a no-op so that this class can compile and run
+   * against Hadoop 2, where {@code ContentSummary.Builder.erasureCodingPolicy}
+   * does not exist. The Hadoop 3 subclass overrides this to set the policy.
+   */
+  protected void applyEcPolicy(ContentSummary.Builder builder, String ecPolicy) {
   }
 
   @Override
