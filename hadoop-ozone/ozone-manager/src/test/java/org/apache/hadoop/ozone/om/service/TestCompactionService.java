@@ -173,7 +173,7 @@ class TestCompactionService {
   @Test
   public void testConfiguredCompactionLevelKForce() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, "2");
+    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 2);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
 
     CompactionService compactionService = getCompactionService(Arrays.asList("keyTable", "fileTable"));
@@ -184,7 +184,7 @@ class TestCompactionService {
   @Test
   public void testInvalidCompactionLevelFallsBackToDefault() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, "99");
+    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 99);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
 
     CompactionService compactionService = getCompactionService(Arrays.asList("keyTable", "fileTable"));
