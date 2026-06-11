@@ -57,7 +57,7 @@ public final class DeprecatedCliOption {
     if (parseResult == null) {
       return;
     }
-    PrintWriter err = parseResult.commandLine().getErr();
+    PrintWriter err = parseResult.commandSpec().commandLine().getErr();
     for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
       if (parseResult.hasMatchedOption(entry.getKey())) {
         warn(err, entry.getKey(), entry.getValue());
