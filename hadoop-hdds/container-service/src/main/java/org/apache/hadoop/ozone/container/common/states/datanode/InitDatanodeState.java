@@ -101,7 +101,13 @@ public class InitDatanodeState implements DatanodeState,
         }
       }
       for (InetSocketAddress addr : addresses) {
-        connectionManager.addSCMServer(addr, context.getThreadNamePrefix());
+        // Preserve the original hostname so the DN can re-resolve DNS
+        // on heartbeat failure (Kubernetes pod-IP-change recovery).
+        // getHostString() does not trigger reverse-DNS, returning the
+        // hostname the address was constructed with.
+        String hostAndPort = addr.getHostString() + ":" + addr.getPort();
+        connectionManager.addSCMServer(addr, hostAndPort,
+            context.getThreadNamePrefix());
         this.context.addEndpoint(addr);
       }
       InetSocketAddress reconAddress = getReconAddressForDatanodes(conf);

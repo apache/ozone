@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -47,6 +48,19 @@ public class EndpointStateMachine
   private final StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint;
   private final AtomicLong missedCount;
   private final InetSocketAddress address;
+  /**
+   * The original "host:port" string used to resolve {@link #address}.
+   * Preserved so that we can re-resolve DNS when the cached IP becomes
+   * stale (e.g. after a Kubernetes pod restart of the SCM peer). Since
+   * {@link InetSocketAddress} performs a one-shot DNS lookup at
+   * construction and freezes the IP, we cannot recover from a peer IP
+   * change without rebuilding the address from this hostname string.
+   * Null only in the legacy code path where the caller did not preserve
+   * the original config string (in which case re-resolution is disabled
+   * for that endpoint and the operator must restart the DN to pick up
+   * the new IP).
+   */
+  private final String hostAndPort;
   private final Lock lock;
   private final ConfigurationSource conf;
   private EndPointStates state = EndPointStates.FIRST;
@@ -67,9 +81,23 @@ public class EndpointStateMachine
   public EndpointStateMachine(InetSocketAddress address,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
       ConfigurationSource conf, String threadNamePrefix) {
+    this(address, null, endPoint, conf, threadNamePrefix);
+  }
+
+  /**
+   * Constructs RPC Endpoints, preserving the original host:port string
+   * so DNS can be re-resolved on heartbeat failure.
+   * @param address     resolved address used to build the RPC proxy
+   * @param hostAndPort the original "host:port" string, or null if the
+   *                    caller did not preserve it (re-resolution disabled)
+   */
+  public EndpointStateMachine(InetSocketAddress address, String hostAndPort,
+      StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
+      ConfigurationSource conf, String threadNamePrefix) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
+    this.hostAndPort = hostAndPort;
     lock = new ReentrantLock();
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
@@ -77,6 +105,59 @@ public class EndpointStateMachine
             .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-"
                 + this.address + "-%d ")
             .build());
+  }
+
+  /**
+   * The original "host:port" string used to construct {@link #getAddress()}.
+   * @return the host:port string, or null if not preserved at construction
+   */
+  public String getHostAndPort() {
+    return hostAndPort;
+  }
+
+  /**
+   * Re-resolves the configured hostname and reports whether the resolved
+   * IP differs from the cached {@link #address}. Does not mutate any
+   * state on this endpoint -- the caller is responsible for swapping
+   * this endpoint out (via {@link SCMConnectionManager#refreshSCMServer})
+   * if a refresh is desired.
+   * <p>
+   * Returns null when:
+   * <ul>
+   *   <li>{@link #hostAndPort} was not preserved at construction</li>
+   *   <li>the resolved IP is unchanged</li>
+   *   <li>the new resolution is unresolved (DNS lookup failed)</li>
+   * </ul>
+   * Returns the freshly-resolved {@link InetSocketAddress} when the IP
+   * has changed under the same hostname.
+   */
+  public InetSocketAddress resolveLatestAddress() {
+    if (hostAndPort == null) {
+      return null;
+    }
+    InetSocketAddress refreshed;
+    try {
+      refreshed = NetUtils.createSocketAddr(hostAndPort);
+    } catch (IllegalArgumentException ex) {
+      LOG.warn("Failed to re-resolve {}: {}", hostAndPort, ex.getMessage());
+      return null;
+    }
+    if (refreshed.isUnresolved()) {
+      LOG.warn("Re-resolution of {} produced an unresolved address; "
+          + "leaving cached address {} in place.", hostAndPort, address);
+      return null;
+    }
+    // Null-safe comparison: if the cached address itself was unresolved
+    // (initial DNS lookup failed; ctor accepted it with a warning),
+    // address.getAddress() is null and a successful re-resolution
+    // counts as a change. NPE-ing here would wedge the heartbeat
+    // refresh path on exactly the case it most needs to fix.
+    java.net.InetAddress cachedIp = address.getAddress();
+    if (cachedIp != null
+        && refreshed.getAddress().equals(cachedIp)) {
+      return null;
+    }
+    return refreshed;
   }
 
   /**
@@ -150,13 +231,23 @@ public class EndpointStateMachine
 
   /**
    * Closes the connection.
+   * <p>
+   * The underlying {@code endPoint.close()} delegates to
+   * {@code RPC.stopProxy} which can raise a RuntimeException; without
+   * the try/finally below, the per-endpoint executor would leak its
+   * thread on close failure. Callers (notably
+   * {@code SCMConnectionManager.refreshSCMServer}) catch RuntimeException
+   * from close, so the leak would otherwise be silent.
    */
   @Override
   public void close() {
-    if (endPoint != null) {
-      endPoint.close();
+    try {
+      if (endPoint != null) {
+        endPoint.close();
+      }
+    } finally {
+      executorService.shutdown();
     }
-    executorService.shutdown();
   }
 
   /**
