@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -254,6 +255,73 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     assertEquals(expectedSnapNs, repaired.getSnapshotUsedNamespace());
     assertTrue(repaired.getSnapshotUsedBytes() > 0,
         "Snapshot pending-delete bytes must be recomputed from deletedTable");
+  }
+
+  @Test
+  public void testQuotaRepairSnapshotDbDeletedTableQuota() throws Exception {
+    OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
+    when(respMock.getSuccess()).thenReturn(true);
+    OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = new AtomicReference<>();
+    doAnswer(invocation -> {
+      ref.set(invocation.getArgument(0, OzoneManagerProtocolProtos.OMRequest.class));
+      return respMock;
+    }).when(ratisServerMock).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServerMock);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String keyName = "/user/snapKey";
+    OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        keyName, -1, RatisReplicationConfig.getInstance(THREE), 1L, omMetadataManager);
+
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).get(ozoneKey);
+    long keyBytes = omKeyInfo.getReplicatedSize();
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    OMRequestTestUtils.deleteKey(ozoneKey, bucketInfo.getObjectID(), omMetadataManager, 2L);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo afterDelete = bucketInfo.toBuilder()
+        .setUsedBytes(0)
+        .setUsedNamespace(0)
+        .setSnapshotUsedBytes(keyBytes)
+        .setSnapshotUsedNamespace(1)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, afterDelete);
+
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(THREE));
+    createSnapshot("snap1");
+
+    assertNull(omMetadataManager.getDeletedTable().get(ozoneKey),
+        "Deleted key should move out of active deletedTable after snapshot");
+    assertEquals(0, omMetadataManager.countRowsInTable(omMetadataManager.getDeletedTable()));
+
+    OmBucketInfo corrupted = afterDelete.toBuilder()
+        .setSnapshotUsedBytes(7L)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, corrupted);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(3L, corrupted));
+
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
+    CompletableFuture<Boolean> repair = quotaRepairTask.repair();
+    assertTrue(awaitRepair(repair));
+
+    OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(ref.get());
+    OMClientResponse omClientResponse = omQuotaRepairRequest.validateAndUpdateCache(ozoneManager, 1);
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMQuotaRepairResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0, repaired.getUsedBytes());
+    assertEquals(0, repaired.getUsedNamespace());
+    assertEquals(keyBytes, repaired.getSnapshotUsedBytes());
   }
 
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,

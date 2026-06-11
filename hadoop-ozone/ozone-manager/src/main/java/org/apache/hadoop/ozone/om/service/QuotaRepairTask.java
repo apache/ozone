@@ -403,10 +403,10 @@ public class QuotaRepairTask {
       Map<String, CountPair> snapshotDeletedKeyMap,
       Map<String, CountPair> snapshotDeletedDirMap) throws IOException {
     LOG.info("Starting recalculate snapshot pending-delete from snapshot DBs");
-    SnapshotChainManager chain =
-        ((OmMetadataManagerImpl) activeMetaManager).getSnapshotChainManager();
-    OmSnapshotManager snapshotManager = om.getOmSnapshotManager();
     OMMetadataManager liveMetaManager = om.getMetadataManager();
+    SnapshotChainManager chain =
+        ((OmMetadataManagerImpl) liveMetaManager).getSnapshotChainManager();
+    OmSnapshotManager snapshotManager = om.getOmSnapshotManager();
     Set<UUID> scannedSnapshotIds = new HashSet<>();
 
     for (OmBucketInfo bucket : nameBucketInfoMap.values()) {
