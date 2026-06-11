@@ -475,6 +475,22 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  void testStartSubcommandMaxDatanodesPercentageKebabCaseFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--max-datanodes-percentage-to-involve-per-iteration", "30");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).doesNotContain("maxDatanodesPercentageToInvolvePerIteration");
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), eq(Optional.of(30)),
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
   void testStartSubcommandHelpDoesNotShowDeprecatedFlags() {
     CommandLine cmd = new CommandLine(startCmd);
     ByteArrayOutputStream usage = new ByteArrayOutputStream();
@@ -489,22 +505,6 @@ class TestContainerBalancerSubCommand {
         .doesNotContain("maxSizeToMovePerIterationInGB")
         .doesNotContain("maxSizeEnteringTargetInGB")
         .doesNotContain("maxSizeLeavingSourceInGB");
-  }
-
-  @Test
-  void testStartSubcommandMaxDatanodesPercentageKebabCaseFlag() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-    mockStartContainerBalancerSuccess(scmClient);
-
-    CommandLine cmd = new CommandLine(startCmd);
-    cmd.parseArgs("--max-datanodes-percentage-to-involve-per-iteration", "30");
-    startCmd.execute(scmClient);
-
-    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
-    assertThat(err.get()).doesNotContain("maxDatanodesPercentageToInvolvePerIteration");
-    verify(scmClient).startContainerBalancer(
-        eq(Optional.empty()), eq(Optional.empty()), eq(Optional.of(30)),
-        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
