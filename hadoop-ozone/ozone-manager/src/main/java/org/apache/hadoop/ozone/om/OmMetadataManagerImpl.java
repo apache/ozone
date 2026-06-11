@@ -109,6 +109,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -178,6 +179,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, TransactionInfo> transactionInfoTable;
   private Table<String, String> metaTable;
   private Table<String, OmLifecycleConfiguration> lifecycleConfigurationTable;
+  private Table<String, OmLifecycleScanState> lifecycleScanStateTable;
 
   // Tables required for multi-tenancy
   private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
@@ -512,6 +514,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
 
     lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
+    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
   }
 
   /**
@@ -1717,6 +1720,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
     return lifecycleConfigurationTable;
+  }
+
+  @Override
+  public Table<String, OmLifecycleScanState> getLifecycleScanStateTable() {
+    return lifecycleScanStateTable;
   }
 
   /**

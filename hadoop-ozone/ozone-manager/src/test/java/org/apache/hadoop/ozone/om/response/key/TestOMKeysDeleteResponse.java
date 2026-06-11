@@ -101,7 +101,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
   protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, omBucketInfo, Collections.emptyMap());
+        omResponse, omKeyInfoList, omBucketInfo, Collections.emptyMap(), null);
   }
 
   @Test

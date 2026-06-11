@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,6 +164,17 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
 
+      if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
+        if (ozoneManager.getAclsEnabled()) {
+          UserGroupInformation ugi = createUGIForApi();
+          if (!ozoneManager.isAdmin(ugi)) {
+            throw new OMException("Access denied for user " + ugi + ". "
+                + "Superuser privilege is required to save Lifecycle Service task state.",
+                OMException.ResultCodes.ACCESS_DENIED);
+          }
+        }
+      }
+
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey =
@@ -227,10 +240,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               quotaReleasedEmptyKeys.getValue(), true);
       omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
 
+      OmLifecycleScanState state = null;
+      if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
+        state = OmLifecycleScanState.getFromProtobuf(deleteKeyRequest.getScanState());
+        // Update cache
+        ozoneManager.getMetadataManager().getLifecycleScanStateTable()
+            .addCacheEntry(new CacheKey<>(state.getBucketKey()),
+                CacheValue.get(trxnLogIndex, state));
+      }
+
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap);
+              unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
 
       result = Result.SUCCESS;
       long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
@@ -335,7 +357,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
       Map<String, ErrorInfo> keyToErrors,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap,
+      OmLifecycleScanState scanState) {
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
@@ -348,7 +371,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 .setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList,
-        omBucketInfo.copyObject(), openKeyInfoMap);
+        omBucketInfo.copyObject(), openKeyInfoMap, scanState);
     return omClientResponse;
   }
 
