@@ -2043,7 +2043,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setStartFinalizeUpgradeRequest(req)
         .build();
 
-    handleError(submitRequest(omRequest)).getStartFinalizeUpgradeResponse();
+    handleError(submitRequest(omRequest));
   }
 
   @Override
