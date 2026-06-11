@@ -711,8 +711,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
+    int poolSize = Integer.parseInt(value);
     getDatanodeStateMachine().getContainer().getReplicationServer()
-        .setPoolSize(Integer.parseInt(value));
+        .setPoolSize(poolSize);
+    getDatanodeStateMachine().getSupervisor()
+        .setReplicationMaxStreams(poolSize);
     return value;
   }
 
