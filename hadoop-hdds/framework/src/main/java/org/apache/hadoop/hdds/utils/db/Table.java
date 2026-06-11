@@ -64,6 +64,8 @@ public interface Table<KEY, VALUE> {
    * Check if a given key exists in Metadata store.
    * (Optimization to save on data deserialization)
    * A lock on the key / bucket needs to be acquired before invoking this API.
+   * Implementations may use fast existence checks internally, but the returned
+   * result must be definitive for the current table state.
    * @param key metadata key
    * @return true if the metadata store contains a key.
    */
@@ -107,12 +109,9 @@ public interface Table<KEY, VALUE> {
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
-   * This method first checks using keyMayExist, if it returns false, we are
-   * 100% sure that key does not exist in DB, so it returns null with out
-   * calling db.get. If keyMayExist return true, then we use db.get and then
-   * return the value. This method will be useful in the cases where the
-   * caller is more sure that this key does not exist in DB and keyMayExist
-   * will help here.
+   * Implementations may use keyMayExist or similar fast-path checks
+   * internally, but the returned result must remain equivalent to a regular
+   * point lookup on the current table state.
    *
    * @param key metadata key
    * @return value in byte array or null if the key is not found.
