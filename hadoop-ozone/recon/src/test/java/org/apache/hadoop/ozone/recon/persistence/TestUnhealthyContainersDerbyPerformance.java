@@ -318,8 +318,9 @@ public class TestUnhealthyContainersDerbyPerformance {
   @AfterAll
   public void tearDownDatabase() {
     if (inMemoryDbName != null) {
-      try {
-        java.sql.DriverManager.getConnection("jdbc:derby:memory:" + inMemoryDbName + ";drop=true");
+      try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
+          "jdbc:derby:memory:" + inMemoryDbName + ";drop=true")) {
+        // Database is dropped when this connection closes.
       } catch (java.sql.SQLException e) {
         if (!"08006".equals(e.getSQLState())) {
           LOG.warn("Unexpected SQLState while dropping in-memory Derby DB: {}", e.getSQLState(), e);
