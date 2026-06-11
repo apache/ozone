@@ -180,6 +180,7 @@ public class TestSCMSafeModeManager {
     config.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "100ms");
 
     List<ContainerInfo> ratisContainers = new ArrayList<>();
+    List<ContainerInfo> deletedContainers = new ArrayList<>();
     ratisContainers.addAll(HddsTestUtils.getContainerInfo(5));
     for (ContainerInfo container : ratisContainers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
@@ -191,6 +192,8 @@ public class TestSCMSafeModeManager {
         .thenAnswer(invocation -> new ArrayList<>(ratisContainers));
     when(containerManager.getContainers(ReplicationType.EC))
         .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(HddsProtos.LifeCycleState.DELETED))
+        .thenAnswer(invocation -> new ArrayList<>(deletedContainers));
 
     scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
         serviceManager, queue, scmContext);
@@ -206,6 +209,7 @@ public class TestSCMSafeModeManager {
     for (int i = 3; i < ratisContainers.size(); i++) {
       ratisContainers.get(i).setState(HddsProtos.LifeCycleState.DELETED);
       ratisContainers.get(i).setNumberOfKeys(10);
+      deletedContainers.add(ratisContainers.get(i));
     }
 
     GenericTestUtils.waitFor(
