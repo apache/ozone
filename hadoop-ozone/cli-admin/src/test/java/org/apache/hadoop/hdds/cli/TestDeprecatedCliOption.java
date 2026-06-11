@@ -49,22 +49,6 @@ public class TestDeprecatedCliOption {
   }
 
   @Test
-  public void doesNotWarnForLongOption() {
-    ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
-    StringWriter err = new StringWriter();
-    CommandLine cli = new CommandLine(cmd);
-    cli.setErr(new PrintWriter(err, true));
-    cli.setExecutionStrategy(parseResult -> {
-      DeprecatedCliOption.warnIfMatched(parseResult);
-      return CommandLine.ExitCode.OK;
-    });
-
-    cli.execute("--filter-by-factor", "THREE");
-
-    assertThat(err.toString()).isEmpty();
-  }
-
-  @Test
   public void warnsForMultipleDeprecatedOptions() {
     ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
     StringWriter err = new StringWriter();
@@ -80,5 +64,21 @@ public class TestDeprecatedCliOption {
     assertThat(err.toString())
         .contains("WARNING: Option '-ffc' is deprecated")
         .contains("WARNING: Option '-fst' is deprecated");
+  }
+
+  @Test
+  public void doesNotWarnForLongOption() {
+    ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
+    StringWriter err = new StringWriter();
+    CommandLine cli = new CommandLine(cmd);
+    cli.setErr(new PrintWriter(err, true));
+    cli.setExecutionStrategy(parseResult -> {
+      DeprecatedCliOption.warnIfMatched(parseResult);
+      return CommandLine.ExitCode.OK;
+    });
+
+    cli.execute("--filter-by-factor", "THREE");
+
+    assertThat(err.toString()).isEmpty();
   }
 }
