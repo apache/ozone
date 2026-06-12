@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.repair.om;
 import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
@@ -58,18 +60,27 @@ public class CompactOMDB extends RepairTool {
   )
   private String nodeId;
 
+  @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      required = true,
+      description = "BottommostLevelCompaction option for RocksDB compaction." +
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce).")
+  private int bottommostLevelCompaction;
+
   @Override
   public void execute() throws Exception {
 
     OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
+    ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
+        CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
     if (!isDryRun()) {
       try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
                OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
                    UserGroupInformation.getCurrentUser(), omNodeDetails)) {
-        omAdminProtocolClient.compactOMDB(columnFamilyName);
-        info("Compaction request issued for om.db of om node: %s, column-family: %s.", nodeId, columnFamilyName);
+        omAdminProtocolClient.compactOMDB(columnFamilyName, blcOption.getValue());
+        info("Compaction request issued for om.db of om node: %s, column-family: %s," +
+            " BottommostLevelCompaction=%s.", nodeId, columnFamilyName, blcOption.name());
         info("Please check role logs of %s for completion status.", nodeId);
       } catch (IOException ex) {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);

@@ -221,6 +221,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -5653,10 +5654,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily,
+      ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",
