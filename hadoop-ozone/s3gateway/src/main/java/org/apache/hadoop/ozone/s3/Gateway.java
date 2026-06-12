@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayVersionMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -63,6 +64,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   /** Servlets and static content on separate port. */
   private BaseHttpServer contentServer;
   private S3GatewayMetrics metrics;
+  private S3GatewayVersionMetrics versionMetrics;
   private NettyMetrics nettyMetrics;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
@@ -84,6 +86,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
     httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
     contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
+    versionMetrics = S3GatewayVersionMetrics.create();
     nettyMetrics = NettyMetrics.create();
     start();
 
@@ -115,6 +118,9 @@ public class Gateway extends GenericCli implements Callable<Void> {
     IOUtils.closeQuietly(httpServer, contentServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
+    if (versionMetrics != null) {
+      versionMetrics.unRegister();
+    }
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
     }
