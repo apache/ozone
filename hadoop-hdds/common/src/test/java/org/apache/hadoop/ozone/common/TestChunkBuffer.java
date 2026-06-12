@@ -66,7 +66,7 @@ public class TestChunkBuffer {
     CodecTestUtil.gc();
   }
 
-  static Stream<Arguments> putByteArrayBufferTypes() {
+  static Stream<Arguments> chunkBufferTypes() {
     return Stream.of(
         Arguments.of("ByteBuffer", (IntFunction<ChunkBuffer>) ChunkBuffer::allocate),
         Arguments.of("Incremental", (IntFunction<ChunkBuffer>) cap ->
@@ -79,17 +79,31 @@ public class TestChunkBuffer {
         }));
   }
 
-  @ParameterizedTest(name = "put(byte[]) rejects null [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
-  void putByteArrayRejectsNull(String ignored, IntFunction<ChunkBuffer> factory) {
+  static Stream<Arguments> putTestCases() {
+    final List<Arguments> cases = new ArrayList<>();
+    chunkBufferTypes().forEach(impl -> {
+      final String name = (String) impl.get()[0];
+      @SuppressWarnings("unchecked")
+      final IntFunction<ChunkBuffer> factory =
+          (IntFunction<ChunkBuffer>) impl.get()[1];
+      for (PutMethod method : PutMethod.values()) {
+        cases.add(Arguments.of(name, factory, method));
+      }
+    });
+    return cases.stream();
+  }
+
+  @ParameterizedTest(name = "put rejects null [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putRejectsNull(String ignored, IntFunction<ChunkBuffer> factory,
+      PutMethod method) {
     try (ChunkBuffer buffer = factory.apply(16)) {
-      assertThrows(NullPointerException.class, () -> buffer.put((byte[]) null));
-      assertThrows(NullPointerException.class, () -> buffer.put(null, 0, 0));
+      method.assertRejectsNull(buffer);
     }
   }
 
   @ParameterizedTest(name = "put(byte[]) rejects negative offset/length [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
+  @MethodSource("chunkBufferTypes")
   void putByteArrayRejectsNegativeOffsetOrLength(String ignored,
       IntFunction<ChunkBuffer> factory) {
     final byte[] source = new byte[8];
@@ -100,7 +114,7 @@ public class TestChunkBuffer {
   }
 
   @ParameterizedTest(name = "put(byte[]) rejects out-of-range slice [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
+  @MethodSource("chunkBufferTypes")
   void putByteArrayRejectsOutOfRangeSlice(String ignored,
       IntFunction<ChunkBuffer> factory) {
     final byte[] source = new byte[8];
@@ -110,66 +124,100 @@ public class TestChunkBuffer {
     }
   }
 
-  @ParameterizedTest(name = "put(byte[]) rejects buffer overflow [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
-  void putByteArrayRejectsBufferOverflow(String ignored,
-      IntFunction<ChunkBuffer> factory) {
+  @ParameterizedTest(name = "put rejects buffer overflow [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putRejectsBufferOverflow(String type, IntFunction<ChunkBuffer> factory,
+      PutMethod method) {
     final byte[] source = new byte[8];
     try (ChunkBuffer buffer = factory.apply(4)) {
       final BufferOverflowException overflow = assertThrows(
-          BufferOverflowException.class, () -> buffer.put(source, 0, 5));
-      assertInstanceOf(IllegalArgumentException.class, overflow.getCause());
+          BufferOverflowException.class,
+          () -> method.putSlice(buffer, source, 0, 5));
+      if (method.expectsCheckArgumentOverflowCause(type)) {
+        assertInstanceOf(IllegalArgumentException.class, overflow.getCause());
+      }
     }
   }
 
-  @ParameterizedTest(name = "put(byte[]) rejects overflow after partial fill [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
-  void putByteArrayRejectsOverflowAfterPartialFill(String ignored,
-      IntFunction<ChunkBuffer> factory) throws IOException {
+  @ParameterizedTest(name = "put rejects overflow after partial fill [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putRejectsOverflowAfterPartialFill(String type, IntFunction<ChunkBuffer> factory,
+      PutMethod method) throws IOException {
     final byte[] first = {1, 2, 3, 4, 5};
     final byte[] second = {6, 7, 8, 9};
     try (ChunkBuffer buffer = factory.apply(8)) {
-      buffer.put(first, 0, 5);
+      method.putSlice(buffer, first, 0, 5);
       assertEquals(5, buffer.position());
       final BufferOverflowException overflow = assertThrows(
-          BufferOverflowException.class, () -> buffer.put(second, 0, 4));
-      assertInstanceOf(IllegalArgumentException.class, overflow.getCause());
+          BufferOverflowException.class, () -> method.putSlice(buffer, second, 0, 4));
+      if (method.expectsCheckArgumentOverflowCause(type)) {
+        assertInstanceOf(IllegalArgumentException.class, overflow.getCause());
+      }
       assertArrayEquals(first, readWrittenBytes(buffer));
     }
   }
 
-  @ParameterizedTest(name = "put(byte[]) writes array slice [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
-  void putByteArrayWritesSlice(String ignored, IntFunction<ChunkBuffer> factory)
+  @ParameterizedTest(name = "put writes array slice [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putWritesSlice(String ignored, IntFunction<ChunkBuffer> factory, PutMethod method)
       throws IOException {
     final byte[] source = {1, 2, 3, 4, 5, 6, 7, 8};
     try (ChunkBuffer buffer = factory.apply(4)) {
-      buffer.put(source, 2, 4);
+      method.putSlice(buffer, source, 2, 4);
       assertEquals(4, buffer.position());
       assertEquals(0, buffer.remaining());
       assertArrayEquals(new byte[] {3, 4, 5, 6}, readWrittenBytes(buffer));
     }
   }
 
-  @ParameterizedTest(name = "put(byte[]) zero-length is no-op [{0}]")
-  @MethodSource("putByteArrayBufferTypes")
-  void putByteArrayZeroLengthIsNoOp(String ignored, IntFunction<ChunkBuffer> factory)
-      throws IOException {
+  @ParameterizedTest(name = "put zero-length payload is no-op [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putZeroLengthPayloadIsNoOp(String ignored, IntFunction<ChunkBuffer> factory,
+      PutMethod method) throws IOException {
     final byte[] source = {1, 2, 3, 4};
     try (ChunkBuffer buffer = factory.apply(4)) {
-      buffer.put(source, 0, 2);
-      buffer.put(source, 2, 0);
+      method.putSlice(buffer, source, 0, 2);
+      method.putEmptySlice(buffer, source, 2, 2);
       assertEquals(2, buffer.position());
       assertArrayEquals(new byte[] {1, 2}, readWrittenBytes(buffer));
     }
   }
 
-  @Test
-  void putByteArraySpansIncrementalChunks() throws IOException {
+  @ParameterizedTest(name = "put fills entire buffer [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putFillsEntireBuffer(String ignored, IntFunction<ChunkBuffer> factory,
+      PutMethod method) throws IOException {
+    final byte[] source = new byte[32];
+    ThreadLocalRandom.current().nextBytes(source);
+    try (ChunkBuffer buffer = factory.apply(source.length)) {
+      method.putAll(buffer, source);
+      assertEquals(source.length, buffer.position());
+      assertArrayEquals(source, readWrittenBytes(buffer));
+    }
+  }
+
+  @ParameterizedTest(name = "put spans incremental chunks [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putSpansIncrementalChunks(String ignored, IntFunction<ChunkBuffer> ignoredFactory,
+      PutMethod method) throws IOException {
     final byte[] source = new byte[10];
     ThreadLocalRandom.current().nextBytes(source);
     try (ChunkBuffer buffer = ChunkBuffer.allocate(10, 3)) {
-      buffer.put(source, 1, 7);
+      method.putSlice(buffer, source, 1, 7);
+      assertEquals(7, buffer.position());
+      assertArrayEquals(Arrays.copyOfRange(source, 1, 8), readWrittenBytes(buffer));
+    }
+  }
+
+  @ParameterizedTest(name = "put spans list chunks [{0} via {1}]")
+  @MethodSource("putTestCases")
+  void putSpansListChunks(String ignored, IntFunction<ChunkBuffer> ignoredFactory,
+      PutMethod method) throws IOException {
+    final byte[] source = new byte[10];
+    ThreadLocalRandom.current().nextBytes(source);
+    try (ChunkBuffer buffer = ChunkBuffer.wrap(ImmutableList.of(
+        ByteBuffer.allocate(4), ByteBuffer.allocate(6)))) {
+      method.putSlice(buffer, source, 1, 7);
       assertEquals(7, buffer.position());
       assertArrayEquals(Arrays.copyOfRange(source, 1, 8), readWrittenBytes(buffer));
     }
@@ -351,5 +399,81 @@ public class TestChunkBuffer {
     final ByteArrayOutputStream output = new ByteArrayOutputStream(written);
     slice.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
     return output.toByteArray();
+  }
+
+  private static ByteBuffer emptySlice(byte[] source, int offset, int length) {
+    final ByteBuffer slice = ByteBuffer.wrap(source, offset, length);
+    slice.position(slice.limit());
+    return slice;
+  }
+
+  /**
+   * Exercises {@link ChunkBuffer#put(byte[], int, int)} vs {@link ChunkBuffer#put(ByteBuffer)}
+   * with equivalent payloads.
+   */
+  private enum PutMethod {
+    BYTE_ARRAY {
+      @Override
+      void putSlice(ChunkBuffer buffer, byte[] source, int offset, int length) {
+        buffer.put(source, offset, length);
+      }
+
+      @Override
+      void putAll(ChunkBuffer buffer, byte[] source) {
+        buffer.put(source);
+      }
+
+      @Override
+      void putEmptySlice(ChunkBuffer buffer, byte[] source, int offset, int length) {
+        buffer.put(source, offset, 0);
+      }
+
+      @Override
+      void assertRejectsNull(ChunkBuffer buffer) {
+        assertThrows(NullPointerException.class, () -> buffer.put((byte[]) null));
+        assertThrows(NullPointerException.class, () -> buffer.put(null, 0, 0));
+      }
+
+      @Override
+      boolean expectsCheckArgumentOverflowCause(String implType) {
+        return true;
+      }
+    },
+    BYTE_BUFFER {
+      @Override
+      void putSlice(ChunkBuffer buffer, byte[] source, int offset, int length) {
+        buffer.put(ByteBuffer.wrap(source, offset, length));
+      }
+
+      @Override
+      void putAll(ChunkBuffer buffer, byte[] source) {
+        buffer.put(ByteBuffer.wrap(source));
+      }
+
+      @Override
+      void putEmptySlice(ChunkBuffer buffer, byte[] source, int offset, int length) {
+        buffer.put(emptySlice(source, offset, length));
+      }
+
+      @Override
+      void assertRejectsNull(ChunkBuffer buffer) {
+        assertThrows(NullPointerException.class, () -> buffer.put((ByteBuffer) null));
+      }
+
+      @Override
+      boolean expectsCheckArgumentOverflowCause(String implType) {
+        return !"ByteBuffer".equals(implType);
+      }
+    };
+
+    abstract void putSlice(ChunkBuffer buffer, byte[] source, int offset, int length);
+
+    abstract void putAll(ChunkBuffer buffer, byte[] source);
+
+    abstract void putEmptySlice(ChunkBuffer buffer, byte[] source, int offset, int length);
+
+    abstract void assertRejectsNull(ChunkBuffer buffer);
+
+    abstract boolean expectsCheckArgumentOverflowCause(String implType);
   }
 }
