@@ -17,21 +17,17 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for OMSetRangerServiceVersionRequest.
  */
-@CleanupTableInfo(cleanupTables = {META_TABLE})
 public class OMSetRangerServiceVersionResponse extends OMClientResponse {
   private String serviceVersionKey;
   private String serviceVersionValueStr;

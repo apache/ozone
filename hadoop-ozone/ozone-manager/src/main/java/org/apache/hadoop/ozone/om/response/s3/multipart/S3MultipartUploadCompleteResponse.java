@@ -17,12 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -33,7 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -45,8 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * 2) Add key to KeyTable,
  * 3) Delete unused parts.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private String multipartKey;
   private String multipartOpenKey;

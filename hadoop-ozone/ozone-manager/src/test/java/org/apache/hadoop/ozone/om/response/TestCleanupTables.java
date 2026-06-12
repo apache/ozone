@@ -18,11 +18,8 @@
 package org.apache.hadoop.ozone.om.response;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,11 +28,8 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Iterators;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Modifier;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -60,9 +54,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
-import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -75,23 +66,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.reflections.Reflections;
 
 /**
- * The test checks whether all {@link OMClientResponse} have defined the
- * {@link CleanupTableInfo} annotation.
- * For certain requests it check whether it is properly defined not just the
- * fact that it is defined.
+ * Tests cleanup table tracking for cache eviction.
  */
 @ExtendWith(MockitoExtension.class)
-public class TestCleanupTableInfo {
+public class TestCleanupTables {
   private static final String TEST_VOLUME_NAME = "testVol";
   private static final String TEST_BUCKET_NAME = "testBucket";
   private static final String TEST_KEY = "/foo/bar/baz/key";
   private static final HddsProtos.BlockID TEST_BLOCK_ID =
       new BlockID(1, 1).getProtobuf();
-  public static final String OM_RESPONSE_PACKAGE =
-      "org.apache.hadoop.ozone.om.response";
 
   @TempDir
   private Path folder;
@@ -130,54 +115,13 @@ public class TestCleanupTableInfo {
   }
 
   @Test
-  public void checkAnnotationAndTableName() {
-    OMMetadataManager omMetadataManager = om.getMetadataManager();
-
-    Set<String> tables = omMetadataManager.listTableNames();
-    Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
-    // OMEchoRPCWriteResponse does not need CleanupTable.
-    subTypes.remove(OMEchoRPCWriteResponse.class);
-    subTypes.remove(DummyOMClientResponse.class);
-    subTypes.forEach(aClass -> {
-      if (Modifier.isAbstract(aClass.getModifiers())) {
-        assertFalse(aClass.isAnnotationPresent(CleanupTableInfo.class),
-            aClass + " is an abstract class and should not contain CleanupTableInfo annotations");
-        return;
-      } else {
-        assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
-            aClass + " does not have annotation of" +
-                " CleanupTableInfo");
-      }
-      CleanupTableInfo annotation =
-          aClass.getAnnotation(CleanupTableInfo.class);
-      assertNotNull(annotation, "CleanupTableInfo is null for class " + aClass.getSimpleName());
-      String[] cleanupTables = annotation.cleanupTables();
-      boolean cleanupAll = annotation.cleanupAll();
-      if (cleanupTables.length >= 1) {
-        assertTrue(
-            Arrays.stream(cleanupTables).allMatch(tables::contains)
-        );
-
-      } else {
-        assertTrue(cleanupAll);
-      }
-    });
-    reset(om);
-  }
-
-  private Set<Class<? extends OMClientResponse>> responseClasses() {
-    Reflections reflections = new Reflections(OM_RESPONSE_PACKAGE);
-    return reflections.getSubTypesOf(OMClientResponse.class);
-  }
-
-  @Test
   public void testFileCreateRequestSetsAllTouchedTableCachesForEviction() {
     OMFileCreateRequest request = anOMFileCreateRequest();
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
-    request.validateAndUpdateCache(om, 1);
+    OMClientResponse response = request.validateAndUpdateCache(om, 1);
 
-    assertCacheItemCounts(cacheItemCount, OMFileCreateResponse.class);
+    assertCacheItemCounts(cacheItemCount, response);
     verify(omMetrics, times(1)).incNumCreateFile();
   }
 
@@ -191,9 +135,9 @@ public class TestCleanupTableInfo {
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
-    request.validateAndUpdateCache(om, 1);
+    OMClientResponse response = request.validateAndUpdateCache(om, 1);
 
-    assertCacheItemCounts(cacheItemCount, OMKeyCreateResponse.class);
+    assertCacheItemCounts(cacheItemCount, response);
     verify(omMetrics, times(1)).incNumKeyAllocates();
   }
 
@@ -212,10 +156,9 @@ public class TestCleanupTableInfo {
 
   private void assertCacheItemCounts(
       Map<String, Integer> cacheItemCount,
-      Class<? extends OMClientResponse> responseClass
+      OMClientResponse response
   ) {
-    CleanupTableInfo ann = responseClass.getAnnotation(CleanupTableInfo.class);
-    List<String> cleanup = Arrays.asList(ann.cleanupTables());
+    Set<String> cleanup = response.getCleanupTables();
     for (String tableName : om.getMetadataManager().listTableNames()) {
       if (!cleanup.contains(tableName)) {
         assertEquals(cacheItemCount.get(tableName).intValue(),

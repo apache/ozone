@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.om.response.upgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
@@ -32,7 +30,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for finalizeUpgrade request.
  */
-@CleanupTableInfo(cleanupTables = {META_TABLE})
 public class OMFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFinalizeUpgradeResponse.class);

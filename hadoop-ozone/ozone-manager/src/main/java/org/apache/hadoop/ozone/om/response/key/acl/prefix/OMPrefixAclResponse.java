@@ -17,21 +17,17 @@
 
 package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for Prefix Acl request.
  */
-@CleanupTableInfo(cleanupTables = {PREFIX_TABLE})
 public class OMPrefixAclResponse extends OMClientResponse {
 
   private OmPrefixInfo prefixInfo;

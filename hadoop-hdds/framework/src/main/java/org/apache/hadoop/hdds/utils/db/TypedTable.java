@@ -430,6 +430,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     // This will override the entry if there is already entry for this key.
+    TableCacheUpdateTracker.recordCacheUpdate(getName());
     cache.put(cacheKey, cacheValue);
   }
 

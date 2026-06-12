@@ -17,23 +17,18 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Performs tasks for RecoverLease request responses.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE, OPEN_FILE_TABLE})
 public class OMRecoverLeaseResponse extends OmKeyResponse {
 
   private OmKeyInfo openKeyInfo;

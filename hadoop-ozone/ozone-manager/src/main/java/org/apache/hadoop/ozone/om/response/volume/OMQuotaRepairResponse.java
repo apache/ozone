@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Map;
@@ -29,14 +26,12 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for {@link OMQuotaRepairRequest} request.
  */
-@CleanupTableInfo(cleanupTables = {VOLUME_TABLE, BUCKET_TABLE})
 public class OMQuotaRepairResponse extends OMClientResponse {
   private Map<String, OmVolumeArgs> volumeArgsMap;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;

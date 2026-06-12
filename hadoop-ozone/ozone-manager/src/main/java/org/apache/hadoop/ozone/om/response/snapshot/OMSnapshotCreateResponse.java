@@ -17,25 +17,24 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for OMSnapshotCreateRequest.
  */
-@CleanupTableInfo(cleanupTables = {
-    DELETED_TABLE, SNAPSHOT_RENAMED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
   private SnapshotInfo snapshotInfo;
@@ -44,6 +43,8 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
       @Nonnull SnapshotInfo snapshotInfo) {
     super(omResponse);
     this.snapshotInfo = snapshotInfo;
+    addCleanupTables(Arrays.asList(DELETED_TABLE, DELETED_DIR_TABLE,
+        SNAPSHOT_RENAMED_TABLE, SNAPSHOT_INFO_TABLE));
   }
 
   /**

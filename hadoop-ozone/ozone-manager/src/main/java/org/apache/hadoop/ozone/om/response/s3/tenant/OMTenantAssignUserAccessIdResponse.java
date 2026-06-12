@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -30,7 +26,6 @@ import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,11 +33,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 /**
  * Response for OMAssignUserToTenantRequest.
  */
-@CleanupTableInfo(cleanupTables = {
-    S3_SECRET_TABLE,
-    TENANT_ACCESS_ID_TABLE,
-    PRINCIPAL_TO_ACCESS_IDS_TABLE
-})
 public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
