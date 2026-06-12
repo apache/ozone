@@ -168,7 +168,7 @@ public final class OBSCreateKeyPlannedRequest extends PlannedRequest {
     String openKeyName = metadataManager.getOpenKey(volumeName, bucketName,
         keyName, String.valueOf(clientID));
     builder.put(OPEN_KEY_TABLE, openKeyName, omKeyInfo,
-        OmKeyInfo.getCodec(true));
+        OmKeyInfo.getCodec());
 
     // Write updated bucket info
     builder.put(BUCKET_TABLE, bucketKey, bucketInfo,

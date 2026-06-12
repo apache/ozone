@@ -170,7 +170,7 @@ public final class OBSCommitKeyPlannedRequest extends PlannedRequest {
     builder.delete(OPEN_KEY_TABLE, openKeyName);
 
     // Put in keyTable
-    builder.put(KEY_TABLE, ozoneKey, omKeyInfo, OmKeyInfo.getCodec(true));
+    builder.put(KEY_TABLE, ozoneKey, omKeyInfo, OmKeyInfo.getCodec());
 
     // Update bucket quota: on overwrite, subtract old key size
     if (existingKey != null) {
