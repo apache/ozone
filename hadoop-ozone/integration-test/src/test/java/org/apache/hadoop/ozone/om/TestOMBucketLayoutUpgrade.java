@@ -33,8 +33,11 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -42,7 +45,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -89,6 +91,7 @@ class TestOMBucketLayoutUpgrade {
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, fromVersion.serialize());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     String omServiceId = UUID.randomUUID().toString();
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -152,10 +155,16 @@ class TestOMBucketLayoutUpgrade {
   @Test
   @Order(DURING_UPGRADE)
   void finalizeUpgrade() throws Exception {
-    UpgradeFinalization.StatusAndMessages response =
-        omClient.finalizeUpgrade("finalize-test");
-    System.out.println("Finalization Messages : " + response.msgs());
-
+    // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+    cluster.getOzoneManagersList().forEach(om -> {
+      try {
+        om.getMetadataManager().getMetaTable().addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
+        om.getMetadataManager().getMetaTable()
+            .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
+      } catch (RocksDatabaseException | CodecException e) {
+        throw new RuntimeException(e);
+      }
+    });
     waitForFinalization(omClient);
 
     final String expectedVersion =

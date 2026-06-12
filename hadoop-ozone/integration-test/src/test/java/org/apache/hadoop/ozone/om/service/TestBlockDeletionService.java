@@ -88,7 +88,7 @@ public class TestBlockDeletionService {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.serialize());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HBASE_SUPPORT.serialize());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
