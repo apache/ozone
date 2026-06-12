@@ -42,8 +42,8 @@ public abstract class AbstractComponentVersionTest {
   @Test
   public void testUnknownFutureVersionHasTheHighestOrdinal() {
     ComponentVersion[] values = getValues();
-    ComponentVersion futureValue = getUnknownVersion();
-    assertEquals(values[values.length - 1], futureValue);
+    ComponentVersion unknownVersion = getUnknownVersion();
+    assertEquals(values[values.length - 1], unknownVersion);
   }
 
   @Test
@@ -80,7 +80,8 @@ public abstract class AbstractComponentVersionTest {
     }
     assertNull(values[knownVersionCount - 1].nextVersion(),
         "Expected latest known version to have no nextVersion");
-    assertNull(unknownVersion.nextVersion(), "Expected unknown version to have no nextVersion");
+    assertNull(unknownVersion.nextVersion(),
+        "Expected unknown version to have no nextVersion");
   }
 
   @Test
