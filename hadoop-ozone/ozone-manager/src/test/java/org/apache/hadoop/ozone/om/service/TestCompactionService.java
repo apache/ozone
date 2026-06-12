@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -74,6 +77,7 @@ class TestCompactionService {
     ozoneManager = mock(OzoneManager.class);
     OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
     TypedTable table = mock(TypedTable.class);
 
     Set<String> tables = new HashSet<>();
@@ -157,6 +161,35 @@ class TestCompactionService {
     // initialization should fail if all tables are invalid
     assertThrows(IllegalArgumentException.class,
         () -> getCompactionService(compactTables));
+  }
+
+  @Test
+  public void testDefaultCompactionLevelIsKSkip() {
+    CompactionService compactionService = getCompactionService(Arrays.asList("keyTable", "fileTable"));
+    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
+        compactionService.getBottommostLevelCompaction());
+  }
+
+  @Test
+  public void testConfiguredCompactionLevelKForce() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 2);
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
+
+    CompactionService compactionService = getCompactionService(Arrays.asList("keyTable", "fileTable"));
+    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce,
+        compactionService.getBottommostLevelCompaction());
+  }
+
+  @Test
+  public void testInvalidCompactionLevelFallsBackToDefault() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 99);
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
+
+    CompactionService compactionService = getCompactionService(Arrays.asList("keyTable", "fileTable"));
+    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
+        compactionService.getBottommostLevelCompaction());
   }
 
   private CompactionService getCompactionService(List<String> compactTables) {
