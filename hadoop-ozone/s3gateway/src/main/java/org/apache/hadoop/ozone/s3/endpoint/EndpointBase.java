@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientUtils;
@@ -104,9 +105,11 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -223,6 +226,39 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
+  }
+
+  /**
+   * Sets the IAM S3 action on thread-local {@link S3Auth} for fine-grained STS authorization.
+   * Called when the handler resolves the {@link S3GAction}.
+   */
+  protected void applyS3Action(S3GAction action) {
+    if (s3Auth != null) {
+      s3Auth.setS3Action(S3GActionIamMapper.toS3ActionString(action));
+    }
+  }
+
+  /**
+   * Temporarily override the S3 action string set on {@link S3Auth} for authorization.
+   * <p>
+   * This does not change S3G auditing (which is based on {@link S3GAction}).
+   * The action string is the IAM-style S3 action name without the {@code s3:} prefix (for example
+   * {@code GetObject}, {@code PutObject}, {@code GetObjectTagging}).
+   * This is used for special case APIs like CopyObject that don't have a 1-1 s3 action mapping, but
+   * requires GetObject on the source file and PutObject on the destination file.
+   */
+  protected <T, E extends Exception> T runWithS3ActionString(String s3Action, CheckedSupplier<T, E> checkedSupplier)
+      throws E {
+    if (s3Auth == null) {
+      return checkedSupplier.get();
+    }
+    final String originalS3Action = s3Auth.getS3Action();
+    s3Auth.setS3Action(s3Action);
+    try {
+      return checkedSupplier.get();
+    } finally {
+      s3Auth.setS3Action(originalS3Action);
+    }
   }
 
   protected OzoneVolume getVolume() throws IOException {

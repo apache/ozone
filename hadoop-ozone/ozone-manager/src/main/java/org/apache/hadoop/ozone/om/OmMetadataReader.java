@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -236,9 +237,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         if (isStsS3Request()) {
-          // We need to be able to tell the difference between being able to download a file and merely seeing the file
-          // name in a list.  Use READ for download ability and LIST (here) for listing.
-          // When listPrefix is set (original S3 ListObjects prefix), authorize LIST on that prefix for the whole
+          // When listPrefix is set (original S3 ListObjects prefix), authorize READ on that prefix for the whole
           // listing, including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
           final String listPrefix = args.getListPrefix();
           final String keyName = args.getKeyName();
@@ -258,7 +257,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
           } else {
             aclKey = "*";
           }
-          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey);
+          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey);
         } else {
           checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
               bucket, args.getKeyName());
@@ -304,12 +303,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        if (isStsS3Request()) {
-          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
-        } else {
-          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-              bucket, args.getKeyName());
-        }
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
@@ -384,7 +378,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
           final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
           captureLatencyNs(
               perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
-                  ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey));
+                  ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey));
         } else {
           captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
               checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
@@ -612,16 +606,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .setVolumeName(vol)
         .setBucketName(bucket)
         .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(owner)
-        .build();
+        .setOwnerName(owner);
 
-    return checkAcls(obj, context, throwIfPermissionDenied);
+    return checkAcls(obj, contextBuilder, throwIfPermissionDenied);
   }
 
   /**
@@ -631,13 +624,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
    *                     and throwOnPermissionDenied set to true.
    */
-  public boolean checkAcls(OzoneObj obj, RequestContext context,
+  public boolean checkAcls(OzoneObj obj, RequestContext.Builder contextBuilder,
       boolean throwIfPermissionDenied) throws OMException {
 
-    final RequestContext normalizedRequestContext = maybeAttachSessionPolicyFromThreadLocal(context);
+    maybeAddToContextFromThreadLocal(contextBuilder);
+    final RequestContext context = contextBuilder.build();
 
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
-        () -> accessAuthorizer.checkAccess(obj, normalizedRequestContext))) {
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -647,7 +641,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                 "Key:" + obj.getKeyName() : "";
         // For STS tokens, make clear that the user is using an assumed role, otherwise the access denied
         // message could be confusing
-        String user = normalizedRequestContext.getClientUgi().getShortUserName();
+        String user = context.getClientUgi().getShortUserName();
         final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
         if (stsTokenIdentifier != null) {
           final StringBuilder builder = new StringBuilder(user)
@@ -660,11 +654,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
             user,
-            normalizedRequestContext.getAclRights(),
+            context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
             "User " + user +
-            " doesn't have " + normalizedRequestContext.getAclRights() +
+            " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
       }
@@ -675,21 +669,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   /**
-   * Attaches session policy to RequestContext if an STSTokenIdentifier is found in the Ozone Manager thread local
-   * (meaning this is an STS request), and the STSTokenIdentifier has a session policy.  Otherwise, returns the
-   * RequestContext as it was before.
-   * @param context the original RequestContext
-   * @return RequestContext as before or with sessionPolicy embedded
+   * Enriches the given {@link RequestContext.Builder} with per-request fields from the Ozone Manager
+   * thread locals: the session policy from {@link STSTokenIdentifier} (set on STS requests) and the
+   * S3 action from {@link S3Authentication} (set on S3 requests). Either or both may be absent, in
+   * which case the corresponding field is left untouched on the builder.
+   * @param contextBuilder the builder to enrich in-place
    */
-  private RequestContext maybeAttachSessionPolicyFromThreadLocal(RequestContext context) {
+  public static void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
     final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
-    if (stsTokenIdentifier == null) {
-      return context;
+    if (stsTokenIdentifier != null) {
+      contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
     }
 
-    return context.toBuilder()
-        .setSessionPolicy(stsTokenIdentifier.getSessionPolicy())
-        .build();
+    final S3Authentication s3Authentication = OzoneManager.getS3Auth();
+    if (s3Authentication != null && s3Authentication.hasS3Action() && !s3Authentication.getS3Action().isEmpty()) {
+      contextBuilder.setS3Action(s3Authentication.getS3Action());
+    }
   }
 
   static String getClientAddress() {
