@@ -697,6 +697,7 @@ public class TestDiskBalancerTask {
 
     long id1 = CONTAINER_ID;
     long id2 = CONTAINER_ID + 1;
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
 
     Container c1 = createContainer(id1, sourceVolume, State.CLOSED);
     Container c2 = createContainer(id2, sourceVolume, State.CLOSED);
@@ -735,21 +736,25 @@ public class TestDiskBalancerTask {
 
     assertEquals(2, diskBalancerService.getMetrics().getSuccessCount());
 
-    // With the bug: map size is 1; with fix: 2 queued replicas.
-    assertEquals(2, diskBalancerService.getPendingDeletionQueueSize());
+    assertEquals(1, diskBalancerService.getPendingDeletionDeadlineCount(),
+        "both moves should share one deadline key");
+    assertEquals(2, diskBalancerService.getPendingDeletionQueueSize(),
+        "both container replicas should be queued for deletion");
 
     // Not deleted yet — delay has not elapsed.
     assertTrue(oldDir1.exists());
     assertTrue(oldDir2.exists());
 
     clock.fastForward(delayMs);
-    diskBalancerService.drainPendingDeletionsForTest();
+    diskBalancerService.cleanupPendingDeletionContainers();
 
     assertEquals(0, diskBalancerService.getPendingDeletionQueueSize());
     assertFalse(oldDir1.exists());
     assertFalse(oldDir2.exists());
     assertFalse(sourceVolume.getContainerIterator().hasNext(),
         "source volume should have no containers after delayed deletion");
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace(),
+        "source volume used space should return to pre-move level after old replicas are deleted");
 
     // New replicas live on dest volume.
     assertTrue(new File(containerSet.getContainer(id1).getContainerData().getContainerPath()).exists());

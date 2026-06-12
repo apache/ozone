@@ -651,7 +651,7 @@ public class DiskBalancerService extends BackgroundService {
         }
         postCall(moveSucceeded && newContainer != null, startTime);
 
-        // pick one expired container from pendingDeletionContainers to delete
+        // Attempt to delete any pending-deletion buckets whose deadline has elapsed.
         tryCleanupOnePendingDeletionContainer();
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
@@ -691,7 +691,8 @@ public class DiskBalancerService extends BackgroundService {
     }
   }
 
-  private void cleanupPendingDeletionContainers() {
+  @VisibleForTesting
+  public void cleanupPendingDeletionContainers() {
     // delete all pending deletion containers before stop the service
     boolean ret;
     do {
@@ -893,13 +894,15 @@ public class DiskBalancerService extends BackgroundService {
     this.replicaDeletionDelay = durationMills;
   }
 
+  @VisibleForTesting
+  public int getPendingDeletionDeadlineCount() {
+    return pendingDeletionContainers.size();
+  }
+
+  @VisibleForTesting
   public int getPendingDeletionQueueSize() {
     return pendingDeletionContainers.values().stream()
         .mapToInt(Queue::size)
         .sum();
-  }
-
-  public void drainPendingDeletionsForTest() {
-    cleanupPendingDeletionContainers();
   }
 }
