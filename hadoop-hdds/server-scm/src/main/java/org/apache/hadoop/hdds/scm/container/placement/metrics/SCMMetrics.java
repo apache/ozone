@@ -180,7 +180,6 @@ public class SCMMetrics {
     }
   }
 
-  @Metric("Ratis state machine events")
   public String getRatisEvents() {
     synchronized (ratisEvents) {
       return String.join("\n", ratisEvents);
