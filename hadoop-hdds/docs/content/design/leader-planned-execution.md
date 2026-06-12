@@ -32,9 +32,7 @@ author: Abhishek Pal
    * [2.5 Apply Engine](#25-apply-engine)
    * [2.6 State Machine Integration](#26-state-machine-integration)
    * [2.7 Granular Locking](#27-granular-locking)
-3. [Comparison: Legacy vs Planned Path](#3-comparison-legacy-vs-planned-path)
-4. [Migration Strategy](#4-migration-strategy)
-5. [FAQs](#5-faqs)
+3. [Migration Strategy](#4-migration-strategy)
 
 ---
 
@@ -319,23 +317,7 @@ readers allowed) and the order is fixed.
 
 ---
 
-## 3. Comparison: Legacy vs Planned Path
-
-| Aspect | Legacy Path | Planned Path |
-|:-------|:------------|:-------------|
-| **Who executes logic** | All nodes | Leader only |
-| **What is replicated** | Raw `OMRequest` bytes | DB patch (`ReplicatedStateTransition`) |
-| **Follower work** | Full `validateAndUpdateCache` | Write raw bytes to column families |
-| **Locking** | Bucket write lock (coarse) | Bucket read + striped key/dir (fine) |
-| **ID generation** | From Ratis `transactionLogIndex` | From `ManagedIndexService` |
-| **Response available** | After `applyTransaction` | Right after planning |
-| **Double buffer** | Required (batches + flushes) | Not used |
-| **Table cache** | Maintained per-table | Not needed (reads from DB directly) |
-| **Recon compatibility** | Must understand all commands | Can apply the raw patch directly |
-
----
-
-## 4. Migration Strategy
+## 3. Migration Strategy
 
 Commands are migrated one at a time:
 
