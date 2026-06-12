@@ -2055,7 +2055,6 @@ public class SCMNodeManager implements NodeManager {
       return true;
     }
 
-
     // Else, either:
     // DN software is older than SCM but SCM is pre-finalized: expected since DNs are upgraded after SCM.
     // DN software matches SCM and DN apparent version <= SCM apparent version: DN can register and will be given a

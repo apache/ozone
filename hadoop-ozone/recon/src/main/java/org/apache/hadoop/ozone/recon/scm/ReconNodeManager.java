@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -84,6 +86,7 @@ public class ReconNodeManager extends SCMNodeManager {
   private Map<DatanodeID, Long> datanodeHeartbeatMap = new HashMap<>();
 
   private final long reconDatanodeOutdatedTime;
+  private final ScmVersionManager versionManager;
 
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
@@ -93,6 +96,7 @@ public class ReconNodeManager extends SCMNodeManager {
                           ScmVersionManager versionManager) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
         SCMContext.emptyContext(), versionManager);
+    this.versionManager = versionManager;
     final int reconStaleDatanodeMultiplier = 3;
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
@@ -294,8 +298,44 @@ public class ReconNodeManager extends SCMNodeManager {
   @Override
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
       LayoutVersionProto versionReport) {
-    // Recon will not send commands to datanodes, but it should still log if a datanode with an invalid version is
-    // heartbeating.
-    shouldFenceDatanode(datanodeDetails, versionReport);
+    // Recon will not send finalize commands to datanodes.
+  }
+
+
+  /**
+   * Called by the parent class to when a datanode registers to determine whether it should be allowed in the cluster.
+   * Since Recon finalizes automatically on startup, it should not reject datanodes with lower software version after
+   * it has finalized, unlike SCM.
+   */
+  @Override
+  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, LayoutVersionProto versionReport) {
+    ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getSoftwareLayoutVersion());
+    ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getMetadataLayoutVersion());
+    ComponentVersion reconSoftwareVersion = versionManager.getSoftwareVersion();
+    ComponentVersion reconApparentVersion = versionManager.getApparentVersion();
+
+    // DN software newer than Recon violates upgrade order. Recon must always be upgraded first.
+    if (!dnSoftwareVersion.isSupportedBy(reconSoftwareVersion)) {
+      LOG.error("Datanode {} has software version {} which is newer than Recon software version {}. " +
+              "Recon must be upgraded before datanodes.",
+          dnDetails, dnSoftwareVersion, reconSoftwareVersion);
+      return true;
+    }
+
+    // DN apparent version cannot be higher than Recon apparent version. Recon must finalize first.
+    if (!versionManager.isAllowed(dnApparentVersion)) {
+      LOG.error("Datanode {} has apparent version {} which is higher than Recon apparent version {}. " +
+              "Recon must finalize before datanodes.",
+          dnDetails, dnApparentVersion, reconApparentVersion);
+      return true;
+    }
+
+    // Else, either:
+    // DN software is older than Recon: expected since DNs are upgraded after Recon.
+    // DN software matches Recon and DN apparent version <= Recon apparent version: DN can register and SCM should
+    // instruct it to finalize if needed.
+    return false;
   }
 }
