@@ -42,10 +42,10 @@ These parameters, defined in `ozone-site.xml`, control how Ozone manages snapsho
     *   `ozone.om.snapshot.diff.db.dir`: Directory for SnapshotDiff job data. Defaults to OM metadata dir. Use a spacious location for large diffs.
     *   `ozone.om.snapshot.force.full.diff`: Force a full diff for all snapshot diff jobs (Default: false).
     *   `ozone.om.snapshot.diff.disable.native.libs`: Disable native libraries for snapshot diff (Default: false).
-    *   `ozone.om.snapshot.diff.max.page.size`: Maximum page size for snapshot diff (Default: 1000).
+    *   `ozone.om.snapshot.diff.max.page.size`: Maximum page size for snapshot diff (Default: 5000).
     *   `ozone.om.snapshot.diff.thread.pool.size`: Thread pool size for snapshot diff (Default: 10).
     *   `ozone.om.snapshot.diff.job.default.wait.time`: Default wait time for a snapshot diff job (Default: 1m).
-    *   `ozone.om.snapshot.diff.max.allowed.keys.changed.per.job`: Maximum number of keys allowed to be changed per snapshot diff job (Default: 10000000).
+    *   `ozone.om.snapshot.diff.max.allowed.keys.changed.per.job`: Maximum number of keys allowed to be changed per snapshot diff job (Default: 1000000000).
 
 *   **Snapshot Compaction and Cleanup**
     *   `ozone.snapshot.key.deleting.limit.per.task`: The maximum number of keys scanned by the snapshot deleting service in a single run (Default: 20000).
