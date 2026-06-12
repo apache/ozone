@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -76,17 +74,21 @@ public final class CompactDBUtil {
     });
   }
 
+  /**
+   * Converts the given RocksDB id to a
+   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum value.
+   * Defaults to {@code kSkip} if the id is invalid.
+   *
+   * @param bottommostLevelCompaction RocksDB id
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized).
+   */
   public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
-      OzoneConfiguration configuration) {
-    int compactionType = configuration.getInt(
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+      int bottommostLevelCompaction) {
     ManagedCompactRangeOptions.BottommostLevelCompaction level =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(bottommostLevelCompaction);
     if (level == null) {
-      compactionType = OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
-      level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
-      LOG.warn("Invalid bottommost level compaction type. Using default value: {}", level);
+      LOG.warn("Invalid bottommost level compaction id: {}. Using default: kSkip.", bottommostLevelCompaction);
+      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
     }
     return level;
   }

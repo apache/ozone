@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
@@ -60,10 +61,9 @@ public class CompactOMDB extends RepairTool {
   private String nodeId;
 
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      required = true,
       description = "BottommostLevelCompaction option for RocksDB compaction." +
-          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce)." +
-          " Default: 0 (kSkip).",
-      defaultValue = "0")
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce).")
   private int bottommostLevelCompaction;
 
   @Override
@@ -73,7 +73,7 @@ public class CompactOMDB extends RepairTool {
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
     ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
-        getBottommostLevelCompaction(bottommostLevelCompaction);
+        CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
     if (!isDryRun()) {
       try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
                OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
@@ -86,16 +86,5 @@ public class CompactOMDB extends RepairTool {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
       }
     }
-  }
-
-  /**
-   * Converts the given rocksId to a
-   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum.
-   * Defaults to kSkip if the value is invalid.
-   */
-  static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(int rocksId) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(rocksId);
-    return blc != null ? blc : ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
   }
 }

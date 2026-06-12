@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.util.Time;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -104,7 +105,7 @@ public class RocksDBManualCompaction extends RepairTool {
       }
 
       ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
-          getBottommostLevelCompaction(bottommostLevelCompaction);
+          CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
       info("Running compaction on " + columnFamilyName +
           " with BottommostLevelCompaction=" + blcOption.name());
       long startTime = Time.monotonicNow();
@@ -126,16 +127,5 @@ public class RocksDBManualCompaction extends RepairTool {
       IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
-  }
-
-  /**
-   * Converts the given rocksId to a
-   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum.
-   * Defaults to kSkip if the value is invalid.
-   */
-  static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(int rocksId) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(rocksId);
-    return blc != null ? blc : ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
   }
 }

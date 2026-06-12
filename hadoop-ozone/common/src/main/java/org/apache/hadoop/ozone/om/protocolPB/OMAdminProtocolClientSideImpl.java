@@ -216,11 +216,6 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   }
 
   @Override
-  public void compactOMDB(String columnFamily) throws IOException {
-    compactOMDB(columnFamily, 0);
-  }
-
-  @Override
   public void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException {
     CompactRequest compactRequest = CompactRequest.newBuilder()
         .setColumnFamily(columnFamily)
