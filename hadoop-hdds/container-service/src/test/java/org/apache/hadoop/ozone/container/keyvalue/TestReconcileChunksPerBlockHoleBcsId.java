@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -98,7 +97,6 @@ public class TestReconcileChunksPerBlockHoleBcsId {
   private static final long LOCAL_BCSID = 1L;
   private static final long PEER_BCSID = 99L;
 
-  private OzoneConfiguration conf;
   private ContainerSet containerSet;
   private KeyValueHandler handler;
   private KeyValueContainer container;
@@ -107,7 +105,7 @@ public class TestReconcileChunksPerBlockHoleBcsId {
 
   @BeforeEach
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     Path dataVolume = Paths.get(tempDir.toString(), "data");
     Path metadataVolume = Paths.get(tempDir.toString(), "metadata");
     conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
@@ -187,13 +185,15 @@ public class TestReconcileChunksPerBlockHoleBcsId {
     handler.reconcileChunksPerBlock(container, peerPipeline, dnClient, LOCAL_ID, peerChunkList,
         new ContainerMerkleTreeWriter(), chunkByteBuffer);
 
-    // A hole remains, so the block is incomplete: the BCSID must not be advanced to the peer's value.
+    // A hole remains, so the block is incomplete: the BCSID must stay at the local value, not advance to
+    // the peer's. Asserting the exact local value (not merely "not the peer value") also catches a BCSID
+    // that drifts to any other wrong value, e.g. 0.
     BlockData localAfter = handler.getBlockManager().getBlock(container, new BlockID(CONTAINER_ID, LOCAL_ID));
-    assertNotEquals(PEER_BCSID, localAfter.getBlockCommitSequenceId(),
-        "block BCSID was advanced to the peer value (" + PEER_BCSID + ") even though the chunk at offset "
+    assertEquals(LOCAL_BCSID, localAfter.getBlockCommitSequenceId(),
+        "block BCSID must stay at the local value (" + LOCAL_BCSID + ") because the chunk at offset "
             + (3L * CHUNK_LEN) + " past the hole at offset " + (2L * CHUNK_LEN) + " was never ingested");
-    assertNotEquals(PEER_BCSID, container.getContainerData().getBlockCommitSequenceId(),
-        "container BCSID was advanced to the peer value (" + PEER_BCSID + ") on a holed, incomplete block");
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
+        "container BCSID must stay at the local value (" + LOCAL_BCSID + ") on a holed, incomplete block");
   }
 
   /**

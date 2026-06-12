@@ -393,8 +393,8 @@ public class KeyValueHandler extends Handler {
   }
 
   @VisibleForTesting
-  public void setBlockInputStreamFactory(BlockInputStreamFactoryImpl factory) {
-    this.blockInputStreamFactory = factory;
+  void setBlockInputStreamFactory(BlockInputStreamFactoryImpl factory) {
+    this.blockInputStreamFactory = Objects.requireNonNull(factory, "factory == null");
   }
 
   ContainerCommandResponseProto handleStreamInit(
