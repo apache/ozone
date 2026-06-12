@@ -477,6 +477,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static UserGroupInformation testUgi;
 
   private final OzoneLockProvider ozoneLockProvider;
+  private org.apache.hadoop.ozone.om.lock.OBSKeyLockManager keyLockManager;
+  private org.apache.hadoop.ozone.om.lock.FSOKeyLockManager fsoKeyLockManager;
   private final OMPerformanceMetrics perfMetrics;
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
@@ -916,6 +918,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OmMetadataManagerImpl metadataManagerImpl =
         new OmMetadataManagerImpl(configuration, this);
     this.metadataManager = metadataManagerImpl;
+    this.keyLockManager = new org.apache.hadoop.ozone.om.lock.OBSKeyLockManager(
+        metadataManager.getLock());
+    this.fsoKeyLockManager = new org.apache.hadoop.ozone.om.lock.FSOKeyLockManager(
+        metadataManager.getLock());
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
     if (isS3MultiTenancyEnabled) {
@@ -1054,6 +1060,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public int getPreallocateBlocksMax() {
     return preallocateBlocksMax;
+  }
+
+  public org.apache.hadoop.ozone.om.lock.OBSKeyLockManager getKeyLockManager() {
+    return keyLockManager;
+  }
+
+  public org.apache.hadoop.ozone.om.lock.FSOKeyLockManager getFsoKeyLockManager() {
+    return fsoKeyLockManager;
   }
 
   /**
