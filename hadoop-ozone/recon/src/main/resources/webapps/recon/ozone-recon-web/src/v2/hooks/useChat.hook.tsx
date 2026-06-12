@@ -93,7 +93,7 @@ export const useChat = () => {
     startTimer();
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
       text: query,
       timestamp: Date.now()
@@ -135,7 +135,7 @@ export const useChat = () => {
       const data = response.data as ChatbotChatResponse;
       
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'assistant',
         text: data.response,
         timestamp: Date.now()
