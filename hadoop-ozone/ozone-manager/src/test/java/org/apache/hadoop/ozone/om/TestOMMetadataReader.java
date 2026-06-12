@@ -120,10 +120,10 @@ public class TestOMMetadataReader {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
 
-    final RequestContext contextWithoutSessionPolicy = createTestRequestContext();
+    final RequestContext.Builder contextWithoutSessionPolicyBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutSessionPolicy, true));
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutSessionPolicyBuilder, true));
 
     verifySessionPolicyPassedToAuthorizer(accessAuthorizer, obj, sessionPolicy);
   }
@@ -136,10 +136,10 @@ public class TestOMMetadataReader {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
 
-    final RequestContext contextWithoutSessionPolicy = createTestRequestContext();
+    final RequestContext.Builder contextWithoutSessionPolicyBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutSessionPolicy, true));
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutSessionPolicyBuilder, true));
 
     verifySessionPolicyPassedToAuthorizer(accessAuthorizer, obj, null);
   }
@@ -154,10 +154,10 @@ public class TestOMMetadataReader {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
 
-    final RequestContext contextWithoutS3Action = createTestRequestContext();
+    final RequestContext.Builder contextWithoutS3ActionBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3Action, true));
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
 
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObject");
   }
@@ -167,10 +167,10 @@ public class TestOMMetadataReader {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
 
-    final RequestContext contextWithoutS3Action = createTestRequestContext();
+    final RequestContext.Builder contextWithoutS3ActionBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3Action, true));
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
 
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
   }
@@ -187,10 +187,10 @@ public class TestOMMetadataReader {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
 
-    final RequestContext baseContext = createTestRequestContext();
+    final RequestContext.Builder baseContextBuilder = createTestRequestContextBuilder();
     final OzoneObj obj = createTestOzoneObj();
 
-    assertTrue(omMetadataReader.checkAcls(obj, baseContext, true));
+    assertTrue(omMetadataReader.checkAcls(obj, baseContextBuilder, true));
 
     verifySessionPolicyAndS3ActionPassedToAuthorizer(accessAuthorizer, obj);
   }
@@ -465,20 +465,18 @@ public class TestOMMetadataReader {
   }
 
   /**
-   * Creates a test RequestContext.
+   * Creates a test RequestContext.Builder.
    *
-   * @return the constructed RequestContext
+   * @return the constructed RequestContext.Builder
    */
-  private RequestContext createTestRequestContext() {
-    RequestContext.Builder builder = RequestContext.newBuilder()
+  private RequestContext.Builder createTestRequestContextBuilder() {
+    return RequestContext.newBuilder()
         .setClientUgi(UserGroupInformation.createRemoteUser("testUser"))
         .setIp(InetAddress.getLoopbackAddress())
         .setHost("localhost")
         .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
         .setAclRights(READ)
         .setOwnerName("owner");
-
-    return builder.build();
   }
 
   /**

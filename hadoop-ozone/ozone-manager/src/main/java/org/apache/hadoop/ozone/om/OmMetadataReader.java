@@ -606,16 +606,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .setVolumeName(vol)
         .setBucketName(bucket)
         .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(owner)
-        .build();
+        .setOwnerName(owner);
 
-    return checkAcls(obj, context, throwIfPermissionDenied);
+    return checkAcls(obj, contextBuilder, throwIfPermissionDenied);
   }
 
   /**
@@ -625,15 +624,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
    *                     and throwOnPermissionDenied set to true.
    */
-  public boolean checkAcls(OzoneObj obj, RequestContext context,
+  public boolean checkAcls(OzoneObj obj, RequestContext.Builder contextBuilder,
       boolean throwIfPermissionDenied) throws OMException {
 
-    final RequestContext.Builder contextBuilder = context.toBuilder();
     maybeAddToContextFromThreadLocal(contextBuilder);
-    final RequestContext normalizedRequestContext = contextBuilder.build();
+    final RequestContext context = contextBuilder.build();
 
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
-        () -> accessAuthorizer.checkAccess(obj, normalizedRequestContext))) {
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -643,7 +641,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                 "Key:" + obj.getKeyName() : "";
         // For STS tokens, make clear that the user is using an assumed role, otherwise the access denied
         // message could be confusing
-        String user = normalizedRequestContext.getClientUgi().getShortUserName();
+        String user = context.getClientUgi().getShortUserName();
         final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
         if (stsTokenIdentifier != null) {
           final StringBuilder builder = new StringBuilder(user)
@@ -656,11 +654,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
             user,
-            normalizedRequestContext.getAclRights(),
+            context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
             "User " + user +
-            " doesn't have " + normalizedRequestContext.getAclRights() +
+            " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
       }
