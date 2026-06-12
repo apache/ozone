@@ -67,6 +67,54 @@ def generate_presigned_put_object_url(
     raise Exception(f"Failed to generate presigned URL: {str(e)}")
 
 
+def generate_presigned_complete_multipart_upload_url(
+    aws_access_key_id=None,
+    aws_secret_access_key=None,
+    bucket_name=None,
+    object_key=None,
+    upload_id=None,
+    region_name='us-east-1',
+    expiration=3600,
+    endpoint_url=None,
+):
+  """
+  Generate a presigned URL for CompleteMultipartUpload. The request body
+  (the XML list of parts) is not part of the signature (UNSIGNED-PAYLOAD),
+  so the caller can stream it, e.g. with chunked transfer encoding.
+  """
+  try:
+    import boto3
+
+    client_args = {
+      'service_name': 's3',
+      'region_name': region_name,
+    }
+
+    if aws_access_key_id and aws_secret_access_key:
+      client_args['aws_access_key_id'] = aws_access_key_id
+      client_args['aws_secret_access_key'] = aws_secret_access_key
+
+    if endpoint_url:
+      client_args['endpoint_url'] = endpoint_url
+
+    s3_client = boto3.client(**client_args)
+
+    presigned_url = s3_client.generate_presigned_url(
+      ClientMethod='complete_multipart_upload',
+      Params={
+        'Bucket': bucket_name,
+        'Key': object_key,
+        'UploadId': upload_id,
+      },
+      ExpiresIn=expiration
+    )
+
+    return presigned_url
+
+  except Exception as e:
+    raise Exception(f"Failed to generate presigned URL: {str(e)}")
+
+
 def compute_sha256_file(path):
   """Compute SHA256 hex digest for the entire file content at path."""
   with open(path, 'rb') as f:
