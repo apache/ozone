@@ -84,7 +84,7 @@
     "prettier": "^2.8.4",
     "vite": "4.5.14",
     "vite-tsconfig-paths": "^3.6.0",
-    "vitest": "^1.6.1"
+    "vitest": "^3.2.6"
   },
   "proxy": "http://localhost:9888"
 }
