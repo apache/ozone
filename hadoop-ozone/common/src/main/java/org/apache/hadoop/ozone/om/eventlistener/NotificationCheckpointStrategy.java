@@ -18,23 +18,14 @@
 package org.apache.hadoop.ozone.om.eventlistener;
 
 import java.io.IOException;
-import java.util.List;
-import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 
 /**
- * A narrow set of functionality we are ok with exposing to plugin
- * implementations.
+ * Interface for implementations which load/save the current checkpoint
+ * transaction log index used by an event poller.
  */
-public interface OMEventListenerPluginContext {
+public interface NotificationCheckpointStrategy {
 
-  boolean isLeaderReady();
+  String load() throws IOException;
 
-  // TODO: should we allow plugins to pass in maxResults or just limit
-  // them to some predefined value for safety?  e.g. 10K
-  List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException;
-
-  // XXX: this probably doesn't belong here
-  String getThreadNamePrefix();
-
-  NotificationCheckpointStrategy getNotificationCheckpointStrategy();
+  void save(String val) throws IOException;
 }
