@@ -20,7 +20,6 @@ import React, { useState, KeyboardEvent } from 'react';
 import { Input, Button } from 'antd';
 import { SendOutlined, StopOutlined } from '@ant-design/icons';
 import ModelPicker from './ModelPicker';
-import { getProviderForModel } from '@/v2/constants/chatbot.constants';
 
 interface ComposerProps {
   onSend: (query: string, model?: string, provider?: string) => void;

@@ -52,7 +52,7 @@ const MessageList: React.FC<MessageListProps> = ({
         <MessageBubble 
           key={msg.id} 
           message={msg} 
-          onRegenerate={() => onRegenerate(index)} 
+          onRegenerate={msg.role === 'assistant' ? () => onRegenerate(index) : undefined} 
         />
       ))}
       

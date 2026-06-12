@@ -113,7 +113,7 @@ const Assistant: React.FC = () => {
   const handleRetry = () => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
-        sendMessage(messages[i].text);
+        sendMessage(messages[i].text, messages[i].model, messages[i].provider);
         break;
       }
     }
@@ -123,7 +123,7 @@ const Assistant: React.FC = () => {
     // Find the last user message before this assistant message
     for (let i = index - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
-        sendMessage(messages[i].text);
+        sendMessage(messages[i].text, messages[i].model, messages[i].provider);
         break;
       }
     }

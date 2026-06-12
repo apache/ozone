@@ -41,6 +41,7 @@ export const useChat = () => {
     return [];
   });
   const [isInFlight, setIsInFlight] = useState(false);
+  const isInFlightRef = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [errorBubble, setErrorBubble] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
@@ -81,14 +82,16 @@ export const useChat = () => {
       controllerRef.current = undefined;
     }
     setIsInFlight(false);
+    isInFlightRef.current = false;
     stopTimer();
   }, [stopTimer]);
 
   const sendMessage = useCallback(async (query: string, model?: string, provider?: string) => {
-    if (!query.trim() || isInFlight) return;
+    if (!query.trim() || isInFlightRef.current) return;
 
     setErrorBubble(null);
     setIsInFlight(true);
+    isInFlightRef.current = true;
     setCurrentQuery(query);
     startTimer();
 
@@ -96,7 +99,9 @@ export const useChat = () => {
       id: crypto.randomUUID(),
       role: 'user',
       text: query,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      model,
+      provider
     };
 
     setMessages(prev => {
@@ -171,9 +176,10 @@ export const useChat = () => {
       }
     } finally {
       setIsInFlight(false);
+      isInFlightRef.current = false;
       stopTimer();
     }
-  }, [isInFlight, startTimer, stopTimer]);
+  }, [startTimer, stopTimer]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
