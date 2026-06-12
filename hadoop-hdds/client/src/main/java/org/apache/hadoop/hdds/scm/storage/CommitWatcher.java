@@ -42,7 +42,9 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
     long acked = 0;
     for (ChunkBuffer buffer : remove(index)) {
       acked += buffer.position();
-      bufferPool.releaseBuffer(buffer);
+      if (!buffer.isReadOnly()) {
+        bufferPool.releaseBuffer(buffer);
+      }
     }
     // TODO move the flush future map to BOS:
     //  When there are concurrent watchForCommits, there's no guarantee of the order of execution
