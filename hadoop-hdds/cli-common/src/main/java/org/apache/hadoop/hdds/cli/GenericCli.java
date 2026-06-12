@@ -48,6 +48,7 @@ public abstract class GenericCli implements GenericParentCommand {
 
   private String configurationPath;
   private String deprecatedConfigurationPath;
+  private boolean isConfigurationPathAdded = false;
 
   @Option(names = {"--verbose"},
       scope = CommandLine.ScopeType.INHERIT,
@@ -135,8 +136,9 @@ public abstract class GenericCli implements GenericParentCommand {
   @Override
   public OzoneConfiguration getOzoneConf() {
     String path = getConfigurationPath();
-    if (path != null) {
+    if (path != null && !isConfigurationPathAdded) {
       config.addResource(new Path(path));
+      isConfigurationPathAdded = true;
     }
     return config;
   }

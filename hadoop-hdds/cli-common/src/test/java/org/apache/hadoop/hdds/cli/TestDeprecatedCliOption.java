@@ -21,17 +21,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import org.apache.hadoop.hdds.scm.cli.pipeline.ListPipelinesSubcommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
 /**
  * Tests for deprecated CLI option warnings.
  */
 public class TestDeprecatedCliOption {
-
   private StringWriter err;
+
+  @Command
+  private static final class TestCommand {
+    @Option(names = {"-ffc", "--filter-by-factor"})
+    private String filterByFactor;
+
+    @Option(names = {"-fst", "--filter-by-state"})
+    private String filterByState;
+  }
 
   @BeforeEach
   public void setup() {
@@ -50,7 +59,7 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void warnsForDeprecatedOption() {
-    createCommandLine(new ListPipelinesSubcommand())
+    createCommandLine(new TestCommand())
         .execute("-ffc", "THREE");
 
     assertThat(err.toString())
@@ -60,7 +69,7 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void warnsForMultipleDeprecatedOptions() {
-    createCommandLine(new ListPipelinesSubcommand())
+    createCommandLine(new TestCommand())
         .execute("-ffc", "THREE", "-fst", "OPEN");
 
     assertThat(err.toString())
@@ -70,7 +79,7 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void doesNotWarnForLongOption() {
-    createCommandLine(new ListPipelinesSubcommand())
+    createCommandLine(new TestCommand())
         .execute("--filter-by-factor", "THREE");
 
     assertThat(err.toString()).isEmpty();
