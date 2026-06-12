@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
@@ -107,6 +108,7 @@ import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,7 +200,6 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
-    clientProtocol.setIsS3Request(true);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -688,6 +689,19 @@ public abstract class EndpointBase {
 
   public static MessageDigest getSha256DigestInstance() {
     return SHA_256_PROVIDER.get();
+  }
+
+  protected static CheckedRunnable<IOException> validateContentLength(
+      long expectedLength, long actualLength, String keyPath) {
+    return () -> {
+      if (actualLength != expectedLength) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage(String.format(
+            "Request body length %d does not match expected length %d",
+            actualLength, expectedLength));
+        throw ex;
+      }
+    };
   }
 
   protected static String extractPartsCount(String eTag) {

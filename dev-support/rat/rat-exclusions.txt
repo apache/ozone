@@ -18,6 +18,8 @@
 **/*.json
 .gitattributes
 .github/*
+AGENTS.md
+CLAUDE.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
@@ -65,6 +67,8 @@ src/test/resources/ssl/*
 # hadoop-ozone/recon
 **/pnpm-lock.yaml
 src/test/resources/prometheus-test-response.txt
+src/main/resources/chatbot/*.txt
+src/main/resources/chatbot/*.md
 
 # hadoop-ozone/shaded
 **/dependency-reduced-pom.xml

@@ -208,7 +208,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodec());
 
   public static final String DELETED_TABLE = "deletedTable";
   /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
@@ -222,7 +222,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodec());
 
   public static final String MULTIPART_INFO_TABLE = "multipartInfoTable";
   /** multipartInfoTable: /volume/bucket/key/uploadId :- parts. */
@@ -245,14 +245,14 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodec());
 
   public static final String OPEN_FILE_TABLE = "openFileTable";
   /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodec());
 
   public static final String DIRECTORY_TABLE = "directoryTable";
   /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
@@ -266,7 +266,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodec());
 
   //---------------------------------------------------------------------------
   // S3 Multi-Tenancy Tables

@@ -185,17 +185,23 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
 
   /**
-   * True if the node can accept another container of the given size.
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
+   *
+   * @param datanodeInfo node info of the receiving the allocation
+   * @param containerID the container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
    */
-  boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID);
+  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
-   * Records a pending container allocation for a single DataNode identified by its ID.
+   * Removes a pending container allocation from a datanode.
    *
-   * @param datanodeID  the ID of the DataNode receiving the allocation
-   * @param containerID the container being allocated
+   * @param datanodeInfo info about the datanode
+   * @param containerID the container to remove from pending
    */
-  void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
+  void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
    * Return the node stat of the specified datanode.
@@ -435,4 +441,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * SCM-side tracker for container allocations not yet reported by datanodes.
+   */
+  PendingContainerTracker getPendingContainerTracker();
 }

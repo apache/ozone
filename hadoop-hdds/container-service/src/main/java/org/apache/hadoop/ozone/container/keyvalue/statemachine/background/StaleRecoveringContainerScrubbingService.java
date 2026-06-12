@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
 import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet.RecoveringContainer;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,13 +55,13 @@ public class StaleRecoveringContainerScrubbingService
     BackgroundTaskQueue backgroundTaskQueue =
         new BackgroundTaskQueue();
     long currentTime = containerSet.getCurrentTime();
-    Iterator<Map.Entry<Long, Long>> it =
+    Iterator<RecoveringContainer> it =
         containerSet.getRecoveringContainerIterator();
     while (it.hasNext()) {
-      Map.Entry<Long, Long> entry = it.next();
-      if (currentTime >= entry.getKey()) {
+      RecoveringContainer entry = it.next();
+      if (currentTime >= entry.getTimeout()) {
         backgroundTaskQueue.add(new RecoveringContainerScrubbingTask(
-            containerSet, entry.getValue()));
+            containerSet, entry.getContainerId()));
         it.remove();
       } else {
         break;

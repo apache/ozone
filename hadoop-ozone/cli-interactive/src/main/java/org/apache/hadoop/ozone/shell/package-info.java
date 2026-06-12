@@ -15,16 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
-
 /**
- * Test OmSnapshot for Object Store bucket type.
+ * Top-level interactive CLI for Ozone.
  */
-public class TestOmSnapshotObjectStoreWithLinkedBuckets extends TestOmSnapshot {
-
-  public TestOmSnapshotObjectStoreWithLinkedBuckets() throws Exception {
-    super(OBJECT_STORE, false, false, false, true);
-  }
-}
+package org.apache.hadoop.ozone.shell;

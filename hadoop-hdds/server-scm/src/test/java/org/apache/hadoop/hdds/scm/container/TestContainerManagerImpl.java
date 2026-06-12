@@ -102,7 +102,9 @@ public class TestContainerManagerImpl {
     pipelineManager = spy(base);
 
     // Default: allow allocation in tests unless a test overrides it.
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class));
+    // Allocation uses checkSpaceAndRecordAllocation
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
@@ -140,11 +142,12 @@ public class TestContainerManagerImpl {
    */
   @Test
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
-    doReturn(false).when(pipelineManager).hasEnoughSpace(any());
+    doReturn(false).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
-    // MockPipelineManager#hasEnoughSpace always returns false
+    // MockPipelineManager#checkSpaceAndRecordAllocation always returns false
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = containerManager
         .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
@@ -162,10 +165,10 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
 
-    // create a spy to mock hasEnoughSpace to always return true
+    // create a spy to mock checkSpaceAndRecordAllocation to always return true
     PipelineManager spyPipelineManager = spy(pipelineManager);
     doReturn(true).when(spyPipelineManager)
-        .hasEnoughSpace(any(Pipeline.class));
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     // create a new ContainerManager using the spy
     File tempDir = new File(testDir, "tempDir");

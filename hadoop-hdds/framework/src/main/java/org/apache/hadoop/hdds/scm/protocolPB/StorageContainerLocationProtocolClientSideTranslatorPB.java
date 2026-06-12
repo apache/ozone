@@ -1248,10 +1248,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     GetContainerCountRequestProto request =
-        GetContainerCountRequestProto.newBuilder().build();
+        GetContainerCountRequestProto.newBuilder()
+            .setState(state)
+            .build();
 
     GetContainerCountResponseProto response =
-        submitRequest(Type.GetClosedContainerCount,
+        submitRequest(Type.GetContainerCount,
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();
