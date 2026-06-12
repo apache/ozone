@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests UNHEALTHY_CONTAINERS constraint upgrade within {@link ReconTaskStatusTableUpgradeAction}.
  */
-public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
+public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTest {
 
   private ReconTaskStatusTableUpgradeAction upgradeAction;
   private DSLContext dslContext;
@@ -65,7 +65,6 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
 
   @Test
   public void testUpgradeAppliesConstraintModificationForAllStates() throws Exception {
-    DataSource dataSource = getInjector().getInstance(DataSource.class);
     upgradeAction.upgradeUnhealthyContainersConstraintForTesting(dslContext);
 
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :
