@@ -221,6 +221,8 @@ public final class ScmConfigKeys {
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
+  public static final String HDDS_DATANODE_DATA_DIR_PERMISSIONS =
+      "hdds.datanode.data.dir.permissions";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
@@ -265,6 +267,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_STALENODE_INTERVAL =
       "ozone.scm.stale.node.interval";
   public static final String OZONE_SCM_STALENODE_INTERVAL_DEFAULT =
+      "5m";
+
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL =
+      "ozone.scm.pending.container.roll.interval";
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT =
       "5m";
 
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
@@ -467,9 +474,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT =
       "network-topology-default.xml";
 
-  public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
-  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
-
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
@@ -585,15 +589,6 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
-  /**
-   * the config will transfer value to ratis config
-   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
-   * when manual trigger using api.
-   */
-  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
-  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
-      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
@@ -628,6 +623,11 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
       = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
+  public static final String HDDS_SCM_HTTP_AUTH_TYPE = "hdds.scm.http.auth.type";
+
+  public static final String OZONE_SCM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.scm.ratis.events.max.limit";
+  public static final int OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

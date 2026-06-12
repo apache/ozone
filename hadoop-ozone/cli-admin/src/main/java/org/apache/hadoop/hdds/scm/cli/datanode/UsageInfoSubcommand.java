@@ -42,14 +42,14 @@ import picocli.CommandLine.Command;
  */
 @Command(
     name = "usageinfo",
-    description = "List usage information of a datanode by IP address, hostname or UUID.\n\n" +
-        "Legend (bytes):\n" +
-        "  Filesystem Capacity/Used/Available: raw filesystem stats for the Datanode, aggregated across volumes.\n" +
+    description = "List usage information of a datanode by IP address, hostname or UUID.%n%n" +
+        "Legend (bytes):%n" +
+        "  Filesystem Capacity/Used/Available: raw filesystem stats for the Datanode, aggregated across volumes.%n" +
         "  Ozone Capacity/Used/Available: Ozone-usable stats after reserved-space adjustment, aggregated across " +
-        "  volumes (see hdds.datanode.dir.du.reserved / hdds.datanode.dir.du.reserved.percent).\n" +
-        "  Reserved: hdds.datanode.dir.du.reserved: configured reserved space for non-Ozone usage.\n" +
-        "  Committed: space pre-allocated for containers.\n" +
-        "  Free Space To Spare: minimum free space to keep before closing containers.\n",
+        "  volumes (see hdds.datanode.dir.du.reserved / hdds.datanode.dir.du.reserved.percent).%n" +
+        "  Reserved: hdds.datanode.dir.du.reserved: configured reserved space for non-Ozone usage.%n" +
+        "  Committed: space pre-allocated for containers.%n" +
+        "  Free Space To Spare: minimum free space to keep before closing containers.%n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
@@ -81,7 +81,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         !Strings.isNullOrEmpty(exclusiveArguments.getIp()) ? exclusiveArguments.getIp()
             : !Strings.isNullOrEmpty(exclusiveArguments.getHostname()) ? exclusiveArguments.getHostname()
             : exclusiveArguments.address; //Fallback to deprecated --address for backward compatibility with older CLI.
-    
+
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
     if (count < 1) {
       throw new IOException("Count must be an integer greater than 0.");
@@ -116,8 +116,8 @@ public class UsageInfoSubcommand extends ScmSubcommand {
    * @param info Information such as Capacity, SCMUsed etc.
    */
   private void printInfo(DatanodeUsage info) {
-    System.out.printf("%-24s: %s %n", "UUID",
-        info.getDatanodeDetails().getUuid());
+    System.out.printf("%-24s: %s %n", "ID",
+        info.getDatanodeDetails().getID());
     System.out.printf("%-24s: %s %n", "IP Address",
         info.getDatanodeDetails().getIpAddress());
     System.out.printf("%-24s: %s %n", "Hostname",
@@ -161,7 +161,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
     System.out.printf("%-24s: %s (%s) %n", "Reserved",
-        info.getReserved() + " B", 
+        info.getReserved() + " B",
         StringUtils.byteDesc(info.getReserved()));
     System.out.println();
   }
@@ -230,7 +230,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       if (proto.hasFreeSpaceToSpare()) {
         freeSpaceToSpare = proto.getFreeSpaceToSpare();
       }
-      if (proto.hasReserved()) { 
+      if (proto.hasReserved()) {
         reserved = proto.getReserved();
       }
     }
@@ -329,7 +329,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       return pipelineCount;
     }
 
-    public long getReserved() { 
+    public long getReserved() {
       return reserved;
     }
   }

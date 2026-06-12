@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -250,6 +251,7 @@ public final class OmUtils {
     case SnapshotDiff:
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
@@ -257,6 +259,8 @@ public final class OmUtils {
       // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetBucketTagging:
+      return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
       return true;
@@ -320,6 +324,9 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
+      return false;
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -374,6 +381,8 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+      return true;
+    case GetBucketTagging:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -435,11 +444,14 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
     case RangerBGSync: // Ranger Background Sync task is only run on leader
     case SnapshotDiff:
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
     case PrintCompactionLogDag:
       // Snapshot diff is a local to a single OM node so we should not send it arbitrarily
       // to any OM nodes
@@ -1076,9 +1088,10 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId,
+      String localNodeId, String localLeaderStatus) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -1086,18 +1099,25 @@ public final class OmUtils {
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
-      // Printing only the OM's running
-      if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
-        List<String> omInfo = new ArrayList<>();
-        omInfo.add(info.getHostname());
-        omInfo.add(info.getOmRoleInfo().getNodeId());
-        omInfo.add(String.valueOf(port));
-        omInfo.add(role);
-        omInfo.add(leaderReadiness);
-        omInfoList.add(omInfo);
+      String nodeId = info.getOmRoleInfo().getNodeId();
+      boolean isLeaderNode = nodeId.equals(leaderId);
+      boolean isLocalNode = nodeId.equals(localNodeId);
+      String role = info.getOmRoleInfo().getServerRole();
+
+      String displayValue;
+      if (isLeaderNode && isLocalNode) {
+        displayValue = localLeaderStatus;
+      } else {
+        displayValue = role;
       }
+
+      List<String> omInfo = new ArrayList<>();
+      omInfo.add(info.getHostname());
+      omInfo.add(nodeId);
+      omInfo.add(String.valueOf(port));
+      omInfo.add(role);
+      omInfo.add(displayValue);
+      omInfoList.add(omInfo);
     }
     return omInfoList;
   }
@@ -1126,5 +1146,11 @@ public final class OmUtils {
       LOG.error("Failure in resolving OM host address", e);
       throw e;
     }
+  }
+
+  public static boolean specifiedReadConsistency(OMRequest request) {
+    return request.hasReadConsistencyHint()
+        && request.getReadConsistencyHint().hasReadConsistency()
+        && request.getReadConsistencyHint().getReadConsistency() != READ_CONSISTENCY_UNSPECIFIED;
   }
 }

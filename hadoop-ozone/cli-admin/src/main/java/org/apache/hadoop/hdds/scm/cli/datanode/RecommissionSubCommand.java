@@ -46,8 +46,8 @@ public class RecommissionSubCommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     List<String> hosts = hostNameParams.getHostNames();
     List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
-    System.out.println("Started recommissioning datanode(s):\n" +
-        String.join("\n", hosts));
+    System.out.println("Started recommissioning datanode(s):");
+    hosts.forEach(System.out::println);
     showErrors(errors, "Some nodes could be recommissioned");
   }
 }

@@ -126,6 +126,7 @@ public class SCMNodeManager implements NodeManager {
   private final VersionInfo version;
   private final CommandQueue commandQueue;
   private final SCMNodeMetrics metrics;
+  private final PendingContainerTracker pendingContainerTracker;
   // Node manager MXBean
   private ObjectName nmInfoBean;
   private final SCMStorageConfig scmStorageConfig;
@@ -188,6 +189,14 @@ public class SCMNodeManager implements NodeManager {
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
+    this.pendingContainerTracker = new PendingContainerTracker(
+        (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
+        conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL,
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS),
+        this.metrics);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
@@ -223,6 +232,11 @@ public class SCMNodeManager implements NodeManager {
       MBeans.unregister(this.nmInfoBean);
       this.nmInfoBean = null;
     }
+  }
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
   }
 
   protected NodeStateManager getNodeStateManager() {
@@ -1060,9 +1074,20 @@ public class SCMNodeManager implements NodeManager {
       return nodeStateManager.getNode(dn);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getUuid());
+          dn.getID());
       return null;
     }
+  }
+
+  @Override
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerID);
   }
 
   /**

@@ -68,8 +68,45 @@
   }
 }
 
+.capacity-info {
+  width: 300px;
+  white-space: normal;
+  word-wrap: break-word;
+  margin: 5px 0 0 1px;
+  padding: 5px 0 0 1px;
+}
+
+.openkeys-space-breakdown {
+  display: grid;
+  grid-template-columns: 150px auto;
+  grid-column-gap: 20px;
+  grid-row-gap: 4px;
+
+  .ant-tag {
+    text-align: center;
+  }
+}
+
 .dn-select-option-uuid {
   font-size: 14px;
   color: #5a656d;
   margin-left: 15px;
+}
+
+.capacity-detail-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 14px auto;
+  color: #5a656d;
+}
+
+.capacity-detail-error-icon {
+  color: #f47b2d;
+  font-size: 24px;
+}
+
+.capacity-detail-error-message {
+  font-size: 13px;
 }

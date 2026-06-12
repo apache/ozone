@@ -25,7 +25,9 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Duration;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -61,6 +63,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.db.volumes.tolerated";
   public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
+  public static final String DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY = "hdds.datanode.disk.check.sliding.window.timeout";
+  public static final String DISK_CHECK_TIMEOUT_TEST_ENABLED_KEY =
+      "hdds.datanode.disk.check.timeout.test.enabled";
+  public static final String DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_KEY =
+      "hdds.datanode.disk.check.timeout.failures.tolerated";
+  public static final String DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY =
+      "hdds.datanode.disk.check.timeout.sliding.window.timeout";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
@@ -73,6 +82,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.02f;
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT =
+      "hdds.datanode.volume.min.free.space.hard.limit.percent";
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT =
+      0.015f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -99,6 +112,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
 
+  static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT =
+      Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT).plus(DISK_CHECK_TIMEOUT_DEFAULT);
+  static final boolean DISK_CHECK_TIMEOUT_TEST_ENABLED_DEFAULT = true;
+  static final int DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT = 1;
+  static final Duration DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_DEFAULT =
+      Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT)
+          .plus(DISK_CHECK_TIMEOUT_DEFAULT);
+
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
@@ -123,6 +144,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
+  public static final String GRPC_SO_BACKLOG_KEY = "hdds.datanode.grpc.so.backlog";
+  public static final int GRPC_SO_BACKLOG_DEFAULT = 256;
+
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
   public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
@@ -137,6 +161,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
+
+  /**
+   * SO_BACKLOG value for the gRPC server socket.
+   */
+  @Config(key = "hdds.datanode.grpc.so.backlog",
+      type = ConfigType.INT,
+      defaultValue = "256",
+      tags = {DATANODE},
+      description = "The SO_BACKLOG value for the Datanode gRPC server socket. " +
+          "This limits the number of pending connections in the kernel's " +
+          "accept queue. When this limit is reached, the kernel will reject " +
+          "new connection attempts with SYN drops."
+  )
+  private int grpcSoBacklog = GRPC_SO_BACKLOG_DEFAULT;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -285,11 +323,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "-1",
       type = ConfigType.SIZE,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space to be used for closing containers" +
-          " When the difference between volume capacity and used reaches this number," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space and min.free.space.percent will be used as final value."
+      description = "Minimum free space (bytes) applied together with min.free.space.percent "
+          + "(reported to SCM in heartbeat as freeSpaceToSpare) and "
+          + "min.free.space.hard.limit.percent (local write enforcement). "
+          + "The effective value for each tier is max(this bytes, capacity * ratio)."
   )
   private long minFreeSpace = getDefaultFreeSpace();
 
@@ -297,13 +334,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "0.02", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space percent to be used for closing containers" +
-          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space or min.free.space.percent will be used as final value."
+      description = "Minimum fraction of volume capacity reported to SCM as freeSpaceToSpare "
+          + "(heartbeat / storage reports). Local write rejection uses "
+          + "hdds.datanode.volume.min.free.space.hard.limit.percent instead. "
+          + "The soft band is the gap between these two (e.g. 2000GB disk: 2% = 40GB reported vs "
+          + "1.5% = 30GB hard → 10GB band) where the DN may send close-container actions while "
+          + "writes still succeed."
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
+  @Config(key = "hdds.datanode.volume.min.free.space.hard.limit.percent",
+      defaultValue = "0.015",
+      type = ConfigType.FLOAT,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "Minimum fraction of volume capacity reserved for local enforcement: "
+          + "writes fail when available space would drop below max(this ratio * capacity, "
+          + "hdds.datanode.volume.min.free.space). Should be <= min.free.space.percent "
+          + "so SCM can plan for a larger headroom than the DN enforces locally."
+  )
+  private float minFreeSpaceHardLimitRatio =
+      HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
 
   @Config(key = "hdds.datanode.periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -350,7 +399,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   @Config(key = "hdds.datanode.disk.check.io.test.count",
       defaultValue = "3",
       type = ConfigType.INT,
-      tags = { DATANODE },
+      tags = {DATANODE},
       description = "The number of IO tests required to determine if a disk " +
           " has failed. Each disk check does one IO test. The volume will be " +
           "failed if more than " +
@@ -359,6 +408,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           "to disable disk IO checks."
   )
   private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.io.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "The configuration to enable or disable disk IO checks."
+  )
+  private boolean isDiskCheckEnabled = true;
+
+  @Config(key = "hdds.datanode.disk.check.rocksdb.check.io.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {DATANODE},
+      description = "The configuration to enable or disable RocksDb disk IO checks."
+  )
+  private boolean isRocksDbDiskCheckEnabled = true;
 
   @Config(key = "hdds.datanode.disk.check.io.failures.tolerated",
       defaultValue = "1",
@@ -403,6 +468,52 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
+      defaultValue = "70m",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.DATANODE},
+      description = "Time interval after which a disk check"
+          + " failure result stored in the sliding window will expire."
+          + " Do not set the window timeout period to less than or equal to the disk check interval period"
+          + " or failures can be missed across sparse checks"
+          + " e.g., every 120m interval with a 60m window rarely accumulates enough failed events"
+          + " Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.timeout.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable or disable timeout-based volume failure tracking "
+          + "independently of the disk IO health checks."
+  )
+  private boolean isDiskCheckTimeoutTestEnabled =
+      DISK_CHECK_TIMEOUT_TEST_ENABLED_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.timeout.failures.tolerated",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of volume check timeouts allowed within the "
+          + "timeout sliding window before the volume is marked as failed."
+  )
+  private int diskCheckTimeoutFailureTolerance =
+      DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.timeout.sliding.window.timeout",
+      defaultValue = "90m",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Time interval after which a timed out volume check "
+          + "event stored in the timeout sliding window will expire. "
+          + "Do not set this below the periodic disk check interval or "
+          + "timeout events may not accumulate across sparse checks. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration diskCheckTimeoutSlidingWindowTimeout =
+      DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_DEFAULT;
 
   @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
@@ -632,46 +743,33 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
-    if (volumeIOTestCount == 0) {
-      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
-          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
+    if (!isDiskCheckEnabled) {
+      LOG.info("Disk IO health tests have been disabled.");
     } else {
-      if (volumeIOTestCount < 0) {
-        LOG.warn("{} must be greater than 0 but was set to {}." +
-                "Defaulting to {}",
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-      }
-
       if (volumeIOFailureTolerance < 0) {
-        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
-                "Defaulting to {}",
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
             DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
         volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
-      if (volumeIOFailureTolerance >= volumeIOTestCount) {
-        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
-                "set to {}. Defaulting {} to {} and {} to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
-      }
-
       if (volumeHealthCheckFileSize < 1) {
-        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
-                "must be at least 1 byte and was set to {}. Defaulting to {}",
-            volumeHealthCheckFileSize,
+        LOG.warn("{} must be at least 1 byte and was set to {}. Defaulting to {}",
+            DISK_CHECK_FILE_SIZE_KEY, volumeHealthCheckFileSize,
             DISK_CHECK_FILE_SIZE_DEFAULT);
-        volumeHealthCheckFileSize =
-            DISK_CHECK_FILE_SIZE_DEFAULT;
+        volumeHealthCheckFileSize = DISK_CHECK_FILE_SIZE_DEFAULT;
       }
+    }
+
+    if (!isDiskCheckTimeoutTestEnabled) {
+      LOG.info("Disk check timeout tracking has been disabled.");
+    } else if (diskCheckTimeoutFailureTolerance < 0) {
+      LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_KEY,
+          diskCheckTimeoutFailureTolerance,
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT);
+      diskCheckTimeoutFailureTolerance =
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT;
     }
 
     if (diskCheckMinGap.isNegative()) {
@@ -686,6 +784,47 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+    }
+
+    if (diskCheckSlidingWindowTimeout.isNegative()) {
+      Duration defaultTimeout = Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, diskCheckSlidingWindowTimeout,
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
+      diskCheckSlidingWindowTimeout = defaultTimeout;
+    }
+
+    // Do not set window timeout <= periodic disk check interval period, or failures can be missed across sparse checks
+    // e.g., every 120m interval with a 60m window rarely accumulates enough failed events
+    if (diskCheckSlidingWindowTimeout.compareTo(Duration.ofMinutes(periodicDiskCheckIntervalMinutes)) < 0) {
+      Duration defaultTimeout = Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, periodicDiskCheckIntervalMinutes,
+          diskCheckSlidingWindowTimeout.toMinutes(),
+          DurationFormatUtils.formatDurationHMS(defaultTimeout.toMillis()));
+      diskCheckSlidingWindowTimeout = defaultTimeout;
+    }
+
+    if (diskCheckTimeoutSlidingWindowTimeout.isNegative()) {
+      Duration defaultTimeout =
+          Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY,
+          diskCheckTimeoutSlidingWindowTimeout,
+          defaultTimeout);
+      diskCheckTimeoutSlidingWindowTimeout = defaultTimeout;
+    }
+
+    if (diskCheckTimeoutSlidingWindowTimeout
+        .compareTo(Duration.ofMinutes(periodicDiskCheckIntervalMinutes)) < 0) {
+      Duration defaultTimeout =
+          Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY,
+          periodicDiskCheckIntervalMinutes,
+          diskCheckTimeoutSlidingWindowTimeout.toMinutes(),
+          DurationFormatUtils.formatDurationHMS(defaultTimeout.toMillis()));
+      diskCheckTimeoutSlidingWindowTimeout = defaultTimeout;
     }
 
     if (blockDeleteCommandWorkerInterval.isNegative()) {
@@ -753,6 +892,23 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           minFreeSpaceRatio);
       minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
     }
+    if (minFreeSpaceHardLimitRatio > 1 || minFreeSpaceHardLimitRatio < 0) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1; resetting to default {}",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT);
+      minFreeSpaceHardLimitRatio =
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
+    }
+    if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
+      LOG.warn("{} = {} must not exceed {} = {}, setting hard limit to soft limit. "
+              + "Set hard.limit.percent <= min.free.space.percent to enable the soft band.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio);
+      minFreeSpaceHardLimitRatio = minFreeSpaceRatio;
+    }
 
     if (minFreeSpace < 0) {
       minFreeSpace = getDefaultFreeSpace();
@@ -819,8 +975,31 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.containerCloseThreads = containerCloseThreads;
   }
 
+  /**
+   * Minimum free space reported to SCM (freeSpaceToSpare in storage reports).
+   */
   public long getMinFreeSpace(long capacity) {
     return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
+  }
+
+  /**
+   * Minimum free space enforced locally for writes (disk full / out-of-space)
+   * and for choosing a volume for a new container (same threshold as writes).
+   */
+  public long getHardLimitMinFreeSpace(long capacity) {
+    return Math.max((long) (capacity * minFreeSpaceHardLimitRatio), minFreeSpace);
+  }
+
+  /**
+   * Width of the soft band: reported spare minus hard spare. For example, with 2000GB capacity,
+   * 2% reported (40GB) and 1.5% hard (30GB), this is 10GB — the gap where the DN may send
+   * close-container actions while writes still succeed.
+   */
+  @VisibleForTesting
+  public long getSoftBandMinFreeSpaceWidth(long capacity) {
+    long reported = getMinFreeSpace(capacity);
+    long hard = getHardLimitMinFreeSpace(capacity);
+    return Math.max(0L, reported - hard);
   }
 
   public long getMinFreeSpace() {
@@ -829,6 +1008,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public float getMinFreeSpaceRatio() {
     return minFreeSpaceRatio;
+  }
+
+  @VisibleForTesting
+  public float getMinFreeSpaceHardLimitRatio() {
+    return minFreeSpaceHardLimitRatio;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {
@@ -905,6 +1089,50 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckTimeout(Duration duration) {
     diskCheckTimeout = duration;
+  }
+
+  public void setDiskCheckEnabled(boolean diskCheckEnabled) {
+    isDiskCheckEnabled = diskCheckEnabled;
+  }
+
+  public boolean isDiskCheckEnabled() {
+    return isDiskCheckEnabled;
+  }
+
+  public boolean isRocksDbDiskCheckEnabled() {
+    return isRocksDbDiskCheckEnabled;
+  }
+
+  public Duration getDiskCheckSlidingWindowTimeout() {
+    return diskCheckSlidingWindowTimeout;
+  }
+
+  public void setDiskCheckSlidingWindowTimeout(Duration duration) {
+    diskCheckSlidingWindowTimeout = duration;
+  }
+
+  public boolean isDiskCheckTimeoutTestEnabled() {
+    return isDiskCheckTimeoutTestEnabled;
+  }
+
+  public void setDiskCheckTimeoutTestEnabled(boolean enabled) {
+    isDiskCheckTimeoutTestEnabled = enabled;
+  }
+
+  public int getDiskCheckTimeoutFailureTolerance() {
+    return diskCheckTimeoutFailureTolerance;
+  }
+
+  public void setDiskCheckTimeoutFailureTolerance(int tolerance) {
+    diskCheckTimeoutFailureTolerance = tolerance;
+  }
+
+  public Duration getDiskCheckTimeoutSlidingWindowTimeout() {
+    return diskCheckTimeoutSlidingWindowTimeout;
+  }
+
+  public void setDiskCheckTimeoutSlidingWindowTimeout(Duration duration) {
+    diskCheckTimeoutSlidingWindowTimeout = duration;
   }
 
   public int getBlockDeleteThreads() {
@@ -1073,5 +1301,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static long getDefaultFreeSpace() {
     final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
     return Math.round(measure.getUnit().toBytes(measure.getValue()));
+  }
+
+  public int getGrpcSoBacklog() {
+    return grpcSoBacklog;
+  }
+
+  public void setGrpcSoBacklog(int grpcSoBacklog) {
+    this.grpcSoBacklog = grpcSoBacklog;
   }
 }

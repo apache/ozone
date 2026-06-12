@@ -36,6 +36,7 @@ These parameters, defined in `ozone-site.xml`, control how Ozone manages snapsho
     *   `ozone.om.ratis.snapshot.max.total.sst.size`: The maximum total size of SST files to be included in a Ratis snapshot (Default: 10737418240).
     *   `ozone.om.snapshot.load.native.lib`: Use native RocksDB library for snapshot operations (Default: true). Set to false as a workaround for native library issues.
     *   `ozone.om.snapshot.checkpoint.dir.creation.poll.timeout`: Timeout for polling the creation of the snapshot checkpoint directory (Default: 20s).
+    *   `ozone.om.snapshot.rename.allowed`: Allow snapshot rename operation (Default: false).
 
 *   **SnapshotDiff Service**
     *   `ozone.om.snapshot.diff.db.dir`: Directory for SnapshotDiff job data. Defaults to OM metadata dir. Use a spacious location for large diffs.
@@ -62,7 +63,7 @@ These parameters, defined in `ozone-site.xml`, control how Ozone manages snapsho
     *   `ozone.snapshot.filtering.service.interval`: Interval for the snapshot filtering service (Default: 60s).
     *   `ozone.snapshot.deleting.service.timeout`: Timeout for the snapshot deleting service (Default: 300s).
     *   `ozone.snapshot.deleting.service.interval`: Interval for the snapshot deleting service (Default: 30s).
-    *   `ozone.snapshot.deep.cleaning.enabled`: Enable deep cleaning of snapshots (Default: false).
+    *   `ozone.snapshot.deep.cleaning.enabled`: Enable deep cleaning of snapshots (Default: true).
 
 *   **Performance and Resource Management**
     *   `ozone.om.snapshot.rocksdb.metrics.enabled`: Enable detailed RocksDB metrics for snapshots (Default: false). Use for debugging/monitoring.

@@ -30,6 +30,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -165,6 +167,15 @@ public class MutableVolumeSet implements VolumeSet {
           throw new IOException("Failed to create storage dir " +
               volume.getStorageDir());
         }
+
+        // Ensure permissions are set on the storage directory
+        // (permissions are also set in StorageVolume.initializeImpl(),
+        // but this ensures they're set even if directory already existed
+        // from a previous run with incorrect permissions)
+        if (volumeType == StorageVolume.VolumeType.DATA_VOLUME) {
+          ServerUtils.setDataDirectoryPermissions(volume.getStorageDir(), conf,
+              ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+        }
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeHealthMetrics.incrementHealthyVolumes();
       } catch (IOException e) {
@@ -212,8 +223,7 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     if (!failedVolumes.isEmpty()) {
-      LOG.warn("checkAllVolumes got {} failed volumes - {}",
-          failedVolumes.size(), failedVolumes);
+      LOG.error("checkAllVolumes got {} failed volumes - {}", failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
     } else {
       LOG.debug("checkAllVolumes encountered no failures");
@@ -231,6 +241,7 @@ public class MutableVolumeSet implements VolumeSet {
       for (StorageVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
+        LOG.error("Marking volume {} as failed", v.getStorageDir().getPath());
         failVolume(v.getStorageDir().getPath());
       }
 
@@ -326,11 +337,10 @@ public class MutableVolumeSet implements VolumeSet {
         failedVolumeMap.put(volumeRoot, volume);
         volumeHealthMetrics.decrementHealthyVolumes();
         volumeHealthMetrics.incrementFailedVolumes();
-        LOG.info("Moving Volume : {} to failed Volumes", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        LOG.info("Volume : {} is not active", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it is inactive", volumeRoot);
       } else {
-        LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it does not exist in the VolumeSet", volumeRoot);
       }
     } finally {
       this.writeUnlock();

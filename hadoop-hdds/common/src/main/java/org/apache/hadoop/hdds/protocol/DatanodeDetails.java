@@ -147,17 +147,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
-   * Returns the DataNode UUID.
-   *
-   * @return UUID of DataNode
-   */
-  // TODO: Remove this in follow-up Jira (HDDS-12015)
-  @Deprecated
-  public UUID getUuid() {
-    return id.getUuid();
-  }
-
-  /**
    * Returns the string representation of DataNode UUID.
    *
    * @return UUID of DataNode
@@ -382,6 +371,17 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       return ratisPort;
     }
     return null;
+  }
+
+  // CHANGE: add a helper to check whether a port is explicitly present
+  // without applying compatibility fallback.
+  public synchronized boolean hasPort(Port.Name name) {
+    for (Port port : ports) {
+      if (port.getName().equals(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -747,7 +747,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       this.id = details.id;
       this.ipAddress = details.getIpAddressAsByteString();
       this.hostName = details.getHostNameAsByteString();
-      this.networkName = details.getHostNameAsByteString();
+      this.networkName = details.getNetworkNameAsByteString();
       this.networkLocation = details.getNetworkLocationAsByteString();
       this.level = details.getLevel();
       this.ports = details.getPorts();

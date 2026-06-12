@@ -19,14 +19,16 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 /**
  * This component holds the state of managed SecretKeys, including the
  * current key and all active keys.
  */
-public interface SecretKeyState {
+public interface SecretKeyState extends SCMHandler {
   /**
    * Get the current active key, which is used for signing tokens. This is
    * also the latest key managed by this state.
@@ -55,4 +57,9 @@ public interface SecretKeyState {
    * Update SecretKeys from a snapshot from SCM leader.
    */
   void reinitialize(List<ManagedSecretKey> secretKeys);
+
+  @Override
+  default RequestType getType() {
+    return RequestType.SECRET_KEY;
+  }
 }

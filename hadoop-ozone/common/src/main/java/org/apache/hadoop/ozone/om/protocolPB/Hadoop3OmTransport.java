@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -31,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -45,10 +49,10 @@ public class Hadoop3OmTransport implements OmTransport {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
-  private HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
-
   private final OzoneManagerProtocolPB rpcProxy;
+
+  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
+  private final HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -62,28 +66,32 @@ public class Hadoop3OmTransport implements OmTransport {
 
     boolean followerReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT
-    );
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
+    String defaultLeaderReadConsistencyStr = conf.get(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY,
+        OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT);
+    ReadConsistency defaultLeaderReadConsistency = ReadConsistency.valueOf(defaultLeaderReadConsistencyStr);
+
     // TODO: In the future, we might support more FollowerReadProxyProvider strategies depending on factors
     //  like latency, applied index, etc.
     //  So instead of enabling using follower read configuration, we can simply let user to configure the
     //  failover proxy provider instead (similar to dfs.client.failover.proxy.provider.<nameservice>)
-    if (followerReadEnabled) {
-      this.followerReadFailoverProxyProvider =
-          new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider);
-      this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
-    } else {
-      // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
-      //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
-      //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
-      //  HadoopRpcOMFollowerReadFailoverProxyProvider
-      this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
-    }
+    String defaultFollowerReadConsistencyStr = conf.get(
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
+    );
+    ReadConsistency defaultFollowerReadConsistency =
+        ReadConsistency.valueOf(defaultFollowerReadConsistencyStr);
+    this.followerReadFailoverProxyProvider =
+        new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
+            defaultFollowerReadConsistency,
+            defaultLeaderReadConsistency,
+            followerReadEnabled);
+    this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
   }
 
   @Override

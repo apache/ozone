@@ -197,7 +197,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     @Override
     public String remove(Object key) {
-      return delegate.remove(key.toString());
+      return delegate.remove(key.toString().toLowerCase());
     }
 
     @Override

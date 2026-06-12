@@ -224,6 +224,19 @@ public abstract class TestOmSnapshot {
     }
   }
 
+  /**
+   * Pins a config-independent heavyweight test to exactly one subclass so it runs
+   * once instead of across the whole 8-class matrix (HDDS-10308); fast-skips in the
+   * other 7. The canonical config is FSO + non-linked. requiresNativeDiff picks
+   * between TestOmSnapshotFsoWithNativeLib (native on) and
+   * TestOmSnapshotFsoWithoutNativeLib (native off).
+   */
+  private void assumeCanonicalConfig(boolean requiresNativeDiff) {
+    assumeTrue(bucketLayout.isFileSystemOptimized()
+        && (requiresNativeDiff != disableNativeDiff)
+        && !createLinkedBucket);
+  }
+
   private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
@@ -1442,7 +1455,7 @@ public abstract class TestOmSnapshot {
 
     IOException ioException = assertThrows(IOException.class,
         () -> store.snapshotDiff(volume, bucket, snap6,
-            snap7, "3", 0, forceFullSnapshotDiff, disableNativeDiff));
+            snap7, "400000000000000000003", 0, forceFullSnapshotDiff, disableNativeDiff));
     assertThat(ioException.getMessage()).contains("Index (given: 3) " +
         "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
         "(given: 1000) should be a positive number > 0.");
@@ -2050,6 +2063,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    assumeCanonicalConfig(false);
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (UncheckedAutoCloseableSupplier<IOmMetadataReader> snapshotSupplier =
              cluster.getOzoneManager().getOmSnapshotManager()
@@ -2172,6 +2186,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
+    assumeCanonicalConfig(false);
     String snapshotName = createSnapshot(volumeName, bucketName);
 
     RDBStore activeDbStore = getRdbStore();
@@ -2399,6 +2414,7 @@ public abstract class TestOmSnapshot {
   // column families are used in SST diff calculation.
   @Test
   public void testSnapshotCompactionDag() throws Exception {
+    assumeCanonicalConfig(true);
     String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
@@ -2543,6 +2559,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotReuseSnapName() throws Exception {
+    assumeCanonicalConfig(false);
     // start KeyManager for this test
     startKeyManager();
     String volume = "vol-" + counter.incrementAndGet();

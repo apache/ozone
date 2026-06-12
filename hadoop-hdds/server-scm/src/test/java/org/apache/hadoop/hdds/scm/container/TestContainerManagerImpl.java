@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -103,7 +102,9 @@ public class TestContainerManagerImpl {
     pipelineManager = spy(base);
 
     // Default: allow allocation in tests unless a test overrides it.
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class), anyLong());
+    // Allocation uses checkSpaceAndRecordAllocation
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
@@ -141,11 +142,12 @@ public class TestContainerManagerImpl {
    */
   @Test
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
-    doReturn(false).when(pipelineManager).hasEnoughSpace(any(), anyLong());
+    doReturn(false).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
-    // MockPipelineManager#hasEnoughSpace always returns false
+    // MockPipelineManager#checkSpaceAndRecordAllocation always returns false
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = containerManager
         .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
@@ -163,10 +165,10 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
 
-    // create a spy to mock hasEnoughSpace to always return true
+    // create a spy to mock checkSpaceAndRecordAllocation to always return true
     PipelineManager spyPipelineManager = spy(pipelineManager);
     doReturn(true).when(spyPipelineManager)
-        .hasEnoughSpace(any(Pipeline.class), anyLong());
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     // create a new ContainerManager using the spy
     File tempDir = new File(testDir, "tempDir");
@@ -210,7 +212,7 @@ public class TestContainerManagerImpl {
   @ParameterizedTest
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
-  void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState desiredState)
+  void testTransitionDeletingOrDeletedToTargetState(HddsProtos.LifeCycleState desiredState)
       throws IOException, InvalidStateTransitionException {
     // Allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING / DELETED
     final ContainerInfo container = containerManager.allocateContainer(
@@ -250,8 +252,8 @@ public class TestContainerManagerImpl {
     }
 
     // DELETING / DELETED -> CLOSED
-    containerManager.transitionDeletingOrDeletedToClosedState(cid);
-    containerManager.transitionDeletingOrDeletedToClosedState(ecCid);
+    containerManager.transitionDeletingOrDeletedToTargetState(cid, LifeCycleState.CLOSED);
+    containerManager.transitionDeletingOrDeletedToTargetState(ecCid, LifeCycleState.CLOSED);
     // the containers should be back in CLOSED state now
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(ecCid).getState());
@@ -267,13 +269,15 @@ public class TestContainerManagerImpl {
             ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(cid));
+    assertThrows(IOException.class, () ->
+            containerManager.transitionDeletingOrDeletedToTargetState(cid, LifeCycleState.CLOSED));
 
     // test for EC container
     final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(ecCid));
+    assertThrows(IOException.class, () ->
+            containerManager.transitionDeletingOrDeletedToTargetState(ecCid, LifeCycleState.CLOSED));
   }
 
   @Test

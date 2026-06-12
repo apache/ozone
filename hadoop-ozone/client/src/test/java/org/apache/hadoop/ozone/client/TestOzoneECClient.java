@@ -42,8 +42,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -336,7 +338,7 @@ public class TestOzoneECClient {
       HddsProtos.DatanodeDetailsProto member =
           blockList.getKeyLocations(0).getPipeline().getMembers(i);
       MockDatanodeStorage mockDatanodeStorage =
-          storages.get(getMatchingStorage(storages, member.getUuid()));
+          storages.get(getMatchingStorage(storages, DatanodeID.fromProto(member.getId())));
       dns.add(mockDatanodeStorage);
     }
     String firstBlockData = dns.get(0).getFullBlockData(new BlockID(
@@ -395,8 +397,8 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks + parityBlocks; i++) {
         MockDatanodeStorage mockDatanodeStorage = storages.get(
             getMatchingStorage(storages,
-                blockList.getKeyLocations(0).getPipeline().getMembers(i)
-                    .getUuid()));
+                DatanodeID.fromProto(blockList.getKeyLocations(0).getPipeline().getMembers(i)
+                    .getId())));
         final OzoneKeyDetails keyDetails = bucket.getKey(keyName);
 
         ContainerProtos.BlockData block = mockDatanodeStorage.getBlock(
@@ -420,11 +422,11 @@ public class TestOzoneECClient {
   }
 
   private static DatanodeDetails getMatchingStorage(
-      Map<DatanodeDetails, MockDatanodeStorage> storages, String uuid) {
+      Map<DatanodeDetails, MockDatanodeStorage> storages, DatanodeID id) {
     Iterator<DatanodeDetails> iterator = storages.keySet().iterator();
     while (iterator.hasNext()) {
       DatanodeDetails dn = iterator.next();
-      if (dn.getUuid().toString().equals(uuid)) {
+      if (dn.getID().equals(id)) {
         return dn;
       }
     }
@@ -694,7 +696,7 @@ public class TestOzoneECClient {
   public void testStripeWriteRetriesOn4FailuresWith3RetriesAllowed()
       throws Exception {
     OzoneConfiguration con = createConfiguration();
-    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
+    con.setInt(OzoneClientConfig.Keys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
 
     int[] nodesIndexesToMarkFailure = new int[4];
     nodesIndexesToMarkFailure[0] = 0;
@@ -895,7 +897,7 @@ public class TestOzoneECClient {
     OzoneConfiguration con = createConfiguration();
     // block size of 3KB could hold 3 full stripes
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 3, StorageUnit.KB);
-    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
+    con.setInt(OzoneClientConfig.Keys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
             15);
@@ -968,7 +970,7 @@ public class TestOzoneECClient {
     OzoneConfiguration con = createConfiguration();
     // block size of 3KB could hold 3 full stripes
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 3, StorageUnit.KB);
-    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
+    con.setInt(OzoneClientConfig.Keys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks, 15);
     createNewClient(con, blkAllocator);
@@ -1029,7 +1031,7 @@ public class TestOzoneECClient {
     close();
     OzoneConfiguration con = createConfiguration();
     int maxRetries = 3;
-    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES,
+    con.setInt(OzoneClientConfig.Keys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES,
         maxRetries);
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,

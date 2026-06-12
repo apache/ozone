@@ -82,7 +82,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
@@ -96,6 +95,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.mapreduce.Job;
@@ -234,7 +234,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
     } else {
-      conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
+      conf.set(OzoneClientConfig.Keys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
           OzoneConfigKeys.OZONE_BUCKET_LAYOUT_LEGACY);
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
@@ -286,27 +286,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path(bucketPath,
         "testCreateDoesNotAddParentDirKeys");
-    Path parent = new Path(grandparent, "parent");
-    Path child = new Path(parent, "child");
-    ContractTestUtils.touch(fs, child);
+    createDoesNotAddParentDirKeys(grandparent);
+  }
 
-    OzoneKeyDetails key = getKey(child, false);
+  @Override
+  String getChildKeyName(Path child) {
     OFSPath childOFSPath = new OFSPath(child, conf);
-    assertEquals(key.getName(), childOFSPath.getKeyName());
-
-    // Creating a child should not add parent keys to the bucket
-    try {
-      getKey(parent, true);
-    } catch (OMException ome) {
-      assertEquals(KEY_NOT_FOUND, ome.getResult());
-    }
-
-    // List status on the parent should show the child file
-    assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
-    assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
-
-    // Cleanup
-    fs.delete(grandparent, true);
+    return childOFSPath.getKeyName();
   }
 
   @Test
@@ -354,34 +340,15 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     //  If possible, improve this to test when FS Path is enabled.
     assumeTrue(!enabledFileSystemPaths, "FS Path is enabled. Skipping this test as it is not " +
             "tuned for FS Path yet");
+    deleteCreatesFakeParentDir(bucketPath);
+  }
 
-    Path grandparent = new Path(bucketPath,
-        "testDeleteCreatesFakeParentDir");
-    Path parent = new Path(grandparent, "parent");
-    Path child = new Path(parent, "child");
-    ContractTestUtils.touch(fs, child);
-
-    // Verify that parent dir key does not exist
-    // Creating a child should not add parent keys to the bucket
-    try {
-      getKey(parent, true);
-    } catch (OMException ome) {
-      assertEquals(KEY_NOT_FOUND, ome.getResult());
-    }
-
-
-    // Delete the child key
-    assertTrue(fs.delete(child, false));
-
-    // Deleting the only child should create the parent dir key if it does
-    // not exist
+  @Override
+  void verifyDeleteCreatesFakeParentDir(Path parent) throws IOException {
     OFSPath parentOFSPath = new OFSPath(parent, conf);
     String parentKey = parentOFSPath.getKeyName() + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
-
-    // Recursive delete with DeleteIterator
-    assertTrue(fs.delete(grandparent, true));
   }
 
   @Test
@@ -399,37 +366,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
 
   @Test
   void testListStatus() throws Exception {
-    Path parent = new Path(bucketPath, "testListStatus");
-    Path file1 = new Path(parent, "key1");
-    Path file2 = new Path(parent, "key2");
-
-    FileStatus[] fileStatuses = fs.listStatus(bucketPath);
-    assertEquals(0, fileStatuses.length, "Should be empty");
-
-    ContractTestUtils.touch(fs, file1);
-    ContractTestUtils.touch(fs, file2);
-
-    fileStatuses = fs.listStatus(bucketPath);
-    assertEquals(1, fileStatuses.length, "Should have created parent");
-    assertEquals(fileStatuses[0].getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
-
-    // ListStatus on a directory should return all subdirs along with
-    // files, even if there exists a file and sub-dir with the same name.
-    fileStatuses = fs.listStatus(parent);
-    assertEquals(2, fileStatuses.length, "FileStatus did not return all children of the directory");
-
-    // ListStatus should return only the immediate children of a directory.
-    Path file3 = new Path(parent, "dir1/key3");
-    Path file4 = new Path(parent, "dir1/key4");
-    ContractTestUtils.touch(fs, file3);
-    ContractTestUtils.touch(fs, file4);
-    fileStatuses = fs.listStatus(parent);
-    assertEquals(3, fileStatuses.length, "FileStatus did not return all children of" +
-        " the directory : Got " + Arrays.toString(
-        fileStatuses));
-
-    // Cleanup
-    fs.delete(parent, true);
+    verifyListStatus(bucketPath, null);
   }
 
   /**
@@ -446,33 +383,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testListStatusIteratorInBucket() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path dir1 = new Path(root, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(root, "dir2");
-    try {
-      fs.mkdirs(dir12);
-      fs.mkdirs(dir2);
-
-      // ListStatus on root should return dir1 (even though /dir1 key does not
-      // exist) and dir2 only. dir12 is not an immediate child of root and
-      // hence should not be listed.
-      RemoteIterator<FileStatus> it = fs.listStatusIterator(root);
-      // Verify that dir12 is not included in the result of the listStatus on
-      // root
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertNotEquals(fileStatus, dir12.toString());
-      }
-      assertEquals(2, iCount, "FileStatus should return only the immediate children");
-
-    } finally {
-      // cleanup
-      fs.delete(dir1, true);
-      fs.delete(dir2, true);
-    }
+    listStatusIteratorOnRoot(root);
   }
 
   @Test
@@ -501,48 +412,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testListStatusIteratorOnSubDirs() throws Exception {
-    // Create the following key structure
-    //      /dir1/dir11/dir111
-    //      /dir1/dir12
-    //      /dir1/dir12/file121
-    //      /dir2
-    // listStatusIterator on /dir1 should return all its immediated subdirs only
-    // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
-    // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
-    // listStatusIterator.
-    Path dir1 = new Path(bucketPath, "dir1");
-    Path dir11 = new Path(dir1, "dir11");
-    Path dir111 = new Path(dir11, "dir111");
-    Path dir12 = new Path(dir1, "dir12");
-    Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path(bucketPath, "dir2");
-    try {
-      fs.mkdirs(dir111);
-      fs.mkdirs(dir12);
-      ContractTestUtils.touch(fs, file121);
-      fs.mkdirs(dir2);
-
-      RemoteIterator<FileStatus> it = fs.listStatusIterator(dir1);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertNotEquals(fileStatus, dir12.toString());
-        // Verify that the two children of /dir1
-        // returned by listStatusIterator operation
-        // are /dir1/dir11 and /dir1/dir12.
-        assertTrue(fileStatus.getPath().toUri().getPath().
-            equals(dir11.toString()) ||
-            fileStatus.getPath().toUri().getPath().
-                equals(dir12.toString()));
-      }
-      assertEquals(2, iCount, "Iterator should return only the immediate children");
-    } finally {
-      // Cleanup
-      fs.delete(dir2, true);
-      fs.delete(dir1, true);
-    }
+    listStatusIteratorOnSubDirs(bucketPath);
   }
 
   /**
@@ -690,30 +560,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testListStatusInBucket() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path dir1 = new Path(root, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(root, "dir2");
-    try {
-      fs.mkdirs(dir12);
-      fs.mkdirs(dir2);
-
-      // ListStatus on root should return dir1 (even though /dir1 key does not
-      // exist) and dir2 only. dir12 is not an immediate child of root and
-      // hence should not be listed.
-      FileStatus[] fileStatuses = fs.listStatus(root);
-      assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
-
-      // Verify that dir12 is not included in the result of the listStatus on
-      // root
-      String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
-      String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
-      assertNotEquals(fileStatus1, dir12.toString());
-      assertNotEquals(fileStatus2, dir12.toString());
-    } finally {
-      // cleanup
-      fs.delete(dir1, true);
-      fs.delete(dir2, true);
-    }
+    listStatusOnRoot(root, null);
   }
 
   /**
@@ -751,69 +598,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testListStatusOnSubDirs() throws Exception {
-    // Create the following key structure
-    //      /dir1/dir11/dir111
-    //      /dir1/dir12
-    //      /dir1/dir12/file121
-    //      /dir2
-    // ListStatus on /dir1 should return all its immediated subdirs only
-    // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
-    // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
-    // listStatus.
-    Path dir1 = new Path(bucketPath, "dir1");
-    Path dir11 = new Path(dir1, "dir11");
-    Path dir111 = new Path(dir11, "dir111");
-    Path dir12 = new Path(dir1, "dir12");
-    Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path(bucketPath, "dir2");
-    fs.mkdirs(dir111);
-    fs.mkdirs(dir12);
-    ContractTestUtils.touch(fs, file121);
-    fs.mkdirs(dir2);
-
-    FileStatus[] fileStatuses = fs.listStatus(dir1);
-    assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
-
-    // Verify that the two children of /dir1 returned by listStatus operation
-    // are /dir1/dir11 and /dir1/dir12.
-    String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
-    String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
-    assertTrue(fileStatus1.equals(dir11.toString()) ||
-        fileStatus1.equals(dir12.toString()));
-    assertTrue(fileStatus2.equals(dir11.toString()) ||
-        fileStatus2.equals(dir12.toString()));
-
-    // Cleanup
-    fs.delete(dir2, true);
-    fs.delete(dir1, true);
+    listStatusOnSubDirs(bucketPath);
   }
 
   @Test
   void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
       throws Exception {
-    Path source = new Path(bucketPath, "source");
-    Path interimPath = new Path(source, "interimPath");
-    Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path(bucketPath, "target");
-    Path leafInTarget = new Path(target, "leaf");
-
-    fs.mkdirs(source);
-    fs.mkdirs(target);
-    fs.mkdirs(leafInsideInterimPath);
-
-    assertTrue(fs.rename(leafInsideInterimPath, leafInTarget));
-
-    // after rename listStatus for interimPath should succeed and
-    // interimPath should have no children
-    FileStatus[] statuses = fs.listStatus(interimPath);
-    assertNotNull(statuses, "liststatus returns a null array");
-    assertEquals(0, statuses.length, "Statuses array is not empty");
-    FileStatus fileStatus = fs.getFileStatus(interimPath);
-    assertEquals(interimPath.getName(), fileStatus.getPath().getName(), "FileStatus does not point to interimPath");
-
-    // Cleanup
-    fs.delete(target, true);
-    fs.delete(source, true);
+    nonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved(bucketPath);
   }
 
   /**
@@ -986,6 +777,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    * Helper function to do FileSystem#listStatus recursively.
    * Simulate what FsShell does, using DFS.
    */
+  @SuppressWarnings("PMD.UseArraysAsList")
   private void listStatusRecursiveHelper(Path curPath, List<FileStatus> result)
       throws IOException {
     FileStatus[] startList = fs.listStatus(curPath);
@@ -1940,25 +1732,21 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameFile() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
-    Path dirPath = new Path(getBucketPath() + dir);
-    Path file1Source = new Path(getBucketPath() + dir
-        + "/file1_Copy");
-    Path file1Destin = new Path(getBucketPath() + dir + "/file1");
+    Path dirPath = pathUnderFsRoot(dir);
     try {
-      getFs().mkdirs(dirPath);
-
-      ContractTestUtils.touch(getFs(), file1Source);
-      assertTrue(getFs().rename(file1Source, file1Destin), "Renamed failed");
-      assertTrue(getFs().exists(file1Destin), "Renamed failed: /dir/file1");
-      FileStatus[] fStatus = getFs().listStatus(dirPath);
-      assertEquals(1, fStatus.length, "Renamed failed");
+      renameFile(dir);
     } finally {
       // clean up
       fs.delete(dirPath, true);
     }
   }
 
-
+  @Override
+  void verifyRenameFile(Path workDir, Path expectedDest) throws IOException {
+    FileStatus[] fStatus = getFs().listStatus(workDir);
+    assertEquals(1, fStatus.length, "Renamed failed");
+    assertEquals(expectedDest.toString(), fStatus[0].getPath().toUri().getPath(), "Wrong path name!");
+  }
 
   /**
    * Rename file to an existed directory.
@@ -1966,17 +1754,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameFileToDir() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
-    Path dirPath = new Path(getBucketPath() + dir);
-    getFs().mkdirs(dirPath);
-
-    Path file1Destin = new Path(getBucketPath() + dir  + "/file1");
-    ContractTestUtils.touch(getFs(), file1Destin);
-    Path abcRootPath = new Path(getBucketPath() + "/a/b/c");
-    getFs().mkdirs(abcRootPath);
-    assertTrue(getFs().rename(file1Destin, abcRootPath), "Renamed failed");
-    assertTrue(getFs().exists(new Path(
-        abcRootPath, "file1")), "Renamed filed: /a/b/c/file1");
+    renameFileToDir(dir);
     getFs().delete(getBucketPath(), true);
+  }
+
+  @Override
+  Path pathUnderFsRoot(String relativePath) {
+    return new Path(getBucketPath() + relativePath);
   }
 
   /**
@@ -1989,33 +1773,11 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testRenameToParentDir() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(getBucketPath() + dir2);
-    final Path destRootPath = new Path(getBucketPath() + root);
-    Path file1Source = new Path(getBucketPath() + dir1 + "/file2");
     try {
-      getFs().mkdirs(dir2SourcePath);
-
-      ContractTestUtils.touch(getFs(), file1Source);
-
-      // rename source directory to its parent directory(destination).
-      assertTrue(getFs().rename(dir2SourcePath, destRootPath), "Rename failed");
-      final Path expectedPathAfterRename =
-          new Path(getBucketPath() + root + "/dir2");
-      assertTrue(getFs().exists(expectedPathAfterRename), "Rename failed");
-
-      // rename source file to its parent directory(destination).
-      assertTrue(getFs().rename(file1Source, destRootPath), "Rename failed");
-      final Path expectedFilePathAfterRename =
-          new Path(getBucketPath() + root + "/file2");
-      assertTrue(getFs().exists(expectedFilePathAfterRename), "Rename failed");
+      renameToParentDir();
     } finally {
       // clean up
-      fs.delete(file1Source, true);
-      fs.delete(dir2SourcePath, true);
-      fs.delete(destRootPath, true);
+      fs.delete(pathUnderFsRoot("/root_dir"), true);
     }
   }
 
@@ -2025,22 +1787,9 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final Path dir1Path = new Path(getBucketPath() + dir1);
-    // Add a sub-dir1 to the directory to be moved.
-    final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    getFs().mkdirs(subDir1);
-    LOG.info("Created dir1 {}", subDir1);
-
-    final Path sourceRoot = new Path(getBucketPath() + root);
-    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    //  rename should fail and return false
+    final Path sourceRoot = pathUnderFsRoot(root);
     try {
-      getFs().rename(sourceRoot, subDir1);
-      fail("Should throw exception : Cannot rename a directory to" +
-          " its own subdirectory");
-    } catch (IllegalArgumentException e) {
-      //expected
+      renameDirToItsOwnSubDir();
     } finally {
       // clean up
       fs.delete(sourceRoot, true);
@@ -2054,33 +1803,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testRenameDestinationParentDoesNotExist() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(getBucketPath() + dir2);
-    getFs().mkdirs(dir2SourcePath);
-    // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(getBucketPath()
-        + root + "/b/c");
-
-    // rename should throw exception
-    try {
-      getFs().rename(dir2SourcePath, destinPath);
-      fail("Should fail as parent of dst does not exist!");
-    } catch (FileNotFoundException fnfe) {
-      //expected
-    }
-    // (b) parent of dst is a file. /root_dir/file1/c
-    Path filePath = new Path(getBucketPath() + root + "/file1");
-    ContractTestUtils.touch(getFs(), filePath);
-    Path newDestinPath = new Path(filePath, "c");
-    // rename shouldthrow exception
-    try {
-      getFs().rename(dir2SourcePath, newDestinPath);
-      fail("Should fail as parent of dst is a file!");
-    } catch (IOException e) {
-      //expected
-    }
+    renameDestinationParentDoesNotExist();
   }
 
   @Test

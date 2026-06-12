@@ -25,12 +25,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -123,12 +125,27 @@ public final class EndpointTestUtils {
       String uploadID,
       String content
   ) throws IOException, OS3Exception {
+    return put(subject, bucket, key, partNumber, uploadID,
+        contentLength(content), content);
+  }
+
+  /** Put with content, part number, upload ID, and explicit Content-Length. */
+  public static Response put(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      int partNumber,
+      String uploadID,
+      long contentLength,
+      String content
+  ) throws IOException, OS3Exception {
     if (uploadID != null) {
       subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     }
     subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
     when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
-    setLengthHeader(subject, content);
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(contentLength));
 
     if (content == null) {
       return subject.put(bucket, key, null);
@@ -246,16 +263,16 @@ public final class EndpointTestUtils {
     }
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedRunnable<?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedRunnable<?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, request::run);
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
     return actual;
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedSupplier<Response, ?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedSupplier<Response, ?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, () -> request.get().close());
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
@@ -263,9 +280,44 @@ public final class EndpointTestUtils {
   }
 
   private static void setLengthHeader(ObjectEndpoint subject, String content) {
-    final long length = content != null ? content.length() : 0;
     when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
-        .thenReturn(String.valueOf(length));
+        .thenReturn(String.valueOf(contentLength(content)));
+  }
+
+  private static long contentLength(String content) {
+    return content != null ? content.getBytes(UTF_8).length : 0;
+  }
+
+  static final class FailingInputStream extends InputStream {
+
+    private final byte[] content;
+    private final int failAfterBytes;
+    private int position;
+
+    FailingInputStream(byte[] content, int failAfterBytes) {
+      this.content = content;
+      this.failAfterBytes = failAfterBytes;
+    }
+
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+
+      int bytesToRead = Math.min(length, failAfterBytes - position);
+      System.arraycopy(content, position, buffer, offset, bytesToRead);
+      position += bytesToRead;
+      return bytesToRead;
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+      return content[position++];
+    }
   }
 
   private EndpointTestUtils() {

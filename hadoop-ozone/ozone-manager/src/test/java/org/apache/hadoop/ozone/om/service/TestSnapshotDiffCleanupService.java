@@ -82,9 +82,6 @@ public class TestSnapshotDiffCleanupService {
       StringUtils.string2Bytes("snap-diff-purged-job-table");
   private final byte[] reportTableNameBytes =
       StringUtils.string2Bytes("snap-diff-report-table");
-  private ColumnFamilyDescriptor jobTableCfd;
-  private ColumnFamilyDescriptor purgedJobTableCfd;
-  private ColumnFamilyDescriptor reportTableCfd;
   private ColumnFamilyHandle jobTableCfh;
   private ColumnFamilyHandle purgedJobTableCfh;
   private ColumnFamilyHandle reportTableCfh;
@@ -154,11 +151,11 @@ public class TestSnapshotDiffCleanupService {
 
     when(ozoneManager.getConfiguration()).thenReturn(config);
 
-    jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
+    ColumnFamilyDescriptor jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
         columnFamilyOptions);
-    reportTableCfd = new ColumnFamilyDescriptor(reportTableNameBytes,
+    ColumnFamilyDescriptor reportTableCfd = new ColumnFamilyDescriptor(reportTableNameBytes,
         columnFamilyOptions);
-    purgedJobTableCfd = new ColumnFamilyDescriptor(purgedJobTableNameBytes,
+    ColumnFamilyDescriptor purgedJobTableCfd = new ColumnFamilyDescriptor(purgedJobTableNameBytes,
         columnFamilyOptions);
     jobTableCfh = db.get().createColumnFamily(jobTableCfd);
     purgedJobTableCfh = db.get().createColumnFamily(purgedJobTableCfd);
@@ -169,7 +166,7 @@ public class TestSnapshotDiffCleanupService {
     // DiffReportEntry codec for Diff Report.
     b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
+    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec());
     codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 
@@ -191,22 +188,24 @@ public class TestSnapshotDiffCleanupService {
       diffCleanupService.shutdown();
     }
     if (jobTableCfh != null) {
+      dropColumnFamily(jobTableCfh);
       jobTableCfh.close();
     }
     if (purgedJobTableCfh != null) {
+      dropColumnFamily(purgedJobTableCfh);
       purgedJobTableCfh.close();
     }
     if (reportTableCfh != null) {
+      dropColumnFamily(reportTableCfh);
       reportTableCfh.close();
     }
-    if (jobTableCfd != null) {
-      ManagedColumnFamilyOptions.closeDeeply(jobTableCfd.getOptions());
-    }
-    if (purgedJobTableCfd != null) {
-      ManagedColumnFamilyOptions.closeDeeply(purgedJobTableCfd.getOptions());
-    }
-    if (reportTableCfd != null) {
-      ManagedColumnFamilyOptions.closeDeeply(reportTableCfd.getOptions());
+  }
+
+  private void dropColumnFamily(ColumnFamilyHandle columnFamilyHandle) {
+    try {
+      db.get().dropColumnFamily(columnFamilyHandle);
+    } catch (RocksDBException exception) {
+      throw new RuntimeException("Failed to drop column family.", exception);
     }
   }
 
@@ -283,6 +282,27 @@ public class TestSnapshotDiffCleanupService {
     assertNumberOfEntriesInTable(reportTableCfh, 19);
   }
 
+  @Test
+  public void testCleanupRemovesReportEntriesForZeroEntryPurgedJob()
+      throws RocksDBException, IOException {
+    diffCleanupService.suspend();
+
+    long currentTime = System.currentTimeMillis() - 1;
+    SnapshotDiffJob failedJob = addJobAndReport(FAILED, currentTime, 0);
+    addReportEntries(failedJob.getJobId(), 2);
+
+    diffCleanupService.resume();
+
+    diffCleanupService.run();
+    assertJobInPurgedTable(failedJob.getJobId(),
+        failedJob.getTotalDiffEntries());
+    assertReport(failedJob.getJobId(), 2, emptyReportEntry);
+
+    diffCleanupService.run();
+    assertNumberOfEntriesInTable(purgedJobTableCfh, 0);
+    assertReport(failedJob.getJobId(), 2, null);
+  }
+
   private SnapshotDiffJob addJobAndReport(JobStatus jobStatus,
                                           long creationTime,
                                           long noOfEntries)
@@ -298,7 +318,7 @@ public class TestSnapshotDiffCleanupService {
 
     SnapshotDiffJob job = new SnapshotDiffJob(creationTime, jobId, jobStatus,
         volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries,
-        null, 0.0);
+        null, 0.0, jobId + "-" + noOfEntries);
 
     db.get().put(jobTableCfh, codecRegistry.asRawData(jobKey),
         codecRegistry.asRawData(job));
@@ -313,6 +333,15 @@ public class TestSnapshotDiffCleanupService {
           emptyReportEntry);
     }
     return job;
+  }
+
+  private void addReportEntries(String jobId, int noOfEntries)
+      throws IOException, RocksDBException {
+    for (int i = 0; i < noOfEntries; i++) {
+      db.get().put(reportTableCfh,
+          codecRegistry.asRawData(jobId + DELIMITER + i),
+          emptyReportEntry);
+    }
   }
 
   private void assertJobAndReport(SnapshotDiffJob expectedJob,
