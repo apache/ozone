@@ -682,6 +682,16 @@ public final class OMConfigKeys {
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
 
   /**
+   * Bottommost level compaction type for manual compaction.
+   * Invalid values will default to kSkip.
+   * Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).
+   * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
+      "ozone.om.compaction.service.bottommostlevelcompaction";
+  public static final int OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = 0;
+
+  /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
    */
   public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 

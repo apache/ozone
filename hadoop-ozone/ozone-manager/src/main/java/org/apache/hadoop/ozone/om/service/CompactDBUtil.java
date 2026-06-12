@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -38,21 +40,13 @@ public final class CompactDBUtil {
   private CompactDBUtil() {
   }
 
-  public static void compactTable(OMMetadataManager omMetadataManager,
-                                  String tableName) throws IOException {
-    compactTable(omMetadataManager, tableName, 0);
-  }
-
-  public static void compactTable(OMMetadataManager omMetadataManager,
-      String tableName,
-      int bottommostLevelCompaction) throws IOException {
+  public static void compactTable(OMMetadataManager omMetadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) throws IOException {
     long startTime = Time.monotonicNow();
-    ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
-        getBottommostLevelCompaction(bottommostLevelCompaction);
-    LOG.info("Compacting column family: {} with BottommostLevelCompaction={}",
-        tableName, blcOption.name());
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(blcOption);
+      options.setBottommostLevelCompaction(compactionType);
+      LOG.info("Compacting column family: {} with {} bottommost level compaction",
+          tableName, options.bottommostLevelCompaction());
       options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
@@ -70,15 +64,11 @@ public final class CompactDBUtil {
     }
   }
 
-  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
-    return compactTableAsync(metadataManager, tableName, 0);
-  }
-
-  public static CompletableFuture<Void> compactTableAsync(
-      OMMetadataManager metadataManager, String tableName, int bottommostLevelCompaction) {
+  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) {
     return CompletableFuture.runAsync(() -> {
       try {
-        compactTable(metadataManager, tableName, bottommostLevelCompaction);
+        compactTable(metadataManager, tableName, compactionType);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
@@ -86,18 +76,18 @@ public final class CompactDBUtil {
     });
   }
 
-  /**
-   * Converts the given rocksId to a
-   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum.
-   * Defaults to kSkip if the value is invalid.
-   */
-  static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(int rocksId) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(rocksId);
-    if (blc == null) {
-      LOG.warn("Invalid BottommostLevelCompaction value: {}. Defaulting to kSkip.", rocksId);
-      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
+  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
+      OzoneConfiguration configuration) {
+    int compactionType = configuration.getInt(
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+    ManagedCompactRangeOptions.BottommostLevelCompaction level =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    if (level == null) {
+      compactionType = OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
+      level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+      LOG.warn("Invalid bottommost level compaction type. Using default value: {}", level);
     }
-    return blc;
+    return level;
   }
 }

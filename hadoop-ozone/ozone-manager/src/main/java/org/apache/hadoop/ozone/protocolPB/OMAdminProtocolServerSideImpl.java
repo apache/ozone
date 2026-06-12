@@ -121,7 +121,7 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     try {
       // check if table exists. IOException is thrown if table is not found.
       ozoneManager.getMetadataManager().getStore().getTable(compactRequest.getColumnFamily());
-      ozoneManager.compactOMDB(compactRequest.getColumnFamily(), compactRequest.getBottommostLevelCompaction());
+      ozoneManager.compactOMDB(compactRequest.getColumnFamily());
     } catch (IOException ex) {
       return CompactResponse.newBuilder()
           .setSuccess(false)
