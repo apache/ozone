@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -79,14 +80,16 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
+
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
-        setBucketPropertyRequestBuilder = getOmRequest()
+        setBucketPropertyRequestBuilder = request
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
     BucketArgs bucketArgs =
-        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+        request.getSetBucketPropertyRequest().getBucketArgs();
 
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
@@ -97,9 +100,25 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
     }
 
-    return getOmRequest().toBuilder()
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      String volumeName = bucketArgs.getVolumeName();
+      String bucketName = bucketArgs.getBucketName();
+      try {
+        checkAclPermission(ozoneManager, volumeName, bucketName);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+        Map<String, String> auditMap = omBucketArgs.toAuditMap();
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.UPDATE_BUCKET, auditMap, ex,
+                request.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return request.toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 
@@ -132,11 +151,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAclPermission(ozoneManager, volumeName, bucketName);
-      }
-
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           BUCKET_LOCK, volumeName, bucketName));
