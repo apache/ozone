@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 
 import java.io.IOException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -43,7 +44,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
       description = "Tenant name", required = true)
   private String tenantId;
 
-  @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
+  @CommandLine.Option(names = {"-a", "--access-id"},
       description = "(Optional) Specify the accessId for user in this tenant. "
           + "If unspecified, accessId would be in the form of "
           + "TenantName$Principal.",
@@ -53,6 +54,12 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   //  unintentionally leak secret if an admin isn't careful.
   private String accessId;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--accessId", hidden = true)
+  private String deprecatedAccessId;
+
   private String getDefaultAccessId(String userPrinc) {
     return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrinc;
   }
@@ -60,6 +67,10 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--accessId", "--access-id", spec, "--access-id", "-a");
+    accessId = DeprecatedCliOptions.resolveString(accessId, deprecatedAccessId);
 
     if (StringUtils.isEmpty(accessId)) {
       accessId = getDefaultAccessId(userPrincipal);

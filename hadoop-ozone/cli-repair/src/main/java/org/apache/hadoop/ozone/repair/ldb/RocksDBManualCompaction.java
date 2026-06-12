@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.repair.ldb;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
@@ -57,10 +58,18 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
-      required = true,
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       description = "Column family name")
   private String columnFamilyName;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--column_family", hidden = true)
+  private String deprecatedColumnFamilyName;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   private String getConsoleReadLineWithFormat() {
     err().printf(WARNING_TO_STOP_SERVICE);
@@ -75,6 +84,8 @@ public class RocksDBManualCompaction extends RepairTool {
    */
   @Override
   public void execute() throws Exception {
+    columnFamilyName = resolveColumnFamilyName();
+
     if (!isDryRun()) {
       confirmUser();
       final boolean confirmed = "y".equalsIgnoreCase(getConsoleReadLineWithFormat());
@@ -116,5 +127,17 @@ public class RocksDBManualCompaction extends RepairTool {
       IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
+  }
+
+  private String resolveColumnFamilyName() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--column_family", "--column-family", spec, "--column-family", "--cf");
+    String resolved = DeprecatedCliOptions.resolveString(
+        columnFamilyName, deprecatedColumnFamilyName);
+    if (resolved == null || resolved.isEmpty()) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Missing required option '--column-family=<columnFamilyName>'");
+    }
+    return resolved;
   }
 }

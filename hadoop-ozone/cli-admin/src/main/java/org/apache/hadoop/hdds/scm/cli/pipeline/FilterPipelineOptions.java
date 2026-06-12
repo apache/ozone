@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
@@ -44,21 +45,32 @@ public class FilterPipelineOptions {
       defaultValue = "")
   private String replication;
 
-  @CommandLine.Option(
-      names = {"-ffc", "--filterByFactor", "--filter-by-factor"},
+  @CommandLine.Option(names = {"-ffc", "--filter-by-factor"},
       description = "[deprecated] Filter pipelines by factor (e.g. ONE, THREE) (implies RATIS replication type)")
   private ReplicationFactor factor;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--filterByFactor", hidden = true)
+  private ReplicationFactor deprecatedFilterByFactor;
+
   Optional<Predicate<? super Pipeline>> getReplicationFilter() {
+    ReplicationFactor resolvedFactor = factor != null ? factor : deprecatedFilterByFactor;
+    DeprecatedCliOptions.warnIfDeprecatedStringUsed("--filterByFactor",
+        "--filter-by-factor",
+        deprecatedFilterByFactor != null ? deprecatedFilterByFactor.name() : null,
+        factor != null ? factor.name() : null);
+
     boolean hasReplication = !Strings.isNullOrEmpty(replication);
-    boolean hasFactor = factor != null;
+    boolean hasFactor = resolvedFactor != null;
     boolean hasReplicationType = !Strings.isNullOrEmpty(replicationType);
 
     if (hasFactor) {
       if (hasReplication) {
         throw new IllegalArgumentException("Factor and replication are mutually exclusive");
       }
-      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(factor.toProto());
+      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(resolvedFactor.toProto());
       return Optional.of(p -> replicationConfig.equals(p.getReplicationConfig()));
     }
 
