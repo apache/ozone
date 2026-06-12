@@ -2891,16 +2891,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setVolumeName(vol)
         .setBucketName(bucket)
         .setKeyName(key).build();
-    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
+    RequestContext context = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(owner);
-    OmMetadataReader.maybeAddToContextFromThreadLocal(contextBuilder);
+        .setOwnerName(owner)
+        .build();
 
-    return omMetadataReader.checkAcls(obj, contextBuilder.build(), throwIfPermissionDenied);
+    return omMetadataReader.checkAcls(obj, context, throwIfPermissionDenied);
   }
 
   /**

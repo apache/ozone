@@ -385,7 +385,6 @@ public abstract class OMClientRequest implements RequestAuditor {
         OmMetadataReader omMetadataReader =
             (OmMetadataReader) rcMetadataReader.get();
 
-        OmMetadataReader.maybeAddToContextFromThreadLocal(contextBuilder);
         omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
       }
     }
