@@ -204,6 +204,7 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_ALIVE = " - alive";
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
+  private final boolean spnegoEnabled;
   private XFrameOption xFrameOption;
   private HttpServer2Metrics metrics;
   private boolean xFrameOptionIsEnabled;
@@ -632,6 +633,7 @@ public final class HttpServer2 implements FilterContainer {
 
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
+    this.spnegoEnabled = b.securityEnabled;
     initializeWebServer(b);
   }
 
@@ -840,7 +842,6 @@ public final class HttpServer2 implements FilterContainer {
    * Add default servlets.
    */
   protected void addDefaultServlets() {
-    // set up default servlets
     addServlet("stacks", "/stacks", StackServlet.class);
     addServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
     addServlet("jmx", "/jmx", JMXJsonServlet.class);
@@ -967,7 +968,7 @@ public final class HttpServer2 implements FilterContainer {
       }
     }
 
-    if (requireAuth && UserGroupInformation.isSecurityEnabled()) {
+    if (requireAuth && spnegoEnabled) {
       LOG.info("Adding Kerberos (SPNEGO) filter to {}", name);
       ServletHandler handler = webAppContext.getServletHandler();
       FilterMapping fmap = new FilterMapping();
