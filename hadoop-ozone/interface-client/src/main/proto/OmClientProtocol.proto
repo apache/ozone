@@ -157,6 +157,7 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   SubmitSnapshotDiff = 143;
+  StartFinalizeUpgrade = 144;
 }
 
 enum SafeMode {
@@ -309,6 +310,7 @@ message OMRequest {
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 
   optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
+  optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 145;
 }
 
 message OMResponse {
@@ -444,6 +446,7 @@ message OMResponse {
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
 
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
+  optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 144;
 }
 
 enum Status {
@@ -1629,6 +1632,12 @@ message FinalizeUpgradeRequest {
 
 message FinalizeUpgradeResponse {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message StartFinalizeUpgradeRequest {
+}
+
+message StartFinalizeUpgradeResponse {
 }
 
 message FinalizeUpgradeProgressRequest {

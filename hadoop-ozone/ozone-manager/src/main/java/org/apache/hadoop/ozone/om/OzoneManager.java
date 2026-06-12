@@ -3642,6 +3642,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequest
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String unusedUpgradeClientId, boolean unusedTakeover, boolean unusedReadonly)
       throws IOException {

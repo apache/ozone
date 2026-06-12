@@ -17,16 +17,18 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,10 +44,21 @@ public class TestFinalizeSubCommand {
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private FinalizeSubCommand cmd;
+  private OzoneManagerProtocol omClient;
 
   @BeforeEach
-  public void setup() throws UnsupportedEncodingException {
-    cmd = new FinalizeSubCommand();
+  public void setup() throws IOException {
+    omClient = mock(OzoneManagerProtocol.class);
+
+    // Mock close() to do nothing - needed for try-with-resources
+    doNothing().when(omClient).close();
+
+    cmd = new FinalizeSubCommand() {
+      @Override
+      protected OzoneManagerProtocol getClient() throws Exception {
+        return omClient;
+      }
+    };
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
   }
 
@@ -55,14 +68,31 @@ public class TestFinalizeSubCommand {
   }
 
   @Test
-  public void testCommandRunsAndPrintsOutput() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-
+  public void testCommandRunsAndPrintsOutput() throws Exception {
     new CommandLine(cmd).parseArgs();
-    cmd.execute(scmClient);
+    cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Cluster finalization has been started"));
-    verify(scmClient).finalizeUpgrade();
+    verify(omClient).finalizeUpgrade();
+  }
+
+  @Test
+  public void testClientIsClosedAfterSuccessfulCall() throws Exception {
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    verify(omClient).close();
+  }
+
+  @Test
+  public void testExceptionFromServerIsPropagated() throws Exception {
+    doThrow(new IOException("OM unavailable")).when(omClient).finalizeUpgrade();
+
+    new CommandLine(cmd).parseArgs();
+    assertThrows(IOException.class, cmd::call);
+
+    // Client must still be closed even when finalizeUpgrade() throws.
+    verify(omClient).close();
   }
 }
