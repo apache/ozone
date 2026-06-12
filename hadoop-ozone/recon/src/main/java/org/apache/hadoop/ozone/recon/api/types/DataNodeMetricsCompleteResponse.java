@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
@@ -44,20 +45,13 @@ public class DataNodeMetricsCompleteResponse {
   @JsonProperty("pendingDeletionPerDataNode")
   private final List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode;
 
-  public DataNodeMetricsCompleteResponse() {
-    this.status = DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED;
-    this.totalNodesQueried = 0;
-    this.totalNodeQueryFailures = 0;
-    this.totalPendingDeletionSize = null;
-    this.pendingDeletionPerDataNode = null;
-  }
-
+  @JsonCreator
   public DataNodeMetricsCompleteResponse(
-      DataNodeMetricsService.MetricCollectionStatus status,
-      int totalNodesQueried,
-      long totalNodeQueriesFailed,
-      Long totalPendingDeletionSize,
-      List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode) {
+      @JsonProperty("status") DataNodeMetricsService.MetricCollectionStatus status,
+      @JsonProperty("totalNodesQueried") int totalNodesQueried,
+      @JsonProperty("totalNodeQueriesFailed") long totalNodeQueriesFailed,
+      @JsonProperty("totalPendingDeletionSize") Long totalPendingDeletionSize,
+      @JsonProperty("pendingDeletionPerDataNode") List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode) {
     this.status = status;
     this.totalNodesQueried = totalNodesQueried;
     this.totalNodeQueryFailures = totalNodeQueriesFailed;

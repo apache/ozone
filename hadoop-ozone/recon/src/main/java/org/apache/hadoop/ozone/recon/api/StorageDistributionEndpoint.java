@@ -180,6 +180,13 @@ public class StorageDistributionEndpoint {
 
     DataNodeMetricsCompleteResponse completeResponse =
         (DataNodeMetricsCompleteResponse) metricsResponse;
+
+    if (completeResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+      return Response.status(Response.Status.ACCEPTED)
+          .entity(completeResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
     List<DatanodePendingDeletionMetrics> pendingDeletionMetrics =
         completeResponse.getPendingDeletionPerDataNode();
 

@@ -89,7 +89,11 @@ public class PendingDeletionEndpoint {
 
     Object response = dataNodeMetricsService.getCollectedMetrics(limit);
     if (response instanceof DataNodeMetricsCompleteResponse) {
-      return Response.ok(response).build();
+      DataNodeMetricsCompleteResponse completeResponse = (DataNodeMetricsCompleteResponse) response;
+      if (completeResponse.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+        return Response.ok(completeResponse).build();
+      }
+      return Response.accepted(completeResponse).build();
     }
     return Response.accepted(response).build();
   }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
@@ -34,9 +35,10 @@ public class DataNodeMetricsProgressResponse {
   @JsonProperty("message")
   private final String message;
 
+  @JsonCreator
   public DataNodeMetricsProgressResponse(
-      DataNodeMetricsService.MetricCollectionStatus status,
-      String message) {
+      @JsonProperty("status") DataNodeMetricsService.MetricCollectionStatus status,
+      @JsonProperty("message") String message) {
     this.status = status;
     this.message = message;
   }
