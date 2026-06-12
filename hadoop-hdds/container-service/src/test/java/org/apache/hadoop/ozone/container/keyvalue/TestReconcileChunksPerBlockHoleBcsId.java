@@ -54,6 +54,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -97,6 +99,10 @@ public class TestReconcileChunksPerBlockHoleBcsId {
   private static final long LOCAL_BCSID = 1L;
   private static final long PEER_BCSID = 99L;
 
+  // conf and volumeSet are fields (not locals) because teardown needs them to release the
+  // RocksDB cache and the volumes opened in setup.
+  private OzoneConfiguration conf;
+  private MutableVolumeSet volumeSet;
   private ContainerSet containerSet;
   private KeyValueHandler handler;
   private KeyValueContainer container;
@@ -105,7 +111,7 @@ public class TestReconcileChunksPerBlockHoleBcsId {
 
   @BeforeEach
   public void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     Path dataVolume = Paths.get(tempDir.toString(), "data");
     Path metadataVolume = Paths.get(tempDir.toString(), "metadata");
     conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
@@ -113,7 +119,7 @@ public class TestReconcileChunksPerBlockHoleBcsId {
 
     containerSet = newContainerSet();
     DatanodeDetails localDn = randomDatanodeDetails();
-    MutableVolumeSet volumeSet = new MutableVolumeSet(localDn.getUuidString(), conf, null,
+    volumeSet = new MutableVolumeSet(localDn.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, CLUSTER_ID, CLUSTER_ID, conf);
 
@@ -125,6 +131,25 @@ public class TestReconcileChunksPerBlockHoleBcsId {
 
     dnClient = new DNContainerOperationClient(conf, null, null);
     peerPipeline = singleNodePipeline(randomDatanodeDetails());
+  }
+
+  @AfterEach
+  public void teardown() throws Exception {
+    // Release everything setup opened so threads, clients, and RocksDB handles do not leak across the
+    // suite. Guarded because setup may have failed partway. DNContainerOperationClient owns an
+    // XceiverClientManager; the handler owns chunk/block managers; the volume set owns the RocksDB cache.
+    if (dnClient != null) {
+      dnClient.close();
+    }
+    if (handler != null) {
+      handler.stop();
+    }
+    if (volumeSet != null) {
+      volumeSet.shutdown();
+    }
+    if (conf != null) {
+      BlockUtils.shutdownCache(conf);
+    }
   }
 
   /**
