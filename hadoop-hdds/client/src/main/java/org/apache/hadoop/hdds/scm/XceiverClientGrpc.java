@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -567,12 +569,38 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public void streamRead(ContainerCommandRequestProto request,
-      StreamingReadResponse streamObserver) {
+      StreamingReadResponse streamObserver) throws IOException {
+    final ClientCallStreamObserver<ContainerCommandRequestProto> obs = streamObserver.getRequestObserver();
+
+    if (!obs.isReady()) {
+      LOG.debug("->{}: flow control stall (isReady=false) for block={} offset={} length={}. Waiting.",
+          streamObserver,
+          request.getReadBlock().getBlockID().getLocalID(),
+          request.getReadBlock().getOffset(),
+          request.getReadBlock().getLength());
+      final long now = System.nanoTime();
+      final long callerDeadlineNs = streamObserver.getReadDeadlineNs();
+      final long waitTimeoutNanos = callerDeadlineNs > 0 ? Math.max(0, callerDeadlineNs - now)
+          : TimeUnit.SECONDS.toNanos(timeout);
+      final long deadlineNs = callerDeadlineNs > 0 ? callerDeadlineNs : now + waitTimeoutNanos;
+      while (!obs.isReady() && System.nanoTime() < deadlineNs) {
+        LockSupport.parkNanos(10_000_000L);
+        if (Thread.currentThread().isInterrupted()) {
+          Thread.currentThread().interrupt();
+          throw new InterruptedIOException("Interrupted while waiting for stream to become ready: " + streamObserver);
+        }
+      }
+      if (!obs.isReady()) {
+        throw new TimeoutIOException("Timed out waiting for stream to become ready after "
+            + TimeUnit.NANOSECONDS.toMillis(waitTimeoutNanos) + "ms");
+      }
+    }
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("->{}, send onNext request {}",
           streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
     }
-    streamObserver.getRequestObserver().onNext(request);
+    obs.onNext(request);
   }
 
   @Override

@@ -31,6 +31,13 @@ public class StreamingReadResponse {
   private final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
   private final String name;
 
+  /**
+   * Deadline (System.nanoTime) for the current wait. Set before streamRead() to bound the
+   * isReady() flow-control wait, then refreshed afterwards to bound the response wait in poll().
+   * Zero falls back to the client-level read timeout.
+   */
+  private volatile long readDeadlineNs;
+
   public StreamingReadResponse(DatanodeDetails dn,
       ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver) {
     this.dn = dn;
@@ -38,6 +45,14 @@ public class StreamingReadResponse {
 
     final String s = dn.getID().toString();
     this.name = "dn" + s.substring(s.lastIndexOf('-')) + "_stream";
+  }
+
+  public void setReadDeadlineNs(long deadlineNs) {
+    this.readDeadlineNs = deadlineNs;
+  }
+
+  public long getReadDeadlineNs() {
+    return readDeadlineNs;
   }
 
   public DatanodeDetails getDatanodeDetails() {
