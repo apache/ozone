@@ -63,7 +63,6 @@ public class TestReconContainerEndpoint {
   private OzoneClient client;
   private ObjectStore store;
   private ReconService recon;
-  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void init() throws Exception {
@@ -121,7 +120,7 @@ public class TestReconContainerEndpoint {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        ReconOmMetaManagerTestUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
     waitUntilReconIndexesKeysForPaths(volName, bucketName,
@@ -192,7 +191,7 @@ public class TestReconContainerEndpoint {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        ReconOmMetaManagerTestUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
     waitUntilReconIndexesKeysForPaths(volumeName, obsBucketName, obsSingleFileKey);
@@ -252,7 +251,7 @@ public class TestReconContainerEndpoint {
     }
     ReconContainerMetadataManager mgr =
         recon.getReconServer().getReconContainerMetadataManager();
-    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(mgr, requiredCountByContainer);
+    ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts(mgr, requiredCountByContainer);
   }
 
   private long getContainerIdForKey(String volumeName, String bucketName,

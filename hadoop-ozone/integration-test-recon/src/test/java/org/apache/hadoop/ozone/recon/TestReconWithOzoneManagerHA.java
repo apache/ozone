@@ -66,7 +66,6 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
   private ReconService recon;
-  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -144,7 +143,7 @@ public class TestReconWithOzoneManagerHA {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        ReconOmMetaManagerTestUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
@@ -152,7 +151,7 @@ public class TestReconWithOzoneManagerHA {
     long containerId = getContainerIdForKey(ozoneManager.get(), VOL_NAME, VOL_NAME, keyPrefix);
     Map<Long, Integer> requiredKeyCountByContainer =
         Collections.singletonMap(containerId, 1);
-    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+    ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
         requiredKeyCountByContainer);
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
