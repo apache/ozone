@@ -56,6 +56,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,6 +95,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
@@ -496,6 +498,11 @@ public class TestOmSnapshotLocalDataManager {
     }
   }
 
+  /**
+   * Verifies that removing versions from a descendant immediately exposes orphan
+   * versions in older snapshots, and that direct cascade checks can clean them in
+   * the same call whether the middle snapshot is purged or still active.
+   */
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testOrphanVersionDeletionWithVersionDeletion(boolean purgeSnapshot) throws IOException {
@@ -511,13 +518,20 @@ public class TestOmSnapshotLocalDataManager {
     assertEquals(new HashSet<>(snapshotIds), localDataManager.getSnapshotToBeCheckedForOrphans().keySet());
     localDataManager.getSnapshotToBeCheckedForOrphans().clear();
     purgedSnapshotIdMap.put(secondSnapId, purgeSnapshot);
-    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, thirdSnapId);
+    invokeCascadeOrphanCheck(null, thirdSnapId);
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(thirdSnapId)) {
       OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
       assertEquals(Sets.newHashSet(0, 13), snapshotLocalData.getVersionSstFileInfos().keySet());
     }
-    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
-    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, secondSnapId);
+    if (purgeSnapshot) {
+      validateVersions(localDataManager, secondSnapId, 11, Sets.newHashSet(0, 10));
+    } else {
+      validateVersions(localDataManager, secondSnapId, 11, Sets.newHashSet(0, 10, 11));
+    }
+    validateVersions(localDataManager, firstSnapId, 3, Sets.newHashSet(0, 3));
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(firstSnapId));
+    invokeCascadeOrphanCheck(null, secondSnapId);
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
       OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
       if (purgeSnapshot) {
@@ -528,6 +542,11 @@ public class TestOmSnapshotLocalDataManager {
     }
   }
 
+  /**
+   * Verifies that changing a snapshot's previous-snapshot link queues the detached
+   * middle snapshot for orphan cleanup and that a direct cascade removes its YAML
+   * only when the snapshot is also purged.
+   */
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testOrphanVersionDeletionWithChainUpdate(boolean purgeSnapshot) throws IOException {
@@ -552,7 +571,7 @@ public class TestOmSnapshotLocalDataManager {
     }
 
     assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
-    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, secondSnapId);
+    invokeCascadeOrphanCheck(null, secondSnapId);
     if (purgeSnapshot) {
       assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
@@ -1062,7 +1081,7 @@ public class TestOmSnapshotLocalDataManager {
     SnapshotChainManager staleChain = mock(SnapshotChainManager.class);
     when(staleChain.getTableKey(snapshotId)).thenReturn(null);
 
-    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, staleChain, snapshotId);
+    invokeCascadeOrphanCheck(staleChain, snapshotId);
 
     // Before the fix: isSnapshotPurged returned true for any null tableKey, so the snapshot
     // was removed from versionNodeMap. getMeta() then returned null, causing NullPointerException
@@ -1108,9 +1127,15 @@ public class TestOmSnapshotLocalDataManager {
 
   private SnapshotInfo createMockSnapshotInfo(UUID snapshotId, UUID previousSnapshotId,
       SnapshotInfo.SnapshotStatus snapshotStatus) {
+    return createMockSnapshotInfo(snapshotId, previousSnapshotId, snapshotStatus, 0L);
+  }
+
+  private SnapshotInfo createMockSnapshotInfo(UUID snapshotId, UUID previousSnapshotId,
+      SnapshotInfo.SnapshotStatus snapshotStatus, long creationTime) {
     SnapshotInfo.Builder builder = SnapshotInfo.newBuilder()
         .setSnapshotId(snapshotId)
-        .setName("snapshot-" + snapshotId);
+        .setName("snapshot-" + snapshotId)
+        .setCreationTime(creationTime);
     builder.setSnapshotStatus(snapshotStatus == null ? SNAPSHOT_ACTIVE : snapshotStatus);
     if (previousSnapshotId != null) {
       builder.setPathPreviousSnapshotId(previousSnapshotId);
@@ -1162,36 +1187,272 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   /**
-   * Tests the fix for the NoSuchFileException : when a purged snapshot (last in chain)
-   * has all its versions removed and YAML deleted by orphan check, it must NOT be
-   * re-added to snapshotToBeCheckedForOrphans. Otherwise the next orphan check run
-   * would try to load the deleted YAML and throw NoSuchFileException.
-   *
+   * Verifies that a purged leaf whose YAML was fully deleted is not re-queued for a
+   * later orphan-cleanup pass, which would otherwise try to reload a missing file.
    */
   @Test
   public void testPurgedSnapshotNotReAddedAfterYamlDeleted() throws Exception {
     localDataManager = getNewOmSnapshotLocalDataManager();
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
     UUID secondSnapId = snapshotIds.get(1);
-    // Simulate purge: set transactionInfo on S2's YAML (purge does this before orphan check runs)
-    try (WritableOmSnapshotLocalDataProvider writableProvider =
-             localDataManager.getWritableOmSnapshotLocalData(secondSnapId)) {
-      writableProvider.setTransactionInfo(TransactionInfo.valueOf(1, 1));
-      writableProvider.commit();
-    }
-    // S2 is last in chain - mark as purged so all versions get removed
-    purgedSnapshotIdMap.put(secondSnapId, true);
-    // Simulate purge adding S2 to orphan check list
+    markSnapshotsPurged(ImmutableList.of(secondSnapId));
     localDataManager.getSnapshotToBeCheckedForOrphans().clear();
     localDataManager.getSnapshotToBeCheckedForOrphans().put(secondSnapId, 1);
-    // Run full orphan check
-    java.lang.reflect.Method method = OmSnapshotLocalDataManager.class.getDeclaredMethod(
-        "checkOrphanSnapshotVersions", OMMetadataManager.class,
-        org.apache.hadoop.ozone.om.SnapshotChainManager.class);
-    method.setAccessible(true);
-    method.invoke(localDataManager, omMetadataManager, null);
-    // S2 should NOT be in the map
+    invokeQueuedOrphanCheck();
     assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId),
         "Purged snapshot should not be re-added after YAML deleted");
+  }
+
+  /**
+   * Verifies the direct cascade path: once the newest purged snapshot is removed,
+   * cleanup walks to older snapshots in the same call and deletes all eligible YAMLs.
+   */
+  @Test
+  public void testPurgedSnapshotCascadeCleanupRemovesAncestorsInSameRun() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    markSnapshotsPurged(snapshotIds);
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+
+    // Simulate the ancestor being checked earlier in the same run while its descendant still exists.
+    invokeCascadeOrphanCheck(null, secondSnapId);
+    assertTrue(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
+    assertTrue(localDataManager.getVersionNodeMapUnmodifiable().containsKey(firstSnapId));
+
+    // Once the leaf is removed, cleanup should cascade immediately to its ancestors.
+    invokeCascadeOrphanCheck(null, thirdSnapId);
+
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(thirdSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(firstSnapId));
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(thirdSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(firstSnapId)).exists());
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(firstSnapId));
+  }
+
+  /**
+   * Verifies the queued drain path: even when only the leaf is seeded in the shared
+   * queue, the drain should cascade through ancestors and delete all eligible YAMLs
+   * in the same scheduler pass.
+   */
+  @Test
+  public void testBatchOrphanCheckCascadesFromLeafToAncestorsInSameRun() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    markSnapshotsPurged(snapshotIds);
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+    localDataManager.getSnapshotToBeCheckedForOrphans().put(thirdSnapId, 1);
+
+    invokeQueuedOrphanCheck();
+
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(thirdSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(firstSnapId));
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(thirdSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(firstSnapId)).exists());
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().isEmpty());
+  }
+
+  /**
+   * Verifies that stale ancestor seeds left in the original batch snapshot are ignored
+   * after an earlier descendant cascade has already removed them.
+   */
+  @Test
+  public void testBatchOrphanCheckSkipsSnapshotsRemovedByEarlierCascade() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    markSnapshotsPurged(snapshotIds);
+    setSnapshotsToBeCheckedForOrphansInOrder(thirdSnapId, secondSnapId, firstSnapId);
+
+    invokeQueuedOrphanCheck();
+
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(thirdSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
+    assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(firstSnapId));
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(thirdSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)).exists());
+    assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(firstSnapId)).exists());
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().isEmpty());
+  }
+
+  /**
+   * Verifies that a purged snapshot which still has referenced local versions is checked
+   * only once in the current drain and remains queued for the next scheduler run.
+   */
+  @Test
+  public void testQueuedOrphanCheckDefersRetriedSnapshotToNextRun() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    addVersionsToLocalData(localDataManager, firstSnapId, ImmutableMap.of(1, 1, 2, 2, 3, 3));
+    addVersionsToLocalData(localDataManager, secondSnapId, ImmutableMap.of(4, 2, 8, 1, 10, 3, 11, 3));
+    addVersionsToLocalData(localDataManager, thirdSnapId, ImmutableMap.of(5, 8, 13, 10));
+    markSnapshotsPurged(ImmutableList.of(secondSnapId));
+    setSnapshotsToBeCheckedForOrphansInOrder(thirdSnapId, secondSnapId);
+
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmSnapshotLocalDataManager.class);
+    try {
+      invokeQueuedOrphanCheck();
+    } finally {
+      logCapturer.stopCapturing();
+    }
+
+    String checkLog = "Checking orphan snapshot versions for snapshot " + secondSnapId;
+    assertEquals(1, countOccurrences(logCapturer.getOutput(), checkLog));
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
+    validateVersions(localDataManager, secondSnapId, 11, Sets.newHashSet(0, 10));
+    validateVersions(localDataManager, firstSnapId, 3, Sets.newHashSet(0, 3));
+  }
+
+  /**
+   * Verifies that the initial batch seeds are processed from newest to oldest when
+   * creation-time metadata is available, avoiding an unnecessary early check of an
+   * older ancestor that is already queued ahead of its descendant.
+   */
+  @Test
+  public void testQueuedOrphanCheckSortsInitialSeedsByCreationTimeDescending() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    markSnapshotsPurged(snapshotIds);
+    setSnapshotsToBeCheckedForOrphansInOrder(secondSnapId, thirdSnapId);
+
+    SnapshotChainManager chainManager = mockSnapshotInfoChain(snapshotIds);
+
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmSnapshotLocalDataManager.class);
+    try {
+      invokeQueuedOrphanCheck(chainManager);
+    } finally {
+      logCapturer.stopCapturing();
+    }
+
+    String logs = logCapturer.getOutput();
+    String secondCheckLog = "Checking orphan snapshot versions for snapshot " + secondSnapId;
+    String thirdCheckLog = "Checking orphan snapshot versions for snapshot " + thirdSnapId;
+    assertEquals(1, countOccurrences(logs, secondCheckLog));
+    assertTrue(logs.indexOf(thirdCheckLog) < logs.indexOf(secondCheckLog));
+  }
+
+  /**
+   * Regression test for the original six-snapshot incident shape. All queued purged
+   * snapshots should have their YAMLs deleted in a single drain, and each snapshot
+   * should be checked only once when the newest-first seed ordering is applied.
+   */
+  @Test
+  public void testQueuedOrphanCheckRemovesSixPurgedSnapshotsInOneRunWithoutDuplicateChecks()
+      throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 6);
+
+    markSnapshotsPurged(snapshotIds);
+    setSnapshotsToBeCheckedForOrphansInOrder(snapshotIds.toArray(new UUID[0]));
+    SnapshotChainManager chainManager = mockSnapshotInfoChain(snapshotIds);
+
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmSnapshotLocalDataManager.class);
+    try {
+      invokeQueuedOrphanCheck(chainManager);
+    } finally {
+      logCapturer.stopCapturing();
+    }
+
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().isEmpty());
+    for (UUID snapshotId : snapshotIds) {
+      assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(snapshotId));
+      assertFalse(new File(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotId)).exists());
+      String checkLog = "Checking orphan snapshot versions for snapshot " + snapshotId;
+      assertEquals(1, countOccurrences(logCapturer.getOutput(), checkLog));
+    }
+  }
+
+  private void markSnapshotsPurged(List<UUID> snapshotIds) throws IOException {
+    for (UUID snapshotId : snapshotIds) {
+      try (WritableOmSnapshotLocalDataProvider writableProvider =
+               localDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
+        writableProvider.setTransactionInfo(TransactionInfo.valueOf(1, 1));
+        writableProvider.commit();
+      }
+      purgedSnapshotIdMap.put(snapshotId, true);
+    }
+  }
+
+  private void setSnapshotsToBeCheckedForOrphansInOrder(UUID... snapshotIds) throws Exception {
+    LinkedHashMap<UUID, Integer> snapshotsToCheck = new LinkedHashMap<>();
+    for (UUID snapshotId : snapshotIds) {
+      snapshotsToCheck.put(snapshotId, 1);
+    }
+    java.lang.reflect.Field field = OmSnapshotLocalDataManager.class.getDeclaredField(
+        "snapshotToBeCheckedForOrphans");
+    field.setAccessible(true);
+    field.set(localDataManager, snapshotsToCheck);
+  }
+
+  private SnapshotChainManager mockSnapshotInfoChain(List<UUID> snapshotIds) throws Exception {
+    Table<String, SnapshotInfo> table = new StringInMemoryTestTable<>();
+    when(omMetadataManager.getSnapshotInfoTable()).thenReturn(table);
+    SnapshotChainManager chainManager = mock(SnapshotChainManager.class);
+    UUID previousSnapshotId = null;
+    long creationTime = 1L;
+    for (UUID snapshotId : snapshotIds) {
+      putSnapshotInfo(table, chainManager, snapshotId, previousSnapshotId, creationTime++);
+      previousSnapshotId = snapshotId;
+    }
+    return chainManager;
+  }
+
+  private void putSnapshotInfo(Table<String, SnapshotInfo> table, SnapshotChainManager chainManager,
+      UUID snapshotId, UUID previousSnapshotId, long creationTime) throws Exception {
+    String tableKey = "table-key-" + snapshotId;
+    table.put(tableKey, createMockSnapshotInfo(snapshotId, previousSnapshotId,
+        SNAPSHOT_ACTIVE, creationTime));
+    when(chainManager.getTableKey(snapshotId)).thenReturn(tableKey);
+  }
+
+  private void invokeQueuedOrphanCheck(SnapshotChainManager chainManager) throws Exception {
+    java.lang.reflect.Method method = OmSnapshotLocalDataManager.class.getDeclaredMethod(
+        "checkQueuedOrphanSnapshotVersions", OMMetadataManager.class,
+        org.apache.hadoop.ozone.om.SnapshotChainManager.class);
+    method.setAccessible(true);
+    method.invoke(localDataManager, omMetadataManager, chainManager);
+  }
+
+  private void invokeQueuedOrphanCheck() throws Exception {
+    invokeQueuedOrphanCheck(null);
+  }
+
+  private void invokeCascadeOrphanCheck(SnapshotChainManager chainManager,
+      UUID snapshotId) throws IOException {
+    localDataManager.cascadeOrphanSnapshotChecksFrom(omMetadataManager, chainManager,
+        snapshotId, new HashSet<>());
+  }
+
+  private int countOccurrences(String content, String needle) {
+    int count = 0;
+    int startIndex = 0;
+    while ((startIndex = content.indexOf(needle, startIndex)) >= 0) {
+      count++;
+      startIndex += needle.length();
+    }
+    return count;
   }
 }
