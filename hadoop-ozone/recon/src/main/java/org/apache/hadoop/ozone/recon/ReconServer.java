@@ -217,9 +217,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     }
 
     try {
-      // TODO HDDS-15482 If Recon gets a heartbeat from a finalized DN with the same software version,
-      //  it should finalize its HDDS version. Currently this is being finalized on startup meaning that Recon's
-      //  apparent HDDS version will be ahead of SCM and DN until the rest of the cluster is finalized.
       reconStorageContainerManager.finalizeScmVersionUpgrade();
     } catch (UpgradeException e) {
       LOG.error("Failed to finalize Recon SCM apparent version.", e);
