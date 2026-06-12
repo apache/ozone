@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
  */
 public class OMVersionManager extends RatisBasedVersionManager {
 
+  private final OMStorage storage;
   private final Map<ComponentVersion, OmUpgradeAction> upgradeActions;
 
   // The OM may not be fully initialized when the version manager is constructed. This field is just provided as an
@@ -46,9 +47,21 @@ public class OMVersionManager extends RatisBasedVersionManager {
   @VisibleForTesting
   public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
       ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider) throws IOException {
-    super(storage, computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);
+    super(computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);
+    this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
+  }
+
+  @Override
+  protected void persistApparentVersion(ComponentVersion newVersion) throws IOException {
+    storage.setApparentVersion(newVersion.serialize());
+    storage.persistCurrentState();
+  }
+
+  @Override
+  public int getPersistedApparentVersion() {
+    return storage.getApparentVersion();
   }
 
   @VisibleForTesting

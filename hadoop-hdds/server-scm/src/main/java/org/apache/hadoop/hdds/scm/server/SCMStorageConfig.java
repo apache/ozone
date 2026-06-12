@@ -47,8 +47,7 @@ public class SCMStorageConfig extends Storage {
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
     super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
-        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY,
-            HDDSVersion.SOFTWARE_VERSION::serialize));
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY, HDDSVersion.SOFTWARE_VERSION::serialize));
   }
 
   public SCMStorageConfig(NodeType type, File root, String sdName)

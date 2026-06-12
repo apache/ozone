@@ -212,6 +212,7 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
       UpgradeException thrown = assertThrows(UpgradeException.class, versionManager::finalizeUpgrade);
       assertEquals(UpgradeException.ResultCodes.APPARENT_VERSION_UPDATE_FAILED, thrown.getResult());
       assertEquals(INITIAL_VERSION, versionManager.getApparentVersion());
+      assertEquals(INITIAL_VERSION.serialize(), versionManager.getPersistedApparentVersion());
       assertEquals(INITIAL_VERSION.serialize(), storage.getApparentVersion());
     }
   }

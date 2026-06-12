@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
  */
 public class ScmVersionManager extends RatisBasedVersionManager {
 
+  private final SCMStorageConfig storage;
   private final Map<ComponentVersion, ScmUpgradeAction> upgradeActions;
   private final OzoneStorageContainerManager upgradeActionArg;
 
@@ -48,10 +49,22 @@ public class ScmVersionManager extends RatisBasedVersionManager {
       OzoneStorageContainerManager upgradeActionArg,
       ComponentUpgradeActionProvider<ScmUpgradeAction> upgradeActionProvider)
       throws IOException {
-    super(storage, HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
+    super(HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
         HDDSVersion.SOFTWARE_VERSION);
+    this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
+  }
+
+  @Override
+  protected void persistApparentVersion(ComponentVersion newVersion) throws IOException {
+    storage.setApparentVersion(newVersion.serialize());
+    storage.persistCurrentState();
+  }
+
+  @Override
+  public int getPersistedApparentVersion() {
+    return storage.getApparentVersion();
   }
 
   @VisibleForTesting
