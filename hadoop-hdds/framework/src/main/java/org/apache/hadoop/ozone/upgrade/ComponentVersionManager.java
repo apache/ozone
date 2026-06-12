@@ -99,7 +99,6 @@ public abstract class ComponentVersionManager implements Closeable {
 
       LOG.info("Version {} has been finalized.", newVersion);
     }
-    LOG.info("Finalization is complete.");
   }
 
   /**

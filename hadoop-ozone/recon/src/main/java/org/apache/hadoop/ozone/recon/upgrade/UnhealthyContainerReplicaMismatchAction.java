@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
+import static org.apache.hadoop.ozone.recon.upgrade.ReconVersion.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
-import static org.jooq.impl.DSL.name;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -80,7 +79,7 @@ public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeActi
 
     dslContext.alterTable(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME)
         .add(DSL.constraint(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
-            .check(field(name("container_state"))
+            .check(field(DSL.name("container_state"))
                 .in(enumStates)))
         .execute();
 
