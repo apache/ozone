@@ -24,6 +24,7 @@
   <packaging>jar</packaging>
   <name>Apache Ozone FS Hadoop 3.x compatibility</name>
   <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
   </properties>

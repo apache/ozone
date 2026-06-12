@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Hadoop Client dependencies</name>
   <description>Apache Ozone Distributed Data Store Hadoop client dependencies</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
+
   <dependencyManagement>
     <dependencies>
       <dependency>

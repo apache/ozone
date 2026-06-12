@@ -27,6 +27,8 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <!-- hdds-server-framework is used by ozone-cli-admin -->
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>
