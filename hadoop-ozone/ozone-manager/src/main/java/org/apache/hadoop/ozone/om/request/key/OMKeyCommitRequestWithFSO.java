@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -346,6 +347,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omKeyInfo, fileName, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
+          .setModificationTime(commitKeyArgs.getModificationTime())
+          .build());
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
