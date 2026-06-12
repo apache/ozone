@@ -60,10 +60,9 @@ public class PrepareSubCommand implements Callable<Void> {
       names = {"--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
-      defaultValue = "120",
       hidden = true
   )
-  private long txnApplyWaitTimeSeconds;
+  private Long txnApplyWaitTimeSeconds;
 
   /** For backward compatibility. */
   @CommandLine.Option(
@@ -78,10 +77,9 @@ public class PrepareSubCommand implements Callable<Void> {
       names = {"--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
           "all transactions to be applied to the OM DB.",
-      defaultValue = "5",
       hidden = true
   )
-  private long txnApplyCheckIntervalSeconds;
+  private Long txnApplyCheckIntervalSeconds;
 
   /** For backward compatibility. */
   @CommandLine.Option(
@@ -96,10 +94,9 @@ public class PrepareSubCommand implements Callable<Void> {
       names = {"--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
           " preparation.",
-      defaultValue = "10",
       hidden = true
   )
-  private long prepareCheckInterval;
+  private Long prepareCheckInterval;
 
   /** For backward compatibility. */
   @CommandLine.Option(
@@ -113,10 +110,9 @@ public class PrepareSubCommand implements Callable<Void> {
   @CommandLine.Option(
       names = {"--prepare-timeout"},
       description = "Max time in SECONDS to wait for all OMs to be prepared",
-      defaultValue = "300",
       hidden = true
   )
-  private long prepareTimeOut;
+  private Long prepareTimeOut;
 
   /** For backward compatibility. */
   @CommandLine.Option(
@@ -206,27 +202,29 @@ public class PrepareSubCommand implements Callable<Void> {
   }
 
   private long getTxnApplyWaitTimeSeconds() {
-    return deprecatedTxnApplyWaitTimeSeconds != null
-        ? deprecatedTxnApplyWaitTimeSeconds
-        : txnApplyWaitTimeSeconds;
+    return resolveOption(txnApplyWaitTimeSeconds, deprecatedTxnApplyWaitTimeSeconds, 120L);
   }
 
   private long getTxnApplyCheckIntervalSeconds() {
-    return deprecatedTxnApplyCheckIntervalSeconds != null
-        ? deprecatedTxnApplyCheckIntervalSeconds
-        : txnApplyCheckIntervalSeconds;
+    return resolveOption(txnApplyCheckIntervalSeconds, deprecatedTxnApplyCheckIntervalSeconds, 5L);
   }
 
   private long getPrepareCheckInterval() {
-    return deprecatedPrepareCheckInterval != null
-        ? deprecatedPrepareCheckInterval
-        : prepareCheckInterval;
+    return resolveOption(prepareCheckInterval, deprecatedPrepareCheckInterval, 10L);
   }
 
   private long getPrepareTimeOut() {
-    return deprecatedPrepareTimeOut != null
-        ? deprecatedPrepareTimeOut
-        : prepareTimeOut;
+    return resolveOption(prepareTimeOut, deprecatedPrepareTimeOut, 300L);
+  }
+
+  private static long resolveOption(Long value, Long deprecatedValue, long defaultValue) {
+    if (value != null) {
+      return value;
+    }
+    if (deprecatedValue != null) {
+      return deprecatedValue;
+    }
+    return defaultValue;
   }
 
 }

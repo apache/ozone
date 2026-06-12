@@ -36,11 +36,11 @@ public final class DeprecatedCliOption {
   private static Map<String, String> buildDeprecatedOptions() {
     Map<String, String> options = new LinkedHashMap<>();
     options.put("-conf", "--conf");
-    options.put("-id", "--service-id or --om-service-id");
+    options.put("-id", "--service-id");
     options.put("-host", "--service-host");
     options.put("-nodeid", "--nodeid");
     options.put("-hostname", "--node-host-address");
-    options.put("-al", "--acls or --acl");
+    options.put("-al", "--acls");
     options.put("-ffc", "--filter-by-factor");
     options.put("-fst", "--filter-by-state");
     options.put("-tawt", "--transaction-apply-wait-timeout");
@@ -57,10 +57,16 @@ public final class DeprecatedCliOption {
     if (parseResult == null) {
       return;
     }
-    PrintWriter err = parseResult.commandSpec().commandLine().getErr();
-    for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
-      if (parseResult.hasMatchedOption(entry.getKey())) {
-        warn(err, entry.getKey(), entry.getValue());
+
+    for (CommandLine cli : parseResult.asCommandLineList()) {
+      CommandLine.ParseResult subcommandResult = cli.getParseResult();
+      if (subcommandResult.matchedOptions().isEmpty()) {
+        continue;
+      }
+      for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
+        if (subcommandResult.hasMatchedOption(entry.getKey())) {
+          warn(cli.getErr(), entry.getKey(), entry.getValue());
+        }
       }
     }
   }

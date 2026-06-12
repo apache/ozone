@@ -73,9 +73,10 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     if (replicationFilter.isPresent()) {
       stream = stream.filter(replicationFilter.get());
     }
-    if (!Strings.isNullOrEmpty(getState())) {
+    String effectiveState = getState();
+    if (!Strings.isNullOrEmpty(effectiveState)) {
       stream = stream.filter(p -> p.getPipelineState().toString()
-          .compareToIgnoreCase(getState()) == 0);
+          .compareToIgnoreCase(effectiveState) == 0);
     }
 
     if (json) {

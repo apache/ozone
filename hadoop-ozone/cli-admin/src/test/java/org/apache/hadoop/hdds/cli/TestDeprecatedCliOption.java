@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import org.apache.hadoop.hdds.scm.cli.pipeline.ListPipelinesSubcommand;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
@@ -30,18 +31,27 @@ import picocli.CommandLine;
  */
 public class TestDeprecatedCliOption {
 
-  @Test
-  public void warnsForDeprecatedOption() {
-    ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
-    StringWriter err = new StringWriter();
-    CommandLine cli = new CommandLine(cmd);
+  private StringWriter err;
+
+  @BeforeEach
+  public void setup() {
+    err = new StringWriter();
+  }
+
+  private CommandLine createCommandLine(Object command) {
+    CommandLine cli = new CommandLine(command);
     cli.setErr(new PrintWriter(err, true));
     cli.setExecutionStrategy(parseResult -> {
       DeprecatedCliOption.warnIfMatched(parseResult);
       return CommandLine.ExitCode.OK;
     });
+    return cli;
+  }
 
-    cli.execute("-ffc", "THREE");
+  @Test
+  public void warnsForDeprecatedOption() {
+    createCommandLine(new ListPipelinesSubcommand())
+        .execute("-ffc", "THREE");
 
     assertThat(err.toString())
         .contains("WARNING: Option '-ffc' is deprecated")
@@ -50,16 +60,8 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void warnsForMultipleDeprecatedOptions() {
-    ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
-    StringWriter err = new StringWriter();
-    CommandLine cli = new CommandLine(cmd);
-    cli.setErr(new PrintWriter(err, true));
-    cli.setExecutionStrategy(parseResult -> {
-      DeprecatedCliOption.warnIfMatched(parseResult);
-      return CommandLine.ExitCode.OK;
-    });
-
-    cli.execute("-ffc", "THREE", "-fst", "OPEN");
+    createCommandLine(new ListPipelinesSubcommand())
+        .execute("-ffc", "THREE", "-fst", "OPEN");
 
     assertThat(err.toString())
         .contains("WARNING: Option '-ffc' is deprecated")
@@ -68,16 +70,8 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void doesNotWarnForLongOption() {
-    ListPipelinesSubcommand cmd = new ListPipelinesSubcommand();
-    StringWriter err = new StringWriter();
-    CommandLine cli = new CommandLine(cmd);
-    cli.setErr(new PrintWriter(err, true));
-    cli.setExecutionStrategy(parseResult -> {
-      DeprecatedCliOption.warnIfMatched(parseResult);
-      return CommandLine.ExitCode.OK;
-    });
-
-    cli.execute("--filter-by-factor", "THREE");
+    createCommandLine(new ListPipelinesSubcommand())
+        .execute("--filter-by-factor", "THREE");
 
     assertThat(err.toString()).isEmpty();
   }

@@ -46,6 +46,9 @@ public abstract class GenericCli implements GenericParentCommand {
 
   private UserGroupInformation user;
 
+  private String configurationPath;
+  private String deprecatedConfigurationPath;
+
   @Option(names = {"--verbose"},
       scope = CommandLine.ScopeType.INHERIT,
       description = "More verbose output. Show the stack trace of the errors.")
@@ -59,7 +62,7 @@ public abstract class GenericCli implements GenericParentCommand {
   @Option(names = {"--conf"},
       description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
-    config.addResource(new Path(configPath));
+    configurationPath = configPath;
   }
 
   /** For backward compatibility. */
@@ -67,7 +70,14 @@ public abstract class GenericCli implements GenericParentCommand {
   @Deprecated
   @SuppressWarnings("DeprecatedIsStillUsed")
   public void setDeprecatedConfigurationPath(String configPath) {
-    setConfigurationPath(configPath);
+    deprecatedConfigurationPath = configPath;
+  }
+
+  private String getConfigurationPath() {
+    if (configurationPath != null) {
+      return configurationPath;
+    }
+    return deprecatedConfigurationPath;
   }
 
   public GenericCli() {
@@ -124,6 +134,10 @@ public abstract class GenericCli implements GenericParentCommand {
 
   @Override
   public OzoneConfiguration getOzoneConf() {
+    String path = getConfigurationPath();
+    if (path != null) {
+      config.addResource(new Path(path));
+    }
     return config;
   }
 
