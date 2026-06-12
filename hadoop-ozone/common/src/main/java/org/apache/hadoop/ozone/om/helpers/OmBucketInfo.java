@@ -267,7 +267,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
   }
 
-  private void incrSnapshotUsedBytes(long bytes) {
+  public void incrSnapshotUsedBytes(long bytes) {
     this.snapshotUsedBytes += bytes;
   }
 
@@ -282,7 +282,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
   }
 
-  private void incrSnapshotUsedNamespace(long namespaceToUse) {
+  public void incrSnapshotUsedNamespace(long namespaceToUse) {
     this.snapshotUsedNamespace += namespaceToUse;
   }
 
