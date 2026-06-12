@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
 
 import java.io.File;
@@ -36,6 +37,17 @@ import org.apache.hadoop.ozone.common.Storage;
  * StorageDirectories used by the DataNode.
  */
 public class DatanodeStorage extends Storage {
+
+  /**
+   * Testing-only config key to override the initial apparent version written
+   * to disk when the datanode has no existing VERSION file. Set to a value
+   * below {@link HDDSVersion#SOFTWARE_VERSION} to simulate a pre-finalization
+   * state without performing an actual upgrade. Should not be set in
+   * production.
+   */
+  public static final String TESTING_INIT_APPARENT_VERSION_KEY =
+      "testing.hdds.datanode.init.apparent.version";
+
   /**
    * Construct DataNodeStorageConfig.
    * @throws IOException if any directories are inaccessible.
@@ -94,6 +106,12 @@ public class DatanodeStorage extends Storage {
    * layout version is found on disk.
    */
   private static int getDefaultApparentVersion(ConfigurationSource conf) {
+    int override = conf.getInt(TESTING_INIT_APPARENT_VERSION_KEY,
+        OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
+    if (override >= 0) {
+      return override;
+    }
+
     int defaultApparentVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
