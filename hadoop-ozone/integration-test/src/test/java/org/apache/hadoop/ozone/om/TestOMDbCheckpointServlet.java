@@ -32,6 +32,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
@@ -47,6 +50,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -54,7 +59,6 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -63,11 +67,14 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Sets;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,10 +83,12 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -105,14 +114,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -532,8 +544,9 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
     try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
+      HttpServletResponse responseMock = mockHttpServletResponse(fileOutputStream);
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new HashSet<>(), tmpdir);
+          responseMock, new HashSet<>(), tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -577,8 +590,9 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
     try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
+      HttpServletResponse responseMock = mockHttpServletResponse(fileOutputStream);
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList, tmpdir);
+          responseMock, toExcludeList, tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -596,6 +610,33 @@ public class TestOMDbCheckpointServlet {
 
     initialCheckpointSet.removeAll(finalCheckpointSet);
     assertThat(initialCheckpointSet).contains(dummyFile.getName());
+  }
+
+  private static HttpServletResponse mockHttpServletResponse(OutputStream out)
+      throws IOException {
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    ServletOutputStream sos = new ServletOutputStream() {
+      @Override
+      public void write(int b) throws IOException {
+        out.write(b);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        out.write(b, off, len);
+      }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+      }
+    };
+    when(response.getOutputStream()).thenReturn(sos);
+    return response;
   }
 
   /**
