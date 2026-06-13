@@ -23,10 +23,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,9 +39,14 @@ import java.util.List;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -219,6 +226,90 @@ public class TestOMFailoverProxyProvider {
       assertEquals(attempt * waitBetweenRetries,
           provider.getWaitTime());
     }
+  }
+
+  /**
+   * The retry policy must use the suggested-leader hint to set the next
+   * proxy directly to that node, instead of advancing one step in the
+   * round-robin order. The test cluster has [omNode-1, omNode-2, omNode-3]
+   * and starts at omNode-1, so round-robin would land on omNode-2 — the
+   * hint must skip ahead to omNode-3 to make this distinguishable.
+   */
+  @Test
+  public void testHintDrivesFailoverToSuggestedLeader() throws Exception {
+    String currentNodeId = provider.getCurrentProxyOMNodeId();
+    String roundRobinDestination = pickAdjacentNodeId(currentNodeId);
+    String suggestedNodeId = pickNonAdjacentNodeId(currentNodeId);
+    assertNotEquals(roundRobinDestination, suggestedNodeId,
+        "test setup needs the hint destination to differ from round-robin");
+
+    OMNotLeaderException notLeader = new OMNotLeaderException(
+        RaftPeerId.valueOf(currentNodeId),
+        RaftPeerId.valueOf(suggestedNodeId),
+        DUMMY_NODE_ADDR,
+        null);
+    ServiceException wireEx = new ServiceException(new RemoteException(
+        OMNotLeaderException.class.getName(), notLeader.getMessage()));
+
+    RetryPolicy.RetryAction action =
+        provider.getRetryPolicy(10).shouldRetry(wireEx, 0, 0, true);
+
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY, action.action);
+    assertEquals(suggestedNodeId, provider.getNextProxyOMNodeId(),
+        "suggested-leader hint must override round-robin");
+  }
+
+  /**
+   * Without a suggested-leader hint (the no-leader form), the retry policy
+   * falls back to round-robin: next proxy is the one immediately after the
+   * current proxy in the configured order, not an arbitrary other node.
+   */
+  @Test
+  public void testNoHintFallsBackToRoundRobin() throws Exception {
+    String currentNodeId = provider.getCurrentProxyOMNodeId();
+    String expectedRoundRobinDestination = pickAdjacentNodeId(currentNodeId);
+
+    OMNotLeaderException notLeader = new OMNotLeaderException(
+        RaftPeerId.valueOf(currentNodeId));
+    ServiceException wireEx = new ServiceException(new RemoteException(
+        OMNotLeaderException.class.getName(), notLeader.getMessage()));
+
+    RetryPolicy.RetryAction action =
+        provider.getRetryPolicy(10).shouldRetry(wireEx, 0, 0, true);
+
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY, action.action);
+    assertEquals(expectedRoundRobinDestination,
+        provider.getNextProxyOMNodeId(),
+        "no-leader form must round-robin to the adjacent node");
+  }
+
+  /**
+   * Returns the node id at (currentIdx + 1) mod size — the destination
+   * round-robin would pick after a single failover.
+   */
+  private String pickAdjacentNodeId(String currentNodeId) {
+    List<String> ids = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    int idx = ids.indexOf(currentNodeId);
+    assertTrue(idx >= 0, "currentNodeId must be in the proxy map");
+    return ids.get((idx + 1) % ids.size());
+  }
+
+  /**
+   * Returns a node id that is *not* adjacent to current in the configured
+   * order — guaranteed to differ from the round-robin destination so the
+   * hint vs round-robin paths are distinguishable.
+   */
+  private String pickNonAdjacentNodeId(String currentNodeId) {
+    List<String> ids = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    int idx = ids.indexOf(currentNodeId);
+    int adjacent = (idx + 1) % ids.size();
+    for (int i = 0; i < ids.size(); i++) {
+      if (i != idx && i != adjacent) {
+        return ids.get(i);
+      }
+    }
+    throw new IllegalStateException(
+        "test fixture needs at least 3 OMs to expose round-robin vs hint");
   }
 
   /**

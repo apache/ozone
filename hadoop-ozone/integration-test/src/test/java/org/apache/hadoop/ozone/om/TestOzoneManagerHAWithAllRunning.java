@@ -324,8 +324,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-    String leaderOMAddress = omFailoverProxyProvider.getOMProxyMap().get(leaderOMNodeId)
-        .getAddress().getAddress().toString();
+    OzoneManager leaderOM = getCluster().getOMLeader();
+    assertEquals(leaderOMNodeId, leaderOM.getOMNodeId());
     OzoneManager followerOM = null;
     for (OzoneManager om: getCluster().getOzoneManagersList()) {
       if (!om.isLeaderReady()) {
@@ -348,8 +348,21 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         followerOM.getOmServerProtocol();
     ServiceException ex = assertThrows(ServiceException.class,
         () -> omServerProtocol.submitRequest(null, readRequest));
-    assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class)
-        .hasMessageEndingWith("Suggested leader is OM:" + leaderOMNodeId + "[" + leaderOMAddress + "].");
+
+    // In-process path: cause is the actual OMNotLeaderException with all
+    // structured fields populated by the producer ctor (no RPC stripping).
+    // Assert the structured fields rather than the message string so the
+    // assertion is robust to format edits.
+    assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class);
+    OMNotLeaderException notLeader = (OMNotLeaderException) ex.getCause();
+    assertEquals(leaderOMNodeId, notLeader.getSuggestedLeaderNodeId());
+    assertEquals(leaderOM.getNodeDetails().getRpcAddressString(),
+        notLeader.getSuggestedLeaderAddress());
+    // IP comes from the producer's cached InetAddress; null only if the
+    // hostname was unresolved at OM startup, which shouldn't happen in
+    // MiniOzoneCluster.
+    assertNotNull(notLeader.getSuggestedLeaderIpAddress(),
+        "leader IP must be populated when DNS resolution succeeded at startup");
   }
 
   @Test
@@ -384,6 +397,48 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
       assertEquals(leaderId, proxyProvider.getCurrentProxyOMNodeId());
     }
+  }
+
+  @Test
+  public void testWriteFailoverHitsLeaderHint() throws Exception {
+    ObjectStore store = getObjectStore();
+    HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider =
+        OmTestUtil.getFailoverProxyProvider(store);
+
+    // Pick the real leader and one real follower from cluster state.
+    String leaderId = getCluster().getOMLeader().getOMNodeId();
+    String followerId = getCluster().getOzoneManagersList().stream()
+        .map(OzoneManager::getOMNodeId)
+        .filter(id -> !id.equals(leaderId))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No follower OM found"));
+
+    // Aim the proxy at a follower. setNextOmProxy stages nextProxyIndex;
+    // performFailover commits it into currentProxyIndex so the next call
+    // through the proxy will hit the follower.
+    provider.setNextOmProxy(followerId);
+    provider.performFailover(null);
+    assertEquals(followerId, provider.getCurrentProxyOMNodeId(),
+        "test setup: proxy must start pointed at a follower");
+
+    // Issue a write. Path: invocation handler → follower OM → server returns
+    // ServiceException(RemoteException(OMNotLeaderException)) → RetryProxy →
+    // OMFailoverProxyProviderBase retry policy reads the suggested leader
+    // hint and routes the retry to the leader.
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    store.createVolume(volumeName);
+
+    // The write succeeded — volume is visible.
+    assertEquals(volumeName, store.getVolume(volumeName).getName());
+
+    // The retry landed on the leader. (Necessary but not sufficient on its
+    // own — a round-robin failover would also eventually reach the leader.
+    // The unit-level RemoteException round-trip in
+    // TestOMNotLeaderExceptionMessageParsing is what proves the hint
+    // mechanism itself is wired up; this assertion is the integration-level
+    // smoke check that the path doesn't regress to the round-robin fallback
+    // for some other reason.)
+    assertEquals(leaderId, provider.getCurrentProxyOMNodeId());
   }
 
   @Test
