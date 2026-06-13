@@ -220,9 +220,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           }
           throw ex;
         } catch (FileAlreadyExistsException ex) {
-          throw new StorageContainerException("Container creation failed " +
-              "because ContainerFile already exists", ex,
-              CONTAINER_ALREADY_EXISTS);
+          containerData.releaseCommitSpace();
+          volumes.remove(containerVolume);
+          LOG.warn("Container {} already exists on selected volume {}, " +
+              "trying another volume. Remaining volumes: {}",
+              containerData.getContainerID(), containerVolume.getHddsRootDir(),
+              volumes.size(), ex);
+          if (volumes.isEmpty()) {
+            throw new StorageContainerException("Container creation failed " +
+                "because ContainerFile already exists on all candidate volumes",
+                ex, CONTAINER_ALREADY_EXISTS);
+          }
         } catch (IOException ex) {
           // This is a general catch all - no space left of device, which should
           // not happen as the volume Choosing policy should filter out full
@@ -233,6 +241,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               containerMetaDataPath.getParentFile().exists()) {
             FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
           }
+          containerData.releaseCommitSpace();
           volumes.remove(containerVolume);
           LOG.error("Failed to create {} on volume {}, remaining volumes: {}]",
               containerData, containerVolume.getHddsRootDir(), volumes.size(), ex);

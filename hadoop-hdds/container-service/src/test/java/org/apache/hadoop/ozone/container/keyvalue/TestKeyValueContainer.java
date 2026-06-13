@@ -93,10 +93,12 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -261,6 +263,43 @@ public class TestKeyValueContainer {
     // We should have called the mocked class twice. Once to get an error and
     // then retry without a failure.
     assertEquals(2, callCount.get());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testNextVolumeTriedWhenSelectedVolumeHasContainerDir(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    String volumeDirPath =
+        Files.createDirectory(folder.toPath().resolve("volumeDir"))
+            .toFile().getAbsolutePath();
+    HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
+        .conf(CONF).datanodeUuid(datanodeId.toString()).build();
+    StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
+    hddsVolumes.add(newVolume);
+    reset(volumeChoosingPolicy);
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+        .thenAnswer(invocation -> {
+          List<HddsVolume> volumes = invocation.getArgument(0);
+          long spaceToReserve = invocation.getArgument(1);
+          HddsVolume volume = volumes.get(0);
+          volume.incCommittedBytes(spaceToReserve);
+          return volume;
+        });
+
+    HddsVolume firstVolume = hddsVolumes.get(0);
+    long initialCommittedBytes = firstVolume.getCommittedBytes();
+    String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        firstVolume, scmId);
+    File staleContainerDir = new File(KeyValueContainerLocationUtil
+        .getBaseContainerLocation(firstVolume.getHddsRootDir().toString(),
+            idDir, keyValueContainerData.getContainerID()));
+    assertTrue(staleContainerDir.mkdirs());
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    assertEquals(initialCommittedBytes, firstVolume.getCommittedBytes());
+    assertEquals(newVolume, keyValueContainer.getContainerData().getVolume());
+    assertTrue(staleContainerDir.exists());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -675,7 +714,8 @@ public class TestKeyValueContainer {
     StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
         keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
     assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, exception.getResult());
-    assertThat(exception).hasMessage("Container creation failed because ContainerFile already exists");
+    assertThat(exception).hasMessage(
+        "Container creation failed because ContainerFile already exists on all candidate volumes");
   }
 
   @ContainerTestVersionInfo.ContainerTest
