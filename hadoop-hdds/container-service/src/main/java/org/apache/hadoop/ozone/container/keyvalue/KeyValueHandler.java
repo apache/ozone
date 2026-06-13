@@ -198,7 +198,8 @@ public class KeyValueHandler extends Handler {
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
   private final Clock clock;
-  private final BlockInputStreamFactoryImpl blockInputStreamFactory;
+  // Not final so tests can substitute a stubbed factory to drive reconcileChunksPerBlock without a live peer.
+  private BlockInputStreamFactoryImpl blockInputStreamFactory;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -389,6 +390,11 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public ContainerChecksumTreeManager getChecksumManager() {
     return this.checksumManager;
+  }
+
+  @VisibleForTesting
+  void setBlockInputStreamFactory(BlockInputStreamFactoryImpl factory) {
+    this.blockInputStreamFactory = Objects.requireNonNull(factory, "factory == null");
   }
 
   ContainerCommandResponseProto handleStreamInit(
@@ -1842,7 +1848,8 @@ public class KeyValueHandler extends Handler {
    *
    * @return The number of chunks that were reconciled in our container.
    */
-  private long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
+  @VisibleForTesting
+  long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
       DNContainerOperationClient dnClient, long localID, List<ContainerProtos.ChunkMerkleTree> peerChunkList,
       ContainerMerkleTreeWriter treeWriter, ByteBuffer chunkByteBuffer) throws IOException {
     long containerID = container.getContainerData().getContainerID();
@@ -1895,6 +1902,11 @@ public class KeyValueHandler extends Handler {
       for (ContainerProtos.ChunkMerkleTree chunkMerkleTree : peerChunkList) {
         long chunkOffset = chunkMerkleTree.getOffset();
         if (!previousChunkPresent(blockID, chunkOffset, localOffset2Chunk)) {
+          // A hole remains: the chunk preceding this offset is missing locally, so the block stays
+          // incomplete. Treat this like the per-chunk failure path below so the commit does not
+          // overwrite the block/container BCSID with the peer's value while data past the hole is
+          // absent. Advancing the BCSID here would falsely advertise committed data we do not hold.
+          allChunksSuccessful = false;
           break;
         }
 
