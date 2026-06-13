@@ -1018,7 +1018,9 @@ public class KeyValueHandler extends Handler {
           final ChunkBuffer b = (ChunkBuffer)data;
           Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
         } else {
-          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString).asReadOnlyByteBuffer(),
+          // Skip concatenating into one ByteString - that would materialize
+          // a chunk-sized copy on the hot write path.
+          Checksum.verifyChecksum(data.toByteStringList(byteBufferToByteString),
               info.getChecksumData(), 0);
         }
       } catch (OzoneChecksumException ex) {

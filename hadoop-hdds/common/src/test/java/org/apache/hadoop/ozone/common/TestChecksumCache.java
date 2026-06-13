@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.common;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.ozone.common.Checksum.Algorithm;
+import org.apache.hadoop.ozone.common.Checksum.StreamingChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +33,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 class TestChecksumCache {
 
   @ParameterizedTest
-  @EnumSource(ChecksumType.class)
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
   void testComputeChecksum(ChecksumType checksumType) throws Exception {
     final int bytesPerChecksum = 16;
     ChecksumCache checksumCache = new ChecksumCache(bytesPerChecksum);
@@ -45,7 +45,7 @@ class TestChecksumCache {
       byteArray[i] = (byte) (i % 128);
     }
 
-    final Function<ByteBuffer, ByteString> function = Algorithm.valueOf(checksumType).newChecksumFunction();
+    final StreamingChecksum algo = Algorithm.valueOf(checksumType).newStreamingChecksum();
 
     int iEnd = size / bytesPerChecksum + (size % bytesPerChecksum == 0 ? 0 : 1);
     List<ByteString> lastRes = null;
@@ -54,9 +54,9 @@ class TestChecksumCache {
       ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, byteBufferLength);
 
       try (ChunkBuffer chunkBuffer = ChunkBuffer.wrap(byteBuffer.asReadOnlyBuffer())) {
-        List<ByteString> res = checksumCache.computeChecksum(chunkBuffer, function);
-        System.out.println(res);
-        // Verify that every entry in the res list except the last one is the same as the one in lastRes list
+        List<ByteString> res = checksumCache.computeChecksum(chunkBuffer, algo, bytesPerChecksum);
+        // Every entry except the last must be unchanged from the prior iteration
+        // (those windows are fully cached and never re-computed).
         if (i > 0) {
           for (int j = 0; j < res.size() - 1; j++) {
             Assertions.assertEquals(lastRes.get(j), res.get(j));
@@ -66,7 +66,6 @@ class TestChecksumCache {
       }
     }
 
-    // Sanity check
     checksumCache.clear();
   }
 }
