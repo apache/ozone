@@ -275,7 +275,8 @@ public class FilePerChunkStrategy implements ChunkManager {
             return ChunkUtils.readData(file, bufferCapacity, offset, len, volume, dispatcherContext);
           }
           return ChunkUtils.readData(len, bufferCapacity, file, offset, volume,
-              readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+              readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager,
+              dispatcherContext);
         }
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the
