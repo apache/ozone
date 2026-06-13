@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.junit.jupiter.api.BeforeEach;
@@ -296,6 +297,29 @@ public class TestObjectGet {
     assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getAndHeadReturnStoredContentType()
+      throws IOException, OS3Exception {
+    // PUT an object whose Content-Type is preserved as ORIGINAL_CONTENT_TYPE.
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(CONTENT_TYPE1);
+    assertSucceeds(() -> put(rest, BUCKET_NAME, "typed-key", CONTENT));
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(null);
+
+    // GET and HEAD return the stored Content-Type when the request carries none.
+    assertEquals(CONTENT_TYPE1,
+        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
+    assertEquals(CONTENT_TYPE1,
+        rest.head(BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
+
+    // An object stored without a Content-Type falls back to the default.
+    assertEquals("binary/octet-stream",
+        get(rest, BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
+    assertEquals("binary/octet-stream",
+        rest.head(BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
   }
 
   private void setDefaultHeader() {
