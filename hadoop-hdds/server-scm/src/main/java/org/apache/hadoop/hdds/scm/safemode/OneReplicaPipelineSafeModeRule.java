@@ -26,9 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -58,6 +57,8 @@ public class OneReplicaPipelineSafeModeRule extends
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
   private final double pipelinePercent;
+  private final ReplicationConfig targetReplicationConfig;
+  private final String targetReplicationLabel;
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
@@ -76,6 +77,8 @@ public class OneReplicaPipelineSafeModeRule extends
             " value should be >= 0.0 and <= 1.0");
 
     this.pipelineManager = pipelineManager;
+    this.targetReplicationConfig = ReplicationConfig.getDefault(configuration);
+    this.targetReplicationLabel = targetReplicationConfig.configFormat();
     initializeRule(false);
 
   }
@@ -108,8 +111,7 @@ public class OneReplicaPipelineSafeModeRule extends
         continue;
       }
 
-      if (RatisReplicationConfig
-          .hasFactor(pipeline.getReplicationConfig(), ReplicationFactor.THREE)
+      if (targetReplicationConfig.equals(pipeline.getReplicationConfig())
           && pipeline.isOpen() &&
           !reportedPipelineIDSet.contains(pipeline.getId())) {
         if (oldPipelineIDSet.contains(pipeline.getId())) {
@@ -152,8 +154,9 @@ public class OneReplicaPipelineSafeModeRule extends
   @Override
   public String getStatusText() {
     String status = String.format(
-        "reported Ratis/THREE pipelines with at least one datanode (=%d) "
-            + ">= threshold (=%d)", getCurrentReportedPipelineCount(),
+        "reported %s pipelines with at least one datanode (=%d) "
+            + ">= threshold (=%d)", targetReplicationLabel,
+        getCurrentReportedPipelineCount(),
         getThresholdCount());
     status = updateStatusTextWithSamplePipelines(status);
     return status;
@@ -184,11 +187,11 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   private void updateReportedPipelineSet() {
-    List<Pipeline> openRatisPipelines =
-        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+    List<Pipeline> openTargetPipelines =
+        pipelineManager.getPipelines(targetReplicationConfig,
             Pipeline.PipelineState.OPEN);
 
-    for (Pipeline pipeline : openRatisPipelines) {
+    for (Pipeline pipeline : openTargetPipelines) {
       PipelineID pipelineID = pipeline.getId();
       if (!pipeline.getNodeSet().isEmpty()
           && oldPipelineIDSet.contains(pipelineID)
@@ -202,7 +205,7 @@ public class OneReplicaPipelineSafeModeRule extends
   private void initializeRule(boolean refresh) {
 
     oldPipelineIDSet = pipelineManager.getPipelines(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        targetReplicationConfig,
         Pipeline.PipelineState.OPEN)
         .stream().map(p -> p.getId()).collect(Collectors.toSet());
 

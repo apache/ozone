@@ -27,9 +27,11 @@ import java.io.File;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -44,11 +46,15 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
@@ -478,6 +484,50 @@ public class TestHealthyPipelineSafeModeRule {
     } finally {
       scmMetadataStore.getStore().close();
     }
+  }
+
+  @Test
+  public void testValidateWithEcDefaultReplicationConfig() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    PipelineManagerImpl mockedPipelineManager = mock(PipelineManagerImpl.class);
+    SCMSafeModeManager mockedSafeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics mockedMetrics = mock(SafeModeMetrics.class);
+    NodeManager mockedNodeManager = mock(NodeManager.class);
+    when(mockedSafeModeManager.getSafeModeMetrics()).thenReturn(mockedMetrics);
+    when(mockedSafeModeManager.getInSafeMode()).thenReturn(true);
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        HddsProtos.ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    ReplicationConfig targetReplicationConfig = ReplicationConfig.getDefault(conf);
+
+    DatanodeDetails dn1 = mock(DatanodeDetails.class);
+    DatanodeDetails dn2 = mock(DatanodeDetails.class);
+    DatanodeDetails dn3 = mock(DatanodeDetails.class);
+    DatanodeDetails dn4 = mock(DatanodeDetails.class);
+    DatanodeDetails dn5 = mock(DatanodeDetails.class);
+    List<DatanodeDetails> dnList = Arrays.asList(dn1, dn2, dn3, dn4, dn5);
+    for (DatanodeDetails dn : dnList) {
+      when(mockedNodeManager.getNodeStatus(dn))
+          .thenReturn(NodeStatus.inServiceHealthy());
+    }
+
+    Pipeline ecPipeline = mock(Pipeline.class);
+    when(ecPipeline.getId()).thenReturn(PipelineID.randomId());
+    when(ecPipeline.getNodes()).thenReturn(dnList);
+    when(mockedPipelineManager.getPipelines(targetReplicationConfig,
+        Pipeline.PipelineState.OPEN)).thenReturn(Arrays.asList(ecPipeline));
+
+    HealthyPipelineSafeModeRule localRule =
+        new HealthyPipelineSafeModeRule(eventQueue, mockedPipelineManager,
+            mockedSafeModeManager, conf, SCMContext.emptyContext(),
+            mockedNodeManager);
+    localRule.setValidateBasedOnReportProcessing(false);
+
+    assertTrue(localRule.validate());
+    assertTrue(localRule.getStatusText().contains("EC/3-2-1024k"));
   }
 
   private void firePipelineEvent(Pipeline pipeline, EventQueue eventQueue) {
