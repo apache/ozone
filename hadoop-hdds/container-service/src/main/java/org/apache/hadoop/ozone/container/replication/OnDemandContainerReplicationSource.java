@@ -18,13 +18,17 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.REPLICATION_LIMIT_REACHED;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A naive implementation of the replication source which creates a tar file
@@ -33,11 +37,17 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 public class OnDemandContainerReplicationSource
     implements ContainerReplicationSource {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OnDemandContainerReplicationSource.class);
+
   private final ContainerController controller;
+  private final ReplicationServer.ReplicationConfig config;
 
   public OnDemandContainerReplicationSource(
-      ContainerController controller) {
+      ContainerController controller,
+      ReplicationServer.ReplicationConfig config) {
     this.controller = controller;
+    this.config = config;
   }
 
   @Override
@@ -57,8 +67,27 @@ public class OnDemandContainerReplicationSource
           " is not found.", CONTAINER_NOT_FOUND);
     }
 
-    controller.exportContainer(
-        container.getContainerType(), containerId, destination,
-        new TarContainerPacker(compression));
+    HddsVolume volume = (HddsVolume) container.getContainerData().getVolume();
+    if (volume != null) {
+      if (volume.getActiveOutboundReplications() >=
+          config.getVolumeOutboundLimit()) {
+        LOG.info("Volume {} has reached the maximum number of concurrent " +
+                "replication reads ({})", volume.getStorageID(),
+            config.getVolumeOutboundLimit());
+        throw new StorageContainerException("Volume " + volume.getStorageID() +
+            " has reached the maximum number of concurrent replication reads ("
+            + config.getVolumeOutboundLimit() + ")", REPLICATION_LIMIT_REACHED);
+      }
+      volume.incActiveOutboundReplications();
+    }
+    try {
+      controller.exportContainer(
+          container.getContainerType(), containerId, destination,
+          new TarContainerPacker(compression));
+    } finally {
+      if (volume != null) {
+        volume.decActiveOutboundReplications();
+      }
+    }
   }
 }

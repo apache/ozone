@@ -398,7 +398,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   private void assertDownloadContainerFails(long containerId,
-      List<DatanodeDetails> sourceDatanodes) {
+      List<DatanodeDetails> sourceDatanodes) throws IOException {
     LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
     SimpleContainerDownloader downloader =
         new SimpleContainerDownloader(conf, caClient);
@@ -411,7 +411,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   private void assertDownloadContainerWorks(List<Long> containers,
-      List<DatanodeDetails> sourceDatanodes) {
+      List<DatanodeDetails> sourceDatanodes) throws IOException {
     for (Long cId : containers) {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);

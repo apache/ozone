@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -157,6 +158,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * the command count has dropped below the limit.
    */
   private final Map<DatanodeDetails, Integer> excludedNodes =
+      new ConcurrentHashMap<>();
+
+  /**
+   * Track the number of active EC reconstruction commands across the cluster.
+   */
+  private final AtomicInteger inflightReconstructionCount = new AtomicInteger(0);
+
+  /**
+   * Mapping from reconstruction command ID to the number of pending fragments
+   * for that command. Used to know when the whole command is finished.
+   */
+  private final Map<Long, Integer> reconstructionCommandIdToPendingFragmentCount =
       new ConcurrentHashMap<>();
 
   /**
@@ -420,6 +433,54 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public long getInflightReplicationCount() {
     return containerReplicaPendingOps
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
+  }
+
+  /**
+   * Returns the number of active EC reconstruction commands currently in
+   * progress across the cluster.
+   */
+  public int getInflightReconstructionCount() {
+    return inflightReconstructionCount.get();
+  }
+
+  /**
+   * Returns the maximum number of inflight reconstruction commands allowed
+   * across the cluster at any given time.
+   * @return the maximum number of inflight reconstruction commands allowed
+   */
+  public int getReconstructionInFlightLimit() {
+    return rmConf.getReconstructionGlobalLimit();
+  }
+
+  /**
+   * Returns true if the number of inflight reconstruction commands has reached
+   * the global limit.
+   * @return true if the limit is reached, false otherwise
+   */
+  public boolean isReconstructionLimitReached() {
+    int limit = getReconstructionInFlightLimit();
+    return limit > 0 && getInflightReconstructionCount() >= limit;
+  }
+
+  /**
+   * Returns true if the given datanode's replication load (queued replication
+   * and reconstruction commands) exceeds the configured load factor threshold.
+   *
+   * @param datanode the datanode to check
+   * @return true if the node is highly loaded, false otherwise
+   */
+  public boolean isNodeHighlyLoaded(DatanodeDetails datanode) {
+    try {
+      int limit = getReplicationLimit(datanode);
+      if (limit <= 0) {
+        return true;
+      }
+      double loadFactor = (double) getQueuedReplicationCount(datanode) / limit;
+      return loadFactor >= rmConf.getEcDecommissionReconstructionLoadFactor();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Node {} not found when checking load factor", datanode, e);
+      return true;
+    }
   }
 
   /**
@@ -697,6 +758,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
             targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
+      inflightReconstructionCount.incrementAndGet();
+      reconstructionCommandIdToPendingFragmentCount.put(cmd.getId(), targetIndexes.size());
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
@@ -1074,6 +1137,19 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   @Override
   public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD
+        && op.getCommand() != null
+        && op.getCommand().getType() == Type.reconstructECContainersCommand) {
+      long cmdId = op.getCommand().getId();
+      reconstructionCommandIdToPendingFragmentCount.compute(cmdId, (k, v) -> {
+        if (v == null || v <= 1) {
+          inflightReconstructionCount.decrementAndGet();
+          return null;
+        }
+        return v - 1;
+      });
+    }
+
     if (!(timedOut && op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)) {
       // We only care about expired delete ops. All others should be ignored.
       return;
@@ -1291,6 +1367,38 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int containerSampleLimit = 100;
 
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.enabled",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "If true, SCM will switch from 1-1 replication to " +
+            "multi-source reconstruction for EC containers on decommissioning " +
+            "nodes when the node's load exceeds the threshold."
+    )
+    private boolean ecDecommissionReconstructionEnabled = false;
+
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.load.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.9",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "The threshold factor (between 0 and 1) of a node's " +
+            "replication limit at which SCM switches to reconstruction for " +
+            "EC decommission. Default is 0.9."
+    )
+    private double ecDecommissionReconstructionLoadFactor = 0.9;
+
+    @Config(key = "hdds.scm.replication.reconstruction.global.limit",
+        type = ConfigType.INT,
+        defaultValue = "50",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "A cluster-wide limit to restrict the total number of " +
+            "active EC reconstruction commands across the cluster."
+    )
+    private int reconstructionGlobalLimit = 50;
+
     @Config(key = "hdds.scm.replication.quasi.closed.stuck.best.origin.copies",
         type = ConfigType.INT,
         defaultValue = "3",
@@ -1345,6 +1453,30 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public void setDatanodeReplicationLimit(int limit) {
       this.datanodeReplicationLimit = limit;
+    }
+
+    public boolean isEcDecommissionReconstructionEnabled() {
+      return ecDecommissionReconstructionEnabled;
+    }
+
+    public void setEcDecommissionReconstructionEnabled(boolean enabled) {
+      this.ecDecommissionReconstructionEnabled = enabled;
+    }
+
+    public double getEcDecommissionReconstructionLoadFactor() {
+      return ecDecommissionReconstructionLoadFactor;
+    }
+
+    public void setEcDecommissionReconstructionLoadFactor(double factor) {
+      this.ecDecommissionReconstructionLoadFactor = factor;
+    }
+
+    public int getReconstructionGlobalLimit() {
+      return reconstructionGlobalLimit;
+    }
+
+    public void setReconstructionGlobalLimit(int limit) {
+      this.reconstructionGlobalLimit = limit;
     }
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {

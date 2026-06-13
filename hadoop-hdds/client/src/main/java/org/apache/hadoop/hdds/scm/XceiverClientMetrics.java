@@ -48,6 +48,8 @@ public class XceiverClientMetrics implements MetricsSource {
   private @Metric MutableCounterLong totalOps;
   private @Metric MutableCounterLong ecReconstructionTotal;
   private @Metric MutableCounterLong ecReconstructionFailsTotal;
+  private @Metric MutableCounterLong grpcAuthenticationFailures;
+  private @Metric MutableCounterLong grpcConnectionFailures;
   private EnumMap<ContainerProtos.Type, MutableCounterLong> pendingOpsArray;
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
@@ -115,6 +117,14 @@ public class XceiverClientMetrics implements MetricsSource {
     ecReconstructionFailsTotal.incr();
   }
 
+  public void incGrpcAuthenticationFailures() {
+    grpcAuthenticationFailures.incr();
+  }
+
+  public void incGrpcConnectionFailures() {
+    grpcConnectionFailures.incr();
+  }
+
   @VisibleForTesting
   public long getTotalOpCount() {
     return totalOps.value();
@@ -144,6 +154,8 @@ public class XceiverClientMetrics implements MetricsSource {
     totalOps.snapshot(recordBuilder, true);
     ecReconstructionTotal.snapshot(recordBuilder, true);
     ecReconstructionFailsTotal.snapshot(recordBuilder, true);
+    grpcAuthenticationFailures.snapshot(recordBuilder, true);
+    grpcConnectionFailures.snapshot(recordBuilder, true);
 
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
       pendingOpsArray.get(type).snapshot(recordBuilder, b);

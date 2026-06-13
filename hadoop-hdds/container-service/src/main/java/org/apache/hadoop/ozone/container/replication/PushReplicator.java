@@ -21,6 +21,8 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
@@ -68,11 +70,19 @@ public class PushReplicator implements ContainerReplicator {
       task.setTransferredBytes(output.getByteCount());
       task.setStatus(Status.DONE);
     } catch (Exception e) {
-      LOG.warn("Container {} replication was unsuccessful.", containerID, e);
-      if (output != null) {
-        task.setTransferredBytes(output.getByteCount());
+      if (e instanceof StorageContainerException &&
+          ((StorageContainerException) e).getResult() ==
+              ContainerProtos.Result.REPLICATION_LIMIT_REACHED) {
+        LOG.info("Container {} replication will be retried as the " +
+            "replication limit was reached.", containerID);
+        task.setStatus(Status.QUEUED);
+      } else {
+        LOG.warn("Container {} replication was unsuccessful.", containerID, e);
+        if (output != null) {
+          task.setTransferredBytes(output.getByteCount());
+        }
+        task.setStatus(Status.FAILED);
       }
-      task.setStatus(Status.FAILED);
     } finally {
       // output may have already been closed, ignore such errors
       IOUtils.cleanupWithLogger(LOG, output);

@@ -34,7 +34,9 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -70,6 +72,7 @@ public final class ReplicationSupervisor {
           .thenComparing(TaskRunner::getTaskQueueTime);
 
   private final ExecutorService executor;
+  private final ScheduledExecutorService scheduler;
   private final StateContext context;
   private final Clock clock;
 
@@ -210,6 +213,11 @@ public final class ReplicationSupervisor {
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.context = context;
     this.executor = executor;
+    this.scheduler = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("ReplicationSupervisor-Scheduler")
+            .build());
     this.replicationConfig = replicationConfig;
     this.datanodeConfig = datanodeConfig;
     maxQueueSize = datanodeConfig.getCommandQueueLimit();
@@ -293,12 +301,18 @@ public final class ReplicationSupervisor {
 
   @VisibleForTesting
   public void shutdownAfterFinish() throws InterruptedException {
+    scheduler.shutdown();
+    scheduler.awaitTermination(1L, TimeUnit.DAYS);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.DAYS);
   }
 
   public void stop() {
     try {
+      scheduler.shutdown();
+      if (!scheduler.awaitTermination(3, TimeUnit.SECONDS)) {
+        scheduler.shutdownNow();
+      }
       executor.shutdown();
       if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
         executor.shutdownNow();
@@ -438,6 +452,10 @@ public final class ReplicationSupervisor {
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
+        if (task.getStatus() == Status.QUEUED) {
+          task.updateQueuedTime();
+          scheduler.schedule(() -> addTask(task), 1, TimeUnit.SECONDS);
+        }
       }
     }
 
