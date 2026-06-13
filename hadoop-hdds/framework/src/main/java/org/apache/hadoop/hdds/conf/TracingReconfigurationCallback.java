@@ -45,7 +45,7 @@ public final class TracingReconfigurationCallback implements ReconfigurationChan
    */
   public static TracingReconfigurationCallback init(
       String serviceName, TracingConfig tracingConfig) {
-    TracingUtil.initTracing(serviceName, tracingConfig);
+    TracingUtil.initServiceTracing(serviceName, tracingConfig);
     return new TracingReconfigurationCallback(serviceName, tracingConfig);
   }
 

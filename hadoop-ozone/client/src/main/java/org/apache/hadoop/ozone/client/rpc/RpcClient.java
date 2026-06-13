@@ -237,6 +237,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     Objects.requireNonNull(conf, "conf == null");
     this.conf = conf;
+    TracingUtil.initClientTracing("client", conf);
     this.ugi = UserGroupInformation.getCurrentUser();
     replicationConfigValidator =
         this.conf.getObject(ReplicationConfigValidator.class);
@@ -334,8 +335,6 @@ public class RpcClient implements ClientProtocol {
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS,
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    TracingUtil.initTracing("client", conf);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
