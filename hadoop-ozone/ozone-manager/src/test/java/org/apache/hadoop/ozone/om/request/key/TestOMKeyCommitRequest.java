@@ -351,6 +351,65 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testAtomicRewritePreExecuteUsesAdmissionFailure()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    List<OmKeyLocationInfo> allocatedLocationList = getKeyLocation(
+        DEFAULT_COMMIT_BLOCK_SIZE).stream()
+        .map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    OmKeyInfo.Builder openKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig,
+        new OmKeyLocationInfoGroup(version, new ArrayList<>()));
+    openKeyInfoBuilder.setExpectedDataGeneration(1L);
+    addKeyToOpenKeyTable(allocatedLocationList, openKeyInfoBuilder);
+
+    OmKeyInfo staleClosedKey = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig,
+        new OmKeyLocationInfoGroup(version, new ArrayList<>()))
+        .setUpdateID(2L)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzonePathKey(), staleClosedKey);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> doPreExecute(createCommitKeyRequest()));
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+  }
+
+  @Test
+  public void testAtomicCreateIfNotExistsPreExecuteUsesAdmissionFailure()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    List<OmKeyLocationInfo> allocatedLocationList = getKeyLocation(
+        DEFAULT_COMMIT_BLOCK_SIZE).stream()
+        .map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    OmKeyInfo.Builder openKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig,
+        new OmKeyLocationInfoGroup(version, new ArrayList<>()));
+    openKeyInfoBuilder.setExpectedDataGeneration(
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
+    addKeyToOpenKeyTable(allocatedLocationList, openKeyInfoBuilder);
+
+    OmKeyInfo existingClosedKey = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig,
+        new OmKeyLocationInfoGroup(version, new ArrayList<>())).build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzonePathKey(), existingClosedKey);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> doPreExecute(createCommitKeyRequest()));
+    assertEquals(OMException.ResultCodes.KEY_ALREADY_EXISTS, ex.getResult());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithUncommittedBlocks()
       throws Exception {
 

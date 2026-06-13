@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
@@ -151,6 +152,24 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
+  protected OmKeyInfo getExistingKeyInfo(
+      OMMetadataManager omMetadataManager,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs) throws IOException {
+    try {
+      String dbOzoneKey = getDBOzoneKey(omMetadataManager,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
+      return getOmKeyInfoFromKeyTable(dbOzoneKey, keyArgs.getKeyName(),
+          omMetadataManager);
+    } catch (OMException ex) {
+      if (ex.getResult() == DIRECTORY_NOT_FOUND) {
+        return null;
+      }
+      throw ex;
+    }
+  }
+
+  @Override
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       Exception exception) {
@@ -178,4 +197,3 @@ public class S3MultipartUploadCompleteRequestWithFSO
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
-

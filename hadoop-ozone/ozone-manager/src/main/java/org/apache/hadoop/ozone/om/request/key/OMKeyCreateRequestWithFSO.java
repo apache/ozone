@@ -121,9 +121,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
       }
-      validateAtomicRewrite(dbFileInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(
-          keyArgs, dbFileInfo);
+      keyArgs = resolveConditionalWriteAtAdmission(
+          dbFileInfo, keyArgs, auditMap);
 
       // Check if a file or directory exists with same key name.
       if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {

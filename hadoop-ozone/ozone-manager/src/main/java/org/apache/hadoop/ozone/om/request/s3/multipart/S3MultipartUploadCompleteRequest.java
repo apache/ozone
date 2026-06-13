@@ -129,10 +129,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             .setKeyName(keyPath).build();
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
         ozoneManager, ACLType.WRITE);
+    KeyArgs conditionalArgs = resolveConditionalWrite(
+        ozoneManager.getMetadataManager(), resolvedArgs);
 
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(
-            resolvedArgs)).setUserInfo(getUserInfo()).build();
+            conditionalArgs)).setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -211,15 +213,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                       omBucketInfo.getDefaultReplicationConfig() :
                       null, ozoneManager);
 
-          OmMultipartKeyInfo multipartKeyInfoFromArgs =
-              new OmMultipartKeyInfo.Builder()
-                  .setUploadID(keyArgs.getMultipartUploadID())
-                  .setCreationTime(keyArgs.getModificationTime())
-                  .setReplicationConfig(replicationConfig)
-                  .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-                  .setUpdateID(trxnLogIndex)
-                  .setParentID(pathInfoFSO.getLastKnownParentId())
-                  .build();
 
           OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
               .setVolumeName(volumeName)
@@ -263,17 +256,19 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       checkDirectoryAlreadyExists(ozoneManager, omBucketInfo, keyName,
           omMetadataManager);
 
+      // Conditional write validation (If-None-Match / If-Match).
+      OmKeyInfo existingKeyInfo = omMetadataManager
+          .getKeyTable(getBucketLayout()).get(dbOzoneKey);
+      if (keyArgs.hasExpectedDataGeneration()) {
+        validateAtomicRewriteAtCommit(existingKeyInfo,
+            keyArgs.getExpectedDataGeneration(), auditMap);
+      }
+
       if (multipartKeyInfo == null) {
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName),
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
-
-      // Conditional write validation (If-None-Match / If-Match).
-      // BUCKET_LOCK is held, so validation and commit are atomic.
-      // Only 412 PreconditionFailed is possible; 409 Conflict cannot occur.
-      OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-      validateAtomicRewrite(existingKeyInfo, keyArgs);
       validateIfMatchETag(keyArgs, existingKeyInfo);
 
       if (!partsList.isEmpty()) {
@@ -407,6 +402,40 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, bucketId);
+  }
+
+  private KeyArgs resolveConditionalWrite(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    if (!keyArgs.hasExpectedETag()
+        && !keyArgs.hasExpectedDataGeneration()) {
+      return keyArgs;
+    }
+
+    String multipartKey = omMetadataManager.getMultipartKey(
+        keyArgs.getVolumeName(),
+        keyArgs.getBucketName(), keyArgs.getKeyName(),
+        keyArgs.getMultipartUploadID());
+    if (omMetadataManager.getMultipartInfoTable().get(multipartKey) == null) {
+      throw new OMException(
+          failureMessage(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+              keyArgs.getKeyName()),
+          OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+    }
+
+    OmKeyInfo existingKeyInfo = getExistingKeyInfo(
+        omMetadataManager, keyArgs);
+    return resolveConditionalWriteAtAdmission(existingKeyInfo, keyArgs, null);
+  }
+
+  protected OmKeyInfo getExistingKeyInfo(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    String dbOzoneKey = getDBOzoneKey(omMetadataManager,
+        keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getKeyName());
+    return getOmKeyInfoFromKeyTable(dbOzoneKey, keyArgs.getKeyName(),
+        omMetadataManager);
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
