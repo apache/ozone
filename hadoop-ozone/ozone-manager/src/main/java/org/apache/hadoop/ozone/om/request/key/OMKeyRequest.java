@@ -1374,6 +1374,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  protected void validateDeleteIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
+    if (!keyArgs.hasExpectedETag()) {
+      return;
+    }
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for If-Match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if ("*".equals(keyArgs.getExpectedETag())) {
+      return;
+    }
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+  }
+
   /**
    * Validates If-Match ETag condition and converts it to expectedDataGeneration.
    * <p>

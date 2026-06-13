@@ -954,11 +954,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public void deleteKey(OmKeyArgs args) throws IOException {
     DeleteKeyRequest.Builder req = DeleteKeyRequest.newBuilder();
-    KeyArgs keyArgs = KeyArgs.newBuilder()
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
-        .setRecursive(args.isRecursive()).build();
+        .setRecursive(args.isRecursive());
+    if (args.getExpectedETag() != null) {
+      keyArgs.setExpectedETag(args.getExpectedETag());
+    }
     req.setKeyArgs(keyArgs);
 
     OMRequest omRequest = createOMRequest(Type.DeleteKey)
