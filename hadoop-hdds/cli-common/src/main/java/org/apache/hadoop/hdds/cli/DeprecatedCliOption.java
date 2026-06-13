@@ -21,7 +21,7 @@ import java.io.PrintWriter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import picocli.CommandLine;
-
+import  java.util.*;
 /**
  * Emits warnings when deprecated multi-character short CLI options are used.
  */
@@ -58,14 +58,20 @@ public final class DeprecatedCliOption {
       return;
     }
 
+    // This loops through the main command AND all nested subcommands
     for (CommandLine cli : parseResult.asCommandLineList()) {
       CommandLine.ParseResult subcommandResult = cli.getParseResult();
-      if (subcommandResult.matchedOptions().isEmpty()) {
-        continue;
-      }
+
+      // Get the exact tokens passed to this specific subcommand layer
+      List<String> originalArgs = subcommandResult.originalArgs();
+
       for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
-        if (subcommandResult.hasMatchedOption(entry.getKey())) {
-          warn(cli.getErr(), entry.getKey(), entry.getValue());
+        String deprecatedOption = entry.getKey(); // e.g., "-ffc"
+
+        // 1. Verify the user literally typed this exact string in this subcommand's args
+        // 2. Verify Picocli actually recognized it as a matched option (not a random string value)
+        if (originalArgs.contains(deprecatedOption) && subcommandResult.hasMatchedOption(deprecatedOption)) {
+          warn(cli.getErr(), deprecatedOption, entry.getValue());
         }
       }
     }
