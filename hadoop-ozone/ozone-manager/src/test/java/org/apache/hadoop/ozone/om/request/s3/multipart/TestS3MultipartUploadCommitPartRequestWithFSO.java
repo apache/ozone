@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,8 +36,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests S3 Multipart upload commit part request.
@@ -69,6 +74,31 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   @Override
   protected String getKeyName() {
     return dirName + UUID.randomUUID().toString();
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheDirectoryNotFound() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    long clientID = Time.now();
+    String multipartUploadID = UUID.randomUUID().toString();
+    OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
+        bucketName, keyName, clientID, multipartUploadID, 1);
+
+    S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
+            2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND,
+        omClientResponse.getOMResponse().getStatus());
   }
 
   @Override

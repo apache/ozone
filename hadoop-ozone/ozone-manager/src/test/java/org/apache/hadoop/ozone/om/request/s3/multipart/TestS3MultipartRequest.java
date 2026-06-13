@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
@@ -47,8 +49,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
@@ -300,6 +304,46 @@ public class TestS3MultipartRequest {
 
     return modifiedRequest;
 
+  }
+
+  /**
+   * Initiate an MPU and optionally rewrite the stored multipart metadata to a
+   * specific schema version.
+   *
+   * <p>The schema version rewrite lets tests emulate post-finalization MPU
+   * entries without needing the rest of the upgrade pipeline.</p>
+   */
+  protected String initiateMultipartUploadWithSchemaVersion(
+      String volumeName, String bucketName, String keyName,
+      byte schemaVersion) throws Exception {
+    OMRequest initiateMPURequest =
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
+
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    if (schemaVersion != 0) {
+      String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+          bucketName, keyName, multipartUploadID);
+      OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+          .getMultipartInfoTable().get(multipartKey);
+      assertNotNull(multipartKeyInfo);
+
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          CacheValue.get(2L, multipartKeyInfo.toBuilder()
+              .setSchemaVersion(schemaVersion)
+              .build()));
+    }
+
+    return multipartUploadID;
   }
 
   /**
