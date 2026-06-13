@@ -344,17 +344,70 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
-   * Calls the container protocol to read a chunk.
+   * Calls the container protocol to read a chunk and returns a detached
+   * {@link ReadChunkResponseProto}.
+   * <p>
+   * Callers that need access to the zero-copy-backed outer response should use
+   * {@link #readChunkForZeroCopy(XceiverClientSpi, ChunkInfo, DatanodeBlockID,
+   * List, Token)}.
    *
    * @param xceiverClient client to perform call
    * @param chunk information about chunk to read
    * @param blockID ID of the block
    * @param validators functions to validate the response
    * @param token a token for this block (may be null)
-   * @return container protocol read chunk response
+   * @return detached read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
-  public static ContainerProtos.ReadChunkResponseProto readChunk(
+  public static ReadChunkResponseProto readChunk(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
+      List<Validator> validators,
+      Token<? extends TokenIdentifier> token) throws IOException {
+    ReadChunkRequestProto.Builder readChunkRequest =
+        ReadChunkRequestProto.newBuilder()
+            .setBlockID(blockID)
+            .setChunkData(chunk)
+            .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
+            .setContainerID(blockID.getContainerID())
+            .setReadChunk(readChunkRequest);
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    try (TracingUtil.TraceCloseable ignored =
+             TracingUtil.createActivatedSpan("readChunk")) {
+      Span span = TracingUtil.getActiveSpan();
+      span.setAttribute("offset", chunk.getOffset())
+          .setAttribute("length", chunk.getLen())
+          .setAttribute("block", blockID.toString());
+      return tryEachDatanode(xceiverClient.getPipeline(),
+          d -> readChunk(xceiverClient, chunk, blockID,
+              validators, builder, d, false).getReadChunk(),
+          d -> toErrorMessage(chunk, blockID, d));
+    }
+  }
+
+  /**
+   * Calls the container protocol to read a chunk and returns the outer
+   * {@link ContainerCommandResponseProto}. The caller is responsible for
+   * invoking
+   * {@link XceiverClientSpi#releaseReceivedResponse(ContainerCommandResponseProto)}
+   * on the returned response once the chunk bytes are no longer needed.
+   * The outer wrapper is returned (rather than just the inner
+   * {@link ReadChunkResponseProto}) so that the caller has a stable reference
+   * for the zero-copy release.
+   *
+   * @param xceiverClient client to perform call
+   * @param chunk information about chunk to read
+   * @param blockID ID of the block
+   * @param validators functions to validate the response
+   * @param token a token for this block (may be null)
+   * @return outer container command response containing the read chunk reply
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ContainerCommandResponseProto readChunkForZeroCopy(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
@@ -378,16 +431,16 @@ public final class ContainerProtocolCalls  {
           .setAttribute("block", blockID.toString());
       return tryEachDatanode(xceiverClient.getPipeline(),
           d -> readChunk(xceiverClient, chunk, blockID,
-              validators, builder, d),
+              validators, builder, d, true),
           d -> toErrorMessage(chunk, blockID, d));
     }
   }
 
-  private static ContainerProtos.ReadChunkResponseProto readChunk(
+  private static ContainerCommandResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
-      DatanodeDetails d) throws IOException {
+      DatanodeDetails d, boolean zeroCopy) throws IOException {
     ContainerCommandRequestProto.Builder requestBuilder = builder
         .setDatanodeUuid(d.getUuidString());
     String traceId = TracingUtil.exportCurrentSpan();
@@ -395,14 +448,21 @@ public final class ContainerProtocolCalls  {
       requestBuilder = requestBuilder.setTraceID(traceId);
     }
     ContainerCommandResponseProto reply =
-        xceiverClient.sendCommand(requestBuilder.build(), validators);
+        zeroCopy
+            ? xceiverClient.sendCommandWithZeroCopy(
+                requestBuilder.build(), validators)
+            : xceiverClient.sendCommand(requestBuilder.build(), validators);
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
     if (readLen != chunk.getLen()) {
+      if (zeroCopy) {
+        // Release the zero-copy-tracked buffer before propagating the error.
+        xceiverClient.releaseReceivedResponse(reply);
+      }
       throw new IOException(toErrorMessage(chunk, blockID, d)
           + ": readLen=" + readLen);
     }
-    return response;
+    return reply;
   }
 
   static String toErrorMessage(ChunkInfo chunk, DatanodeBlockID blockId,

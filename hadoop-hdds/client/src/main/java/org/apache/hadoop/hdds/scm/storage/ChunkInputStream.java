@@ -96,6 +96,13 @@ public class ChunkInputStream extends InputStream
   // retry.  Once the chunk is read, this variable is reset.
   private long chunkPosition = -1;
 
+  // Outer ContainerCommandResponseProto whose chunk data the current `buffers`
+  // view. Held until releaseBuffers() so the underlying zero-copy-tracked
+  // Netty buffer is not freed while the buffers are still in use.
+  // Null on the standard (non-zero-copy) parse path - the proto's bytes
+  // are heap-backed and need no explicit release.
+  private ContainerCommandResponseProto lastResponseToRelease;
+
   private final Supplier<Token<?>> tokenSupplier;
 
   private static final int EOF = -1;
@@ -431,14 +438,25 @@ public class ChunkInputStream extends InputStream
 
   /**
    * Send RPC call to get the chunk from the container.
+   * <p>
+   * On the zero-copy path (HDDS-10283), the returned {@link ByteBuffer}s
+   * view the underlying inbound Netty buffer of the response. Those bytes
+   * stay reachable until {@link #releaseBuffers()} releases them via
+   * {@link XceiverClientSpi#releaseReceivedResponse}, which this method
+   * registers as a side effect through {@link #lastResponseToRelease}.
    */
   @VisibleForTesting
   protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo)
       throws IOException {
 
-    ReadChunkResponseProto readChunkResponse =
-        ContainerProtocolCalls.readChunk(xceiverClient, readChunkInfo, datanodeBlockID, validators,
-            tokenSupplier.get());
+    ContainerCommandResponseProto reply =
+        ContainerProtocolCalls.readChunkForZeroCopy(xceiverClient, readChunkInfo,
+            datanodeBlockID, validators, tokenSupplier.get());
+    // The zero-copy-tracked buffer for the chunk data lives inside `reply`.
+    // Stash the outer reference so releaseBuffers() can return it once the
+    // chunk bytes have been fully consumed.
+    setLastResponseToRelease(reply);
+    final ReadChunkResponseProto readChunkResponse = reply.getReadChunk();
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()
@@ -451,6 +469,16 @@ public class ChunkInputStream extends InputStream
       throw new IOException("Unexpected error while reading chunk data " +
           "from container. No data returned.");
     }
+  }
+
+  private void setLastResponseToRelease(ContainerCommandResponseProto reply) {
+    // If a previous response is still being held (e.g., readChunk called
+    // twice without an intervening releaseBuffers), release the prior one
+    // first so its Netty buffer goes back to the pool.
+    if (lastResponseToRelease != null) {
+      xceiverClient.releaseReceivedResponse(lastResponseToRelease);
+    }
+    lastResponseToRelease = reply;
   }
 
   private void validateChunk(
@@ -702,6 +730,13 @@ public class ChunkInputStream extends InputStream
     buffers = null;
     bufferIndex = 0;
     firstUnreleasedBufferIndex = 0;
+    // Release the zero-copy-tracked Netty buffer of the response that backed
+    // these ByteBuffers. Idempotent and a no-op if the response was parsed
+    // via the standard heap-backed path.
+    if (lastResponseToRelease != null) {
+      xceiverClient.releaseReceivedResponse(lastResponseToRelease);
+      lastResponseToRelease = null;
+    }
     // We should not reset bufferOffsetWrtChunkData and buffersSize here
     // because when getPos() is called in chunkStreamEOF() we use these
     // values and determine whether chunk is read completely or not.

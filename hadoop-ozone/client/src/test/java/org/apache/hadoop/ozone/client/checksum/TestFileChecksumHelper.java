@@ -217,9 +217,9 @@ public class TestFileChecksumHelper {
     XceiverClientGrpc xceiverClientGrpc =
         new XceiverClientGrpc(pipeline, conf) {
           @Override
-          public XceiverClientReply sendCommandAsync(
+          protected XceiverClientReply sendCommandAsync(
               ContainerProtos.ContainerCommandRequestProto request,
-              DatanodeDetails dn) {
+              DatanodeDetails dn, boolean zeroCopy) {
             return buildValidResponse(helperType);
           }
         };

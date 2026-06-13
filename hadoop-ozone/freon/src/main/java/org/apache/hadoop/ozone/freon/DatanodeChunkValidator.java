@@ -126,9 +126,12 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
     ContainerCommandRequestProto request = createReadChunkRequest(0);
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
-
-    checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
-    checksumReference = computeChecksum(response);
+    try {
+      checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
+      checksumReference = computeChecksum(response);
+    } finally {
+      xceiverClient.releaseReceivedResponse(response);
+    }
   }
 
   private void validateChunk(long stepNo) throws Exception {
@@ -138,15 +141,18 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
       try {
         ContainerCommandResponseProto response =
             xceiverClient.sendCommand(request);
+        try {
+          ChecksumData checksumOfChunk = computeChecksum(response);
 
-        ChecksumData checksumOfChunk = computeChecksum(response);
-
-        if (!checksumReference.equals(checksumOfChunk)) {
-          throw new IllegalStateException(
-              "Reference (=first) message checksum doesn't match " +
-                  "with checksum of chunk "
-                        + response.getReadChunk()
-                  .getChunkData().getChunkName());
+          if (!checksumReference.equals(checksumOfChunk)) {
+            throw new IllegalStateException(
+                "Reference (=first) message checksum doesn't match " +
+                    "with checksum of chunk "
+                          + response.getReadChunk()
+                    .getChunkData().getChunkName());
+          }
+        } finally {
+          xceiverClient.releaseReceivedResponse(response);
         }
       } catch (IOException e) {
         LOG.warn("Could not read chunk due to IOException: ", e);

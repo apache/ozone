@@ -510,7 +510,7 @@ public class TestContainerReconciliationWithMockDatanodes {
           .build();
     }
 
-    public ContainerProtos.ReadChunkResponseProto readChunk(ContainerProtos.DatanodeBlockID blockId,
+    public ContainerProtos.ContainerCommandResponseProto readChunk(ContainerProtos.DatanodeBlockID blockId,
         ContainerProtos.ChunkInfo chunkInfo, List<XceiverClientSpi.Validator> validators) throws IOException {
       KeyValueContainer container = getContainer(blockId.getContainerID());
       ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
@@ -520,11 +520,11 @@ public class TestContainerReconciliationWithMockDatanodes {
               .setData(handler.getChunkManager().readChunk(container, BlockID.getFromProtobuf(blockId),
                   ChunkInfo.getFromProtoBuf(chunkInfo), null).toByteString())
               .build();
-      verifyChecksums(readChunkResponseProto, blockId, chunkInfo, validators);
-      return readChunkResponseProto;
+      return verifyChecksums(readChunkResponseProto, blockId, chunkInfo, validators);
     }
 
-    public void verifyChecksums(ContainerProtos.ReadChunkResponseProto readChunkResponseProto,
+    public ContainerProtos.ContainerCommandResponseProto verifyChecksums(
+        ContainerProtos.ReadChunkResponseProto readChunkResponseProto,
         ContainerProtos.DatanodeBlockID blockId, ContainerProtos.ChunkInfo chunkInfo,
         List<XceiverClientSpi.Validator> validators) throws IOException {
       assertFalse(validators.isEmpty());
@@ -547,6 +547,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       for (XceiverClientSpi.Validator function : validators) {
         function.accept(requestProto, responseProto);
       }
+      return responseProto;
     }
 
     public KeyValueContainer getContainer(long containerID) {
