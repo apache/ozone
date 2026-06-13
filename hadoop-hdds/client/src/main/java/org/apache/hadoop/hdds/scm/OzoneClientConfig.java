@@ -87,9 +87,9 @@ public class OzoneClientConfig {
   @Config(key = "ozone.client.datastream.sync.size",
       defaultValue = "0B",
       type = ConfigType.SIZE,
-      description = "The minimum size of written data before forcing the datanodes " +
-          "in the pipeline to flush the pending data to underlying storage." +
-          " If set to zero or negative, the client will not force the datanodes to flush.",
+      description = "The minimum size of written data before forcing the datanodes "
+          + "in the pipeline to flush the pending data to underlying storage."
+          + " If set to zero or negative, the client will not force the datanodes to flush.",
       tags = ConfigTag.CLIENT)
   private int dataStreamSyncSize = 0;
 
@@ -172,13 +172,39 @@ public class OzoneClientConfig {
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "ozone.client.bytes.per.checksum",
-      defaultValue = "16KB",
+      defaultValue = "1MB",
       type = ConfigType.SIZE,
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
-          + "this config is 8KB.",
-      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
-  private int bytesPerChecksum = 16 * 1024;
+          + "this config is 16KB.",
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+  private int bytesPerChecksum = 1024 * 1024;
+
+  @Config(key = "ozone.client.stream.buffer.reference.write",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When true, eligible write(byte[]) calls on "
+          + "BlockOutputStream use a read-only view over the caller array "
+          + "instead of copying into the BufferPool. Each such write sends "
+          + "one chunk, then synchronously flushes with putBlock and waits "
+          + "for Ratis commit before write() returns; the array slice may be "
+          + "reused after that. Not used while the stream has a partially "
+          + "filled pooled buffer. See "
+          + "ozone.client.stream.buffer.reference.write.min.size.",
+      tags = ConfigTag.CLIENT)
+  private boolean streamBufferReferenceWrite = false;
+
+  @Config(key = "ozone.client.stream.buffer.reference.write.min.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      description = "Minimum length of a single write(byte[]) for the "
+          + "read-only fast path when "
+          + "ozone.client.stream.buffer.reference.write is true. The write "
+          + "must be at most ozone.client.stream.buffer.size and must not "
+          + "follow a partially filled stream buffer (no pending pooled "
+          + "chunk data in the stream).",
+      tags = ConfigTag.CLIENT)
+  private int streamBufferReferenceWriteMinSize = 1024 * 1024;
 
   @Config(key = "ozone.client.verify.checksum",
       defaultValue = "true",
@@ -189,11 +215,8 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
-      description = "When EC stripe write failed, client will request to allocate new block group "
-          + "and write the failed stripe into new block group. If the same stripe failure "
-          + "continued in newly acquired block group also, then it will retry by requesting "
-          + "to allocate new block group again. This configuration is used to limit these "
-          + "number of retries. By default the number of retries are 10.",
+      description = "Ozone EC client to retry stripe to new block group on" +
+          " failures.",
       tags = ConfigTag.CLIENT)
   private int maxECStripeWriteRetries = 10;
 
@@ -247,12 +270,8 @@ public class OzoneClientConfig {
   @Config(key = "ozone.client.fs.default.bucket.layout",
       defaultValue = "FILE_SYSTEM_OPTIMIZED",
       type = ConfigType.STRING,
-      description =
-          "Default bucket layout value used when buckets are created using OFS. "
-          + "Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED. "
-          + "FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and "
-          + "also allows interoperability between S3 and FS APIs. Keys written via S3 API with a '/' delimiter "
-          + "will create intermediate directories.",
+      description = "The bucket layout used by buckets created using OFS. " +
+          "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
@@ -335,6 +354,9 @@ public class OzoneClientConfig {
         "expected flush size (%s) to be a multiple of buffer size (%s)",
         streamBufferFlushSize, streamBufferSize);
 
+    Preconditions.checkArgument(streamBufferReferenceWriteMinSize > 0,
+        "ozone.client.stream.buffer.reference.write.min.size must be positive");
+
     if (bytesPerChecksum <
         OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE) {
       LOG.warn("The checksum size ({}) is not allowed to be less than the " +
@@ -416,6 +438,23 @@ public class OzoneClientConfig {
 
   public void setStreamBufferSize(int streamBufferSize) {
     this.streamBufferSize = streamBufferSize;
+  }
+
+  public boolean getStreamBufferReferenceWrite() {
+    return streamBufferReferenceWrite;
+  }
+
+  public void setStreamBufferReferenceWrite(boolean streamBufferReferenceWrite) {
+    this.streamBufferReferenceWrite = streamBufferReferenceWrite;
+  }
+
+  public int getStreamBufferReferenceWriteMinSize() {
+    return streamBufferReferenceWriteMinSize;
+  }
+
+  public void setStreamBufferReferenceWriteMinSize(
+      int streamBufferReferenceWriteMinSize) {
+    this.streamBufferReferenceWriteMinSize = streamBufferReferenceWriteMinSize;
   }
 
   public boolean isStreamBufferFlushDelay() {
