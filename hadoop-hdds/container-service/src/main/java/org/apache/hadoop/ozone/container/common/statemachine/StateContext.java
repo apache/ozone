@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -44,6 +43,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -181,18 +181,44 @@ public class StateContext {
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
-    incrementalReportsQueue = new HashMap<>();
+    // ConcurrentHashMap because addEndpoint / removeEndpoint /
+    // migrateEndpoint mutate this map's KEYSET (put/remove) without
+    // holding the same monitor that producers (addIncrementalReport,
+    // putBackReports, getIncrementalReports) take. The producers'
+    // `synchronized(incrementalReportsQueue)` blocks still guard
+    // operations on the inner LinkedList values across threads --
+    // CHM only fixes the map-structure race. The metric readers
+    // (getIncrementalReportQueueSize) iterate the entrySet without
+    // any monitor; weakly-consistent CHM iteration is safe here.
+    incrementalReportsQueue = new ConcurrentHashMap<>();
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
-    endpoints = new HashSet<>();
-    containerActions = new HashMap<>();
+    // CopyOnWriteArraySet so producers in addContainerAction /
+    // addIncrementalReport / addPipelineActionIfAbsent can iterate
+    // endpoints lock-free and a concurrent migrateEndpoint() (fired
+    // from the heartbeat thread on DNS-refresh recovery) cannot raise
+    // ConcurrentModificationException. Endpoint membership changes
+    // are infrequent (startup add, reconfig, refresh swap) so the
+    // copy-on-write cost is negligible.
+    endpoints = new CopyOnWriteArraySet<>();
+    // ConcurrentHashMap for the same reason as incrementalReportsQueue
+    // above: addEndpoint / removeEndpoint / migrateEndpoint mutate the
+    // map structure without taking the producer's monitor. Inner Queue
+    // operations are still guarded by `synchronized(containerActions)`
+    // in the producers.
+    containerActions = new ConcurrentHashMap<>();
     pipelineActions = new ConcurrentHashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
     lastHeartbeatSent = new AtomicLong(0);
-    isFullReportReadyToBeSent = new HashMap<>();
+    // ConcurrentHashMap because reads from getFullReports /
+    // refreshFullReport / migrateEndpoint can race against startup
+    // addEndpoint and against migrateEndpoint's putIfAbsent. Plain
+    // HashMap was unsafe even pre-PR; migrateEndpoint promoted that
+    // latent race into a regular occurrence under K8s pod churn.
+    isFullReportReadyToBeSent = new ConcurrentHashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     this.threadNamePrefix = threadNamePrefix;
@@ -311,7 +337,13 @@ public class StateContext {
     // see XceiverServerRatis#sendPipelineReport
     synchronized (incrementalReportsQueue) {
       for (InetSocketAddress endpoint : endpoints) {
-        incrementalReportsQueue.get(endpoint).add(report);
+        // Same migration race shape as addPipelineActionIfAbsent: an
+        // endpoint observed in the COW set may have just had its
+        // queue removed by migrateEndpoint. Skip rather than NPE.
+        List<Message> queue = incrementalReportsQueue.get(endpoint);
+        if (queue != null) {
+          queue.add(report);
+        }
       }
     }
   }
@@ -483,7 +515,10 @@ public class StateContext {
   public void addContainerAction(ContainerAction containerAction) {
     synchronized (containerActions) {
       for (InetSocketAddress endpoint : endpoints) {
-        containerActions.get(endpoint).add(containerAction);
+        Queue<ContainerAction> q = containerActions.get(endpoint);
+        if (q != null) {
+          q.add(containerAction);
+        }
       }
     }
   }
@@ -496,8 +531,9 @@ public class StateContext {
   public void addContainerActionIfAbsent(ContainerAction containerAction) {
     synchronized (containerActions) {
       for (InetSocketAddress endpoint : endpoints) {
-        if (!containerActions.get(endpoint).contains(containerAction)) {
-          containerActions.get(endpoint).add(containerAction);
+        Queue<ContainerAction> q = containerActions.get(endpoint);
+        if (q != null && !q.contains(containerAction)) {
+          q.add(containerAction);
         }
       }
     }
@@ -539,7 +575,17 @@ public class StateContext {
     final PipelineKey key = new PipelineKey(pipelineAction);
     boolean added = false;
     for (InetSocketAddress endpoint : endpoints) {
-      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
+      // Endpoints are migrated under the DNS-refresh path
+      // (migrateEndpoint) which removes the old pipelineActions entry
+      // before it removes the endpoint from this set. With
+      // CopyOnWriteArraySet iteration semantics we may still observe
+      // an endpoint whose pipelineActions entry was just removed --
+      // skip rather than NPE.
+      PipelineActionMap actions = pipelineActions.get(endpoint);
+      if (actions == null) {
+        continue;
+      }
+      added = actions.putIfAbsent(key, pipelineAction) || added;
     }
     return added;
   }
@@ -919,6 +965,193 @@ public class StateContext {
     this.isFullReportReadyToBeSent.remove(endpoint);
     if (getQueueMetrics() != null) {
       getQueueMetrics().removeEndpoint(endpoint);
+    }
+  }
+
+  /**
+   * Re-key all per-endpoint state from {@code oldEndpoint} to
+   * {@code newEndpoint}, preserving any reports / actions already
+   * queued for the old key. Used by the DNS-refresh-on-failure path
+   * ({@code HeartbeatEndpointTask#maybeRefreshScmAddress}) so that an
+   * SCM peer pod-IP change does not silently drop in-flight
+   * incremental container reports, container actions, or pipeline
+   * actions queued under the stale {@link InetSocketAddress}.
+   * <p>
+   * Concurrency / lock-order rules:
+   * <ul>
+   *   <li>{@link #endpoints} is a {@link CopyOnWriteArraySet} so
+   *       producers iterating it (in {@link #addContainerAction},
+   *       {@link #addIncrementalReport}, {@link #addPipelineActionIfAbsent})
+   *       cannot CME against the {@code remove}+{@code add} pair below. </li>
+   *   <li>{@link #incrementalReportsQueue} mutations take the same
+   *       {@code synchronized(incrementalReportsQueue)} monitor that
+   *       producers use. </li>
+   *   <li>{@link #containerActions} mutations take the same
+   *       {@code synchronized(containerActions)} monitor that
+   *       producers use. </li>
+   *   <li>{@link #pipelineActions} is {@link ConcurrentHashMap}; we
+   *       guard the read-modify-write sequence with the per-key atomic
+   *       {@code compute} call. </li>
+   *   <li>{@link #isFullReportReadyToBeSent} is now a
+   *       {@link ConcurrentHashMap} so its mutations are individually
+   *       atomic and concurrent {@link #refreshFullReport} iterations
+   *       are weakly-consistent rather than fail-fast. </li>
+   * </ul>
+   * Migration order: producers' queues first (so a producer racing in
+   * during the migration finds the new endpoint key already populated),
+   * then the {@code endpoints} set last (so any thread that observes
+   * the new endpoint in {@code endpoints} also observes its queues
+   * present). Each step is idempotent at the per-key level.
+   * <p>
+   * Collision case (the freshly-resolved IP collides with another
+   * already-registered endpoint key): this method leaves the existing
+   * collided entry untouched and only drops the old key's state. Two
+   * distinct SCM peers' queues are NEVER merged; doing so would deliver
+   * one peer's incremental reports / pipeline actions to a different
+   * peer that did not request them.
+   * <p>
+   * If {@code oldEndpoint} was not registered, this is a no-op. The
+   * new endpoint is NOT added in that case.
+   *
+   * @param oldEndpoint the InetSocketAddress under which queues are
+   *                    currently keyed
+   * @param newEndpoint the freshly-resolved InetSocketAddress that the
+   *                    new EndpointStateMachine is bound to
+   */
+  public void migrateEndpoint(InetSocketAddress oldEndpoint,
+                              InetSocketAddress newEndpoint) {
+    if (oldEndpoint == null || newEndpoint == null
+        || oldEndpoint.equals(newEndpoint)) {
+      return;
+    }
+    if (!endpoints.contains(oldEndpoint)) {
+      return;
+    }
+    final boolean newAlreadyRegistered = endpoints.contains(newEndpoint);
+
+    // Invariant we must preserve at every observable point:
+    //   "for every e in endpoints, queues[e] exists for all four
+    //    per-endpoint maps."
+    // Producers iterate `endpoints` lock-free (CopyOnWriteArraySet) and
+    // then look up the per-key queue. If we removed a queue before
+    // removing the endpoint from the set, a producer iterating between
+    // the two operations would see the endpoint, fail to find a queue,
+    // and silently drop its report. The producer-side null-skip we
+    // added previously was a band-aid for exactly this race.
+    //
+    // To preserve the invariant, the ordering is:
+    //   1. PUBLISH: install new-key queues alongside the old-key queues.
+    //      During this step both keys are valid.
+    //   2. SWITCH: add newEndpoint to the endpoints set; remove
+    //      oldEndpoint from the endpoints set. After this step,
+    //      producers iterating `endpoints` see only the new key (which
+    //      has its queue from step 1).
+    //   3. RETIRE: drop the old-key queues. By this point no producer
+    //      iterating `endpoints` can reach the old key.
+    //
+    // Collision case (newEndpoint already a registered peer): we MUST
+    // NOT install our incoming queues over the colliding peer's queues
+    // (would deliver one peer's reports to another). On collision we
+    // skip the publish step's "install" and the switch step's "add",
+    // and only retire the old-key queues. Any old-key in-flight reports
+    // are dropped (logged) -- the alternative of merging into a foreign
+    // peer's queue is worse.
+
+    // Step 1 (PUBLISH): install new-key queues. On collision, do not
+    // touch newEndpoint's existing queues (foreign peer owns them).
+    synchronized (incrementalReportsQueue) {
+      if (!newAlreadyRegistered) {
+        List<Message> oldQueue = incrementalReportsQueue.get(oldEndpoint);
+        if (oldQueue != null) {
+          // Both keys reference the SAME LinkedList. Safe because
+          // producers serialize on `incrementalReportsQueue`'s monitor
+          // and the inner list is not mutated unsynchronized. After
+          // step 3 removes the old key, only the new key references
+          // the list.
+          incrementalReportsQueue.put(newEndpoint, oldQueue);
+        } else {
+          incrementalReportsQueue.putIfAbsent(newEndpoint, new LinkedList<>());
+        }
+      }
+    }
+    synchronized (containerActions) {
+      if (!newAlreadyRegistered) {
+        Queue<ContainerAction> oldActions = containerActions.get(oldEndpoint);
+        if (oldActions != null) {
+          containerActions.put(newEndpoint, oldActions);
+        } else {
+          containerActions.putIfAbsent(newEndpoint, new LinkedList<>());
+        }
+      }
+    }
+    if (!newAlreadyRegistered) {
+      PipelineActionMap oldPipelineActions = pipelineActions.get(oldEndpoint);
+      pipelineActions.computeIfAbsent(newEndpoint,
+          k -> oldPipelineActions != null
+              ? oldPipelineActions
+              : new PipelineActionMap());
+
+      // Always seed all-true flags for the new peer. A rescheduled SCM
+      // pod is a fresh process and needs a full container/node/pipeline
+      // report on the next heartbeat regardless of what the old peer
+      // had already received.
+      Map<String, AtomicBoolean> flags = new HashMap<>();
+      for (String e : fullReportTypeList) {
+        flags.put(e, new AtomicBoolean(true));
+      }
+      isFullReportReadyToBeSent.putIfAbsent(newEndpoint, flags);
+    }
+
+    // Step 2 (SWITCH): swap endpoint membership under the same monitors
+    // producers hold when fanning out incremental reports and container
+    // actions, so no producer observes both keys while they alias the
+    // same underlying queue.
+    synchronized (incrementalReportsQueue) {
+      synchronized (containerActions) {
+        if (!newAlreadyRegistered) {
+          endpoints.add(newEndpoint);
+        }
+        endpoints.remove(oldEndpoint);
+      }
+    }
+
+    // Step 3 (RETIRE): drop the old-key queues. From this point no
+    // producer iterating `endpoints` reaches the old key.
+    synchronized (incrementalReportsQueue) {
+      List<Message> oldQueue =
+          incrementalReportsQueue.remove(oldEndpoint);
+      if (newAlreadyRegistered && oldQueue != null && !oldQueue.isEmpty()) {
+        LOG.warn("DNS refresh produced an endpoint collision: dropping "
+                + "{} incremental reports queued under {} because {} is "
+                + "already a registered endpoint with its own queue.",
+            oldQueue.size(), oldEndpoint, newEndpoint);
+      }
+    }
+    synchronized (containerActions) {
+      Queue<ContainerAction> oldActions = containerActions.remove(oldEndpoint);
+      if (newAlreadyRegistered && oldActions != null && !oldActions.isEmpty()) {
+        LOG.warn("DNS refresh produced an endpoint collision: dropping "
+                + "{} container actions queued under {} because {} is "
+                + "already a registered endpoint with its own queue.",
+            oldActions.size(), oldEndpoint, newEndpoint);
+      }
+    }
+    PipelineActionMap retiredPipelineActions =
+        pipelineActions.remove(oldEndpoint);
+    if (newAlreadyRegistered && retiredPipelineActions != null
+        && retiredPipelineActions.size() > 0) {
+      LOG.warn("DNS refresh produced an endpoint collision: dropping "
+              + "{} pipeline actions queued under {} because {} is "
+              + "already a registered endpoint with its own map.",
+          retiredPipelineActions.size(), oldEndpoint, newEndpoint);
+    }
+    isFullReportReadyToBeSent.remove(oldEndpoint);
+
+    if (getQueueMetrics() != null) {
+      getQueueMetrics().removeEndpoint(oldEndpoint);
+      if (!newAlreadyRegistered) {
+        getQueueMetrics().addEndpoint(newEndpoint);
+      }
     }
   }
 
