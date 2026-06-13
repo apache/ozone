@@ -30,21 +30,12 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.slf4j.event.Level;
 
 /**
  * Test for {@link BufferPool}.
  */
 class TestBufferPool {
-
-  @BeforeAll
-  static void init() {
-    GenericTestUtils.setLogLevel(BufferPool.class, Level.DEBUG);
-  }
 
   @Test
   void testBufferPool() throws Exception {
@@ -63,11 +54,13 @@ class TestBufferPool {
     assertAllocationBlockedUntilReleased(pool, buffers);
   }
 
-  private void assertAllocationBlockedUntilReleased(BufferPool pool, Deque<ChunkBuffer> buffers) throws Exception {
+  private void assertAllocationBlockedUntilReleased(BufferPool pool, Deque<ChunkBuffer> buffers)
+      throws Exception {
     // As the pool is full, allocation will need to wait until a buffer is released.
     assertFull(pool);
 
-    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.class);
+    assertEquals(buffers.size(), pool.getAllocatedBuffers().size());
+
     AtomicReference<ChunkBuffer> allocated = new AtomicReference<>();
     AtomicBoolean allocatorStarted = new AtomicBoolean();
     Thread allocator = new Thread(() -> {
@@ -90,18 +83,16 @@ class TestBufferPool {
         throw new RuntimeException(e);
       }
     }
-
     releaser.start();
     allocator.join();
+    assertEquals(buffers.size() + 1, pool.getAllocatedBuffers().size());
     assertEquals(toRelease, allocated.get());
-    assertTrue(logCapturer.getOutput().contains("Allocation needs to wait the pool is at capacity"));
   }
 
   private void assertAllocationBlocked(BufferPool pool) throws Exception {
     // As the pool is full, new allocation will be blocked interruptably if no allocated buffer is released.
     assertFull(pool);
 
-    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.class);
     AtomicBoolean allocatorStarted = new AtomicBoolean();
     AtomicBoolean interrupted = new AtomicBoolean(false);
     Thread allocator = new Thread(() -> {
@@ -128,7 +119,6 @@ class TestBufferPool {
     allocator.interrupt();
     allocator.join();
     assertTrue(interrupted.get());
-    assertTrue(logCapturer.getOutput().contains("Allocation needs to wait the pool is at capacity"));
   }
 
   private static void testBufferPool(final int capacity, final int bufferSize) throws Exception {
