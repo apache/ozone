@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec.ListContainerQuery;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -146,7 +147,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
           .ONE, OzoneConsts.OZONE);
     }
 
-    int count = storageClient.listContainer(0, CONTAINER_LIST_LIMIT + 1)
+    int count = storageClient.listContainer(ListContainerQuery.newBuilder(0, CONTAINER_LIST_LIMIT + 1).build())
         .getContainerInfoList()
         .size();
     assertEquals(CONTAINER_LIST_LIMIT, count);
