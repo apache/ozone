@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.util.Time;
@@ -336,6 +337,11 @@ public class BucketEndpoint extends BucketOperationHandler {
       MultiDeleteRequest request
   ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
+
+    if (request.getObjects() != null
+        && request.getObjects().size() > S3Consts.S3_DELETE_OBJECTS_MAX_KEYS) {
+      throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
+    }
 
     OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();

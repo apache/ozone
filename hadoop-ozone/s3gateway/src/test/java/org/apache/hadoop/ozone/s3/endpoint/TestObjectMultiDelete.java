@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.util.Collections.singleton;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -32,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -99,6 +102,45 @@ public class TestObjectMultiDelete {
     assertEquals(singleton("key3"), keysAtTheEnd);
     assertEquals(0, response.getDeletedObjects().size());
     assertEquals(0, response.getErrors().size());
+  }
+
+  @Test
+  public void multiDeleteRejectsMoreThanMaxKeysPerRequest() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    for (int i = 0; i < S3Consts.S3_DELETE_OBJECTS_MAX_KEYS + 1; i++) {
+      mdr.getObjects().add(new DeleteObject("key-" + i));
+    }
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> rest.multiDelete("b1", "", mdr));
+    assertEquals("MalformedXML", ex.getCode());
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+  }
+
+  @Test
+  public void multiDeleteAllowsMaxKeysPerRequest() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.setQuiet(true);
+    for (int i = 0; i < S3Consts.S3_DELETE_OBJECTS_MAX_KEYS; i++) {
+      mdr.getObjects().add(new DeleteObject("missing-" + i));
+    }
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+    assertEquals(0, response.getDeletedObjects().size());
+    assertEquals(0, response.getErrors().size());
+
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
   }
 
   private OzoneBucket initTestData(OzoneClient client) throws IOException {
