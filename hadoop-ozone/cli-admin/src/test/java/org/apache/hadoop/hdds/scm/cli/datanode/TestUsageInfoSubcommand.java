@@ -98,6 +98,7 @@ public class TestUsageInfoSubcommand {
 
     assertEquals(5, json.get(0).get("containerCount").longValue());
     assertEquals(10, json.get(0).get("pipelineCount").longValue());
+    assertEquals(80, json.get(0).get("remainingAllocatable").longValue());
   }
 
   @Test
