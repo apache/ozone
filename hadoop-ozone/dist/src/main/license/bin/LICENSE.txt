@@ -361,7 +361,6 @@ Apache License 2.0
    io.opentelemetry:opentelemetry-exporter-sender-okhttp
    io.opentelemetry:opentelemetry-sdk
    io.opentelemetry:opentelemetry-sdk-common
-   io.opentelemetry:opentelemetry-sdk-common-extension-autoconfigure-spi
    io.opentelemetry:opentelemetry-sdk-logs
    io.opentelemetry:opentelemetry-sdk-metrics
    io.opentelemetry:opentelemetry-sdk-trace
