@@ -563,6 +563,31 @@ public class TestRDBTableStore {
   }
 
   @Test
+  public void testPrefixedIteratorUsesNativeBounds() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst");
+    testTable.put(bytes("prefix-aa-key-01"), bytes("value-01"));
+    testTable.put(bytes("prefix-aa-key-02"), bytes("value-02"));
+    testTable.put(bytes("prefix-ab-key-01"), bytes("value-03"));
+    testTable.put(bytes("prefix-b-key-01"), bytes("value-04"));
+
+    try (Table.KeyValueIterator<byte[], byte[]> iter =
+             testTable.iterator(bytes("prefix-aa"))) {
+      List<String> keys = new ArrayList<>();
+      while (iter.hasNext()) {
+        keys.add(StringUtils.bytes2String(iter.next().getKey()));
+      }
+
+      assertEquals(Arrays.asList("prefix-aa-key-01", "prefix-aa-key-02"),
+          keys);
+
+      assertArrayEquals(bytes("prefix-aa-key-01"),
+          iter.seek(bytes("prefix-aa-key-01")).getKey());
+      assertNull(iter.seek(bytes("prefix-ab")));
+      assertFalse(iter.hasNext());
+    }
+  }
+
+  @Test
   public void testStringPrefixedIterator() throws Exception {
     final int prefixCount = 3;
     final int keyCount = 5;
@@ -764,6 +789,10 @@ public class TestRDBTableStore {
             entry.getValue().getBytes(StandardCharsets.UTF_8));
       }
     }
+  }
+
+  private static byte[] bytes(String value) {
+    return value.getBytes(StandardCharsets.UTF_8);
   }
 
   private void populateTable(Table<String, String> table,
