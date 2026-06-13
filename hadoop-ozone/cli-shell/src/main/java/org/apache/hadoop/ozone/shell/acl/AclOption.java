@@ -31,24 +31,39 @@ import picocli.CommandLine;
  */
 public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
 
-  @CommandLine.Option(names = {"--acls", "--acl", "-al", "-a"}, split = ",",
-      required = true,
-      converter = AclOption.class,
-      description = "Comma separated ACL list:%n" +
-          "Example: user:user2:a OR user:user1:rw,group:hadoop:a%n" +
-          "r = READ, " +
-          "w = WRITE, " +
-          "c = CREATE, " +
-          "d = DELETE, " +
-          "l = LIST, " +
-          "a = ALL, " +
-          "n = NONE, " +
-          "x = READ_ACL, " +
-          "y = WRITE_ACL.")
-  private OzoneAcl[] values;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private Exclusive exclusive = new Exclusive();
+
+  private static final class Exclusive {
+    @CommandLine.Option(names = {"--acls", "--acl", "-a"}, split = ",",
+        required = true,
+        converter = AclOption.class,
+        description = "Comma separated ACL list:%n" +
+            "Example: user:user2:a OR user:user1:rw,group:hadoop:a%n" +
+            "r = READ, " +
+            "w = WRITE, " +
+            "c = CREATE, " +
+            "d = DELETE, " +
+            "l = LIST, " +
+            "a = ALL, " +
+            "n = NONE, " +
+            "x = READ_ACL, " +
+            "y = WRITE_ACL.")
+        private OzoneAcl[] values;
+
+    /** For backward compatibility. */
+    @CommandLine.Option(names = {"-al"}, split = ",", hidden = true,
+        required = true, converter = AclOption.class)
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    private OzoneAcl[] deprecatedValues;
+  }
 
   private List<OzoneAcl> getAclList() {
-    return ImmutableList.copyOf(values);
+    OzoneAcl[] acls = exclusive.values != null
+        ? exclusive.values
+        : exclusive.deprecatedValues;
+    return ImmutableList.copyOf(acls);
   }
 
   public void addTo(OzoneObj obj, ObjectStore objectStore, PrintWriter out)
