@@ -1383,10 +1383,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("Key not found for If-Match",
           OMException.ResultCodes.KEY_NOT_FOUND);
     }
-    if ("*".equals(keyArgs.getExpectedETag())) {
+    String expectedETag = keyArgs.getExpectedETag();
+    if ("*".equals(expectedETag)) {
       return;
     }
-    validateIfMatchETag(keyArgs, dbKeyInfo);
+    if (!dbKeyInfo.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          OMException.ResultCodes.ETAG_MISMATCH);
+    }
   }
 
   /**
