@@ -58,7 +58,7 @@ import java.net.UnknownHostException;
  * </ul>
  * The walk is bounded to {@value #MAX_CAUSE_DEPTH} levels to defend
  * against cause chains that have been constructed (in violation of
- * {@code Throwable.initCause}'s contract) into a cycle of length > 1.
+ * {@code Throwable.initCause}'s contract) into a cycle of length &gt; 1.
  */
 public final class ConnectionFailureUtils {
 
