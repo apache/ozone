@@ -132,7 +132,7 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   @Test
-  public void testValidateAndUpdateCacheRejectsSchemaVersionOneBeforeFinalization()
+  public void testValidateAndUpdateCacheUsesSchemaVersionOneBeforeFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -163,14 +163,14 @@ public class TestS3MultipartUploadCommitPartRequest
 
     addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
 
-    // Regular part metadata is present; the upgrade gate should still reject
-    // this schema version before commit proceeds.
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status
+    assertNotEquals(OzoneManagerProtocolProtos.Status
         .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omClientResponse.getOMResponse().getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 

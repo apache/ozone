@@ -269,16 +269,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // Use the layout version stamped by the leader in preExecute so all
-      // replicas evaluate the gate deterministically at apply.
-      long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
-      if (requestLayoutVersion < OMLayoutFeature.MPU_PARTS_TABLE_SPLIT
-          .layoutVersion() && multipartKeyInfo.getSchemaVersion() != 0) {
-        throw new OMException("MPU parts-table split behavior is not allowed " +
-            "before cluster finalization for complete request.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-      }
-
       // Conditional write validation (If-None-Match / If-Match).
       // BUCKET_LOCK is held, so validation and commit are atomic.
       // Only 412 PreconditionFailed is possible; 409 Conflict cannot occur.

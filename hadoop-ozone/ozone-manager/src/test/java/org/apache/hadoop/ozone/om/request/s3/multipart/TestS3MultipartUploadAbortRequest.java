@@ -100,7 +100,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheRejectsSchemaVersionOneBeforeFinalization()
+  public void testValidateAndUpdateCacheUsesSchemaVersionOneBeforeFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -129,12 +129,13 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
         getS3MultipartUploadAbortReq(abortMPURequest);
 
-    // The multipart metadata exists, but schema version 1 is not allowed yet.
     OMClientResponse omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status
+    assertNotEquals(OzoneManagerProtocolProtos.Status
         .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omClientResponse.getOMResponse().getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 

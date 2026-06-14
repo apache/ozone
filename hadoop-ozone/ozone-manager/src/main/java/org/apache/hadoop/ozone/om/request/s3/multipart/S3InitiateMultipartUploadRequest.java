@@ -72,6 +72,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
+  private static final int LEGACY_MPU_SCHEMA_VERSION = 0;
 
   public S3InitiateMultipartUploadRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -100,10 +101,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, ACLType.CREATE);
+    int schemaVersion = resolveMultipartSchemaVersion(multipartInfoInitiateRequest);
+    MultipartInfoInitiateRequest.Builder requestBuilder =
+        multipartInfoInitiateRequest.toBuilder()
+            .setKeyArgs(resolvedArgs)
+            .setSchemaVersion(schemaVersion);
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
-        .setInitiateMultiPartUploadRequest(
-            multipartInfoInitiateRequest.toBuilder().setKeyArgs(resolvedArgs))
+        .setInitiateMultiPartUploadRequest(requestBuilder)
         .build();
   }
 
@@ -195,7 +200,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
-          .setSchemaVersion(resolveMultipartSchemaVersion())
+          .setSchemaVersion(
+              resolveMultipartSchemaVersion(multipartInfoInitiateRequest))
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -285,12 +291,33 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     }
   }
 
-  protected int resolveMultipartSchemaVersion() {
-    // Keep newly initiated MPUs on legacy schema until the complete split
-    // parts-table write/read paths are implemented across commit/list/complete.
-    // This method is intentionally kept as a single switch point so we can
-    // restore dynamic schema selection in a follow-up change.
-    return 0;
+  protected int resolveMultipartSchemaVersion(
+      MultipartInfoInitiateRequest multipartInfoInitiateRequest) {
+    if (!multipartInfoInitiateRequest.hasSchemaVersion()) {
+      return LEGACY_MPU_SCHEMA_VERSION;
+    }
+    return (int) multipartInfoInitiateRequest.getSchemaVersion();
+  }
+
+  @RequestFeatureValidator(
+      conditions = {
+          ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+          ValidationCondition.CLUSTER_HAS_MPU_PARTS_TABLE_SPLIT
+      },
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.InitiateMultiPartUpload
+  )
+  public static OMRequest setSchemaVersionOnInitiateMultipartUpload(
+      OMRequest req, ValidationContext ctx) {
+    MultipartInfoInitiateRequest initiateRequest =
+        req.getInitiateMultiPartUploadRequest();
+
+    // Keep newly initiated MPUs on legacy schema until split parts-table
+    // write/read paths are fully implemented.
+    return req.toBuilder()
+        .setInitiateMultiPartUploadRequest(initiateRequest.toBuilder()
+            .setSchemaVersion(LEGACY_MPU_SCHEMA_VERSION))
+        .build();
   }
 
   @RequestFeatureValidator(

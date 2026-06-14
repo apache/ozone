@@ -211,7 +211,7 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   @Test
-  public void testValidateAndUpdateCacheRejectsSchemaVersionOneBeforeFinalization()
+  public void testValidateAndUpdateCacheUsesSchemaVersionOneBeforeFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -224,7 +224,6 @@ public class TestS3MultipartUploadCompleteRequest
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
             keyName, (byte) 1);
 
-    // The request is still rejected before the empty part-list validation.
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, new ArrayList<>());
 
@@ -235,8 +234,10 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status
+    assertNotEquals(OzoneManagerProtocolProtos.Status
         .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omClientResponse.getOMResponse().getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omClientResponse.getOMResponse().getStatus());
   }
 

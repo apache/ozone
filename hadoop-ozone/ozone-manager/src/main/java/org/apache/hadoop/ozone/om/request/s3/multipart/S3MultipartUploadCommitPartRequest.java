@@ -173,17 +173,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // Use the layout version stamped by the leader in preExecute so all
-      // replicas evaluate the gate deterministically at apply.
-      long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
-      boolean splitPartsFeatureAllowed = requestLayoutVersion
-          >= OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion();
-      if (!splitPartsFeatureAllowed
-          && multipartKeyInfo.getSchemaVersion() != 0) {
-        throw new OMException("MPU parts-table split behavior is not allowed " +
-            "before cluster finalization for commit part request.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-      }
       // Add/Update user defined metadata.
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
