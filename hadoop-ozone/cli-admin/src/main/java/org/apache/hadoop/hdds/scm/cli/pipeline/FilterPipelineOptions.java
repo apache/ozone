@@ -45,20 +45,30 @@ public class FilterPipelineOptions {
   private String replication;
 
   @CommandLine.Option(
-      names = {"-ffc", "--filterByFactor", "--filter-by-factor"},
+      names = {"--filterByFactor", "--filter-by-factor"},
       description = "[deprecated] Filter pipelines by factor (e.g. ONE, THREE) (implies RATIS replication type)")
   private ReplicationFactor factor;
 
+  /** For backward compatibility. */
+  @CommandLine.Option(
+      names = {"-ffc"},
+      hidden = true
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private ReplicationFactor deprecatedFactor;
+
   Optional<Predicate<? super Pipeline>> getReplicationFilter() {
+    ReplicationFactor effectiveFactor = getFactor();
     boolean hasReplication = !Strings.isNullOrEmpty(replication);
-    boolean hasFactor = factor != null;
+    boolean hasFactor = effectiveFactor != null;
     boolean hasReplicationType = !Strings.isNullOrEmpty(replicationType);
 
     if (hasFactor) {
       if (hasReplication) {
         throw new IllegalArgumentException("Factor and replication are mutually exclusive");
       }
-      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(factor.toProto());
+      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(effectiveFactor.toProto());
       return Optional.of(p -> replicationConfig.equals(p.getReplicationConfig()));
     }
 
@@ -80,5 +90,9 @@ public class FilterPipelineOptions {
     }
 
     return Optional.empty();
+  }
+
+  private ReplicationFactor getFactor() {
+    return factor != null ? factor : deprecatedFactor;
   }
 }
