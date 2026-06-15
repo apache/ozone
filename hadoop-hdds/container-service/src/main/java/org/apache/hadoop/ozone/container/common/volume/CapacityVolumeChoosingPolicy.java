@@ -115,7 +115,8 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
   // Fraction of capacity still free for hdds, excluding space committed to open containers.
   // Comparing the ratio (not absolute bytes) keeps utilization balanced across volumes of
   // different capacity.
-  private static double freeSpaceRatio(HddsVolume volume) {
+  @VisibleForTesting
+  static double freeSpaceRatio(HddsVolume volume) {
     SpaceUsageSource usage = volume.getCurrentUsage();
     long capacity = usage.getCapacity();
     if (capacity <= 0) {

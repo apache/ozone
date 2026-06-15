@@ -122,7 +122,7 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
-  public void choosesLowerUtilizationAcrossDifferentCapacities() throws Exception {
+  public void testChoosesLowerUtilizationAcrossDifferentCapacities() throws Exception {
     // big has more free bytes but is 90% full; small is only 60% full.
     // The policy must prefer the less-utilized volume, not the one with more free bytes.
     SpaceUsageSource bigSource = MockSpaceUsageSource.fixed(1000, 100);
@@ -156,6 +156,23 @@ public class TestCapacityVolumeChoosingPolicy {
     } finally {
       bigVolume.shutdown();
       smallVolume.shutdown();
+    }
+  }
+
+  @Test
+  public void testFreeSpaceRatioIsZeroWhenCapacityUnknown() throws Exception {
+    // A volume with unknown capacity (<= 0) yields ratio 0 instead of dividing by zero,
+    // so it is never preferred over a volume with known capacity.
+    SpaceUsageSource unknown = MockSpaceUsageSource.fixed(0, 0);
+    HddsVolume volume = new HddsVolume.Builder(baseDir + "unknown")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            unknown, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    try {
+      assertEquals(0.0, CapacityVolumeChoosingPolicy.freeSpaceRatio(volume));
+    } finally {
+      volume.shutdown();
     }
   }
 
