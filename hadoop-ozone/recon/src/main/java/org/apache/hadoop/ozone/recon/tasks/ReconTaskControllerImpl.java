@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -102,6 +103,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private AtomicLong lastRetryTimestamp = new AtomicLong(0);
   private static final int MAX_EVENT_PROCESS_RETRIES = 6;
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
+  // Time source for the retry-delay gate; overridable in tests via the
+  // @VisibleForTesting constructor to drive the gate with virtual time.
+  private LongSupplier timeSource = System::currentTimeMillis;
 
   @Inject
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -134,6 +138,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
+  }
+
+  @VisibleForTesting
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  ReconTaskControllerImpl(OzoneConfiguration configuration,
+                          Set<ReconOmTask> tasks,
+                          ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
+                          ReconDBProvider reconDBProvider,
+                          ReconContainerMetadataManager reconContainerMetadataManager,
+                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                          ReconGlobalStatsManager reconGlobalStatsManager,
+                          ReconFileMetadataManager reconFileMetadataManager,
+                          LongSupplier timeSource) {
+    this(configuration, tasks, taskStatusUpdaterManager, reconDBProvider,
+        reconContainerMetadataManager, reconNamespaceSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
+    this.timeSource = timeSource;
   }
 
   @Override
@@ -636,7 +657,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private ReconTaskController.ReInitializationResult validateRetryCountAndDelay() {
     // Check if we should retry based on timing for iteration-based retries
-    long currentTime = System.currentTimeMillis();
+    long currentTime = timeSource.getAsLong();
     if (eventProcessRetryCount.get() > 0) {
       // Check if 2 seconds have passed since last iteration
       long timeSinceLastRetry = currentTime - lastRetryTimestamp.get();
@@ -655,7 +676,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Handle iteration failure by updating retry counters.
    */
   private void handleEventFailure() {
-    long currentTime = System.currentTimeMillis();
+    long currentTime = timeSource.getAsLong();
     lastRetryTimestamp.set(currentTime);
     eventProcessRetryCount.getAndIncrement();
     tasksFailed.compareAndSet(false, true);
