@@ -76,6 +76,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -91,6 +92,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -458,6 +460,20 @@ public class TestSnapshotDefragService {
     );
   }
 
+  private static String rocksDBMetricsSourceName(Path dbLocation) {
+    return RocksDBStoreMetrics.ROCKSDB_CONTEXT_PREFIX + dbLocation.getFileName();
+  }
+
+  private static void assertNoRocksDBMetrics(Path dbLocation) {
+    assertNull(DefaultMetricsSystem.instance().getSource(
+        rocksDBMetricsSourceName(dbLocation)));
+  }
+
+  private static void assertRocksDBMetricsRegistered(Path dbLocation) {
+    assertNotNull(DefaultMetricsSystem.instance().getSource(
+        rocksDBMetricsSourceName(dbLocation)));
+  }
+
   private Map<String, Map<String, String>> createTableContents(Path path, String keyPrefix) throws IOException {
     DBCheckpoint snapshotCheckpointLocation = new RocksDBCheckpoint(path);
     Map<String, Map<String, String>> tableContents = new HashMap<>();
@@ -525,7 +541,35 @@ public class TestSnapshotDefragService {
           .filter(e -> !incrementalTables.contains(e.getKey()))
           .forEach(e -> e.getValue().clear());
       assertContents(tableContents, result.getStore());
+      assertNoRocksDBMetrics(result.getStore().getDbLocation().toPath());
     }
+  }
+
+  @Test
+  public void testDefragCheckpointMetadataManagerSkipsRocksDBMetrics() throws Exception {
+    Path checkpointPath = tempDir.resolve("defrag-metrics-" + UUID.randomUUID());
+    createTableContents(checkpointPath, "_metrics_");
+
+    assertNoRocksDBMetrics(checkpointPath);
+    // The generic checkpoint path should keep the existing behavior and
+    // register RocksDB metrics.
+    try (OmMetadataManagerImpl defaultCheckpointMetadataManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(
+                 configuration, new RocksDBCheckpoint(checkpointPath), false)) {
+      assertRocksDBMetricsRegistered(
+          defaultCheckpointMetadataManager.getStore().getDbLocation().toPath());
+    }
+    assertNoRocksDBMetrics(checkpointPath);
+
+    // Defrag checkpoint DBs are transient and must not register generic
+    // RocksDB metrics.
+    try (OmMetadataManagerImpl defragCheckpointMetadataManager =
+             defragService.createDefragCheckpointMetadataManager(
+                 new RocksDBCheckpoint(checkpointPath), false)) {
+      assertNoRocksDBMetrics(
+          defragCheckpointMetadataManager.getStore().getDbLocation().toPath());
+    }
+    assertNoRocksDBMetrics(checkpointPath);
   }
 
   private void assertContents(Map<String, Map<String, String>> contents, Path path) throws IOException {

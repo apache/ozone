@@ -27,9 +27,12 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -91,6 +94,9 @@ public class TestObjectHead {
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
+
+    assertNull(response.getHeaderString(TAG_COUNT_HEADER),
+        "HeadObject must omit x-amz-tagging-count (AWS TagCount) when object has no tags");
   }
 
   @Test
@@ -208,6 +214,21 @@ public class TestObjectHead {
     createKey(keyPath);
 
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, keyPath + "/"));
+  }
+
+  @Test
+  public void testHeadObjectIncludesTagCount()
+      throws Exception {
+    String keyName = "head-with-tags";
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "c"));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    // S3 HeadObject TagCount in the AWS API is driven by x-amz-tagging-count
+    assertNotNull(response.getHeaderString(TAG_COUNT_HEADER),
+        "HeadObject must include x-amz-tagging-count when object has tags (AWS TagCount)");
+    assertEquals("2", response.getHeaderString(TAG_COUNT_HEADER));
   }
 
   private byte[] createKey(String keyPath) throws IOException {

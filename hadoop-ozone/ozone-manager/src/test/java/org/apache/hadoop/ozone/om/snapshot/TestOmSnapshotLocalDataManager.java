@@ -461,16 +461,26 @@ public class TestOmSnapshotLocalDataManager {
         createMockLiveFileMetaData("file6.sst", FILE_TABLE, "key1", "key2"),
         createMockLiveFileMetaData("file7.sst", KEY_TABLE, "key1", "key2"),
         createMockLiveFileMetaData("file1.sst", "col1", "key1", "key2"));
+    long beforeAdd = System.currentTimeMillis();
+    long committedLastDefragTime;
     try (WritableOmSnapshotLocalDataProvider snap =
              localDataManager.getWritableOmSnapshotLocalData(snapId)) {
+      assertEquals(0L, snap.getSnapshotLocalData().getLastDefragTime());
       mockSnapshotStore(snapId, newVersionSstFiles);
       snap.addSnapshotVersion(snapshotStore);
+      assertEquals(0L, snap.getSnapshotLocalData().getLastDefragTime());
       snap.commit();
+      committedLastDefragTime = snap.getSnapshotLocalData().getLastDefragTime();
+      assertTrue(committedLastDefragTime >= beforeAdd);
     }
+    long afterAdd = System.currentTimeMillis();
     validateVersions(localDataManager, snapId, 1, Sets.newHashSet(0, 1));
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapId)) {
       OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
       OmSnapshotLocalData.VersionMeta versionMeta = snapshotLocalData.getVersionSstFileInfos().get(1);
+      assertEquals(committedLastDefragTime, snapshotLocalData.getLastDefragTime());
+      assertTrue(snapshotLocalData.getLastDefragTime() >= beforeAdd);
+      assertTrue(snapshotLocalData.getLastDefragTime() <= afterAdd);
       assertEquals(6, versionMeta.getPreviousSnapshotVersion());
       List<SstFileInfo> expectedLiveFileMetaData =
           newVersionSstFiles.subList(0, 3).stream().map(SstFileInfo::new).collect(Collectors.toList());

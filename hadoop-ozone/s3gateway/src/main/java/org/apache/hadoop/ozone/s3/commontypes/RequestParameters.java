@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -44,12 +43,8 @@ public interface RequestParameters {
     try {
       return Integer.parseInt(value);
     } catch (NumberFormatException e) {
-      throw translateException(e);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key, e);
     }
-  }
-
-  default WebApplicationException translateException(RuntimeException e) {
-    return new WebApplicationException(e.getMessage(), S3ErrorTable.INVALID_ARGUMENT.getHttpCode());
   }
 
   /** Additional methods for tests. */

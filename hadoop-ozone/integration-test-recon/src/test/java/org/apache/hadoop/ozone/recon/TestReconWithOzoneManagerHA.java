@@ -23,7 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -41,6 +44,8 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
@@ -51,7 +56,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * This class sets up a MiniOzoneOMHACluster to test with Recon.
+ * Integration tests for Recon when Ozone Manager runs in HA mode on a mini cluster.
  */
 public class TestReconWithOzoneManagerHA {
 
@@ -107,9 +112,9 @@ public class TestReconWithOzoneManagerHA {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
-        + "no leader or more than one leader.");
-    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
+    assertNotNull(ozoneManager.get(),
+        "Expected an elected OM leader after the cluster became ready.");
+    assertTrue(ozoneManager.get().isLeaderReady(), "OM leader should be ready to serve.");
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
@@ -144,6 +149,11 @@ public class TestReconWithOzoneManagerHA {
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
+    long containerId = getContainerIdForKey(ozoneManager.get(), VOL_NAME, VOL_NAME, keyPrefix);
+    Map<Long, Integer> requiredKeyCountByContainer =
+        Collections.singletonMap(containerId, 1);
+    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+        requiredKeyCountByContainer);
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
       String reconKeyPrefix = null;
@@ -154,5 +164,24 @@ public class TestReconWithOzoneManagerHA {
           String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
           reconKeyPrefix);
     }
+  }
+
+  /**
+   * Looks up the object key on the given OM instance and returns the container id for its first block.
+   * In HA tests, pass the current leader so the read goes to the right node.
+   */
+  private static long getContainerIdForKey(OzoneManager omLeader, String volumeName,
+      String bucketName, String keyName) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    OmKeyLocationInfo location = omLeader.lookupKey(keyArgs)
+        .getKeyLocationVersions()
+        .get(0)
+        .getBlocksLatestVersionOnly()
+        .get(0);
+    return location.getContainerID();
   }
 }

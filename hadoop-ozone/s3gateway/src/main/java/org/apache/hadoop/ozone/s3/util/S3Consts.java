@@ -50,6 +50,10 @@ public final class S3Consts {
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MATCH =
+      COPY_SOURCE_IF_PREFIX + "match";
+  public static final String COPY_SOURCE_IF_NONE_MATCH =
+      COPY_SOURCE_IF_PREFIX + "none-match";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
       COPY_SOURCE_IF_PREFIX + "modified-since";
   public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
@@ -105,6 +109,11 @@ public final class S3Consts {
   public static final String IF_UNMODIFIED_SINCE_HEADER =
       "If-Unmodified-Since";
 
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
+
   //Never Constructed
   private S3Consts() {
 
@@ -126,7 +135,10 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    // GetBucketLocation is not implemented
+    public static final String LOCATION = "location";
     public static final String MARKER = "marker";
+    public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
     public static final String MAX_KEYS = "max-keys";
     public static final String MAX_PARTS = "max-parts";
     public static final String MAX_UPLOADS = "max-uploads";

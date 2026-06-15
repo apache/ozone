@@ -23,6 +23,16 @@ MYNAME="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
 
+## @description  true when the ozone-iceberg artifact is present in this distribution
+## @audience     private
+function ozone_iceberg_available
+{
+  local lib_dir="${HDDS_LIB_JARS_DIR:-${OZONE_HOME}/share/ozone/lib}"
+
+  [[ -f "${OZONE_HOME}/share/ozone/classpath/ozone-iceberg.classpath" ]] \
+    && compgen -G "${lib_dir}/ozone-iceberg-*.jar" > /dev/null
+}
+
 ## @description  build up the ozone command's usage text.
 ## @audience     public
 ## @stability    stable
@@ -59,12 +69,15 @@ function ozone_usage
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
+  ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
   ozone_add_subcommand "vapor" client "Ozone server simulator"
-
+  if ozone_iceberg_available; then
+    ozone_add_subcommand "iceberg" client "commands for Iceberg tables on Ozone (see ozone iceberg --help for subcommands)"
+  fi
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
 
@@ -103,7 +116,7 @@ function ozonecmd_case
     ;;
     completion)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-dist"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -176,7 +189,7 @@ function ozonecmd_case
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -221,6 +234,11 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
+    interactive)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-interactive"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+    ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
@@ -245,6 +263,15 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Vapor
       OZONE_VAPOR_OPTS="${OZONE_VAPOR_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
+    ;;
+    iceberg)
+      if ! ozone_iceberg_available; then
+        ozone_error "ERROR: ozone iceberg is not available in this distribution (requires JDK 11+ build)."
+        exit 1
+      fi
+      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.IcebergCommand"
+      OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
@@ -281,7 +308,9 @@ function check_running_ozone_services
 function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
-      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-iceberg" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF

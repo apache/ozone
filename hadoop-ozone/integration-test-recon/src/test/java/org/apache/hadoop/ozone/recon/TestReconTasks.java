@@ -157,8 +157,8 @@ public class TestReconTasks {
   }
 
   /**
-   * Verifies that {@code syncWithSCMContainerInfo()} pulls CLOSED containers
-   * from SCM into Recon when they are not yet known to Recon.
+   * Verifies that {@code triggerTargetedSCMContainerSync()} pulls CLOSED
+   * containers from SCM into Recon when they are not yet known to Recon.
    */
   @Test
   public void testSyncSCMContainerInfo() throws Exception {
@@ -185,7 +185,7 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconCm.getContainers().size();
     assertNotEquals(scmContainersCount, reconContainersCount);
-    reconScm.syncWithSCMContainerInfo();
+    reconScm.triggerSCMContainerSync();
     reconContainersCount = reconCm.getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
   }
@@ -264,8 +264,8 @@ public class TestReconTasks {
     //   RatisReplicationCheckHandler → only reached for CLOSED/QUASI_CLOSED containers;
     //                                  this is the ONLY handler that records UNDER_REPLICATED
     //
-    // syncWithSCMContainerInfo() only discovers *new* CLOSED containers, not state
-    // changes to already-known ones, so we apply the transition to both managers directly.
+    // Apply the transition to both managers directly so this test can focus on
+    // the health-check handler chain rather than targeted sync state correction.
     scmContainerManager.updateContainerState(containerInfo.containerID(),
         HddsProtos.LifeCycleEvent.FINALIZE);
     scmContainerManager.updateContainerState(containerInfo.containerID(),
@@ -604,7 +604,7 @@ public class TestReconTasks {
     DatanodeDetails primaryDn = pipeline.getFirstNode();
     DatanodeDetails secondDn = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails)
-        .filter(dd -> !dd.getUuid().equals(primaryDn.getUuid()))
+        .filter(dd -> !dd.getID().equals(primaryDn.getID()))
         .findFirst()
         .orElseThrow(() -> new AssertionError("No second datanode available"));
 

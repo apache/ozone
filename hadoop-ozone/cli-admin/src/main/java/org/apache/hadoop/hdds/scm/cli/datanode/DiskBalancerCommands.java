@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine.Command;
 
@@ -33,9 +35,9 @@ import picocli.CommandLine.Command;
  *      [--in-service-datanodes]   Send requests to all available DataNodes in HEALTHY
  *                                  and IN_SERVICE operational state. When this option
  *                                  is used, specific datanode addresses are not required.
- *                                  Note: Commands will only be sent to IN_SERVICE datanodes,
- *                                  excluding DECOMMISSIONING, DECOMMISSIONED, and nodes
- *                                  in maintenance states.
+ *                                  Note: Commands will only be sent to HEALTHY datanodes
+ *                                  in IN_SERVICE operational state, excluding non-HEALTHY,
+ *                                  DECOMMISSIONING, DECOMMISSIONED, and nodes in maintenance states.
  *
  * To start:
  *      ozone admin datanode diskbalancer start {@literal <host[:port]>} [{@literal <host[:port]>} ...]
@@ -75,7 +77,7 @@ import picocli.CommandLine.Command;
  *        Start balancer on all IN_SERVICE and HEALTHY datanodes
  *
  *      ozone admin datanode diskbalancer start --in-service-datanodes --json
- *        Start balancer on all IN_SERVICE datanodes and output results in JSON format
+ *        Start balancer on all IN_SERVICE and HEALTHY datanodes and output results in JSON format
  *
  * To stop:
  *      ozone admin datanode diskbalancer stop {@literal <host[:port]>} [{@literal <host[:port]>} ...]
@@ -109,7 +111,7 @@ import picocli.CommandLine.Command;
  *        Update diskbalancer threshold to 10% on DN-1
  *
  *      ozone admin datanode diskbalancer update --in-service-datanodes -t 10
- *        Update diskbalancer threshold to 10% on all IN_SERVICE datanodes
+ *        Update diskbalancer threshold to 10% on all IN_SERVICE and HEALTHY datanodes
  *
  *      ozone admin datanode diskbalancer update DN-1 -t 10 --json
  *        Update diskbalancer threshold to 10% on DN-1 and output result in JSON format
@@ -155,11 +157,10 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "diskbalancer",
-    description = "DiskBalancer specific operations. It is disabled by default." +
-        " To enable it, set 'hdds.datanode.disk.balancer.enabled' as true",
+    description = "DiskBalancer specific operations to ensure even disk utilization." +
+        " It is enabled by default. Set " + HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " to false to disable.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
-    hidden = true,
     subcommands = {
         DiskBalancerStartSubcommand.class,
         DiskBalancerStopSubcommand.class,
