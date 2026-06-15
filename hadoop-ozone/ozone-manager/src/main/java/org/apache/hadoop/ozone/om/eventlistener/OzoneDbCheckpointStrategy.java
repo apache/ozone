@@ -23,6 +23,8 @@ import java.net.InetAddress;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -115,6 +117,36 @@ public class OzoneDbCheckpointStrategy implements NotificationCheckpointStrategy
     } catch (IOException e) {
       throw e;
     }
+  }
+
+  @Override
+  public Long getMinimumCheckpoint() throws IOException {
+    Table<String, String> metaTable = ozoneManager.getMetadataManager().getMetaTable();
+    long minCheckpoint = Long.MAX_VALUE;
+    boolean hasCheckpoint = false;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>> iterator =
+             metaTable.iterator()) {
+      iterator.seek(OzoneConsts.EVENT_NOTIFICATION_CHECKPOINT_PREFIX);
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, String> entry = iterator.next();
+        String key = entry.getKey();
+        if (!key.startsWith(OzoneConsts.EVENT_NOTIFICATION_CHECKPOINT_PREFIX)) {
+          break;
+        }
+        String valStr = entry.getValue();
+        if (StringUtils.isNotBlank(valStr)) {
+          try {
+            long val = Long.parseLong(valStr);
+            minCheckpoint = Math.min(minCheckpoint, val);
+            hasCheckpoint = true;
+          } catch (NumberFormatException e) {
+            LOG.warn("Invalid checkpoint value {} found under key {}", valStr, key);
+          }
+        }
+      }
+    }
+    return hasCheckpoint ? minCheckpoint : null;
   }
 
   private void saveImpl(String val) throws IOException {

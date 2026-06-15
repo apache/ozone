@@ -15,21 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.eventlistener;
+package org.apache.hadoop.ozone.om.exceptions;
 
 import java.io.IOException;
 
 /**
- * Interface for implementations which load/save the current checkpoint
- * transaction log index used by an event poller.
+ * Exception thrown when a requested completed request info record
+ * is not found because it has already been pruned by the retention policy.
  */
-public interface NotificationCheckpointStrategy {
+public class OMCompletedRequestPrunedException extends IOException {
 
-  String load() throws IOException;
-
-  void save(String val) throws IOException;
-
-  void reset() throws IOException;
-
-  Long getMinimumCheckpoint() throws IOException;
+  public OMCompletedRequestPrunedException(String message) {
+    super(message);
+  }
 }
