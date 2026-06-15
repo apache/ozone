@@ -365,7 +365,7 @@ public class ContainerBalancerSelectionCriteria {
     this.excludeContainersDueToFailure.add(container);
   }
 
-  public Set<ContainerID> getExcludeDueToFailContainers() {
+  Set<ContainerID> getExcludeDueToFailContainers() {
     return excludeContainersDueToFailure;
   }
 

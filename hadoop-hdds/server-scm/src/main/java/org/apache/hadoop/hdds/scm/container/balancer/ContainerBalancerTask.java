@@ -1197,7 +1197,7 @@ public class ContainerBalancerTask implements Runnable {
     return underUtilizedNodes;
   }
 
-  public ContainerBalancerSelectionCriteria getSelectionCriteria() {
+  ContainerBalancerSelectionCriteria getSelectionCriteria() {
     return selectionCriteria;
   }
 
