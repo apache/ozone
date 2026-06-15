@@ -18,16 +18,17 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.time.Clock;
 import java.util.List;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,14 @@ import org.junit.jupiter.api.Test;
 public class TestBackgroundPipelineCreator {
 
   @Test
-  public void testEcDefaultReplicationAddsEcPipelineConfig() throws Exception {
+  public void testEcDefaultReplicationWithoutRatisThreeFlagCreatesNoPipelines()
+      throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
         HddsProtos.ReplicationType.EC.name());
     conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+        false);
 
     BackgroundPipelineCreator creator = new BackgroundPipelineCreator(
         mock(PipelineManager.class), conf, mock(SCMContext.class),
@@ -50,9 +54,30 @@ public class TestBackgroundPipelineCreator {
 
     List<ReplicationConfig> configs = creator.getReplicationConfigs(false);
 
-    assertTrue(configs.stream().anyMatch(c ->
+    assertTrue(configs.isEmpty());
+  }
+
+  @Test
+  public void testEcDefaultReplicationWithRatisThreeFlag() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        HddsProtos.ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+        true);
+
+    BackgroundPipelineCreator creator = new BackgroundPipelineCreator(
+        mock(PipelineManager.class), conf, mock(SCMContext.class),
+        Clock.systemUTC());
+
+    List<ReplicationConfig> configs = creator.getReplicationConfigs(false);
+
+    assertEquals(1, configs.size());
+    assertTrue(configs.stream()
+        .anyMatch(c -> RatisReplicationConfig.hasFactor(c,
+            HddsProtos.ReplicationFactor.THREE)));
+    assertFalse(configs.stream().anyMatch(c ->
         c.getReplicationType() == HddsProtos.ReplicationType.EC));
-    assertTrue(configs.contains(new ECReplicationConfig("rs-3-2-1024k")));
   }
 
   @Test

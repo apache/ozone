@@ -26,8 +26,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -57,8 +58,8 @@ public class OneReplicaPipelineSafeModeRule extends
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
   private final double pipelinePercent;
-  private final ReplicationConfig targetReplicationConfig;
-  private final String targetReplicationLabel;
+  private final RatisReplicationConfig targetReplicationConfig =
+      RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
@@ -77,8 +78,6 @@ public class OneReplicaPipelineSafeModeRule extends
             " value should be >= 0.0 and <= 1.0");
 
     this.pipelineManager = pipelineManager;
-    this.targetReplicationConfig = ReplicationConfig.getDefault(configuration);
-    this.targetReplicationLabel = targetReplicationConfig.configFormat();
     initializeRule(false);
 
   }
@@ -155,7 +154,8 @@ public class OneReplicaPipelineSafeModeRule extends
   public String getStatusText() {
     String status = String.format(
         "reported %s pipelines with at least one datanode (=%d) "
-            + ">= threshold (=%d)", targetReplicationLabel,
+            + ">= threshold (=%d)",
+        targetReplicationConfig.configFormat(),
         getCurrentReportedPipelineCount(),
         getThresholdCount());
     status = updateStatusTextWithSamplePipelines(status);

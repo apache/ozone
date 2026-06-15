@@ -27,9 +27,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -65,9 +67,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
   private final NodeManager nodeManager;
-  private final ReplicationConfig targetReplicationConfig;
-  private final int targetRequiredNodes;
-  private final String targetReplicationLabel;
+  private final RatisReplicationConfig targetReplicationConfig =
+      RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+  private final int targetRequiredNodes =
+      HddsProtos.ReplicationFactor.THREE_VALUE;
+  private final String targetReplicationLabel =
+      targetReplicationConfig.configFormat();
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
@@ -76,9 +81,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
-    this.targetReplicationConfig = ReplicationConfig.getDefault(configuration);
-    this.targetRequiredNodes = targetReplicationConfig.getRequiredNodes();
-    this.targetReplicationLabel = targetReplicationConfig.configFormat();
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
@@ -101,7 +103,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
 
-    return minDatanodes / targetRequiredNodes;
+    return minDatanodes / HddsProtos.ReplicationFactor.THREE_VALUE;
 
   }
 
@@ -144,12 +146,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     // datanode can send pipeline report again, or SCMPipelineManager will
     // create new pipelines.
 
-    // Only handle pipelines matching the configured default replication.
     if (!targetReplicationConfig.equals(pipeline.getReplicationConfig())) {
       Logger safeModeManagerLog = SCMSafeModeManager.getLogger();
       if (safeModeManagerLog.isDebugEnabled()) {
-        safeModeManagerLog.debug("Skipping pipeline safemode report processing as replication config {} " +
-            "does not match target {}.", pipeline.getReplicationConfig(), targetReplicationConfig);
+        safeModeManagerLog.debug("Skipping pipeline safemode report processing"
+            + " as replication config {} does not match target {}.",
+            pipeline.getReplicationConfig(), targetReplicationConfig);
       }
       return;
     }
@@ -163,7 +165,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     List<DatanodeDetails> pipelineDns = pipeline.getNodes();
     if (pipelineDns.size() != targetRequiredNodes) {
-      LOG.warn("Only {} DNs reported this pipeline: {}, all {} DNs should report the pipeline",
+      LOG.warn("Only {} DNs reported this pipeline: {}, all {} DNs should "
+              + "report the pipeline",
           pipelineDns.size(), pipeline.getId(), targetRequiredNodes);
       return;
     }

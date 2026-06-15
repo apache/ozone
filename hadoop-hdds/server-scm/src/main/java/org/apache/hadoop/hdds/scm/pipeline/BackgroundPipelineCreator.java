@@ -89,6 +89,7 @@ public class BackgroundPipelineCreator implements SCMService {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
   private final Clock clock;
+  private final boolean createRatisThreeForEcDefault;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext, Clock clock) {
@@ -110,6 +111,9 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.createRatisThreeForEcDefault = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
 
     threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
@@ -200,8 +204,6 @@ public class BackgroundPipelineCreator implements SCMService {
       // used.
       return ((StandaloneReplicationConfig) replicationConfig)
           .getReplicationFactor() != ReplicationFactor.ONE;
-    } else if (replicationConfig.getReplicationType().equals(EC)) {
-      return false;
     }
     return true;
   }
@@ -237,35 +239,28 @@ public class BackgroundPipelineCreator implements SCMService {
   @VisibleForTesting
   List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
     List<ReplicationConfig> list = new ArrayList<>();
+    ReplicationConfig defaultReplicationConfig = getDefaultReplicationConfig();
     // TODO: #CLUTIL Different replication factor may need to be supported
-    HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
-        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE, OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    HddsProtos.ReplicationType type = defaultReplicationConfig != null
+        ? defaultReplicationConfig.getReplicationType()
+        : HddsProtos.ReplicationType.valueOf(conf.get(
+            OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
     if (type == EC) {
-      try {
-        ReplicationConfig defaultConfig = ReplicationConfig.getDefault(conf);
-        if (defaultConfig.getReplicationType() == EC) {
-          list.add(defaultConfig);
-        }
-      } catch (IllegalArgumentException e) {
-        LOG.warn(
-            "Skipping EC pipeline creation due to invalid default EC " + "replication config. type={}, replication={}",
-            conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE, OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
-            conf.get(OzoneConfigKeys.OZONE_REPLICATION, OzoneConfigKeys.OZONE_REPLICATION_DEFAULT), e);
+      if (createRatisThreeForEcDefault) {
+        list.add(ReplicationConfig.fromProtoTypeAndFactor(RATIS,
+            ReplicationFactor.THREE));
       }
+      return list;
     }
 
-    for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor.values()) {
+    for (HddsProtos.ReplicationFactor factor
+        : HddsProtos.ReplicationFactor.values()) {
       if (factor == ReplicationFactor.ZERO) {
         continue; // Ignore it.
       }
-      final ReplicationConfig replicationConfig;
-      if (type != EC) {
-        replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(type, factor);
-      } else if (factor == ReplicationFactor.ONE) {
-        replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
-      } else {
-        continue;
-      }
+      final ReplicationConfig replicationConfig =
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor);
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
@@ -275,6 +270,21 @@ public class BackgroundPipelineCreator implements SCMService {
       }
     }
     return list;
+  }
+
+  private ReplicationConfig getDefaultReplicationConfig() {
+    try {
+      return ReplicationConfig.getDefault(conf);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Ignoring invalid default replication config: type={}, "
+              + "replication={}.",
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT),
+          e);
+      return null;
+    }
   }
 
   @Override

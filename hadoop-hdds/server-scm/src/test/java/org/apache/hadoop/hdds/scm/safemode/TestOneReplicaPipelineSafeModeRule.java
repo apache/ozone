@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -57,7 +56,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
@@ -218,7 +216,7 @@ public class TestOneReplicaPipelineSafeModeRule {
                 java.util.Collections.singletonList(mock(DatanodeDetails.class))));
 
     when(mockedPipelineManager.getPipelines(
-        Mockito.any(ReplicationConfig.class),
+        Mockito.any(),
         Mockito.eq(Pipeline.PipelineState.OPEN)))
         .thenReturn(java.util.Collections.singletonList(mockedPipeline));
 
@@ -234,42 +232,6 @@ public class TestOneReplicaPipelineSafeModeRule {
     // After at least one node is present in the pipeline, the rule should pass.
     assertTrue(localRule.validate());
     assertTrue(localRule.getReportedPipelineIDSet().contains(pipelineID));
-  }
-
-  @Test
-  public void testOneReplicaPipelineRuleForEcDefaultReplication() {
-    EventQueue localEventQueue = new EventQueue();
-    PipelineManager mockedPipelineManager = mock(PipelineManager.class);
-    SCMSafeModeManager mockedSafeModeManager = mock(SCMSafeModeManager.class);
-    SafeModeMetrics mockedMetrics = mock(SafeModeMetrics.class);
-    when(mockedSafeModeManager.getSafeModeMetrics()).thenReturn(mockedMetrics);
-    when(mockedSafeModeManager.getInSafeMode()).thenReturn(true);
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-        HddsProtos.ReplicationType.EC.name());
-    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
-    ReplicationConfig targetReplicationConfig = ReplicationConfig.getDefault(conf);
-
-    PipelineID pipelineID = PipelineID.randomId();
-    Pipeline mockedPipeline = mock(Pipeline.class);
-    when(mockedPipeline.getId()).thenReturn(pipelineID);
-    when(mockedPipeline.getNodeSet())
-        .thenReturn(new java.util.HashSet<>(
-            java.util.Collections.singletonList(mock(DatanodeDetails.class))));
-
-    when(mockedPipelineManager.getPipelines(targetReplicationConfig,
-        Pipeline.PipelineState.OPEN))
-        .thenReturn(java.util.Collections.singletonList(mockedPipeline));
-
-    OneReplicaPipelineSafeModeRule localRule =
-        new OneReplicaPipelineSafeModeRule(localEventQueue, mockedPipelineManager,
-            mockedSafeModeManager, conf);
-    localRule.setValidateBasedOnReportProcessing(false);
-
-    assertTrue(localRule.validate());
-    assertTrue(localRule.getReportedPipelineIDSet().contains(pipelineID));
-    assertTrue(localRule.getStatusText().contains("EC/3-2-1024k"));
   }
 
   private void createPipelines(int count,

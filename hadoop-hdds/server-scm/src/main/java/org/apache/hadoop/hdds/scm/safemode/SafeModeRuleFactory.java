@@ -19,7 +19,10 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -75,10 +78,13 @@ public final class SafeModeRuleFactory {
         config, containerManager, safeModeManager);
     SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
         config, nodeManager, safeModeManager);
+    SafeModeExitRule<?> ecMinDnRule = new ECMinDataNodeSafeModeRule(eventQueue,
+        config, nodeManager, safeModeManager);
 
     safeModeRules.add(ratisContainerRule);
     safeModeRules.add(ecContainerRule);
     safeModeRules.add(datanodeRule);
+    safeModeRules.add(ecMinDnRule);
 
     preCheckRules.add(datanodeRule);
 
@@ -93,12 +99,39 @@ public final class SafeModeRuleFactory {
     }
 
     if (pipelineManager != null) {
-      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config, scmContext, nodeManager));
+      if (shouldEnableHealthyPipelineRule()) {
+        safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
+            pipelineManager, safeModeManager, config, scmContext, nodeManager));
+      } else {
+        SCMSafeModeManager.getLogger().info("HealthyPipelineSafeModeRule is "
+            + "disabled for EC-default cluster because "
+            + "{} is false.",
+            ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE);
+      }
       safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config));
     }
 
+  }
+
+  private boolean shouldEnableHealthyPipelineRule() {
+    ReplicationConfig defaultReplicationConfig;
+    try {
+      defaultReplicationConfig = ReplicationConfig.getDefault(config);
+    } catch (IllegalArgumentException e) {
+      SCMSafeModeManager.getLogger().warn("Falling back to enabling "
+          + "HealthyPipelineSafeModeRule because default replication config "
+          + "could not be parsed.", e);
+      return true;
+    }
+
+    if (defaultReplicationConfig.getReplicationType()
+        != HddsProtos.ReplicationType.EC) {
+      return true;
+    }
+
+    return config.getBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
   }
 
   public static synchronized SafeModeRuleFactory getInstance() {
