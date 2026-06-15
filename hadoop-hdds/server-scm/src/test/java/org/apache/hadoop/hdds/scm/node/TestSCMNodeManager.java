@@ -132,10 +132,6 @@ public class TestSCMNodeManager {
   private StorageContainerManager scm;
   private SCMContext scmContext;
 
-  private static final LayoutVersionProto PRE_FINALIZED_VERSION_PROTO =
-      toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSVersion.SOFTWARE_VERSION);
-  private static final LayoutVersionProto MATCHING_VERSION_PROTO = defaultVersionProto();
-
   @BeforeEach
   public void setup() {
     testDir = PathUtils.getTestDir(
@@ -658,13 +654,16 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException, NodeNotFoundException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails finalizedNode =
-          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
+          registerWithCapacity(nodeManager, defaultVersionProto(), success);
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Finalized registration should increment finalized count");
 
+
+      LayoutVersionProto preFinalizedVersionProto =
+          toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSVersion.SOFTWARE_VERSION);
       DatanodeDetails nonFinalizedNode =
-          registerWithCapacity(nodeManager, PRE_FINALIZED_VERSION_PROTO, success);
+          registerWithCapacity(nodeManager, preFinalizedVersionProto, success);
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Non-finalized registration should not increment finalized count");
@@ -786,10 +785,10 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       // transitionNode stops heartbeating and will become STALE or DEAD
       DatanodeDetails transitionNode =
-          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
+          registerWithCapacity(nodeManager, defaultVersionProto(), success);
       // heartbeatingNode keeps heartbeating as a healthy baseline
       DatanodeDetails heartbeatingNode =
-          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
+          registerWithCapacity(nodeManager, defaultVersionProto(), success);
 
       nodeManager.processHeartbeat(transitionNode);
       nodeManager.processHeartbeat(heartbeatingNode);
@@ -830,7 +829,7 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException, NodeNotFoundException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails node =
-          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
+          registerWithCapacity(nodeManager, defaultVersionProto(), success);
       nodeManager.setNodeOperationalState(node, opState);
 
       // All HEALTHY nodes should be counted regardless of operational state
