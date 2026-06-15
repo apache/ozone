@@ -387,7 +387,7 @@ public class TestClientRetryContainerStateMachineFailures {
     }
   }
 
-  private boolean validateBlockData(String keyName, int matchCount, boolean missingContainer) throws IOException {
+  private void validateBlockData(String keyName, int matchCount, boolean missingContainer) throws IOException {
     OzoneKeyDetails key = objectStore.getVolume(volumeName).getBucket(bucketName).getKey(keyName);
     Map<Long, List<Long>> containerBlockListMap = new HashMap<>();
     cluster.getHddsDatanodes().forEach(dn -> {
@@ -410,6 +410,5 @@ public class TestClientRetryContainerStateMachineFailures {
         System.out.println("Block max bcsid: " + max + ", count: " + count + ", block list: " + blockList);
       }
     });
-    return true;
   }
 }
