@@ -38,9 +38,10 @@ on:
         required: false
 
 env:
+  # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
@@ -69,19 +70,19 @@ jobs:
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
         if: github.event_name  == 'push'
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
       - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
@@ -359,7 +360,7 @@ jobs:
       - integration
     steps:
       - name: Checkout project
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           persist-credentials: false

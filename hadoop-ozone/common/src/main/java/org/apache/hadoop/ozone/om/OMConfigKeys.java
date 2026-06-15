@@ -401,7 +401,7 @@ public final class OMConfigKeys {
    * Configuration properties for Snapshot Directory Service.
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
-  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = true;
   /**
    * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
    * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
@@ -621,7 +621,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(60);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);

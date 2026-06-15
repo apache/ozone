@@ -27,7 +27,7 @@ Note: we have more tests (like TCP-DS, TCP-H tests via Spark or Hive) which are 
 
 ## Unit test
 
-As every almost every java project we have the good old unit tests inside each of our projects.
+As with every Java project, we have the good old unit tests within each of our projects.
 
 ## Integration test (JUnit)
 
@@ -56,11 +56,11 @@ cd compose/ozone
 
 [Blockade](https://github.com/worstcase/blockade) is a tool to test network failures and partitions (it's inspired by the legendary [Jepsen tests](https://jepsen.io/analyses)).
 
-Blockade tests are implemented with the help of tests and can be started from the `./blockade` directory of the distribution.
+The Blockade test suite is shipped as Python tests under `tests/blockade`. After you build or unpack the distribution, run the commands below from that directory:
 
 ```
-cd blockade
-pip install pytest==2.8.7,blockade
+cd tests/blockade
+pip install pytest==2.8.7 blockade
 python -m pytest -s .
 ```
 
@@ -82,7 +82,7 @@ The number of volumes/buckets/keys can be configured. The replication type and f
 
 For more information use:
 
-bin/ozone freon --help
+ozone freon --help
 
 For example:
 

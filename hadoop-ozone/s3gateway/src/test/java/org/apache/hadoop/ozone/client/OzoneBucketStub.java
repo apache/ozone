@@ -145,7 +145,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(key, toByteArray());
+            byte[] bytes = toByteArray();
+            super.close();
+            keyContents.put(key, bytes);
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -158,7 +160,6 @@ public final class OzoneBucketStub extends OzoneBucket {
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
-            super.close();
           }
         };
 
@@ -179,7 +180,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(keyName, toByteArray());
+            byte[] bytes = toByteArray();
+            super.close();
+            keyContents.put(keyName, bytes);
             keyDetails.put(keyName, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -190,7 +193,6 @@ public final class OzoneBucketStub extends OzoneBucket {
                 new ArrayList<>(), finalReplicationCon, metadata, null,
                 () -> readKey(keyName), true, null, null
             ));
-            super.close();
           }
         };
 
@@ -326,6 +328,12 @@ public final class OzoneBucketStub extends OzoneBucket {
     if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
+      if (isECMultipartUpload(multipartInfo)) {
+        OzoneOutputStream outputStream =
+            createMultipartKey(key, size, partNumber, uploadID);
+        return new OzoneDataStreamOutputStub(outputStream, key + size);
+      }
+
       ByteBufferStreamOutput byteBufferStreamOutput =
           new KeyMetadataAwareByteBufferStreamOutput(new HashMap<>()) {
             private final ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
@@ -362,6 +370,12 @@ public final class OzoneBucketStub extends OzoneBucket {
 
       return new OzoneDataStreamOutputStub(byteBufferStreamOutput, key + size);
     }
+  }
+
+  private boolean isECMultipartUpload(MultipartInfoStub multipartInfo) {
+    ReplicationConfig config = multipartInfo.getReplicationConfig();
+    return config != null &&
+        config.getReplicationType() == HddsProtos.ReplicationType.EC;
   }
 
   @Override
@@ -502,7 +516,8 @@ public final class OzoneBucketStub extends OzoneBucket {
        ReplicationConfig config, Map<String, String> metadata, Map<String, String> tags)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
-    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata, tags));
+    keyToMultipartUpload.put(keyName,
+        new MultipartInfoStub(uploadID, config, metadata, tags));
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
   }
 
@@ -518,8 +533,10 @@ public final class OzoneBucketStub extends OzoneBucket {
           new KeyMetadataAwareOutputStream((int) size, new HashMap<>()) {
             @Override
             public void close() throws IOException {
-              Part part = new Part(key + size,
-                  toByteArray(), getMetadata().get(ETAG));
+              byte[] bytes = toByteArray();
+              String eTag = getMetadata().get(ETAG);
+              super.close();
+              Part part = new Part(key + size, bytes, eTag);
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -527,7 +544,6 @@ public final class OzoneBucketStub extends OzoneBucket {
               } else {
                 partList.get(key).put(partNumber, part);
               }
-              super.close();
             }
           };
       return new OzoneOutputStreamStub(keyOutputStream, key + size);
@@ -911,18 +927,24 @@ public final class OzoneBucketStub extends OzoneBucket {
   private static class MultipartInfoStub {
 
     private final String uploadId;
+    private final ReplicationConfig replicationConfig;
     private final Map<String, String> metadata;
     private final Map<String, String> tags;
 
-    MultipartInfoStub(String uploadId, Map<String, String> metadata,
-                      Map<String, String> tags) {
+    MultipartInfoStub(String uploadId, ReplicationConfig replicationConfig,
+                      Map<String, String> metadata, Map<String, String> tags) {
       this.uploadId = uploadId;
+      this.replicationConfig = replicationConfig;
       this.metadata = metadata;
       this.tags = tags;
     }
 
     public String getUploadId() {
       return uploadId;
+    }
+
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
     }
 
     public Map<String, String> getMetadata() {

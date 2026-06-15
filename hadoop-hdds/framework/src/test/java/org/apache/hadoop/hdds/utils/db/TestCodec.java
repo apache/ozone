@@ -32,6 +32,7 @@ import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -142,6 +143,20 @@ public final class TestCodec {
   }
 
   @Test
+  public void testStringCodecMalformedUtf8String() throws Exception {
+    final byte[] malformed = new byte[] {(byte) 0xC3, (byte) '/', 0, 0, 0, 1};
+
+    // StringCodec.getCodecNoFallback() should throw CodecException
+    assertThrows(CodecException.class,
+        () -> StringCodec.getCodecNoFallback().fromPersistedFormat(malformed));
+
+    // StringCodec.get() will replace malformed characters.
+    final String decoded = StringCodec.get().fromPersistedFormat(malformed);
+    final byte[] encoded = StringCodec.get().toPersistedFormat(decoded);
+    assertFalse(Arrays.equals(malformed, encoded));
+  }
+
+  @Test
   public void testStringCodec() throws Exception {
     assertFalse(StringCodec.get().isFixedLength());
     runTestStringCodec("");
@@ -183,6 +198,7 @@ public final class TestCodec {
   static int runTestStringCodec(String original) throws Exception {
     final int serializedSize = UTF_8.encode(original).remaining();
     runTest(StringCodec.get(), original, serializedSize);
+    runTest(StringCodec.getCodecNoFallback(), original, serializedSize);
     return serializedSize;
   }
 
@@ -204,7 +220,7 @@ public final class TestCodec {
 
 
     final String multiByteChars = "Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。";
-    assertThrows(IOException.class,
+    assertThrows(CodecException.class,
         tryCatch(() -> runTestFixedLengthStringCodec(multiByteChars)));
     assertThrows(IllegalStateException.class,
         tryCatch(() -> FixedLengthStringCodec.string2Bytes(multiByteChars)));

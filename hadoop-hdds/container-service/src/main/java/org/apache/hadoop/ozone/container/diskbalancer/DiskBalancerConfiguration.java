@@ -347,7 +347,7 @@ public final class DiskBalancerConfiguration {
                 + "Valid names are: " + Arrays.toString(State.values()),
             ex);
       }
-      if (HddsUtils.isOpenToWriteState(state) || state == State.DELETED) {
+      if (HddsUtils.isOpenToWriteState(state) || state == State.CLOSING || state == State.DELETED) {
         throw new IllegalArgumentException("State " + name + " is not movable.");
       }
       states.add(State.valueOf(name));

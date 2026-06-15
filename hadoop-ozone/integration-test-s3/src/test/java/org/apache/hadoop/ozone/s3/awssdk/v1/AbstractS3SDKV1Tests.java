@@ -35,15 +35,20 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
+import com.amazonaws.services.s3.model.CopyObjectRequest;
+import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingResult;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -68,6 +73,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
+import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -492,6 +498,105 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(ErrorType.Client, missingKey.getErrorType());
     assertEquals(404, missingKey.getStatusCode());
     assertEquals("NoSuchKey", missingKey.getErrorCode());
+  }
+
+  @Test
+  public void testCopyObject() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putResult.getETag());
+
+    CopyObjectResult copyResult = s3Client.copyObject(sourceBucketName, sourceKey, destBucketName, destKey);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfMatch() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withMatchingETagConstraint(sourceETag);
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertEquals(sourceETag, copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfMatchFail() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withMatchingETagConstraint("wrong-etag");
+
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfNoneMatch() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withNonmatchingETagConstraint("different-etag");
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertEquals(sourceETag, copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfNoneMatchFail() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withNonmatchingETagConstraint(sourceETag);
+    
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
   }
 
   @Test
@@ -998,6 +1103,85 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
       assertEquals(content, bos.toString("UTF-8"));
     }
+  }
+
+  static Stream<Arguments> onlyTagKeyCasesV1() {
+    Map<String, String> fooBarEmptyBar = new HashMap<>();
+    fooBarEmptyBar.put("foo", "bar");
+    fooBarEmptyBar.put("bar", "");
+    return Stream.of(
+        Arguments.of(
+            new ObjectTagging(Collections.singletonList(new Tag("tag1", null))),
+            Collections.singletonMap("tag1", "")),
+        Arguments.of(
+            new ObjectTagging(Arrays.asList(new Tag("foo", "bar"), new Tag("bar", null))),
+            fooBarEmptyBar)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCasesV1")
+  public void testPutObjectWithOnlyTagKey(ObjectTagging objectTagging,
+      Map<String, String> expectedTags) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(bucketName);
+
+    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+      PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, keyName, is, new ObjectMetadata())
+          .withTagging(objectTagging);
+      s3Client.putObject(putObjectRequest);
+    }
+
+    GetObjectTaggingResult taggingResult = s3Client.getObjectTagging(
+        new GetObjectTaggingRequest(bucketName, keyName));
+    Map<String, String> actualTags = taggingResult.getTagSet().stream()
+        .collect(Collectors.toMap(Tag::getKey, Tag::getValue));
+    assertEquals(expectedTags, actualTags);
+  }
+
+  @Test
+  public void testHeadObjectReturnsTaggingCount() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "head-object-tag-count";
+    s3Client.createBucket(bucketName);
+
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)), new ObjectMetadata());
+
+    List<Tag> tags = Arrays.asList(new Tag("tag1", "v1"), new Tag("tag2", "v2"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tags)));
+
+    ObjectMetadata head = s3Client.getObjectMetadata(bucketName, keyName);
+    // AWS SDK v1: getTaggingCount() exists on S3Object (GET), not on ObjectMetadata (HEAD).
+    // x-amz-tagging-count is exposed via raw metadata.
+    Object tagCountHeader = head.getRawMetadataValue(Headers.S3_TAGGING_COUNT);
+    assertNotNull(tagCountHeader);
+    assertEquals(tags.size(), Integer.parseInt(tagCountHeader.toString()));
+  }
+
+  @Test
+  public void testGetObjectTaggingReturnsTagsSortedByKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "");
+
+    List<Tag> tagsPutOrder = Arrays.asList(new Tag("key2", "val2"), new Tag("key", "val"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tagsPutOrder)));
+
+    GetObjectTaggingResult taggingResult =
+        s3Client.getObjectTagging(new GetObjectTaggingRequest(bucketName, keyName));
+    List<Tag> tagSet = taggingResult.getTagSet();
+    assertEquals(2, tagSet.size());
+    assertEquals("key", tagSet.get(0).getKey());
+    assertEquals("val", tagSet.get(0).getValue());
+    assertEquals("key2", tagSet.get(1).getKey());
+    assertEquals("val2", tagSet.get(1).getValue());
   }
 
   @Test

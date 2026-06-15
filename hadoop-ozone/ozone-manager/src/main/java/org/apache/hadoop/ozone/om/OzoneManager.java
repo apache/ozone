@@ -248,6 +248,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -515,6 +516,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
 
+  private final OMServiceManager serviceManager;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -712,6 +715,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     readBlacklist = OzoneBlacklist.getReadonlyBlacklist(conf);
 
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
+
+    serviceManager = new OMServiceManager();
+
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -2459,6 +2465,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisSnapshotProvider != null) {
         omRatisSnapshotProvider.close();
       }
+      serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
@@ -5624,6 +5631,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  public OMServiceManager getOMServiceManager() {
+    return serviceManager;
   }
 
   /**

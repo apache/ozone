@@ -63,12 +63,19 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
+  /**
+   * Max attempts to acquire {@link Container#writeLock()} while verifying this set's id → container mapping
+   * is same (e.g. another thread may {@link #updateContainer} / DiskBalancer swap the instance).
+   */
+  private static final int MAX_CONTAINER_MAP_SWAP_RETRIES = 5;
+
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
-  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
-      new ConcurrentSkipListMap<>();
+
+  private final ConcurrentSkipListSet<RecoveringContainer> recoveringContainerSet =
+      new ConcurrentSkipListSet<>();
   private final Clock clock;
   private long recoveringTimeout;
   @Nullable
@@ -202,8 +209,9 @@ public class ContainerSet implements Iterable<Container<?>> {
       updateContainerIdTable(containerId, container.getContainerData());
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
-        recoveringContainerMap.put(
-            clock.millis() + recoveringTimeout, containerId);
+        recoveringContainerSet.add(
+            new RecoveringContainer(clock.millis() + recoveringTimeout,
+                containerId));
       }
       HddsVolume volume = container.getContainerData().getVolume();
       if (volume != null) {
@@ -277,6 +285,54 @@ public class ContainerSet implements Iterable<Container<?>> {
   public Container<?> getContainer(long containerId) {
     Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
     return containerMap.get(containerId);
+  }
+
+  /**
+   * Returns the max retry for a container map swap while acquiring container lock.
+   * @return max retry count
+   */
+  public static int maxContainerMapSwapRetries() {
+    return MAX_CONTAINER_MAP_SWAP_RETRIES;
+  }
+
+  /**
+   * Locks the container mapped to {@code containerId} for write, and verifies that the instance locked is still
+   * the one stored in this set. If the mapping is swapped, unlocks and retries up to
+   * {@link #maxContainerMapSwapRetries()} times, then returns {@code null}.
+   *
+   * @return the locked container, or {@code null} if the mapping could not be stabilized after all retries
+   * @throws StorageContainerException with {@code CONTAINER_NOT_FOUND}
+   */
+  @Nullable
+  public Container<?> getContainerWithWriteLock(long containerId) throws StorageContainerException {
+    for (int retry = 0; retry < MAX_CONTAINER_MAP_SWAP_RETRIES; retry++) {
+      Container<?> candidate = getContainer(containerId);
+      if (candidate == null) {
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      candidate.writeLock();
+      Container<?> current = getContainer(containerId);
+      if (current == null) {
+        candidate.writeUnlock();
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      if (current != candidate) {
+        candidate.writeUnlock();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Container {} mapping changed during lock acquisition (attempt {}); retrying.",
+              containerId, retry);
+        }
+        continue;
+      }
+      return candidate;
+    }
+    LOG.warn("Container {} mapping kept changing after {} attempts; giving up.",
+        containerId, MAX_CONTAINER_MAP_SWAP_RETRIES);
+    return null;
   }
 
   /**
@@ -367,16 +423,16 @@ public class ContainerSet implements Iterable<Container<?>> {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     //it might take a little long time to iterate all the entries
-    // in recoveringContainerMap, but it seems ok here since:
+    // in recoveringContainerSet, but it seems ok here since:
     // 1 In the vast majority of cases，there will not be too
     // many recovering containers.
     // 2 closing container is not a sort of urgent action
     //
     // we can revisit here if any performance problem happens
-    Iterator<Map.Entry<Long, Long>> it = getRecoveringContainerIterator();
+    Iterator<RecoveringContainer> it = getRecoveringContainerIterator();
     while (it.hasNext()) {
-      Map.Entry<Long, Long> entry = it.next();
-      if (entry.getValue() == containerId) {
+      RecoveringContainer entry = it.next();
+      if (entry.getContainerId() == containerId) {
         it.remove();
         return true;
       }
@@ -435,11 +491,11 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   /**
    * Return an container Iterator over
-   * {@link ContainerSet#recoveringContainerMap}.
-   * @return {@literal Iterator<Container<?>>}
+   * {@link ContainerSet#recoveringContainerSet}.
+   * @return {@literal Iterator<RecoveringContainer>}
    */
-  public Iterator<Map.Entry<Long, Long>> getRecoveringContainerIterator() {
-    return recoveringContainerMap.entrySet().iterator();
+  public Iterator<RecoveringContainer> getRecoveringContainerIterator() {
+    return recoveringContainerSet.iterator();
   }
 
   /**
@@ -612,5 +668,53 @@ public class ContainerSet implements Iterable<Container<?>> {
         }
       }
     });
+  }
+
+  /**
+   * A class that holds information about a recovering container.
+   */
+  public static class RecoveringContainer
+      implements Comparable<RecoveringContainer> {
+    private final long timeout;
+    private final long containerId;
+
+    public RecoveringContainer(long timeout, long containerId) {
+      this.timeout = timeout;
+      this.containerId = containerId;
+    }
+
+    public long getTimeout() {
+      return timeout;
+    }
+
+    public long getContainerId() {
+      return containerId;
+    }
+
+    @Override
+    public int compareTo(RecoveringContainer other) {
+      int timeoutCompare = Long.compare(this.timeout, other.timeout);
+      if (timeoutCompare != 0) {
+        return timeoutCompare;
+      }
+      return Long.compare(this.containerId, other.containerId);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      RecoveringContainer that = (RecoveringContainer) o;
+      return timeout == that.timeout && containerId == that.containerId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(timeout, containerId);
+    }
   }
 }
