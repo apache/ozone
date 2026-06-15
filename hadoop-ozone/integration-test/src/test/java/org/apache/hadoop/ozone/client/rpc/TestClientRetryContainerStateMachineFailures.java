@@ -399,7 +399,7 @@ public class TestClientRetryContainerStateMachineFailures {
       });
     });
     key.getOzoneKeyLocations().forEach(location -> {
-      List<Long> blockList = containerBlockListMap.get(location.getContainerID());
+      List<Long> blockList = containerBlockListMap.getOrDefault(location.getContainerID(), Collections.emptyList());
       if (missingContainer) {
         Assertions.assertEquals(blockList.size(), matchCount, "Block list: " + blockList.size());
         System.out.println("Block list: " + blockList.size());
