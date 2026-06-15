@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.SqlDbUtils.indexExists;
-import static org.jooq.impl.DSL.name;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -33,7 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade action to ensure idx_state_container_id exists on UNHEALTHY_CONTAINERS.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX)
+@UpgradeActionRecon(feature = ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX)
 public class UnhealthyContainersStateContainerIdIndexUpgradeAction
     implements ReconUpgradeAction {
 
@@ -59,8 +58,8 @@ public class UnhealthyContainersStateContainerIdIndexUpgradeAction
           UNHEALTHY_CONTAINERS_TABLE_NAME);
       dslContext.createIndex(INDEX_NAME)
           .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME),
-              DSL.field(name("container_state")),
-              DSL.field(name("container_id")))
+              DSL.field(DSL.name("container_state")),
+              DSL.field(DSL.name("container_id")))
           .execute();
     } catch (SQLException e) {
       throw new SQLException("Failed to create " + INDEX_NAME

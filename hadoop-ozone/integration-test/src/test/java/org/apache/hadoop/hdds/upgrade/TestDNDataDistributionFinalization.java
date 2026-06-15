@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAF
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -75,10 +75,7 @@ public class TestDNDataDistributionFinalization {
 
   public void init(OzoneConfiguration conf) throws Exception {
 
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(null);
-
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
@@ -101,17 +98,16 @@ public class TestDNDataDistributionFinalization {
         .setSCMServiceId("scmservice")
         .setOMServiceId("omServiceId")
         .setNumOfOzoneManagers(1)
-        .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
             .build());
     this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
+        cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
 
     // Create Volume and Bucket
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
@@ -136,8 +132,8 @@ public class TestDNDataDistributionFinalization {
     init(new OzoneConfiguration());
 
     // Verify initial state - STORAGE_SPACE_DISTRIBUTION should not be finalized yet
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
+        cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
 
     // Create some data and delete operations to trigger pending deletion logic
     String keyName1 = "testKey1";
@@ -163,8 +159,7 @@ public class TestDNDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
 
     // Verify finalization completed
-    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
 
     // Create more data and deletions to test post-finalization behavior
     String keyName3 = "testKey3";
@@ -198,8 +193,7 @@ public class TestDNDataDistributionFinalization {
     scmClient.finalizeUpgrade();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
 
-    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
 
     // Verify the system can handle scenarios where pendingDeleteBlockCount
     // might be missing and needs recalculation

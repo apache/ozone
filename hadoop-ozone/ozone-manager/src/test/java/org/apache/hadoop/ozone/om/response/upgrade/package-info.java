@@ -15,18 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
-
-import org.apache.hadoop.hdds.ComponentVersion;
-
 /**
- * Generic Layout feature interface for Ozone.
+ * Package contains test classes for upgrade responses.
  */
-public interface LayoutFeature extends ComponentVersion {
-  int layoutVersion();
-
-  @Override
-  default int serialize() {
-    return this.layoutVersion();
-  }
-}
+package org.apache.hadoop.ozone.om.response.upgrade;

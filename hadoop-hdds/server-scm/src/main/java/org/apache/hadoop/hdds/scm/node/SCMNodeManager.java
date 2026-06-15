@@ -50,7 +50,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
-import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -84,8 +84,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -135,7 +136,7 @@ public class SCMNodeManager implements NodeManager {
   private final Map<String, Set<DatanodeID>> dnsToDnIdMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int datanodePipelineLimit;
-  private final HDDSLayoutVersionManager scmLayoutVersionManager;
+  private final ScmVersionManager versionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
@@ -157,28 +158,18 @@ public class SCMNodeManager implements NodeManager {
   private static final String VERSION = "VERSION";
 
   /**
-   * TODO HDDS-15129 Remove when SCM uses the new versioning framework
-   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software version ({@code 100}), while
-   * SCM still on {@link org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature} reports the legacy maximum ({@code 10}
-   * today).
-   * Without this bridge, registration fails and heartbeats log {@code dnSlv > scmSlv} as an invalid node.
+   * Constructs SCM machine Manager using {@link ScmVersionManager} (production SCM).
    */
-  private static boolean shouldFenceDatanode(int dnSoftwareVersion, int scmSoftwareVersion) {
-    return dnSoftwareVersion > scmSoftwareVersion && dnSoftwareVersion != HDDSVersion.ZDU.serialize();
-  }
-
-  /**
-   * Constructs SCM machine Manager.
-   */
+  @VisibleForTesting
   public SCMNodeManager(
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
-      HDDSLayoutVersionManager layoutVersionManager) {
+      ScmVersionManager versionManager) {
     this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
-        layoutVersionManager, hostname -> null);
+        versionManager, hostname -> null);
   }
 
   public SCMNodeManager(
@@ -187,14 +178,14 @@ public class SCMNodeManager implements NodeManager {
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
-      HDDSLayoutVersionManager layoutVersionManager,
+      ScmVersionManager versionManager,
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
-    this.scmLayoutVersionManager = layoutVersionManager;
+    this.versionManager = versionManager;
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
@@ -384,10 +375,8 @@ public class SCMNodeManager implements NodeManager {
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(
-                scmLayoutVersionManager.getMetadataLayoutVersion())
-            .setSoftwareLayoutVersion(
-                scmLayoutVersionManager.getSoftwareLayoutVersion())
+            .setMetadataLayoutVersion(versionManager.getApparentVersion().serialize())
+            .setSoftwareLayoutVersion(versionManager.getSoftwareVersion().serialize())
             .build());
   }
 
@@ -408,9 +397,7 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto dnVersionInfo) {
-    int dnSlvRegister = dnVersionInfo.getSoftwareLayoutVersion();
-    int scmSlvRegister = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    if (shouldFenceDatanode(dnSlvRegister, scmSlvRegister)) {
+    if (shouldFenceDatanode(datanodeDetails, dnVersionInfo)) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
           .setDatanode(datanodeDetails)
@@ -764,46 +751,48 @@ public class SCMNodeManager implements NodeManager {
 
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
       LayoutVersionProto versionReport) {
-    // Software layout version is hardcoded to the SCM.
-    int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    int dnSlv = versionReport.getSoftwareLayoutVersion();
-    int dnMlv = versionReport.getMetadataLayoutVersion();
+    ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getSoftwareLayoutVersion());
+    ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getMetadataLayoutVersion());
+    ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
+    ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
 
-    // A datanode with a larger software layout version is from a future
-    // version of ozone. It should not have been added to the cluster.
-    // TODO HDDS-15129 REMOVE WHEN SCM USES new versioning framework.
-    //  For now, do not treat datanodes with ZDU future software version as invalid.
-    if (shouldFenceDatanode(dnSlv, scmSlv)) {
-      LOG.error("Invalid data node in the cluster : {}. " +
-              "DataNode SoftwareLayoutVersion = {}, SCM " +
-              "SoftwareLayoutVersion = {}",
-          datanodeDetails.getHostName(), dnSlv, scmSlv);
+    if (shouldFenceDatanode(datanodeDetails, dnSoftwareVersion, dnApparentVersion)) {
+      LOG.error("Invalid datanode in the cluster : {}. " +
+              "Datanode software version = {}, " +
+              "Datanode apparent version = {}, " +
+              "SCM software version = {} " +
+              "SCM apparent version = {}",
+          datanodeDetails.getHostName(), dnSoftwareVersion, dnApparentVersion,
+          scmSoftwareVersion, scmApparentVersion);
       return;
     }
 
-    if (!scmContext.isLeader() || scmLayoutVersionManager.needsFinalization()) {
+    if (!scmContext.isLeader() || versionManager.needsFinalization()) {
       return;
     }
 
-    int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
-    if (dnMlv == scmMlv) {
-      // datanode is already finalized, so there is nothing to do
+    if (versionManager.getApparentVersion().equals(dnApparentVersion)) {
+      // If SCM and DN apparent version match, then the datanode is already finalized.
+      LOG.debug("Skip sending finalize command to datanode {} because its apparent version matches SCM's apparent " +
+          "version {}", datanodeDetails, versionManager.getApparentVersion());
       return;
     }
 
     // Because the finalizationManager / versionManager says finalization is not needed it means any DN reporting a
     // metadata layout version less than the SCM's metadata layout version can be finalized.
-    LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
-        datanodeDetails.getHostName(), dnMlv, scmMlv);
+    LOG.info("Sending finalize command to datanode {} with apparent version {} which is less than SCM's finalized " +
+        "apparent version {}", datanodeDetails, dnApparentVersion, scmApparentVersion);
 
     FinalizeVersionCommand finalizeCmd =
         new FinalizeVersionCommand(true,
             LayoutVersionProto.newBuilder()
-                .setSoftwareLayoutVersion(dnSlv)
-                .setMetadataLayoutVersion(dnSlv).build());
+                .setSoftwareLayoutVersion(dnSoftwareVersion.serialize())
+                .setMetadataLayoutVersion(dnSoftwareVersion.serialize()).build());
     try {
       finalizeCmd.setTerm(scmContext.getTermOfLeader());
-      // Send Finalize command to the data node. Its OK to send Finalize command multiple times.
+      // Send Finalize command to the data node. It's OK to send Finalize command multiple times.
       scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails,
               finalizeCmd));
@@ -1987,15 +1976,6 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getSkippedHealthChecks();
   }
 
-  /**
-   * @return  HDDSLayoutVersionManager
-   */
-  @VisibleForTesting
-  @Override
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
-    return scmLayoutVersionManager;
-  }
-
   private ReentrantReadWriteLock.WriteLock writeLock() {
     return lock.writeLock();
   }
@@ -2034,5 +2014,43 @@ public class SCMNodeManager implements NodeManager {
     } finally {
       writeLock().unlock();
     }
+  }
+
+  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, LayoutVersionProto versionReport) {
+    ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getSoftwareLayoutVersion());
+    ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getMetadataLayoutVersion());
+    return shouldFenceDatanode(dnDetails, dnSoftwareVersion, dnApparentVersion);
+  }
+
+  /**
+   * TODO Update this method to fence datanodes based on their software and apparent version and log the results.
+   * For now, maintain the non-rolling upgrade requirement that DN and SCM must have the same software version.
+   * Datanodes still cannot have a higher apparent version than SCM.
+   */
+  private boolean shouldFenceDatanode(DatanodeDetails dnDetails, ComponentVersion softwareVersion,
+                                        ComponentVersion apparentVersion) {
+    // Check datanode software version against SCM.
+    if (!versionManager.getSoftwareVersion().equals(softwareVersion)) {
+      // TODO Once SCM implementation for ZDU is complete, Datanodes with lower software versions will be allowed as
+      //  long as SCM is pre-finalized.
+      LOG.error("Datanode {} with software version {} which does not match SCM software version {} will not be " +
+              "allowed to join the cluster. This requirement will be lifted when ZDU is complete.",
+          dnDetails, softwareVersion, versionManager.getSoftwareVersion());
+      return true;
+    }
+
+    // Check datanode apparent version against SCM.
+    if (!versionManager.isAllowed(apparentVersion)) {
+      // Datanodes can never have a higher apparent version than SCM.
+      LOG.error("Datanode {} with apparent version {} which is larger than SCM's apparent version {} will not be " +
+          "allowed to join the cluster.", dnDetails, apparentVersion, versionManager.getApparentVersion());
+      return true;
+    }
+
+    // Datanodes with lower apparent version than SCM are allowed in the cluster but will be instructed to finalize
+    // if SCM has finalized.
+    return false;
   }
 }

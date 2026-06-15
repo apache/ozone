@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -55,5 +56,7 @@ public class OMFinalizeUpgradeResponse extends OMClientResponse {
           APPARENT_VERSION_KEY,
           String.valueOf(serializedApparentVersion));
     }
+    // Finalization has completed successfully, so the IN_PROGRESS Key should be removed from the database.
+    omMetadataManager.getMetaTable().deleteWithBatch(batchOperation, OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
   }
 }

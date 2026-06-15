@@ -28,11 +28,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public interface FinalizationStateManager extends SCMHandler {
 
+  // TODO this will need a parameter for peer version info to validate.
   @Replicate
-  void finalizeLayoutFeatures(Integer toLayoutVersion)
-      throws IOException;
-
-  void setUpgradeContext(SCMUpgradeFinalizationContext context);
+  void finalizeUpgrade() throws IOException;
 
   /**
    * Called on snapshot installation.

@@ -15,13 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.ozone.recon.upgrade;
+
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 
 /**
- * Interface for exposing Layout version metrics to JMX.
+ * Loads {@link ReconUpgradeAction} implementations annotated with {@link UpgradeActionRecon}.
  */
-public interface LayoutVersionManagerMXBean {
-  int getMetadataLayoutVersion();
+public final class ReconUpgradeActionProvider extends AbstractUpgradeActionProvider<ReconUpgradeAction> {
 
-  int getSoftwareLayoutVersion();
+  public static final String RECON_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.recon.upgrade";
+
+  public ReconUpgradeActionProvider() {
+    super(UpgradeActionRecon.class, ReconUpgradeAction.class, RECON_UPGRADE_CLASS_PACKAGE);
+  }
+
+  @Override
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionRecon annotation = clazz.getAnnotation(UpgradeActionRecon.class);
+    return annotation.feature();
+  }
 }

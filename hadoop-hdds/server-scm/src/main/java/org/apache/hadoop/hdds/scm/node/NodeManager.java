@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -173,19 +173,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
         totalHealthyNodes++;
         DatanodeInfo datanodeInfo = getDatanodeInfo(dn);
         if (datanodeInfo == null) {
-          LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
-              "finalization wait.", dn.getHostName());
+          LOG.warn("Could not get DatanodeInfo for {}, skip counting for finalization.", dn.getHostName());
           continue;
         }
 
-        LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
-        int dnMlv = dnLayout.getMetadataLayoutVersion();
-        int dnSlv = dnLayout.getSoftwareLayoutVersion();
+        ComponentVersion dnApparentVersion = datanodeInfo.getLastKnownApparentVersion();
+        ComponentVersion dnSoftwareVersion = datanodeInfo.getLastKnownSoftwareVersion();
 
-        if (dnMlv < dnSlv) {
+        if (!dnApparentVersion.equals(dnSoftwareVersion)) {
           // Datanode has not yet finalized
-          LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
-              dn.getHostName(), dnMlv, dnSlv);
+          LOG.debug("Datanode {} has not yet finalized: apparent version={}, software version={}",
+              dn.getHostName(), dnApparentVersion, dnSoftwareVersion);
         } else {
           finalizedNodes++;
         }
@@ -470,10 +468,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param dn datanode
    */
   default Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
-    return null;
-  }
-
-  default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
 

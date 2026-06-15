@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,8 +46,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -71,7 +73,7 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
-  private HDDSLayoutVersionManager versionManager;
+  private ScmVersionManager versionManager;
   private ReconContext reconContext;
 
   @BeforeEach
@@ -81,8 +83,8 @@ public class TestReconNodeManager {
     conf.set(OZONE_SCM_NAMES, "localhost");
     ReconUtils reconUtils = new ReconUtils();
     ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
-    versionManager = new HDDSLayoutVersionManager(
-        reconStorageConfig.getApparentVersion(), null, null);
+    versionManager = new ScmVersionManager(reconStorageConfig,
+        mock(OzoneStorageContainerManager.class), HashMap::new);
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
     reconContext = new ReconContext(conf, reconUtils);
   }

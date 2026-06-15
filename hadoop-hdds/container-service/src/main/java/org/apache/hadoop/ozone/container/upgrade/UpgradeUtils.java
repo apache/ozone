@@ -42,11 +42,4 @@ public final class UpgradeUtils {
         .setSoftwareLayoutVersion(softwareVersion.serialize())
         .build();
   }
-
-  public static LayoutVersionProto toVersionProto(int metadataLayoutVersion, int softwareLayoutVersion) {
-    return LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(metadataLayoutVersion)
-        .setSoftwareLayoutVersion(softwareLayoutVersion)
-        .build();
-  }
 }

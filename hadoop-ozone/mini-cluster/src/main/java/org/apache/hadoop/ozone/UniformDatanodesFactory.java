@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT;
-import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_INITIAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR;
@@ -60,16 +59,14 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
   private final int numDataVolumes;
   private final String reservedSpace;
-  private final Integer layoutVersion;
-  private final HDDSVersion initialVersion;
+  private final Integer apparentVersion;
   private final HDDSVersion currentVersion;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
-    layoutVersion = builder.layoutVersion;
+    apparentVersion = builder.apparentVersion;
     reservedSpace = builder.reservedSpace;
     currentVersion = builder.currentVersion;
-    initialVersion = builder.initialVersion != null ? builder.initialVersion : builder.currentVersion;
   }
 
   @Override
@@ -104,15 +101,12 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     Files.createDirectories(ratisDir);
     dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
 
-    if (layoutVersion != null) {
+    if (apparentVersion != null) {
       DatanodeStorage layoutStorage = new DatanodeStorage(
-          dnConf, UUID.randomUUID().toString(), layoutVersion);
+          dnConf, UUID.randomUUID().toString(), apparentVersion);
       layoutStorage.initialize();
     }
 
-    if (initialVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.serialize());
-    }
     if (currentVersion != null) {
       dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.serialize());
     }
@@ -144,8 +138,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     private int numDataVolumes = 1;
     private String reservedSpace;
-    private Integer layoutVersion;
-    private HDDSVersion initialVersion;
+    private Integer apparentVersion;
     private HDDSVersion currentVersion;
 
     /**
@@ -169,13 +162,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder setInitialVersion(HDDSVersion version) {
-      this.initialVersion = version;
+    public Builder setApparentVersion(int apparentVersion) {
+      this.apparentVersion = apparentVersion;
       return this;
     }
 

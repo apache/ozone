@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -46,11 +46,10 @@ public class DatanodeStorage extends Storage {
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultApparentVersion(conf));
   }
 
-  public DatanodeStorage(OzoneConfiguration conf, String dataNodeId,
-                         int layoutVersion)
+  public DatanodeStorage(OzoneConfiguration conf, String dataNodeId, int apparentVersion)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, layoutVersion);
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, apparentVersion);
   }
 
   public DatanodeStorage(ConfigurationSource conf)
@@ -95,11 +94,11 @@ public class DatanodeStorage extends Storage {
    * layout version is found on disk.
    */
   private static int getDefaultApparentVersion(ConfigurationSource conf) {
-    int defaultApparentVersion = maxLayoutVersion();
+    int defaultApparentVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
     if (dnIdFile.exists()) {
-      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.serialize();
     }
 
     return defaultApparentVersion;

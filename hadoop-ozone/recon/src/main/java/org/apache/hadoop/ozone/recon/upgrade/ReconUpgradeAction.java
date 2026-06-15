@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
-import static org.jooq.impl.DSL.name;
 
 import com.google.inject.Injector;
 import java.sql.Connection;
@@ -31,6 +30,7 @@ import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
@@ -38,9 +38,9 @@ import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 
 /**
- * ReconUpgradeAction is an interface for executing upgrade actions in Recon.
+ * Recon upgrade action executed during finalization of a {@link ReconVersion}.
  */
-public interface ReconUpgradeAction {
+public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
   /**
    * Execute the upgrade action during finalization.
    */
@@ -74,7 +74,7 @@ public interface ReconUpgradeAction {
 
       dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
           .add(DSL.constraint(constraintName)
-              .check(field(name("container_state")).in(enumStates)))
+              .check(field(DSL.name("container_state")).in(enumStates)))
           .execute();
 
       log.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",

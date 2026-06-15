@@ -300,6 +300,7 @@ import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizeService;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -463,6 +464,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private KeyProviderCryptoExtension kmsProvider;
   private final OMVersionManager versionManager;
+  private OMUpgradeFinalizeService omUpgradeFinalizeService;
 
   private final ReplicationConfigValidator replicationConfigValidator;
 
@@ -638,6 +640,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
+
+    if (versionManager.needsFinalization()) {
+      long intervalMs = conf.getTimeDuration(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL,
+          OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+      omUpgradeFinalizeService = new OMUpgradeFinalizeService(this, versionManager, getScmClient(), intervalMs);
+    }
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
@@ -946,7 +954,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OmMetadataManagerImpl metadataManagerImpl =
         new OmMetadataManagerImpl(configuration, this);
     this.metadataManager = metadataManagerImpl;
-    versionManager.validateDBVersion(metadataManager);
+    versionManager.validateDBVersion(metadataManager.getMetaTable());
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
     if (isS3MultiTenancyEnabled) {
@@ -1033,7 +1041,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
-      versionManager.finalizeFromSnapshotIfRequired(metadataManager);
+      versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
       instantiatePrepareStateAfterSnapshot();
     } else {
       // Prepare state depends on the transaction ID of metadataManager after a
@@ -1900,6 +1908,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       bootstrap(omNodeDetails);
     }
 
+    if (omUpgradeFinalizeService != null) {
+      omUpgradeFinalizeService.start();
+    }
+
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
@@ -2439,6 +2451,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       if (bucketUtilizationMetrics != null) {
         bucketUtilizationMetrics.unRegister();
+      }
+
+      if (omUpgradeFinalizeService != null) {
+        omUpgradeFinalizeService.shutdown();
       }
 
       if (versionManager != null) {

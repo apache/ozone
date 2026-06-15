@@ -17,105 +17,33 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Objects;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * Class to initiate SCM finalization and query its progress.
  */
-public class FinalizationManagerImpl implements FinalizationManager {
-
-  private SCMUpgradeFinalizer upgradeFinalizer;
-  private SCMUpgradeFinalizationContext context;
-  private SCMStorageConfig storage;
+public final class FinalizationManagerImpl implements FinalizationManager {
   private final FinalizationStateManager finalizationStateManager;
 
-  /**
-   * For test classes to inject their own state manager.
-   */
-  @VisibleForTesting
-  protected FinalizationManagerImpl(Builder builder,
-      FinalizationStateManager stateManager) throws IOException {
-    initCommonFields(builder);
-    this.finalizationStateManager = stateManager;
-
-  }
-
   private FinalizationManagerImpl(Builder builder) throws IOException {
-    initCommonFields(builder);
     this.finalizationStateManager = new FinalizationStateManagerImpl.Builder()
-        .setUpgradeFinalizer(this.upgradeFinalizer)
         .setFinalizationStore(builder.finalizationStore)
         .setTransactionBuffer(builder.scmHAManager.getDBTransactionBuffer())
         .setRatisServer(builder.scmHAManager.getRatisServer())
+        .setVersionManager(builder.versionManager)
         .build();
-  }
-
-  private void initCommonFields(Builder builder) {
-    this.storage = builder.storage;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager, builder.executor);
-  }
-
-  @Override
-  public void buildUpgradeContext(NodeManager nodeManager,
-      SCMContext scmContext) {
-    this.context = new SCMUpgradeFinalizationContext.Builder()
-            .setStorage(this.storage)
-            .setFinalizationStateManager(finalizationStateManager)
-            .setNodeManager(nodeManager)
-            .setSCMContext(scmContext)
-            .build();
-
-    finalizationStateManager.setUpgradeContext(this.context);
-  }
-
-  @Override
-  public UpgradeFinalization.StatusAndMessages finalizeUpgrade(
-      String upgradeClientID)
-      throws IOException {
-    Objects.requireNonNull(context, "Cannot finalize upgrade without " +
-        "first building the upgrade context.");
-    return upgradeFinalizer.finalize(upgradeClientID, context);
   }
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    Objects.requireNonNull(context, "Cannot finalize upgrade without first building the upgrade context.");
-    upgradeFinalizer.finalize(context);
+    finalizationStateManager.finalizeUpgrade();
   }
 
   @Override
-  public UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover, boolean readonly
-  ) throws IOException {
-    if (readonly) {
-      return new UpgradeFinalization.StatusAndMessages(
-          upgradeFinalizer.getStatus(), Collections.emptyList());
-    }
-    return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
-  }
-
-  @Override
-  public BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
-      HDDSLayoutVersionManager> getUpgradeFinalizer() {
-    return upgradeFinalizer;
-  }
-
-  @Override
-  public void reinitialize(Table<String, String> finalizationStore)
-      throws IOException {
+  public void reinitialize(Table<String, String> finalizationStore) throws IOException {
     finalizationStateManager.reinitialize(finalizationStore);
   }
 
@@ -123,24 +51,15 @@ public class FinalizationManagerImpl implements FinalizationManager {
    * Builds a {@link FinalizationManagerImpl}.
    */
   public static class Builder {
-    private HDDSLayoutVersionManager versionManager;
-    private SCMStorageConfig storage;
-    private SCMHAManager scmHAManager;
     private Table<String, String> finalizationStore;
-    private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor;
+    private SCMHAManager scmHAManager;
+    private ScmVersionManager versionManager;
 
     public Builder() {
-      executor = new DefaultUpgradeFinalizationExecutor<>();
     }
 
-    public Builder setLayoutVersionManager(
-        HDDSLayoutVersionManager layoutVersionManager) {
-      this.versionManager = layoutVersionManager;
-      return this;
-    }
-
-    public Builder setStorage(SCMStorageConfig storage) {
-      this.storage = storage;
+    public Builder setVersionManager(ScmVersionManager versionManager) {
+      this.versionManager = versionManager;
       return this;
     }
 
@@ -155,18 +74,10 @@ public class FinalizationManagerImpl implements FinalizationManager {
       return this;
     }
 
-    public Builder setFinalizationExecutor(
-        UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> finalizationExecutor) {
-      this.executor = finalizationExecutor;
-      return this;
-    }
-
     public FinalizationManagerImpl build() throws IOException {
-      Objects.requireNonNull(versionManager, "versionManager == null");
-      Objects.requireNonNull(storage, "storage == null");
       Objects.requireNonNull(scmHAManager, "scmHAManager == null");
       Objects.requireNonNull(finalizationStore, "finalizationStore == null");
-      Objects.requireNonNull(executor, "executor == null");
+      Objects.requireNonNull(versionManager, "versionManager == null");
 
       return new FinalizationManagerImpl(this);
     }

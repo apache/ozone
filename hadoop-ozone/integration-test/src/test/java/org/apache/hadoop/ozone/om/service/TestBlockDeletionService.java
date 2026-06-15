@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -89,17 +88,16 @@ public class TestBlockDeletionService {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.layoutVersion());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HBASE_SUPPORT.serialize());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HBASE_SUPPORT.layoutVersion()).build())
+            .setApparentVersion(HBASE_SUPPORT.serialize()).build())
         .build();
     cluster.waitForClusterToBeReady();
     scmClient = cluster.getStorageContainerLocationClient();
-    assertEquals(HBASE_SUPPORT.ordinal(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertEquals(HBASE_SUPPORT, cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
     metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
 
     OzoneClient ozoneClient = cluster.newClient();
@@ -140,8 +138,6 @@ public class TestBlockDeletionService {
     // UPGRADE SCM (if specified)
     scmClient.finalizeUpgrade();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
-    assertEquals(STORAGE_SPACE_DISTRIBUTION.ordinal(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // POST-UPGRADE
     //Step 6: Repeat the same steps in pre-upgrade

@@ -37,9 +37,9 @@ public class TestHDDSLayoutFeature {
     for (HDDSLayoutFeature lf : values) {
       // This will skip the jump from the last HDDSLayoutFeature to HDDSVersion#ZDU,
       // since that is expected to be a larger version increment.
-      assertEquals(currVersion + 1, lf.layoutVersion(),
+      assertEquals(currVersion + 1, lf.serialize(),
           "Expected monotonically increasing layout version for " + lf);
-      currVersion = lf.layoutVersion();
+      currVersion = lf.serialize();
     }
   }
 
@@ -52,7 +52,7 @@ public class TestHDDSLayoutFeature {
     HDDSLayoutFeature lastFeature = HDDSLayoutFeature.values()[numHDDSLayoutFeatures - 1];
     assertEquals(11, numHDDSLayoutFeatures);
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION, lastFeature);
-    assertEquals(10, lastFeature.layoutVersion());
+    assertEquals(10, lastFeature.serialize());
   }
 
   @Test
@@ -87,7 +87,7 @@ public class TestHDDSLayoutFeature {
   public void testIsSupportedByFeatureBoundary() {
     for (HDDSLayoutFeature feature : HDDSLayoutFeature.values()) {
       // A layout feature should support itself.
-      int layoutVersion = feature.layoutVersion();
+      int layoutVersion = feature.serialize();
       assertSupportedBy(feature, feature);
       if (layoutVersion > 0) {
         // A layout feature should not be supported by older features.
@@ -98,11 +98,11 @@ public class TestHDDSLayoutFeature {
   }
 
   @Test
-  public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
+  public void testAllLayoutFeaturesAreSupportedByUnknownFutureVersions() {
     for (HDDSLayoutFeature feature : HDDSLayoutFeature.values()) {
       assertSupportedBy(feature, HDDSVersion.ZDU);
       assertSupportedBy(feature, HDDSVersion.UNKNOWN_VERSION);
-      // No ComponentVersion instance represents an arbitrary future version.
+      // No ComponentVersion instance represents an arbitrary unknown version.
       assertTrue(feature.isSupportedBy(Integer.MAX_VALUE));
     }
   }

@@ -62,7 +62,7 @@ class TestDatanodeIdYaml {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -86,7 +86,7 @@ class TestDatanodeIdYaml {
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS
-            .layoutVersion());
+            .serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -106,7 +106,7 @@ class TestDatanodeIdYaml {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -127,7 +127,7 @@ class TestDatanodeIdYaml {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);

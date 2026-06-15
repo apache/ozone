@@ -48,7 +48,7 @@ public class TestDatanodeStartupInvalidApparentVersion {
   public void testStartupFailsWhenApparentVersionBetweenLastLayoutFeatureAndZdu()
       throws Exception {
     assertStartupFailsWithComponentVersionMessage(
-        HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion() + 1);
+        HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.serialize() + 1);
   }
 
   @Test

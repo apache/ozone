@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.recon.upgrade.ReconVersion.INITIAL_VERSION;
 
 import java.sql.SQLException;
 import javax.sql.DataSource;

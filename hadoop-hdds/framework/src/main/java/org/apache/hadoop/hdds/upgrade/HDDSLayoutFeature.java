@@ -21,20 +21,17 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * List of HDDS Layout Features. All version management has been migrated to {@link HDDSVersion} and no new additions
  * should be made to this class. Existing versions are kept here for backwards compatibility when upgrading to this
  * version from older versions.
  */
-public enum HDDSLayoutFeature implements LayoutFeature {
+public enum HDDSLayoutFeature implements ComponentVersion {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
@@ -65,40 +62,14 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private final int layoutVersion;
   private final String description;
-  private UpgradeAction<?> scmAction;
-  private UpgradeAction<?> datanodeAction;
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
     this.description = description;
   }
 
-  /**
-   * Associates an SCM upgrade action with this feature. Only the first upgrade action registered will be used.
-   *
-   * @param action The upgrade action to associate with this feature.
-   */
-  public void addScmAction(UpgradeAction<?> action) {
-    // Required by SpotBugs since this setter exists in an enum.
-    if (this.scmAction == null) {
-      this.scmAction = action;
-    }
-  }
-
-  /**
-   * Associates a Datanode upgrade action with this feature. Only the first upgrade action registered will be used.
-   *
-   * @param action The upgrade action to associate with this feature.
-   */
-  public void addDatanodeAction(UpgradeAction<?> action) {
-    // Required by SpotBugs since this setter exists in an enum.
-    if (this.datanodeAction == null) {
-      this.datanodeAction = action;
-    }
-  }
-
   @Override
-  public int layoutVersion() {
+  public int serialize() {
     return layoutVersion;
   }
 
@@ -134,13 +105,5 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  public Optional<UpgradeAction<?>> scmAction() {
-    return Optional.ofNullable(scmAction);
-  }
-
-  public Optional<UpgradeAction<?>> datanodeAction() {
-    return Optional.ofNullable(datanodeAction);
   }
 }

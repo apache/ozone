@@ -654,7 +654,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       fail(String.format("Datanode %s not registered",
           hostname));
     }
-    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), datanodeMetadata.getLayoutVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), datanodeMetadata.getApparentVersion());
   }
 
   @Test

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
+import static org.apache.hadoop.ozone.recon.upgrade.ReconVersion.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
 
 import javax.sql.DataSource;
 import org.slf4j.Logger;
