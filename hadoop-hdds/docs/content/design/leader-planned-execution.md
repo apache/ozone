@@ -28,7 +28,6 @@ author: Abhishek Pal
    * [2.1 CockroachDB — Proposer-Evaluated KV](#21-cockroachdb--proposer-evaluated-kv)
    * [2.2 YugabyteDB — Leader-Computed Write Batches](#22-yugabytedb--leader-computed-write-batches)
    * [2.3 TiKV — Classic State Machine Replication](#23-tikv--classic-state-machine-replication)
-   * [2.4 Why Ozone Does NOT Need Full RDBMS Concurrency](#24-why-ozone-does-not-need-full-rdbms-concurrency)
 3. [Proposal](#3-proposal)
    * [3.1 High-Level Architecture](#31-high-level-architecture)
    * [3.2 Proto Format: ReplicatedStateTransition](#32-proto-format-replicatedstatetransition)
@@ -74,14 +73,14 @@ Every OM node (leader and followers) runs the full business logic again in
 | **Wasted compute on followers** | Every follower repeats the full request processing — lock acquisition, validation, key building, quota computation |
 | **Risk of inconsistency** | `validateAndUpdateCache` reads from a table cache that may have different temporary state on leader vs follower when requests run at the same time |
 | **Double buffer complexity** | Results are queued in `OzoneManagerDoubleBuffer`, which adds batching delay and a separate flush thread. Snapshot barriers add more coordination |
-| **Tight coupling** | External consumers (Recon) must understand all command logic to read state changes |
+| **Tight coupling** | External consumers (such as Recon) must understand all command logic to read state changes |
 | **Lock contention** | OBS key operations hold a bucket-level write lock even though most creates/commits do not conflict with each other |
 
 ### What we want
 
 1. Leader computes a **fixed DB patch** (a list of table puts and deletes) once.
 2. The patch is sent to all nodes via Ratis as a self-contained payload.
-3. All nodes (leader, followers, future Recon follower) apply the patch directly to RocksDB — no business logic runs again.
+3. All nodes (leader, followers, listeners) apply the patch directly to RocksDB — no business logic runs again.
 4. Locks are made more fine-grained so independent key operations can run in parallel.
 
 ---
@@ -94,7 +93,7 @@ practice:
 
 | Model | Who runs the logic? | What goes through Raft? | Used by |
 |-------|--------------------|-----------------------|---------|
-| **State Machine Replication (SMR)** | All replicas | Commands (the operation) | TiKV, older CockroachDB |
+| **State Machine Replication (SMR)** | All replicas | Commands (the operation) | TiKV, older CockroachDB, existing Ozone replication model |
 | **Leader Execution (Primary-Backup)** | Leader only | Computed results (WriteBatch) | YugabyteDB, newer CockroachDB, **this proposal** |
 
 ### 2.1 CockroachDB — Proposer-Evaluated KV
@@ -152,38 +151,6 @@ on key-value pairs. There is no complex business logic to re-execute.
 This works for TiKV because the transaction coordination layer (Percolator 2PC)
 runs **above** Raft. By the time something enters the Raft log, it is already a
 simple key-value mutation.
-
-### 2.4 Why Ozone Does NOT Need Full RDBMS Concurrency
-
-The reviewer raised a valid concern: does leader-side execution require us to
-implement RDBMS-style MVCC, transaction rollback, or two-phase commit?
-
-**The answer is no.** Here is why:
-
-| RDBMS concern | Why Ozone does not need it |
-|---------------|---------------------------|
-| Transaction rollback | Each request produces one atomic RocksDB `WriteBatch`. It either commits fully or not at all. Nothing to roll back. |
-| MVCC (multiple versions) | All OM metadata lives in one Ratis group. No multi-shard transactions that need versioned visibility. |
-| Two-phase commit (2PC) | All state is in one RocksDB. No distributed commit across multiple storage nodes needed. |
-| Deadlock detection | Fixed lock ordering (bucket read → key/dir write) prevents deadlocks by design. |
-| Write-ahead log for crash recovery | The Ratis log IS the write-ahead log. Apply is a replay of committed entries. |
-
-**What we DO need (and have):**
-- Fine-grained latching (striped locks) — same concept as CockroachDB's `latchManager`
-- Atomic apply (RocksDB WriteBatch) — same as CockroachDB and YugabyteDB
-- Leader-computed patches — same as CockroachDB PEVK and YugabyteDB
-
-The systems that need full MVCC/rollback (CockroachDB, TiKV, YugabyteDB) do so
-because their transactions can span **multiple Raft groups** (multiple shards).
-A write may touch data on different nodes and must be atomic across all of them.
-This requires provisional writes, 2PC, and rollback.
-
-Ozone OM is different: all metadata lives in **one Ratis group**. Each request
-is self-contained — it reads from the DB, computes changes, and produces one
-atomic batch. There are no multi-entry transactions that span multiple log
-entries. The complexity level we need is closer to CockroachDB's **latch
-manager** (which is a simple concurrency primitive), not their full transaction
-engine.
 
 ---
 
@@ -812,7 +779,6 @@ This test gives high confidence that the migration does not change behavior.
 | **Response available** | After `applyTransaction` | Right after planning |
 | **Double buffer** | Required (batches + flushes) | Not used |
 | **Table cache** | Maintained per-table | Not needed (reads from DB directly) |
-| **Recon compatibility** | Must understand all commands | Can apply the raw patch directly |
 
 ---
 
@@ -825,14 +791,6 @@ Commands are migrated one at a time:
 1. Implement a `PlannedRequest` subclass (e.g. `OBSCreateKeyPlannedRequest`).
 2. Register it via `stateMachine.registerPlannedCommand(Type.CreateKey, creator)`.
 3. The state machine handles routing automatically.
-
-**Migration order (proposed):**
-1. OBS CreateKey + CommitKey (highest throughput benefit)
-2. OBS DeleteKey, RenameKey
-3. FSO key operations
-4. Volume/Bucket operations
-5. Snapshot operations (barrier handling already in place)
-6. Remaining commands
 
 ### 8.2 Zero-Downtime Upgrade (ZDU) Compatibility
 
@@ -1076,16 +1034,3 @@ hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/
 hadoop-ozone/interface-client/src/main/proto/
   OmClientProtocol.proto              - ReplicatedStateTransition messages
 ```
-
-## Appendix: References
-
-- CockroachDB Proposer-Evaluated KV RFC:
-  `github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20160420_proposer_evaluated_kv.md`
-- CockroachDB concurrency control source:
-  `pkg/kv/kvserver/concurrency/` (latch manager, lock table)
-- YugabyteDB transaction architecture:
-  `docs.yugabyte.com/preview/architecture/transactions/distributed-txns/`
-- TiKV deep-dive:
-  `tikv.org/deep-dive/`
-- ScyllaDB Raft integration:
-  `github.com/scylladb/scylladb/tree/master/raft/`
