@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
  * {@link ReconTaskSchemaDefinition} in case it is missing .
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS)
+@UpgradeActionRecon(feature = ReconVersion.TASK_STATUS_STATISTICS)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);

@@ -25,7 +25,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * Versioning for datanode.
+ * Upgrade and downgrade version handling for SCM and Datanode.
  */
 public enum HDDSVersion implements ComponentVersion {
 

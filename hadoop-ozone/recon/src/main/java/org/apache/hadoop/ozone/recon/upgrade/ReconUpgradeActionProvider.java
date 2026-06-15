@@ -17,11 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import javax.sql.DataSource;
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 
 /**
- * Recon upgrade action executed during finalization of a {@link ReconVersion}.
+ * Loads {@link ReconUpgradeAction} implementations annotated with {@link UpgradeActionRecon}.
  */
-public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
+public final class ReconUpgradeActionProvider extends AbstractUpgradeActionProvider<ReconUpgradeAction> {
+
+  public static final String RECON_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.recon.upgrade";
+
+  public ReconUpgradeActionProvider() {
+    super(UpgradeActionRecon.class, ReconUpgradeAction.class, RECON_UPGRADE_CLASS_PACKAGE);
+  }
+
+  @Override
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionRecon annotation = clazz.getAnnotation(UpgradeActionRecon.class);
+    return annotation.feature();
+  }
 }
