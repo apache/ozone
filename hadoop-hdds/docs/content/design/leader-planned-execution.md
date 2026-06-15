@@ -50,6 +50,8 @@ author: Abhishek Pal
    * [6.5 Stress/Chaos Tests](#65-stresschaos-tests)
 7. [Comparison: Legacy vs Planned Path](#7-comparison-legacy-vs-planned-path)
 8. [Migration Strategy](#8-migration-strategy)
+   * [8.1 Per-Command Migration](#81-per-command-migration)
+   * [8.2 Zero-Downtime Upgrade (ZDU) Compatibility](#82-zero-downtime-upgrade-zdu-compatibility)
 9. [FAQs](#9-faqs)
 
 ---
@@ -816,15 +818,13 @@ This test gives high confidence that the migration does not change behavior.
 
 ## 8. Migration Strategy
 
+### 8.1 Per-Command Migration
+
 Commands are migrated one at a time:
 
 1. Implement a `PlannedRequest` subclass (e.g. `OBSCreateKeyPlannedRequest`).
 2. Register it via `stateMachine.registerPlannedCommand(Type.CreateKey, creator)`.
 3. The state machine handles routing automatically.
-
-**No backwards compatibility is required.** This is a clean-cut migration within
-a release boundary. All nodes in the cluster run the same code, so there is no
-mixed-version case to handle.
 
 **Migration order (proposed):**
 1. OBS CreateKey + CommitKey (highest throughput benefit)
@@ -833,6 +833,84 @@ mixed-version case to handle.
 4. Volume/Bucket operations
 5. Snapshot operations (barrier handling already in place)
 6. Remaining commands
+
+### 8.2 Zero-Downtime Upgrade (ZDU) Compatibility
+
+The Ozone cluster supports Zero-Downtime Upgrade (ZDU) where nodes are
+upgraded one at a time while the cluster stays online (see HDDS-14498). During a
+rolling upgrade, different OMs may run different software versions at the same
+time. The ZDU design uses an "apparent version" system:
+
+- **Pre-finalized:** All OMs act as the old version (same API surface, same
+  disk format) even if some run newer software.
+- **Finalized:** After the admin runs the finalize command, all OMs switch to
+  the new version together via Ratis.
+
+**How leader-planned execution works with ZDU:**
+
+The planned execution path is gated behind the OM component version. When the
+cluster is pre-finalized (apparent version < software version), OMs use the
+legacy request flow (`validateAndUpdateCache` + double buffer). After
+finalization, OMs switch to the planned execution path.
+
+The routing decision happens in `OzoneManagerStateMachine`:
+
+```java
+boolean usePlannedPath(Type cmdType) {
+  if (!omVersionManager.isFinalized(LEADER_PLANNED_EXECUTION)) {
+    return false;  // pre-finalized: use legacy path
+  }
+  return plannedRequestCreators.containsKey(cmdType);
+}
+```
+
+**Version lifecycle for removing the legacy path:**
+
+Following the ZDU versioning policy, the legacy path for a migrated command
+goes through three stages:
+
+| Version | Behavior |
+|---------|----------|
+| **Vn** (introduces planned execution) | Both paths exist. Pre-finalized: legacy path. Finalized: planned path. |
+| **Vn+1** | Legacy path still present but only used pre-finalization. Planned path is the default post-finalization. |
+| **Vn+2** | Legacy path removed. Docs state: if upgrading from <= Vn to >= Vn+2 with ZDU, you must pass through Vn+1. |
+
+This means:
+- The old `validateAndUpdateCache` code for migrated commands stays in the
+  codebase for at least one additional version after the planned path is
+  introduced
+- During pre-finalization, the old path handles all requests (ensuring
+  compatibility with any OM still running old software)
+- After finalization, all OMs switch to the planned path together (they all
+  run the same software version by this point, per ZDU invariants)
+- In a later version, the old path can be safely removed
+
+**Why this works safely:**
+
+The ZDU design guarantees that at the time of finalization, all OMs run the
+same software version. This means:
+- All OMs have the `PlannedRequest` code available
+- All OMs have the `StateTransitionApplyEngine` available
+- The switch from legacy to planned happens atomically across all OMs (via the
+  finalization Ratis transaction)
+- There is no mixed-mode scenario where one OM uses the planned path while
+  another uses legacy
+
+**Impact on the design:**
+
+1. The dual-path routing in the state machine (Section 3.6) already supports
+   this — we just add the version gate check.
+2. The `BatchedStateTransitions` proto field (field 200 on `OMRequest`) is a
+   new field that old software ignores (proto backwards compatibility).
+3. The `ManagedIndexService` is initialized on all nodes but only actively used
+   post-finalization. Pre-finalization, the existing `transactionLogIndex`
+   continues to be used for objectID generation.
+
+**Non-rolling upgrade path:**
+
+For clusters that accept downtime, the upgrade is simpler: stop all OMs,
+upgrade all software, start all OMs, finalize. In this case the legacy path is
+never used in the new version — finalization happens immediately after startup.
 
 ---
 
@@ -950,6 +1028,27 @@ batches. Both are proven at scale in production. The key difference: those
 systems also need full MVCC and 2PC because they have multiple Raft groups
 (sharded data). We do not — all OM metadata is in one Raft group, so our
 concurrency needs are simpler (just latching, no multi-shard transactions).
+
+### Q: Does this work with Zero-Downtime Upgrade (ZDU)?
+
+Yes. See Section 8.2 for full details. In short:
+- The planned execution path is gated behind a component version check.
+- Pre-finalization: OMs use the legacy path (compatible with old software).
+- Post-finalization: all OMs switch to the planned path together.
+- The legacy path stays in the code for one version after introduction, then
+  can be removed. Users upgrading across multiple versions must pass through
+  the intermediate version if using ZDU.
+
+### Q: Do we need to keep the old `validateAndUpdateCache` code forever?
+
+No. The ZDU versioning policy allows removing old internal APIs after one
+version. For example:
+- Version N introduces the planned path (legacy path still used pre-finalization)
+- Version N+1 keeps the legacy path for pre-finalization only
+- Version N+2 removes the legacy path entirely
+
+Users doing ZDU from version N to N+2 must pass through N+1. Users doing
+offline (downtime) upgrades can jump directly.
 
 ---
 
