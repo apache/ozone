@@ -23,13 +23,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -52,15 +50,19 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopDirTreeGenerator.class);
 
+  private static final int DEFAULT_FILE_COUNT = 2;
+  private static final int DEFAULT_NAME_LEN = 10;
+  private static final StorageSize DEFAULT_FILE_SIZE =
+      StorageSize.parse("4KB", org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
+
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
       defaultValue = "5")
   private int depth;
 
   @Option(names = {"-c", "--file-count"},
-      description = "Number of files to be written in each directory.",
-      defaultValue = "2")
-  private int fileCount;
+      description = "Number of files to be written in each directory.")
+  private Integer fileCount;
 
   /** For backward compatibility. */
   @Deprecated
@@ -72,7 +74,6 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       description = "Generated data size of each file to be " +
           "written in each directory. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
-      defaultValue = "4KB",
       converter = StorageSizeConverter.class)
   private StorageSize fileSize;
 
@@ -95,18 +96,14 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create.",
-      defaultValue = "10")
-  private int length;
+          "Length of the random name of directory you want to create.")
+  private Integer length;
 
   /** For backward compatibility. */
   @Deprecated
   @SuppressWarnings("DeprecatedIsStillUsed")
   @Option(names = "--nameLen", hidden = true)
   private Integer deprecatedLength;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   private AtomicLong totalDirsCnt = new AtomicLong();
 
@@ -116,7 +113,6 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-    applyDeprecatedOptionOverrides();
     String s;
     if (depth <= 0) {
       s = "Invalid depth value, depth value should be greater than zero!";
@@ -126,7 +122,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       print(s);
     } else {
       super.init();
-      contentGenerator = new ContentGenerator(fileSize.toBytes(), bufferSize);
+      contentGenerator = new ContentGenerator(getFileSize().toBytes(), bufferSize);
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);
@@ -134,30 +130,34 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
     return null;
   }
 
-  private void applyDeprecatedOptionOverrides() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--fileCount", "--file-count", spec, "--file-count", "-c");
-    if (deprecatedFileCount != null
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "--file-count")
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "-c")) {
-      fileCount = deprecatedFileCount;
+  private int getFileCount() {
+    if (fileCount != null) {
+      return fileCount;
     }
+    if (deprecatedFileCount != null) {
+      return deprecatedFileCount;
+    }
+    return DEFAULT_FILE_COUNT;
+  }
 
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--fileSize", "--file-size", spec, "--file-size", "-g");
-    if (deprecatedFileSize != null
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "--file-size")
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "-g")) {
-      fileSize = deprecatedFileSize;
+  private StorageSize getFileSize() {
+    if (fileSize != null) {
+      return fileSize;
     }
+    if (deprecatedFileSize != null) {
+      return deprecatedFileSize;
+    }
+    return DEFAULT_FILE_SIZE;
+  }
 
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--nameLen", "--name-len", spec, "--name-len", "-l");
-    if (deprecatedLength != null
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "--name-len")
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "-l")) {
-      length = deprecatedLength;
+  private int getLength() {
+    if (length != null) {
+      return length;
     }
+    if (deprecatedLength != null) {
+      return deprecatedLength;
+    }
+    return DEFAULT_NAME_LEN;
   }
 
   /*
@@ -232,7 +232,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private String makeDirWithGivenNumberOfFiles(String parent)
           throws Exception {
-    String dir = RandomStringUtils.secure().nextAlphanumeric(length);
+    String dir = RandomStringUtils.secure().nextAlphanumeric(getLength());
     dir = parent.concat("/").concat(dir);
     getFileSystem().mkdirs(new Path(dir));
     totalDirsCnt.incrementAndGet();
@@ -243,7 +243,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private void createFile(String dir, long counter) throws Exception {
     String fileName = dir.concat("/").concat(RandomStringUtils.
-            secure().nextAlphanumeric(length));
+            secure().nextAlphanumeric(getLength()));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);
@@ -257,7 +257,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
   }
 
   private void createFiles(String dir) throws Exception {
-    for (int i = 0; i < fileCount; i++) {
+    for (int i = 0; i < getFileCount(); i++) {
       createFile(dir, i);
     }
   }

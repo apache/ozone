@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -42,9 +41,6 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
   @Mixin
   private ScmOption scmOption;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.ArgGroup(multiplicity = "1")
   private TransferOption configGroup;
 
@@ -65,6 +61,10 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
     private boolean isRandom;
+
+    String getScmId() {
+      return scmId != null ? scmId : deprecatedScmId;
+    }
   }
 
   @Override
@@ -74,10 +74,7 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     if (configGroup.isRandom) {
       configGroup.scmId = "";
     } else {
-      DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-          "--newLeaderId", "--new-leader-id", spec, "--new-leader-id", "-n");
-      configGroup.scmId = DeprecatedCliOptions.resolveString(
-          configGroup.scmId, configGroup.deprecatedScmId);
+      configGroup.scmId = configGroup.getScmId();
     }
     client.transferLeadership(configGroup.scmId);
     System.out.println("Transfer leadership successfully to " +

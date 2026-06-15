@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 
 import java.io.IOException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -33,9 +32,6 @@ import picocli.CommandLine;
 @CommandLine.Command(name = "assign",
     description = "Assign user accessId to tenant")
 public class TenantAssignUserAccessIdHandler extends TenantHandler {
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Parameters(description = "User name", arity = "1..1")
   private String userPrincipal;
@@ -60,6 +56,10 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   @CommandLine.Option(names = "--accessId", hidden = true)
   private String deprecatedAccessId;
 
+  private String getAccessId() {
+    return accessId != null ? accessId : deprecatedAccessId;
+  }
+
   private String getDefaultAccessId(String userPrinc) {
     return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrinc;
   }
@@ -68,9 +68,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--accessId", "--access-id", spec, "--access-id", "-a");
-    accessId = DeprecatedCliOptions.resolveString(accessId, deprecatedAccessId);
+    accessId = getAccessId();
 
     if (StringUtils.isEmpty(accessId)) {
       accessId = getDefaultAccessId(userPrincipal);

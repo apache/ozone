@@ -20,12 +20,10 @@ package org.apache.hadoop.ozone.freon;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -47,6 +45,8 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
 
+  private static final int DEFAULT_NAME_LEN = 10;
+
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
       defaultValue = "5")
@@ -60,9 +60,8 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
 
   @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create.",
-      defaultValue = "10")
-  private int length;
+          "Length of the random name of directory you want to create.")
+  private Integer length;
 
   /** For backward compatibility. */
   @Deprecated
@@ -70,12 +69,8 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
   @Option(names = "--nameLen", hidden = true)
   private Integer deprecatedLength;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @Override
   public Void call() throws Exception {
-    applyDeprecatedOptionOverrides();
     String s;
     if (depth <= 0) {
       s = "Invalid depth value, depth value should be greater than zero!";
@@ -90,14 +85,14 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
     return null;
   }
 
-  private void applyDeprecatedOptionOverrides() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--nameLen", "--name-len", spec, "--name-len", "-l");
-    if (deprecatedLength != null
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "--name-len")
-        && !DeprecatedCliOptions.hasMatchedOption(spec, "-l")) {
-      length = deprecatedLength;
+  private int getLength() {
+    if (length != null) {
+      return length;
     }
+    if (deprecatedLength != null) {
+      return deprecatedLength;
+    }
+    return DEFAULT_NAME_LEN;
   }
 
   /*
@@ -114,14 +109,15 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
-    String dirString = RandomStringUtils.secure().nextAlphanumeric(length);
+    int nameLen = getLength();
+    String dirString = RandomStringUtils.secure().nextAlphanumeric(nameLen);
     for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
-          secure().nextAlphanumeric(length));
+          secure().nextAlphanumeric(nameLen));
     }
     Path file = new Path(getRootPath().concat("/").concat(dirString));
     getFileSystem().mkdirs(file.getParent());
-    String leafDir = dirString.substring(0, dirString.length() - length);
+    String leafDir = dirString.substring(0, dirString.length() - nameLen);
     String tmp = "/0";
     for (int i = 1; i <= span; i++) {
       String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);

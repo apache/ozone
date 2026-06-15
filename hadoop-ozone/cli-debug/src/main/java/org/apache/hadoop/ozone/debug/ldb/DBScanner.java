@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -91,22 +90,15 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
+  private static final String DEFAULT_DN_DB_SCHEMA_VERSION = "V3";
 
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"--column-family", "--cf"},
-      description = "Table name")
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ColumnFamilyOption columnFamilyOption;
+
   private String tableName;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--column_family", hidden = true)
-  private String deprecatedTableName;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(names = {"--with-keys"},
       description = "Print a JSON object of key->value pairs (default)"
@@ -147,8 +139,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private String filter;
 
   @CommandLine.Option(names = {"--dn-schema", "-d"},
-      description = "Datanode DB Schema Version: V1/V2/V3",
-      defaultValue = "V3")
+      description = "Datanode DB Schema Version: V1/V2/V3")
   private String dnDBSchemaVersion;
 
   /** For backward compatibility. */
@@ -197,31 +188,37 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private static volatile boolean exception;
   private static final long FIRST_SEQUENCE_ID = 0L;
 
-  private String resolveTableName() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--column_family", "--column-family", spec, "--column-family", "--cf");
-    String resolved = DeprecatedCliOptions.resolveString(tableName, deprecatedTableName);
-    if (resolved == null || resolved.isEmpty()) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--column-family=<tableName>'");
+  static class ColumnFamilyOption {
+    @CommandLine.Option(names = {"--column-family", "--cf"},
+        description = "Table name",
+        required = true)
+    private String tableName;
+
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--column_family", hidden = true, required = true)
+    private String deprecatedTableName;
+
+    String getTableName() {
+      return tableName != null ? tableName : deprecatedTableName;
     }
-    return resolved;
   }
 
-  private String resolveDnDBSchemaVersion() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--dnSchema", "--dn-schema", spec, "--dn-schema", "-d");
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--dnSchema")) {
-      return deprecatedDnDBSchemaVersion != null ? deprecatedDnDBSchemaVersion
-          : dnDBSchemaVersion;
+  private String getDnDBSchemaVersion() {
+    if (dnDBSchemaVersion != null) {
+      return dnDBSchemaVersion;
     }
-    return dnDBSchemaVersion;
+    if (deprecatedDnDBSchemaVersion != null) {
+      return deprecatedDnDBSchemaVersion;
+    }
+    return DEFAULT_DN_DB_SCHEMA_VERSION;
   }
 
   @Override
   public Void call() throws Exception {
-    tableName = resolveTableName();
-    dnDBSchemaVersion = resolveDnDBSchemaVersion();
+    tableName = columnFamilyOption.getTableName();
+    dnDBSchemaVersion = getDnDBSchemaVersion();
     fileSuffix = 0;
     globalCount = 0;
     List<ColumnFamilyDescriptor> cfDescList =

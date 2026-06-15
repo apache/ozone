@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -36,13 +35,9 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class CreatePipelineSubcommand extends ScmSubcommand {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Option(
       names = {"-t", "--replication-type"},
       description = "Replication type is RATIS.",
-      defaultValue = "RATIS",
       hidden = true
   )
   private HddsProtos.ReplicationType type;
@@ -55,8 +50,7 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(
       names = {"-f", "--replication-factor"},
-      description = "Replication factor for RATIS (ONE, THREE).",
-      defaultValue = "ONE"
+      description = "Replication factor for RATIS (ONE, THREE)."
   )
   private HddsProtos.ReplicationFactor factor;
 
@@ -66,34 +60,30 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
   @CommandLine.Option(names = "--replicationFactor", hidden = true)
   private HddsProtos.ReplicationFactor deprecatedReplicationFactor;
 
-  private HddsProtos.ReplicationType resolveReplicationType() {
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--replicationType")) {
-      return deprecatedReplicationType != null ? deprecatedReplicationType : type;
+  private HddsProtos.ReplicationType getReplicationType() {
+    if (type != null) {
+      return type;
     }
-    return type;
+    if (deprecatedReplicationType != null) {
+      return deprecatedReplicationType;
+    }
+    return HddsProtos.ReplicationType.RATIS;
   }
 
-  private HddsProtos.ReplicationFactor resolveReplicationFactor() {
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--replicationFactor")) {
-      return deprecatedReplicationFactor != null ? deprecatedReplicationFactor : factor;
+  private HddsProtos.ReplicationFactor getReplicationFactor() {
+    if (factor != null) {
+      return factor;
     }
-    return factor;
-  }
-
-  private void warnIfDeprecatedOptionsUsed() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--replicationType", "--replication-type", spec,
-        "--replication-type", "-t");
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--replicationFactor", "--replication-factor", spec,
-        "--replication-factor", "-f");
+    if (deprecatedReplicationFactor != null) {
+      return deprecatedReplicationFactor;
+    }
+    return HddsProtos.ReplicationFactor.ONE;
   }
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    warnIfDeprecatedOptionsUsed();
-    HddsProtos.ReplicationType resolvedType = resolveReplicationType();
-    HddsProtos.ReplicationFactor resolvedFactor = resolveReplicationFactor();
+    HddsProtos.ReplicationType resolvedType = getReplicationType();
+    HddsProtos.ReplicationFactor resolvedFactor = getReplicationFactor();
     // Once we support creating EC containers/pipelines from the client, the
     // client should check if SCM is able to fulfil the request, and
     // understands an EcReplicationConfig. For that we also need to have SCM's

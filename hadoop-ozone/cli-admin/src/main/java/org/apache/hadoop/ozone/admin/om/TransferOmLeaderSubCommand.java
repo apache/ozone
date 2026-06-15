@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
@@ -36,9 +35,6 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
 
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.ArgGroup(multiplicity = "1")
   private TransferOption configGroup;
@@ -59,6 +55,10 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
     private boolean isRandom;
+
+    String getOmNodeId() {
+      return omNodeId != null ? omNodeId : deprecatedOmNodeId;
+    }
   }
 
   @Override
@@ -66,10 +66,7 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
     if (configGroup.isRandom) {
       configGroup.omNodeId = "";
     } else {
-      DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-          "--newLeaderId", "--new-leader-id", spec, "--new-leader-id", "-n");
-      configGroup.omNodeId = DeprecatedCliOptions.resolveString(
-          configGroup.omNodeId, configGroup.deprecatedOmNodeId);
+      configGroup.omNodeId = configGroup.getOmNodeId();
     }
     try (OzoneManagerProtocol client = omServiceOption.newClient()) {
       client.transferLeadership(configGroup.omNodeId);

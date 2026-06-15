@@ -184,57 +184,8 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
     return deprecatedMaxSizeLeavingSourceInGB;
   }
 
-  private void warnIfDeprecatedMaxDatanodesPercentageUsed() {
-    if (deprecatedMaxDatanodesPercentage != null
-        && deprecatedMaxDatanodesPercentage.isPresent()
-        && (maxDatanodesPercentageToInvolvePerIteration == null
-            || !maxDatanodesPercentageToInvolvePerIteration.isPresent())) {
-      System.err.println("warning: --maxDatanodesPercentageToInvolvePerIteration "
-          + "is deprecated, use --max-datanodes-percentage-to-involve-per-iteration "
-          + "instead.");
-    }
-  }
-
-  private void warnIfDeprecatedMaxSizeToMovePerIterationInGBUsed() {
-    if (deprecatedMaxSizeToMovePerIterationInGB != null
-        && deprecatedMaxSizeToMovePerIterationInGB.isPresent()
-        && (maxSizeToMovePerIterationInGB == null
-            || !maxSizeToMovePerIterationInGB.isPresent())) {
-      System.err.println("warning: --maxSizeToMovePerIterationInGB is deprecated, "
-          + "use --max-size-to-move-per-iteration-in-gb instead.");
-    }
-  }
-
-  private void warnIfDeprecatedMaxSizeEnteringTargetInGBUsed() {
-    if (deprecatedMaxSizeEnteringTargetInGB != null
-        && deprecatedMaxSizeEnteringTargetInGB.isPresent()
-        && (maxSizeEnteringTargetInGB == null
-            || !maxSizeEnteringTargetInGB.isPresent())) {
-      System.err.println("warning: --maxSizeEnteringTargetInGB is deprecated, "
-          + "use --max-size-entering-target-in-gb instead.");
-    }
-  }
-
-  private void warnIfDeprecatedMaxSizeLeavingSourceInGBUsed() {
-    if (deprecatedMaxSizeLeavingSourceInGB != null
-        && deprecatedMaxSizeLeavingSourceInGB.isPresent()
-        && (maxSizeLeavingSourceInGB == null
-            || !maxSizeLeavingSourceInGB.isPresent())) {
-      System.err.println("warning: --maxSizeLeavingSourceInGB is deprecated, "
-          + "use --max-size-leaving-source-in-gb instead.");
-    }
-  }
-
-  private void warnIfDeprecatedOptionsUsed() {
-    warnIfDeprecatedMaxDatanodesPercentageUsed();
-    warnIfDeprecatedMaxSizeToMovePerIterationInGBUsed();
-    warnIfDeprecatedMaxSizeEnteringTargetInGBUsed();
-    warnIfDeprecatedMaxSizeLeavingSourceInGBUsed();
-  }
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    warnIfDeprecatedOptionsUsed();
     StartContainerBalancerResponseProto response = scmClient.
         startContainerBalancer(threshold, iterations,
         resolveMaxDatanodesPercentageToInvolvePerIteration(),

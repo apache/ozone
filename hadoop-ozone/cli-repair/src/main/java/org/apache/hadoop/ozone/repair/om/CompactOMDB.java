@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
@@ -42,18 +41,8 @@ import picocli.CommandLine;
 )
 public class CompactOMDB extends RepairTool {
 
-  @CommandLine.Option(names = {"--column-family", "--cf"},
-      description = "Column family name")
-  private String columnFamilyName;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--column_family", hidden = true)
-  private String deprecatedColumnFamilyName;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ColumnFamilyOption columnFamilyOption;
 
   @CommandLine.Option(
       names = {"--service-id", "--om-service-id"},
@@ -69,16 +58,34 @@ public class CompactOMDB extends RepairTool {
   )
   private String nodeId;
 
+<<<<<<< HEAD
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
       description = "BottommostLevelCompaction option for RocksDB compaction." +
           " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
       defaultValue = "0",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int bottommostLevelCompaction;
+=======
+  static class ColumnFamilyOption {
+    @CommandLine.Option(names = {"--column-family", "--cf"},
+        description = "Column family name")
+    private String columnFamilyName;
+
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--column_family", hidden = true)
+    private String deprecatedColumnFamilyName;
+
+    String getColumnFamilyName() {
+      return columnFamilyName != null ? columnFamilyName : deprecatedColumnFamilyName;
+    }
+  }
+>>>>>>> a71ff80348 (Remove conflicts and refactor the code to use DeprecatedCliOption class)
 
   @Override
   public void execute() throws Exception {
-    columnFamilyName = resolveColumnFamilyName();
+    String columnFamilyName = columnFamilyOption.getColumnFamilyName();
 
     OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
@@ -97,17 +104,5 @@ public class CompactOMDB extends RepairTool {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
       }
     }
-  }
-
-  private String resolveColumnFamilyName() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--column_family", "--column-family", spec, "--column-family", "--cf");
-    String resolved = DeprecatedCliOptions.resolveString(
-        columnFamilyName, deprecatedColumnFamilyName);
-    if (resolved == null || resolved.isEmpty()) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--column-family=<columnFamilyName>'");
-    }
-    return resolved;
   }
 }

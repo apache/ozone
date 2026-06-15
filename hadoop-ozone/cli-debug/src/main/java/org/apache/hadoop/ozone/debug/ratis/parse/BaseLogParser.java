@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug.ratis.parse;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.function.Function;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.tools.ParseRatisLog;
 import picocli.CommandLine;
@@ -29,40 +28,34 @@ import picocli.CommandLine;
  * Base Ratis Log Parser used by generic, datanode etc.
  */
 public abstract class BaseLogParser {
-  @CommandLine.Option(names = {"-s", "--segment-path"},
-      description = "Path of the segment file")
-  private File segmentFile;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private SegmentFileOption segmentFileOption;
 
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--segmentPath", hidden = true)
-  private File deprecatedSegmentFile;
+  static class SegmentFileOption {
+    @CommandLine.Option(names = {"-s", "--segment-path"},
+        description = "Path of the segment file")
+    private File segmentFile;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--segmentPath", hidden = true)
+    private File deprecatedSegmentFile;
 
-  private File resolveSegmentFile() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--segmentPath", "--segment-path", spec, "--segment-path", "-s");
-    File resolved;
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--segmentPath")) {
-      resolved = deprecatedSegmentFile;
-    } else {
-      resolved = segmentFile;
+    File getSegmentFile() {
+      return segmentFile != null ? segmentFile : deprecatedSegmentFile;
     }
-    if (resolved == null) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--segment-path=<segmentFile>'");
+
+    void setSegmentFile(File file) {
+      segmentFile = file;
     }
-    return resolved;
   }
 
   public void parseRatisLogs(
       Function<RaftProtos.StateMachineLogEntryProto, String> smLogToStr) {
     try {
       ParseRatisLog.Builder builder = new ParseRatisLog.Builder();
-      builder.setSegmentFile(resolveSegmentFile());
+      builder.setSegmentFile(segmentFileOption.getSegmentFile());
       builder.setSMLogToString(smLogToStr);
 
       ParseRatisLog prl = builder.build();
@@ -75,6 +68,7 @@ public abstract class BaseLogParser {
 
   @VisibleForTesting
   public void setSegmentFile(File segmentFile) {
-    this.segmentFile = segmentFile;
+    segmentFileOption = new SegmentFileOption();
+    segmentFileOption.setSegmentFile(segmentFile);
   }
 }

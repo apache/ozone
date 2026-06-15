@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -52,24 +51,20 @@ import picocli.CommandLine;
 )
 public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
 
+  private static final String DEFAULT_DN_DB_SCHEMA_VERSION = "V3";
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
   private static final Logger LOG = LoggerFactory.getLogger(ValueSchema.class);
 
-  @CommandLine.Option(names = {"--column-family", "--cf"},
-      description = "Table name")
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ColumnFamilyOption columnFamilyOption;
+
   private String tableName;
 
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--column_family", hidden = true)
-  private String deprecatedTableName;
-
   @CommandLine.Option(names = {"--dn-schema", "-d"},
-      description = "Datanode DB Schema Version: V1/V2/V3",
-      defaultValue = "V3")
+      description = "Datanode DB Schema Version: V1/V2/V3")
   private String dnDBSchemaVersion;
 
   /** For backward compatibility. */
@@ -78,13 +73,27 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
   @CommandLine.Option(names = "--dnSchema", hidden = true)
   private String deprecatedDnDBSchemaVersion;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Option(names = {"--depth"},
       description = "The level till which the value-schema should be shown. Values in the range [0-10] are allowed)",
       defaultValue = "10")
   private int depth;
+
+  static class ColumnFamilyOption {
+    @CommandLine.Option(names = {"--column-family", "--cf"},
+        description = "Table name",
+        required = true)
+    private String tableName;
+
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--column_family", hidden = true, required = true)
+    private String deprecatedTableName;
+
+    String getTableName() {
+      return tableName != null ? tableName : deprecatedTableName;
+    }
+  }
 
   @Override
   public Void call() throws Exception {
@@ -92,8 +101,8 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
       throw new IOException("depth should be specified in the range [0, 10]");
     }
 
-    tableName = resolveTableName();
-    dnDBSchemaVersion = resolveDnDBSchemaVersion();
+    tableName = columnFamilyOption.getTableName();
+    dnDBSchemaVersion = getDnDBSchemaVersion();
 
     boolean success = true;
 
@@ -112,25 +121,14 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
     return null;
   }
 
-  private String resolveTableName() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--column_family", "--column-family", spec, "--column-family", "--cf");
-    String resolved = DeprecatedCliOptions.resolveString(tableName, deprecatedTableName);
-    if (resolved == null || resolved.isEmpty()) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--column-family=<tableName>'");
+  private String getDnDBSchemaVersion() {
+    if (dnDBSchemaVersion != null) {
+      return dnDBSchemaVersion;
     }
-    return resolved;
-  }
-
-  private String resolveDnDBSchemaVersion() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--dnSchema", "--dn-schema", spec, "--dn-schema", "-d");
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--dnSchema")) {
-      return deprecatedDnDBSchemaVersion != null ? deprecatedDnDBSchemaVersion
-          : dnDBSchemaVersion;
+    if (deprecatedDnDBSchemaVersion != null) {
+      return deprecatedDnDBSchemaVersion;
     }
-    return dnDBSchemaVersion;
+    return DEFAULT_DN_DB_SCHEMA_VERSION;
   }
 
   public boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {

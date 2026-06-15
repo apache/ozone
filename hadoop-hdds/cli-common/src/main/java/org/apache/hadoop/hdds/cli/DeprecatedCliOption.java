@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Emits warnings when deprecated multi-character short CLI options are used.
+ * Emits warnings when deprecated CLI option aliases are used.
  */
 public final class DeprecatedCliOption {
 
@@ -47,6 +47,35 @@ public final class DeprecatedCliOption {
     options.put("-tact", "--transaction-apply-check-interval");
     options.put("-pct", "--prepare-check-interval");
     options.put("-pt", "--prepare-timeout");
+    options.put("--accessId", "--access-id");
+    options.put("--bufferSize", "--buffer-size");
+    options.put("--column_family", "--column-family");
+    options.put("--dnSchema", "--dn-schema");
+    options.put("--expectedGeneration", "--expected-generation");
+    options.put("--fileCount", "--file-count");
+    options.put("--fileSize", "--file-size");
+    options.put("--filterByFactor", "--filter-by-factor");
+    options.put("--filterByState", "--filter-by-state");
+    options.put("--keySize", "--key-size");
+    options.put("--maxDatanodesPercentageToInvolvePerIteration",
+        "--max-datanodes-percentage-to-involve-per-iteration");
+    options.put("--maxSizeEnteringTargetInGB", "--max-size-entering-target-in-gb");
+    options.put("--maxSizeLeavingSourceInGB", "--max-size-leaving-source-in-gb");
+    options.put("--maxSizeToMovePerIterationInGB", "--max-size-to-move-per-iteration-in-gb");
+    options.put("--nameLen", "--name-len");
+    options.put("--newLeaderId", "--new-leader-id");
+    options.put("--numOfBuckets", "--num-of-buckets");
+    options.put("--numOfKeys", "--num-of-keys");
+    options.put("--numOfThreads", "--num-of-threads");
+    options.put("--numOfValidateThreads", "--num-of-validate-threads");
+    options.put("--numOfVolumes", "--num-of-volumes");
+    options.put("--onlyFileNames", "--only-file-names");
+    options.put("--replicationFactor", "--replication-factor");
+    options.put("--replicationType", "--replication-type");
+    options.put("--scmHost", "--scm-host");
+    options.put("--secretKey", "--secret");
+    options.put("--segmentPath", "--segment-path");
+    options.put("--validateWrites", "--validate-writes");
     return options;
   }
 

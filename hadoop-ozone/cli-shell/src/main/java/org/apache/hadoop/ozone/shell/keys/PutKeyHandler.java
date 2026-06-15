@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -45,7 +44,6 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -77,17 +75,8 @@ public class PutKeyHandler extends KeyHandler {
   @Option(names = "--expectedGeneration", hidden = true)
   private Long deprecatedExpectedGeneration;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  private Long resolveExpectedGeneration() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--expectedGeneration", "--expected-generation", spec,
-        "--expected-generation");
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--expectedGeneration")) {
-      return deprecatedExpectedGeneration;
-    }
-    return expectedGeneration;
+  private Long getExpectedGeneration() {
+    return expectedGeneration != null ? expectedGeneration : deprecatedExpectedGeneration;
   }
 
   @Override
@@ -148,7 +137,7 @@ public class PutKeyHandler extends KeyHandler {
   private OzoneOutputStream createOrReplaceKey(OzoneBucket bucket, String keyName,
       long size, Map<String, String> keyMetadata, ReplicationConfig replicationConfig
   ) throws IOException {
-    Long generation = resolveExpectedGeneration();
+    Long generation = getExpectedGeneration();
     if (generation != null) {
       final long existingGeneration = generation;
       Preconditions.checkArgument(existingGeneration > 0,

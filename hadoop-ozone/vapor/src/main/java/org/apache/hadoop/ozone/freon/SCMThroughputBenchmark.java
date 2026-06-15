@@ -43,7 +43,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -117,6 +116,20 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
 
+  static final int CHECK_INTERVAL_MILLIS = 5000;
+
+  private static final Random RANDOM = new Random();
+
+  private OzoneConfiguration conf;
+
+  private List<FakeDatanode> datanodes;
+
+  private StorageContainerDatanodeProtocol datanodeScmClient;
+
+  private StorageContainerLocationProtocol scmContainerClient;
+
+  private ScmBlockLocationProtocol scmBlockClient;
+
   @CommandLine.ParentCommand
   private Freon freon;
 
@@ -157,39 +170,33 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.Option(names = {"--scm-host"},
-      description = "The leader scm host x.x.x.x.")
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private ScmHostOption scmHostOption;
+
   private String scm;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--scmHost", hidden = true)
-  private String deprecatedScm;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Mixin
   private FreonReplicationOptions replication;
 
-  static final int CHECK_INTERVAL_MILLIS = 5000;
+  static class ScmHostOption {
+    @CommandLine.Option(names = {"--scm-host"},
+        description = "The leader scm host x.x.x.x.")
+    private String scm;
 
-  private static final Random RANDOM = new Random();
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--scmHost", hidden = true)
+    private String deprecatedScm;
 
-  private OzoneConfiguration conf;
-
-  private List<FakeDatanode> datanodes;
-
-  private StorageContainerDatanodeProtocol datanodeScmClient;
-
-  private StorageContainerLocationProtocol scmContainerClient;
-
-  private ScmBlockLocationProtocol scmBlockClient;
+    String getScmHost() {
+      return scm != null ? scm : deprecatedScm;
+    }
+  }
 
   @Override
   public Void call() throws Exception {
-    scm = resolveScmHost();
+    scm = scmHostOption.getScmHost();
     conf = freon.getOzoneConf();
 
     ThroughputBenchmark benchmark = createBenchmark();
@@ -197,17 +204,6 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     benchmark.run();
 
     return null;
-  }
-
-  private String resolveScmHost() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--scmHost", "--scm-host", spec, "--scm-host");
-    String resolved = DeprecatedCliOptions.resolveString(scm, deprecatedScm);
-    if (resolved == null || resolved.isEmpty()) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--scm-host=<scm>'");
-    }
-    return resolved;
   }
 
   private ThroughputBenchmark createBenchmark() {

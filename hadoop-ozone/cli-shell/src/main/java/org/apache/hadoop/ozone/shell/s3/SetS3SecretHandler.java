@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell.s3;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -34,28 +33,34 @@ import picocli.CommandLine.Option;
     description = "Set s3 secret for current user")
 public class SetS3SecretHandler extends S3Handler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @Option(names = "-u",
       description = "Specify the user to perform the operation on "
           + "(Admins only)'")
   private String username;
 
-  @CommandLine.Option(names = {"-s", "--secret"},
-      description = "Secret key")
-  private String secretKey;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--secretKey", hidden = true)
-  private String deprecatedSecretKey;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private SecretKeyOption secretKeyOption;
 
   @Option(names = "-e",
       description = "Print out variables together with 'export' prefix, to "
           + "use it from 'eval $(ozone s3 setsecret)'")
   private boolean export;
+
+  static class SecretKeyOption {
+    @CommandLine.Option(names = {"-s", "--secret"},
+        description = "Secret key")
+    private String secretKey;
+
+    /** For backward compatibility. */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @CommandLine.Option(names = "--secretKey", hidden = true)
+    private String deprecatedSecretKey;
+
+    String getSecretKey() {
+      return secretKey != null ? secretKey : deprecatedSecretKey;
+    }
+  }
 
   @Override
   protected boolean isApplicable() {
@@ -65,13 +70,7 @@ public class SetS3SecretHandler extends S3Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--secretKey", "--secret", spec, "--secret", "-s");
-    secretKey = DeprecatedCliOptions.resolveString(secretKey, deprecatedSecretKey);
-    if (secretKey == null || secretKey.isEmpty()) {
-      throw new CommandLine.ParameterException(spec.commandLine(),
-          "Missing required option '--secret=<secretKey>'");
-    }
+    String secretKey = secretKeyOption.getSecretKey();
 
     if (username == null || username.isEmpty()) {
       username = UserGroupInformation.getCurrentUser().getUserName();

@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -93,9 +92,6 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   @CommandLine.Option(names = {"--onlyFileNames"}, hidden = true)
   private boolean deprecatedOnlyFileNames;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Option(names = {"--in-progress"},
       defaultValue = "false",
       description = "Includes in-progress open files/keys and multipart uploads")
@@ -116,18 +112,13 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private final Map<String, Long> volumeCache = new HashMap<>();
   private ConfigurationSource conf;
 
-  private boolean resolveOnlyFileNames() {
-    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
-        "--onlyFileNames", "--only-file-names", spec, "--only-file-names");
-    if (DeprecatedCliOptions.hasMatchedOption(spec, "--onlyFileNames")) {
-      return deprecatedOnlyFileNames;
-    }
-    return onlyFileNames;
+  private boolean getOnlyFileNames() {
+    return onlyFileNames || deprecatedOnlyFileNames;
   }
 
   @Override
   public Void call() throws Exception {
-    onlyFileNames = resolveOnlyFileNames();
+    onlyFileNames = getOnlyFileNames();
     String dbPath = parent.getDbPath();
     // Parse container IDs
     Set<Long> containerIDs = Arrays.stream(containers.split(","))
