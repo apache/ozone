@@ -1346,6 +1346,7 @@ function ozone_os_tricks
           export JAVA_HOME
         fi
       fi
+      export DYLD_LIBRARY_PATH=$OZONE_HOME/lib/native:$DYLD_LIBRARY_PATH
     ;;
     Linux)
 
@@ -1373,6 +1374,7 @@ function ozone_os_tricks
         ozone_error "ERROR: For more info: http://wiki.apache.org/hadoop/HadoopIPv6"
         exit 1
       fi
+      export LD_LIBRARY_PATH=$OZONE_HOME/lib/native:$LD_LIBRARY_PATH
     ;;
     CYGWIN*)
       # Flag that we're running on Cygwin to trigger path translation later.
