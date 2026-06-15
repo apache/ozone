@@ -122,6 +122,44 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
+  public void choosesLowerUtilizationAcrossDifferentCapacities() throws Exception {
+    // big has more free bytes but is 90% full; small is only 60% full.
+    // The policy must prefer the less-utilized volume, not the one with more free bytes.
+    SpaceUsageSource bigSource = MockSpaceUsageSource.fixed(1000, 100);
+    HddsVolume bigVolume = new HddsVolume.Builder(baseDir + "big")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            bigSource, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    SpaceUsageSource smallSource = MockSpaceUsageSource.fixed(200, 80);
+    HddsVolume smallVolume = new HddsVolume.Builder(baseDir + "small")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            smallSource, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+
+    List<HddsVolume> mixedVolumes = new ArrayList<>();
+    mixedVolumes.add(bigVolume);
+    mixedVolumes.add(smallVolume);
+
+    Map<HddsVolume, Integer> chooseCount = new HashMap<>();
+    chooseCount.put(bigVolume, 0);
+    chooseCount.put(smallVolume, 0);
+
+    try {
+      for (int i = 0; i < 1000; i++) {
+        HddsVolume volume = policy.chooseVolume(mixedVolumes, 0);
+        chooseCount.put(volume, chooseCount.get(volume) + 1);
+      }
+      assertThat(chooseCount.get(smallVolume))
+          .isGreaterThan(chooseCount.get(bigVolume));
+    } finally {
+      bigVolume.shutdown();
+      smallVolume.shutdown();
+    }
+  }
+
+  @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
     Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 500));
