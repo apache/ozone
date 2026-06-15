@@ -49,7 +49,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   // TODO: https://issues.apache.org/jira/browse/HDDS-13555
   @SuppressWarnings("PMD.SingularField")
   private MetricsRegistry registry;
-  private static S3GatewayMetrics instance;
+  private static volatile S3GatewayMetrics instance;
 
   // BucketEndpoint
   private @Metric MutableCounterLong getBucketSuccess;
@@ -857,7 +857,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     return value;
   }
 
-  public static synchronized S3GatewayMetrics getMetrics() {
+  public static S3GatewayMetrics getMetrics() {
     return instance;
   }
 }
