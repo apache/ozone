@@ -85,7 +85,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
             DSL.field(name("applied_on")))
         .values(apparentVersion, DSL.currentTimestamp())
         .execute();
-    LOG.info("Inserted initial software version '{}' into SchemaVersion table.", apparentVersion);
+    LOG.info("Inserted initial apparent version '{}' into SchemaVersion table.", apparentVersion);
   }
 
   public void setSoftwareVersion(int version) {

@@ -47,7 +47,7 @@ public abstract class AbstractComponentVersionTest {
   }
 
   @Test
-  public void testFutureVersionSerializesToMinusOne() {
+  public void testUnknownVersionSerializesToMinusOne() {
     ComponentVersion unknownVersion = getUnknownVersion();
     assertEquals(-1, unknownVersion.serialize());
   }
@@ -58,7 +58,7 @@ public abstract class AbstractComponentVersionTest {
     assertEquals(0, defaultValue.serialize());
   }
 
-  // known (non-future) versions are strictly increasing
+  // known versions are strictly increasing
   @Test
   public void testSerializedValuesAreMonotonic() {
     ComponentVersion[] values = getValues();
@@ -72,7 +72,7 @@ public abstract class AbstractComponentVersionTest {
   @Test
   public void testNextVersionProgression() {
     ComponentVersion[] values = getValues();
-    ComponentVersion futureValue = getUnknownVersion();
+    ComponentVersion unknownVersion = getUnknownVersion();
     int knownVersionCount = values.length - 1;
     for (int i = 0; i < knownVersionCount - 1; i++) {
       assertEquals(values[i + 1], values[i].nextVersion(),
@@ -80,8 +80,7 @@ public abstract class AbstractComponentVersionTest {
     }
     assertNull(values[knownVersionCount - 1].nextVersion(),
         "Expected latest known version to have no nextVersion");
-    assertNull(futureValue.nextVersion(),
-        "Expected unknown version to have no nextVersion");
+    assertNull(unknownVersion.nextVersion(), "Expected unknown version to have no nextVersion");
   }
 
   @Test
@@ -102,19 +101,19 @@ public abstract class AbstractComponentVersionTest {
   }
 
   @Test
-  public void testFutureVersionSupportsAllKnownVersions() {
+  public void testUnknownFutureVersionSupportsAllKnownVersions() {
     ComponentVersion[] values = getValues();
-    int unknownFutureVersion = Integer.MAX_VALUE;
+    int unknownSerializedVersion = Integer.MAX_VALUE;
     for (ComponentVersion knownVersion : values) {
       if (knownVersion == getUnknownVersion()) {
         // Two unknown future versions should not support each other.
-        assertFalse(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
-            " should not support unknown future version " + unknownFutureVersion);
+        assertFalse(knownVersion.isSupportedBy(unknownSerializedVersion), knownVersion +
+            " should not support unknown future version " + unknownSerializedVersion);
       } else {
         // The unknown future version should deserialize to a negative value, but still be considered larger than all
         // known versions.
-        assertTrue(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
-            " should support unknown future version " + unknownFutureVersion);
+        assertTrue(knownVersion.isSupportedBy(unknownSerializedVersion), knownVersion +
+            " should support unknown future version " + unknownSerializedVersion);
       }
     }
   }

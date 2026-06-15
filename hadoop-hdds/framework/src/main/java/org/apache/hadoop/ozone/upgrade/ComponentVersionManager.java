@@ -90,17 +90,14 @@ public abstract class ComponentVersionManager implements Closeable {
   public abstract int getPersistedApparentVersion();
 
   public void finalizeUpgrade() throws UpgradeException {
-    if (needsFinalization()) {
-      ComponentVersion prevVersion = apparentVersion;
-      for (ComponentVersion newVersion : getUnfinalizedVersions()) {
-        validateForFinalization(newVersion);
-        runUpgradeAction(newVersion);
-        persistApparentVersion(newVersion, prevVersion);
-        prevVersion = newVersion;
+    ComponentVersion prevVersion = apparentVersion;
+    for (ComponentVersion newVersion : getUnfinalizedVersions()) {
+      validateForFinalization(newVersion);
+      runUpgradeAction(newVersion);
+      persistApparentVersion(newVersion, prevVersion);
+      prevVersion = newVersion;
 
-        LOG.info("Version {} has been finalized.", newVersion);
-      }
-      LOG.info("Finalization is complete.");
+      LOG.info("Version {} has been finalized.", newVersion);
     }
   }
 

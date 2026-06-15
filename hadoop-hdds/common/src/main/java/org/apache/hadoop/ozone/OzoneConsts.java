@@ -439,6 +439,9 @@ public final class OzoneConsts {
   // Apparent Version written into Meta Table ONLY during finalization.
   // The name "layout version" is kept for backwards compatibility.
   public static final String APPARENT_VERSION_KEY = "#LAYOUTVERSION";
+  // Key written into the Meta table when finalization is needed and a finalization command has been received
+  // to trigger the process
+  public static final String FINALIZATION_IN_PROGRESS_KEY = "#FINALIZATION_IN_PROGRESS";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

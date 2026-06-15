@@ -210,7 +210,7 @@ public class TestRpcClient {
   }
 
   @Test
-  public void testFutureVersionShouldNotBeAnExpectedVersion() {
+  public void testUnknownVersionShouldNotBeAnExpectedVersion() {
     assertThrows(
         IllegalArgumentException.class,
         () -> validateOmVersion(OzoneManagerVersion.UNKNOWN_VERSION, null));

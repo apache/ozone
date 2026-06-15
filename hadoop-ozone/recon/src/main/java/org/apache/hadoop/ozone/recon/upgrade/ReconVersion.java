@@ -26,7 +26,8 @@ import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
- * Recon component versions for SQL schema upgrades.
+ * Upgrade version handling for Recon. Currently Recon is finalized on startup and does not support downgrade,
+ * so versioning is only used to execute reformatting actions on upgrade.
  *
  * <p>{@link #INITIAL_VERSION} is the starting state when no version is recorded; it has no upgrade
  * action. Finalization advances one version at a time via {@link ComponentVersion#nextVersion()}.
