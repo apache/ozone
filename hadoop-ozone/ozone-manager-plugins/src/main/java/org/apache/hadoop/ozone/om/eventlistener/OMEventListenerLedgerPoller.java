@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.om.exceptions.OMCompletedRequestPrunedException;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,8 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
   private final OMEventListenerPluginContext pluginContext;
   private final OMEventListenerLedgerPollerSeekPosition seekPosition;
   private final Consumer<OmCompletedRequestInfo> callback;
+  private final long softRetentionLimit;
+  private final long hardRetentionLimit;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMEventListenerLedgerPoller(long interval, TimeUnit unit,
@@ -70,6 +73,10 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
     this.pluginContext = pluginContext;
     this.seekPosition = seekPosition;
     this.callback = callback;
+    this.softRetentionLimit = configuration.getLong(
+        "ozone.om.plugin.kafka.ledger.retention.soft.limit", 100_000L);
+    this.hardRetentionLimit = configuration.getLong(
+        "ozone.om.plugin.kafka.ledger.retention.hard.limit", 1_000_000L);
   }
 
   private boolean shouldRun() {
@@ -121,14 +128,21 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
         }
         getRunCount().incrementAndGet();
 
+        String startKeyStr = seekPosition.get();
         try {
-          String startKeyStr = seekPosition.get();
           Long startKey = StringUtils.isNotBlank(startKeyStr) ? Long.valueOf(startKeyStr) : null;
           for (OmCompletedRequestInfo requestInfo : pluginContext.listCompletedRequestInfo(
                   startKey, MAX_RESULTS)) {
             callback.accept(requestInfo);
           }
           successRunCount.incrementAndGet();
+
+          if (startKey != null) {
+            pluginContext.pruneCompletedRequestInfo(startKey, softRetentionLimit, hardRetentionLimit);
+          }
+        } catch (OMCompletedRequestPrunedException e) {
+          LOG.warn("Consumer checkpoint {} has been hard-pruned. Fast-forwarding and self-healing...", startKeyStr);
+          seekPosition.set(null); // Clear checkpoint to fast-forward
         } catch (IOException e) {
           LOG.error("Error while running completed operation consumer " +
               "background task. Will retry at next run.", e);

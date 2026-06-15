@@ -18,6 +18,11 @@
 package org.apache.hadoop.ozone.om.eventlistener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -38,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo.OperationArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
+import org.apache.kafka.clients.producer.Callback;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +93,7 @@ public class TestOMEventListenerKafkaPublisher {
 
       OMEventListenerKafkaPublisher.KafkaClientWrapper mock = mockedKafkaClientWrapper.constructed().get(0);
       ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
-      verify(mock, times(expectEvents)).send(argument.capture());
+      verify(mock, times(expectEvents)).sendAsync(argument.capture(), any(Callback.class));
 
       events.addAll(argument.getAllValues());
     }
@@ -275,6 +281,107 @@ public class TestOMEventListenerKafkaPublisher {
 
     // Also ensure it is actually parsable by the standard Java 8 API
     java.time.OffsetDateTime.parse(eventTimeStr);
+  }
+
+  @Test
+  public void testAsyncSlidingWindowWatermark() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.om.plugin.kafka.topic", "abc");
+
+    OMEventListenerKafkaPublisher plugin = new OMEventListenerKafkaPublisher();
+    List<Callback> callbacks = new ArrayList<>();
+
+    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockedKafkaClientWrapper =
+             mockConstruction(OMEventListenerKafkaPublisher.KafkaClientWrapper.class, (mock, context) -> {
+               doAnswer(invocation -> {
+                 Callback cb = invocation.getArgument(1, Callback.class);
+                 synchronized (callbacks) {
+                   callbacks.add(cb);
+                 }
+                 return null;
+               }).when(mock).sendAsync(anyString(), any(Callback.class));
+             })) {
+
+      plugin.initialize(conf, pluginContext);
+
+      OmCompletedRequestInfo op1 = buildCompletedRequestInfo(1L, Type.CreateKey, "key1", new OperationArgs.NoArgs());
+      OmCompletedRequestInfo op2 = buildCompletedRequestInfo(2L, Type.CreateKey, "key2", new OperationArgs.NoArgs());
+      OmCompletedRequestInfo op3 = buildCompletedRequestInfo(3L, Type.CreateKey, "key3", new OperationArgs.NoArgs());
+
+      plugin.handleCompletedRequest(op1);
+      plugin.handleCompletedRequest(op2);
+      plugin.handleCompletedRequest(op3);
+
+      OMEventListenerKafkaPublisher.KafkaClientWrapper mock = mockedKafkaClientWrapper.constructed().get(0);
+      verify(mock, times(3)).sendAsync(anyString(), any(Callback.class));
+
+      assertNull(plugin.getSeekPosition().get());
+
+      callbacks.get(1).onCompletion(null, null);
+      assertNull(plugin.getSeekPosition().get());
+
+      callbacks.get(0).onCompletion(null, null);
+      assertEquals("2", plugin.getSeekPosition().get());
+
+      callbacks.get(2).onCompletion(null, null);
+      assertEquals("3", plugin.getSeekPosition().get());
+    }
+  }
+
+  @Test
+  public void testAsyncSendFailureHaltsWatermark() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.om.plugin.kafka.topic", "abc");
+
+    OMEventListenerKafkaPublisher plugin = new OMEventListenerKafkaPublisher();
+    List<Callback> callbacks = new ArrayList<>();
+
+    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockedKafkaClientWrapper =
+             mockConstruction(OMEventListenerKafkaPublisher.KafkaClientWrapper.class, (mock, context) -> {
+               doAnswer(invocation -> {
+                 Callback cb = invocation.getArgument(1, Callback.class);
+                 synchronized (callbacks) {
+                   callbacks.add(cb);
+                 }
+                 return null;
+               }).when(mock).sendAsync(anyString(), any(Callback.class));
+             })) {
+
+      plugin.initialize(conf, pluginContext);
+
+      OmCompletedRequestInfo op1 = buildCompletedRequestInfo(1L, Type.CreateKey, "key1", new OperationArgs.NoArgs());
+      OmCompletedRequestInfo op2 = buildCompletedRequestInfo(2L, Type.CreateKey, "key2", new OperationArgs.NoArgs());
+
+      plugin.handleCompletedRequest(op1);
+      plugin.handleCompletedRequest(op2);
+
+      assertNull(plugin.getSeekPosition().get());
+
+      // Simulate failure on Transaction 1
+      callbacks.get(0).onCompletion(null, new IOException("Simulated Kafka send failure"));
+
+      // Simulate success on Transaction 2
+      callbacks.get(1).onCompletion(null, null);
+
+      // Even though Transaction 2 succeeded, the seek position must NOT advance because Transaction 1 failed.
+      // The checkpoint remains null, preserving at-least-once safety!
+      assertNull(plugin.getSeekPosition().get());
+
+      // Simulate a retry of Transaction 1 (poller re-processing from startKey)
+      plugin.handleCompletedRequest(op1);
+
+      OMEventListenerKafkaPublisher.KafkaClientWrapper mock = mockedKafkaClientWrapper.constructed().get(0);
+
+      // Verify a new send was triggered (callbacks size should grow to 3)
+      verify(mock, times(3)).sendAsync(anyString(), any(Callback.class));
+
+      // Complete the retried Transaction 1 successfully
+      callbacks.get(2).onCompletion(null, null);
+
+      // Since Transaction 2 is already successfully completed, the sliding window should
+      // now successfully advance to 2!
+      assertEquals("2", plugin.getSeekPosition().get());
+    }
   }
 
   @Test

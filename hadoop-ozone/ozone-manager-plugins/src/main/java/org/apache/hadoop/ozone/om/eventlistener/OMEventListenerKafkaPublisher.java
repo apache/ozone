@@ -23,14 +23,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotificationStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
@@ -52,11 +56,13 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
   private static final String KAFKA_SERVICE_INTERVAL_CONFIG = KAFKA_CONFIG_PREFIX + "service.interval";
   private static final String KAFKA_SERVICE_TIMEOUT_CONFIG = KAFKA_CONFIG_PREFIX + "service.timeout";
   private static final int COMPLETED_REQUEST_CONSUMER_CORE_POOL_SIZE = 1;
+  private static final int MAX_PENDING_TRANSACTIONS = 1000;
 
   private OMEventListenerLedgerPoller ledgerPoller;
   private KafkaClientWrapper kafkaClient;
   private OMEventListenerNotificationStrategy notificationStrategy;
   private OMEventListenerLedgerPollerSeekPosition seekPosition;
+  private PendingTransactionTracker tracker;
 
   @Override
   public void initialize(OzoneConfiguration conf, OMEventListenerPluginContext pluginContext) {
@@ -84,7 +90,10 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
       exception.initCause(ex);
       throw exception;
     }
-    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
+    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition(
+        pluginContext.getNotificationCheckpointStrategy());
+
+    this.tracker = new PendingTransactionTracker(seekPosition, MAX_PENDING_TRANSACTIONS);
 
     LOG.info("Creating OMEventListenerLedgerPoller with serviceInterval={}," +
         "serviceTimeout={}, seekPosition={}",
@@ -113,6 +122,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
   @Override
   public void stop() {
+    tracker.stop();
     try {
       kafkaClient.shutdown();
     } catch (IOException ex) {
@@ -122,28 +132,126 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
     ledgerPoller.shutdown();
   }
 
+  OMEventListenerLedgerPollerSeekPosition getSeekPosition() {
+    return seekPosition;
+  }
+
   // callback called by OMEventListenerLedgerPoller
   public void handleCompletedRequest(OmCompletedRequestInfo completedRequestInfo) {
-    LOG.debug("Processing {}", completedRequestInfo);
+    long trxIndex = completedRequestInfo.getTrxLogIndex();
+    LOG.debug("Processing {}, trxIndex={}", completedRequestInfo, trxIndex);
+
+    // Apply backpressure / high watermark
+    try {
+      tracker.acquirePermit();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return;
+    }
+
+    if (tracker.isStopped()) {
+      return;
+    }
 
     List<String> eventsToSend = notificationStrategy.determineEventsForOperation(completedRequestInfo);
 
-    // loop over events and send them to our kafka sink
+    if (eventsToSend.isEmpty()) {
+      tracker.complete(trxIndex);
+      return;
+    }
+
+    tracker.track(trxIndex);
+    AtomicInteger remainingEvents = new AtomicInteger(eventsToSend.size());
+
+    // loop over events and send them to our kafka sink asynchronously
     for (String event : eventsToSend) {
       if (event == null) {
-        LOG.warn("Skipping null event for transaction {}", completedRequestInfo.getTrxLogIndex());
+        if (remainingEvents.decrementAndGet() == 0) {
+          tracker.complete(trxIndex);
+        }
         continue;
       }
-      try {
-        kafkaClient.send(event);
-      } catch (IOException ex) {
-        LOG.error("Failure to send event {}", event, ex);
-        return;
+
+      kafkaClient.sendAsync(event, (metadata, exception) -> {
+        if (exception != null) {
+          LOG.error("Failure to send event {} for transaction {} - checkpointing halted", event, trxIndex, exception);
+        } else {
+          if (remainingEvents.decrementAndGet() == 0) {
+            tracker.complete(trxIndex);
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * Helper class to track pending transactions and apply backpressure
+   * while ensuring contiguous checkpoint (seek) updates.
+   */
+  static class PendingTransactionTracker {
+    private final ConcurrentSkipListMap<Long, Boolean> pendingTransactions = new ConcurrentSkipListMap<>();
+    private final AtomicInteger pendingCount = new AtomicInteger(0);
+    private final int maxPendingTransactions;
+    private final Object lock = new Object();
+    private final OMEventListenerLedgerPollerSeekPosition seekPosition;
+    private volatile boolean stopped = false;
+
+    PendingTransactionTracker(OMEventListenerLedgerPollerSeekPosition seekPosition, int maxPendingTransactions) {
+      this.seekPosition = seekPosition;
+      this.maxPendingTransactions = maxPendingTransactions;
+    }
+
+    public void track(long trxIndex) {
+      if (pendingTransactions.put(trxIndex, false) == null) {
+        pendingCount.incrementAndGet();
       }
     }
 
-    // no errors so we can update the seek position
-    seekPosition.set(String.valueOf(completedRequestInfo.getTrxLogIndex()));
+    public void complete(long trxIndex) {
+      Boolean prev = pendingTransactions.put(trxIndex, true);
+      if (prev != null && prev) {
+        return;
+      }
+
+      long newSeek = -1;
+      synchronized (lock) {
+        while (!pendingTransactions.isEmpty()) {
+          Map.Entry<Long, Boolean> first = pendingTransactions.firstEntry();
+          if (first.getValue()) {
+            newSeek = first.getKey();
+            pendingTransactions.pollFirstEntry();
+            pendingCount.decrementAndGet();
+          } else {
+            break;
+          }
+        }
+        lock.notifyAll();
+      }
+
+      if (newSeek != -1) {
+        seekPosition.set(String.valueOf(newSeek));
+        LOG.debug("Updated checkpoint seek position to {}", newSeek);
+      }
+    }
+
+    public void acquirePermit() throws InterruptedException {
+      synchronized (lock) {
+        while (pendingCount.get() >= maxPendingTransactions && !stopped) {
+          lock.wait(100);
+        }
+      }
+    }
+
+    public void stop() {
+      stopped = true;
+      synchronized (lock) {
+        lock.notifyAll();
+      }
+    }
+
+    public boolean isStopped() {
+      return stopped;
+    }
   }
 
   static class KafkaClientWrapper {
@@ -173,25 +281,34 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
       }
     }
 
-    public void send(String message) throws IOException {
+    public void sendAsync(String message, Callback callback) {
       if (producer != null) {
-        LOG.debug("Producing event {}", message);
+        LOG.debug("Producing event asynchronously {}", message);
         ProducerRecord<String, String> producerRecord =
             new ProducerRecord<>(topic, message);
-        try {
-          // TODO: Sequential blocking for every event ensures at-least-once delivery
-          // but limits throughput. Consider batching async sends and calling
-          // producer.flush() before updating the seek position for high-volume use cases.
-          producer.send(producerRecord).get();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new IOException("Interrupted while sending message to Kafka", e);
-        } catch (ExecutionException e) {
-          throw new IOException("Failed to send message to Kafka", e);
-        }
+        producer.send(producerRecord, callback);
       } else {
         LOG.warn("Producing event {} [KAFKA DOWN]", message);
-        throw new IOException("Kafka producer is not initialized");
+        callback.onCompletion(null, new IOException("Kafka producer is not initialized"));
+      }
+    }
+
+    public void send(String message) throws IOException {
+      CompletableFuture<Void> future = new CompletableFuture<>();
+      sendAsync(message, (metadata, exception) -> {
+        if (exception != null) {
+          future.completeExceptionally(exception);
+        } else {
+          future.complete(null);
+        }
+      });
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted while sending message", e);
+      } catch (ExecutionException e) {
+        throw new IOException("Failed to send message", e);
       }
     }
 
