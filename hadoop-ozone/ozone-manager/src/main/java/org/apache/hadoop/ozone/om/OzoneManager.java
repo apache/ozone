@@ -971,8 +971,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(this, metadataManager, true);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
-    eventListenerPluginManager = new OMEventListenerPluginManager(this,
-        configuration);
     // If authorizer is not initialized or the authorizer is Native
     // re-initialize the authorizer, else for non-native authorizer
     // like ranger we can reuse previous value if it is initialized
@@ -995,6 +993,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       }
     };
+
+    eventListenerPluginManager = new OMEventListenerPluginManager(this,
+        configuration);
 
     // Reload snapshot feature config flag
     fsSnapshotEnabled = configuration.getBoolean(

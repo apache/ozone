@@ -35,4 +35,16 @@ public interface OMEventListenerPluginContext {
 
   // XXX: this probably doesn't belong here
   String getThreadNamePrefix();
+
+  NotificationCheckpointStrategy getNotificationCheckpointStrategy();
+
+  /**
+   * Prunes records from completedRequestInfoTable using a hybrid soft and hard retention limit.
+   *
+   * @param checkpointKey the current consumer checkpoint (startKey).
+   * @param softLimit the soft retention keep limit behind the checkpoint.
+   * @param hardLimit the hard retention cap limit behind the latest transaction in database.
+   * @throws IOException if any database error occurs.
+   */
+  void pruneCompletedRequestInfo(long checkpointKey, long softLimit, long hardLimit) throws IOException;
 }

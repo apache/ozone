@@ -19,18 +19,27 @@ package org.apache.hadoop.ozone.om.eventlistener;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A narrow set of functionality we are ok with exposing to plugin
  * implementations.
  */
 public final class OMEventListenerPluginContextImpl implements OMEventListenerPluginContext {
-  private final OzoneManager ozoneManager;
+  private static final Logger LOG = LoggerFactory.getLogger(OMEventListenerPluginContextImpl.class);
 
-  public OMEventListenerPluginContextImpl(OzoneManager ozoneManager) {
+  private final OzoneManager ozoneManager;
+  private final NotificationCheckpointStrategy checkpointStrategy;
+
+  public OMEventListenerPluginContextImpl(OzoneManager ozoneManager,
+      NotificationCheckpointStrategy checkpointStrategy) {
     this.ozoneManager = ozoneManager;
+    this.checkpointStrategy = checkpointStrategy;
   }
 
   @Override
@@ -49,5 +58,41 @@ public final class OMEventListenerPluginContextImpl implements OMEventListenerPl
   @Override
   public String getThreadNamePrefix() {
     return ozoneManager.getThreadNamePrefix();
+  }
+
+  @Override
+  public NotificationCheckpointStrategy getNotificationCheckpointStrategy() {
+    return checkpointStrategy;
+  }
+
+  @Override
+  public void pruneCompletedRequestInfo(long checkpointKey, long softLimit, long hardLimit) throws IOException {
+    Table<Long, OmCompletedRequestInfo> table = ozoneManager.getMetadataManager().getCompletedRequestInfoTable();
+    try {
+      long softPruneBeforeKey = checkpointKey - softLimit;
+
+      long latestKey = -1;
+      try (TableIterator<Long, ? extends Table.KeyValue<Long, OmCompletedRequestInfo>>
+              iterator = table.iterator()) {
+        iterator.seekToLast();
+        if (iterator.hasNext()) {
+          latestKey = iterator.next().getKey();
+        }
+      }
+
+      long hardPruneBeforeKey = latestKey - hardLimit;
+
+      long beforeKey = Math.max(softPruneBeforeKey, hardPruneBeforeKey);
+      if (beforeKey > 0) {
+        table.deleteRange(0L, beforeKey);
+        LOG.info("Pruned records from completedRequestInfoTable older than trxLogIndex {} " +
+            "(checkpointKey={}, softLimit={}, latestKey={}, hardLimit={})",
+            beforeKey, checkpointKey, softLimit, latestKey, hardLimit);
+      }
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException("Failed to prune completedRequestInfoTable range", e);
+    }
   }
 }
