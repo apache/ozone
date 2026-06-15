@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto.DISK;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -473,7 +474,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testDatanodeIsInvalidWhenNoSlotsAvailable() {
+  public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
     NodeManager nodeMngr = mock(NodeManager.class);
     final DatanodeID datanodeID = DatanodeID.of(UUID.randomUUID());
     DummyPlacementPolicy placementPolicy =
@@ -487,19 +488,43 @@ public class TestSCMCommonPlacementPolicy {
     when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
     when(nodeMngr.getNode(eq(datanodeID))).thenReturn(datanodeInfo);
 
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 500
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(500)
+            .setFreeSpaceToSpare(10000)
+            .build();
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
+        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(1000)
+            .setFreeSpaceToSpare(100000)
+            .build();
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
         metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
           200);
+    when(datanodeInfo.getStorageReports())
+        .thenReturn(Collections.singletonList(storageReport1))
+        .thenReturn(Collections.singletonList(storageReport2));
     when(datanodeInfo.getMetadataStorageReports())
         .thenReturn(Collections.singletonList(metaReport));
 
-    // Space check now uses PendingContainerTracker.hasAvailableSpace:
-    // slot available → isValidNode returns true
-    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(true);
+
+    // 500 committed bytes:
+    //
+    //   101000       500
+    //     |           |
+    // (remaining - committed) > Math.max(4000, freeSpaceToSpare)
+    //                                                    |
+    //                                                  100000
+    //
+    // Summary: 101000 - 500 > 100000 == true
     assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
 
-    // No slot available (all pending) → isValidNode returns false
-    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(false);
+    // 1000 committed bytes:
+    // Summary: 101000 - 1000 > 100000 == false
     assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 

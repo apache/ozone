@@ -462,14 +462,6 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    if (datanodeInfo == null) {
-      return false;
-    }
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
-  }
-
-  @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     if (datanodeInfo != null) {
       pendingContainerTracker.removePendingAllocation(
@@ -961,11 +953,6 @@ public class MockNodeManager implements NodeManager {
   @Override
   public PendingContainerTracker getPendingContainerTracker() {
     return pendingContainerTracker;
-  }
-
-  public void setPendingContainerMaxSize(long maxContainerSize) {
-    this.pendingContainerTracker = new PendingContainerTracker(maxContainerSize,
-        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
   }
 
   @Override

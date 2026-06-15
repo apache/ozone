@@ -213,7 +213,7 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
-    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf, this);
+    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
   }
 
   @Override
@@ -1085,11 +1085,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
-  }
-
-  @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
@@ -1473,9 +1468,8 @@ public class SCMNodeManager implements NodeManager {
     private final long blockSize;
     private final long minRatisVolumeSizeBytes;
     private final long containerSize;
-    private final NodeManager nodeManager;
 
-    NonWritableNodeFilter(ConfigurationSource conf, NodeManager nodeManager) {
+    NonWritableNodeFilter(ConfigurationSource conf) {
       blockSize = (long) conf.getStorageSize(
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1488,13 +1482,12 @@ public class SCMNodeManager implements NodeManager {
           ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
           StorageUnit.BYTES);
-      this.nodeManager = nodeManager;
     }
 
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, nodeManager)
+          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize)
           && !hasEnoughCommittedVolumeSpace(dn));
     }
 

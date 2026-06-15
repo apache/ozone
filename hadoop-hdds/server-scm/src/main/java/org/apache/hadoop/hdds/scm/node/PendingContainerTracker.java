@@ -208,38 +208,12 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Returns true if the given datanode has at least one allocatable container slot
-   * available, accounting for pending in-flight allocations.
+   * Remove a pending container allocation from a specific DataNode.
+   * Removes from both current and previous windows.
+   * Called when container is confirmed.
    *
-   * Uses the same slot-counting logic as {@link TwoWindowBucket#checkSpaceAndAdd}
-   *
-   * <p>This method does not consume a slot — it is a read-only check intended
-   * for the placement policy
-   *
-   * @param datanodeInfo the datanode to check
-   * @return true if at least one container slot is available
+   * @param containerID The container to remove from pending
    */
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
-    List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
-    if (storageReports.isEmpty()) {
-      return false;
-    }
-    TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
-    bucket.rollIfNeeded();
-    final int pendingCount = bucket.getCount();
-    long allocatableCount = 0;
-    for (StorageReportProto report : storageReports) {
-      allocatableCount += VolumeUsage.getUsableSpace(report) / maxContainerSize;
-      if (allocatableCount > pendingCount) {
-        return true;
-      }
-    }
-    LOG.debug("Datanode {} has no available container slots. Pending: {}, Allocatable: {}",
-        datanodeInfo.getID(), pendingCount, allocatableCount);
-    return false;
-  }
-
   public void removePendingAllocation(TwoWindowBucket bucket, ContainerID containerID) {
     Objects.requireNonNull(containerID, "containerID == null");
 
