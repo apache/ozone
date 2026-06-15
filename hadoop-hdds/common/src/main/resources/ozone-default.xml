@@ -1711,6 +1711,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.creation.ec.ratis.three.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      If enabled, SCM creates RATIS/THREE background pipelines even when the
+      default replication type is EC.
+    </description>
+  </property>
+  <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
     <tag>HDDS,SCM,OPERATION</tag>
