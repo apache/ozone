@@ -44,6 +44,7 @@ public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
   /**
    * Execute the upgrade action during finalization.
    */
+  @Override
   void execute(DataSource source) throws Exception;
 
   /**
