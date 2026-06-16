@@ -65,9 +65,9 @@ public class RocksDBManualCompaction extends RepairTool {
 
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
       description = "BottommostLevelCompaction option for RocksDB compaction." +
-          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce)." +
-          " Default: 0 (kSkip).",
-      defaultValue = "0")
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
+      defaultValue = "0",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int bottommostLevelCompaction;
 
   private String getConsoleReadLineWithFormat() {
@@ -107,7 +107,7 @@ public class RocksDBManualCompaction extends RepairTool {
       ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
           CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
       info("Running compaction on " + columnFamilyName +
-          " with BottommostLevelCompaction=" + blcOption.name());
+          " with bottommost level compaction: " + blcOption.name());
       long startTime = Time.monotonicNow();
       if (!isDryRun()) {
         ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();

@@ -61,9 +61,10 @@ public class CompactOMDB extends RepairTool {
   private String nodeId;
 
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
-      required = true,
       description = "BottommostLevelCompaction option for RocksDB compaction." +
-          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce).")
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
+      defaultValue = "0",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int bottommostLevelCompaction;
 
   @Override
@@ -79,8 +80,8 @@ public class CompactOMDB extends RepairTool {
                OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
                    UserGroupInformation.getCurrentUser(), omNodeDetails)) {
         omAdminProtocolClient.compactOMDB(columnFamilyName, blcOption.getValue());
-        info("Compaction request issued for om.db of om node: %s, column-family: %s," +
-            " BottommostLevelCompaction=%s.", nodeId, columnFamilyName, blcOption.name());
+        info("Compaction request issued for om.db of om node: %s, column-family: %s" +
+            " with bottommost level compaction: %s.", nodeId, columnFamilyName, blcOption.name());
         info("Please check role logs of %s for completion status.", nodeId);
       } catch (IOException ex) {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
