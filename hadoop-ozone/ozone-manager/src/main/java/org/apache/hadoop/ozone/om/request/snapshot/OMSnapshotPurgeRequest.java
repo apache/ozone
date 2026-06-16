@@ -136,7 +136,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
-      LOG.info("Successfully executed snapshotPurgeRequest for snapshots: {} along with updating snapshots:{}.",
+      LOG.info("Successfully executed snapshotPurgeRequest for snapshots: {} along with updating snapshots: {}.",
           purgedSnapshotsForLog, updatedSnapshotInfos);
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();

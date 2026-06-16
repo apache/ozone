@@ -209,6 +209,8 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
       assertThat(logCapturer.getOutput()).contains(
           snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')");
     }
+    assertThat(logCapturer.getOutput()).contains(
+        "along with updating snapshots: {");
 
     assertEquals(initialSnapshotPurgeCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
