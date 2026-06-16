@@ -323,8 +323,8 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     try {
       refreshed = NetUtils.createSocketAddr(hostAndPort);
     } catch (IllegalArgumentException ex) {
-      getLogger().warn("Failed to re-resolve SCM address {}: {}",
-          hostAndPort, ex.getMessage());
+      getLogger().warn("Failed to re-resolve SCM address {}",
+          hostAndPort, ex);
       return false;
     }
     if (refreshed.isUnresolved()) {
@@ -359,8 +359,8 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
       try {
         RPC.stopProxy(staleProxy.proxy);
       } catch (RuntimeException stopEx) {
-        getLogger().warn("Failed to stop stale proxy for SCM nodeId {}: {}",
-            nodeId, stopEx.getMessage());
+        getLogger().warn("Failed to stop stale proxy for SCM nodeId {}",
+            nodeId, stopEx);
       }
     }
     getLogger().info("DNS re-resolution: SCM nodeId {} address {} -> {} "
