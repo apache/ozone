@@ -36,14 +36,12 @@ import org.slf4j.LoggerFactory;
  * Utility methods for the Chatbot Agent.
  *
  * <p>Contains pure functions for string manipulation, JSON parsing, security validation,
- * and I/O operations used by {@link ChatbotAgent} and {@link ToolExecutor}.</p>
+ * and I/O operations used by {@link ChatbotAgent} and {@link org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor}.</p>
  */
 public final class ChatbotUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChatbotUtils.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final String API_V1_ROOT = "/api/v1";
-
   private ChatbotUtils() {
     // Prevent instantiation
   }
@@ -51,56 +49,6 @@ public final class ChatbotUtils {
   // =========================================================================
   // Path & Security Utilities
   // =========================================================================
-
-  public static String normalizeEndpoint(String endpoint) {
-    if (StringUtils.isBlank(endpoint)) {
-      return "";
-    }
-    String fullEndpoint = endpoint;
-    if (!fullEndpoint.startsWith("/api/v1/")) {
-      fullEndpoint = "/api/v1" + (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
-    }
-    return fullEndpoint;
-  }
-
-  /**
-   * Resolves {@code .} and {@code ..} in the path and ensures it stays under {@link #API_V1_ROOT}.
-   * Returns an empty string when the path is invalid, contains a scheme ({@code ://}),
-   * or escapes the Recon API root after normalization.
-   */
-  public static String canonicalizeEndpointPath(String endpointPath) {
-    if (StringUtils.isBlank(endpointPath)) {
-      return "";
-    }
-    if (endpointPath.indexOf("://") >= 0) {
-      return "";
-    }
-    String pathOnly = endpointPath;
-    int queryIdx = pathOnly.indexOf('?');
-    if (queryIdx >= 0) {
-      pathOnly = pathOnly.substring(0, queryIdx);
-    }
-    try {
-      URI uri = new URI(null, null, pathOnly, null, null);
-      String normalized = uri.normalize().getPath();
-      if (normalized == null || normalized.isEmpty()) {
-        return "";
-      }
-      if (!normalized.equals(API_V1_ROOT) && !normalized.startsWith(API_V1_ROOT + "/")) {
-        return "";
-      }
-      return normalized;
-    } catch (URISyntaxException e) {
-      return "";
-    }
-  }
-
-  /**
-   * True when {@code path} is exactly {@code prefix} or a sub-path ({@code prefix + "/..."}).
-   */
-  public static boolean matchesAllowedPrefix(String path, String prefix) {
-    return path.equals(prefix) || path.startsWith(prefix + "/");
-  }
 
   /**
    * {@code listKeys} requires {@code startPrefix} scoped to at least volume/bucket level.
@@ -188,7 +136,10 @@ public final class ChatbotUtils {
     }
     try {
       int parsed = Integer.parseInt(value.trim());
-      return parsed > 0 ? parsed : defaultValue;
+      if (parsed <= 0) {
+        throw new IllegalArgumentException("limit must be a positive integer");
+      }
+      return parsed;
     } catch (NumberFormatException e) {
       return defaultValue;
     }

@@ -39,6 +39,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryRequest;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,7 +78,13 @@ public class TestChatbotAgentListKeysPolicy {
   private LLMClient mockLlmClient;
 
   @Mock
-  private ToolExecutor mockToolExecutor;
+  private ReconQueryExecutor mockReconQueryExecutor;
+
+  @Mock
+  private ReconApiAllowlist mockReconApiAllowlist;
+  
+  @Mock
+  private LlmToolSpecFactory mockLlmToolSpecFactory;
 
   private ChatbotAgent agent;
 
@@ -87,11 +97,12 @@ public class TestChatbotAgentListKeysPolicy {
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, true);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
-    lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt()))
+    lenient().when(mockReconQueryExecutor.execute(any(ReconQueryRequest.class)))
         .thenReturn(defaultOutcome());
 
-    agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
+    lenient().when(mockReconApiAllowlist.isRegistered(anyString())).thenReturn(true);
+
+    agent = new ChatbotAgent(mockLlmClient, mockReconQueryExecutor, mockReconApiAllowlist, mockLlmToolSpecFactory, conf);
   }
 
   // ── Safe-scope violations (listKeys without a bucket prefix) ───────
@@ -102,7 +113,7 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery(
@@ -112,8 +123,7 @@ public class TestChatbotAgentListKeysPolicy {
     assertTrue(result.toLowerCase().contains("bucket") ||
             result.toLowerCase().contains("prefix"),
         "Response should ask for a bucket-scoped prefix");
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -122,14 +132,13 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("List all keys", null, null);
 
     assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -137,14 +146,13 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"\"},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("List all keys", null, null);
 
     assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -153,7 +161,7 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/myvol\"},\"reasoning\":\"volume only\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("List keys in volume myvol", null, null);
@@ -161,8 +169,7 @@ public class TestChatbotAgentListKeysPolicy {
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("bucket"),
         "Response should ask for a bucket-scoped prefix");
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -171,15 +178,15 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(resp(json));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any()))
         .thenReturn(resp(SUMMARY_RESPONSE));
 
     agent.processQuery("List keys in bucket1", null, null);
 
     // Executor must be called with the correct endpoint
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -188,20 +195,20 @@ public class TestChatbotAgentListKeysPolicy {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED, true);
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, false);
-    ChatbotAgent agentNoScope = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
+    ChatbotAgent agentNoScope = new ChatbotAgent(mockLlmClient, mockReconQueryExecutor, mockReconApiAllowlist, mockLlmToolSpecFactory, conf);
 
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(resp(json));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any()))
         .thenReturn(resp(SUMMARY_RESPONSE));
 
     agentNoScope.processQuery("List all keys", null, null);
 
     // Safe-scope check is off — executor IS called
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(any(ReconQueryRequest.class));
   }
 
   // ── Exception Handling and Parameter Pass-through ───────────────────────
@@ -211,11 +218,10 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
-    when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt()))
+    when(mockReconQueryExecutor.execute(any(ReconQueryRequest.class)))
         .thenThrow(new IOException("Recon API is down"));
 
     ChatbotException exception = assertThrows(ChatbotException.class, () -> {
@@ -235,8 +241,9 @@ public class TestChatbotAgentListKeysPolicy {
         "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
 
     // First call returns valid tool call JSON, second call throws exception
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(resp(json));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any()))
         .thenThrow(new RuntimeException("LLM summarization failed"));
 
     ChatbotException exception = assertThrows(ChatbotException.class, () -> {
@@ -250,8 +257,7 @@ public class TestChatbotAgentListKeysPolicy {
     assertEquals("LLM summarization failed", exception.getCause().getMessage());
 
     // Executor should have been called successfully
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(any(ReconQueryRequest.class));
   }
 
   @Test
@@ -262,17 +268,17 @@ public class TestChatbotAgentListKeysPolicy {
         "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\",\"limit\":\"50\"," +
         "\"replicationType\":\"RATIS\",\"keySize\":\"1024\"}," +
         "\"reasoning\":\"scoped with filters\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
+    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(resp(json));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any()))
         .thenReturn(resp(SUMMARY_RESPONSE));
 
     agent.processQuery("List 50 RATIS keys in bucket1 larger than 1024 bytes", null, null);
 
-    ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        eq("/api/v1/keys/listKeys"), eq("GET"), paramsCaptor.capture(), anyInt(), anyInt());
+    ArgumentCaptor<ReconQueryRequest> requestCaptor = ArgumentCaptor.forClass(ReconQueryRequest.class);
+    verify(mockReconQueryExecutor, times(1)).execute(requestCaptor.capture());
 
-    Map<String, String> capturedParams = paramsCaptor.getValue();
+    Map<String, String> capturedParams = requestCaptor.getValue().getParameters();
     assertEquals("/vol1/bucket1", capturedParams.get("startPrefix"));
     assertEquals("50", capturedParams.get("limit"));
     assertEquals("RATIS", capturedParams.get("replicationType"));
@@ -282,11 +288,11 @@ public class TestChatbotAgentListKeysPolicy {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private LLMClient.LLMResponse resp(String content) {
-    return new LLMClient.LLMResponse(content, "test-model", 10, 20, null);
+    return new LLMClient.LLMResponse(content, "test-model", 10, 20, null, null);
   }
 
-  private ToolExecutor.ToolExecutionOutcome defaultOutcome() {
-    return new ToolExecutor.ToolExecutionOutcome(
-        new HashMap<>(), 0, 1, false, null, new HashMap<>());
+  private ReconQueryResult defaultOutcome() {
+    return new ReconQueryResult(
+        new HashMap<>(), 0, false, 1000);
   }
 }

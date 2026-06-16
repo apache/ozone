@@ -42,16 +42,29 @@ public interface LLMClient {
    * key parameter — all callers should be cluster admins using the shared server key.</p>
    *
    * @param messages   The back-and-forth chat history so far (System Prompts, User Questions, etc.)
-   * @param model      The specific model name (e.g. "gpt-4.1" or "gemini-2.5-flash")
-   * @param parameters Extra rules like "temperature" (how creative the AI should be) or
-   *                   "max_tokens" (how long the answer can be)
+   * @param model      Requested model name (optional; falls back to configured default when unsupported)
+   * @param provider   Requested provider name (optional; falls back via routing rules when unsupported)
+   * @param parameters Extra rules like {@code temperature} or {@code max_tokens}, applied when
+   *                   building the provider model (LangChain4j 0.35.0 does not support per-request
+   *                   overrides on {@code ChatRequest})
    * @return A standardized LLMResponse object containing the AI's final text.
    * @throws LLMException if the network fails, the API key is missing, or the provider returns an error.
    */
   LLMResponse chatCompletion(
       List<ChatMessage> messages,
       String model,
+      String provider,
       Map<String, Object> parameters) throws LLMException;
+
+  /**
+   * Send a conversation to an AI and wait for its answer, providing a list of tools it can call.
+   */
+  LLMResponse chatWithTools(
+      List<ChatMessage> messages,
+      String model,
+      String provider,
+      Map<String, Object> parameters,
+      List<ToolSpec> tools) throws LLMException;
 
   /**
    * Returns whether this client is ready to work (e.g. has an API key configured).
@@ -114,14 +127,25 @@ public interface LLMClient {
     // Extra sneaky information about the answer (like why it stopped typing)
     private final Map<String, Object> metadata;
 
+    // Native tool calls requested by the LLM
+    private final List<ToolCallRequest> toolCalls;
+
     public LLMResponse(String content, String model,
                        int promptTokens, int completionTokens,
                        Map<String, Object> metadata) {
+      this(content, model, promptTokens, completionTokens, metadata, null);
+    }
+
+    public LLMResponse(String content, String model,
+                       int promptTokens, int completionTokens,
+                       Map<String, Object> metadata,
+                       List<ToolCallRequest> toolCalls) {
       this.content = content;
       this.model = model;
       this.promptTokens = promptTokens;
       this.completionTokens = completionTokens;
       this.metadata = metadata;
+      this.toolCalls = toolCalls;
     }
 
     public String getContent() {
@@ -147,6 +171,52 @@ public interface LLMClient {
 
     public Map<String, Object> getMetadata() {
       return metadata;
+    }
+
+    public List<ToolCallRequest> getToolCalls() {
+      return toolCalls;
+    }
+  }
+
+  class ToolSpec {
+    private final String name;
+    private final String description;
+    private final Map<String, Object> parametersSchema;
+
+    public ToolSpec(String name, String description, Map<String, Object> parametersSchema) {
+      this.name = name;
+      this.description = description;
+      this.parametersSchema = parametersSchema;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    public Map<String, Object> getParametersSchema() {
+      return parametersSchema;
+    }
+  }
+
+  class ToolCallRequest {
+    private final String toolName;
+    private final String argumentsJson;
+
+    public ToolCallRequest(String toolName, String argumentsJson) {
+      this.toolName = toolName;
+      this.argumentsJson = argumentsJson;
+    }
+
+    public String getToolName() {
+      return toolName;
+    }
+
+    public String getArgumentsJson() {
+      return argumentsJson;
     }
   }
 

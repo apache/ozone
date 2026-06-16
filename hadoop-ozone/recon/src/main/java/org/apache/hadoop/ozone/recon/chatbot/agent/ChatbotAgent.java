@@ -37,6 +37,12 @@ import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ChatMessage;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.LLMResponse;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolCallRequest;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolSpec;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryRequest;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +59,6 @@ public class ChatbotAgent {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   // A specific Recon API endpoint we want to handle carefully because it can return millions of rows.
-  private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
 
   /**
    * Allowlist of Recon API path prefixes the chatbot is permitted to call.
@@ -64,35 +69,19 @@ public class ChatbotAgent {
    * executed. Paths are canonicalized (.. resolved) and matched with a boundary-aware
    * prefix check so /api/v1/keys2 does not match /api/v1/keys.
    */
-  private static final String API_V1_ROOT = "/api/v1";
-
-  private static final Set<String> ALLOWED_ENDPOINT_PREFIXES =
-      Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-          "/api/v1/clusterState",
-          "/api/v1/datanodes",
-          "/api/v1/pipelines",
-          "/api/v1/containers",
-          "/api/v1/keys",
-          "/api/v1/volumes",
-          "/api/v1/buckets",
-          "/api/v1/task/status",
-          "/api/v1/metrics",
-          "/api/v1/utilization",
-          "/api/v1/namespace",
-          "/api/v1/om"
-      )));
 
   // The connection to Gemini/OpenAI
+  private static final String LIST_KEYS_TOOL = "api_v1_keys_listKeys";
   private final LLMClient llmClient;
-
-  // The hands that execute the internal API calls
-  private final ToolExecutor toolExecutor;
-
-  // The Cheat Sheet of all available APIs loaded from the .md file
-  private final String apiSchema;
+  private final ReconQueryExecutor reconQueryExecutor;
+  private final ReconApiAllowlist reconApiAllowlist;
+  private final LlmToolSpecFactory llmToolSpecFactory;
 
   // Prompt preamble for tool selection — loaded from classpath resource
   private final String toolSelectionPreamble;
+
+  // Semantic API guide for tool-selection reasoning (transport-agnostic)
+  private final String apiGuide;
 
   // System prompt for the summarization LLM call — loaded from classpath resource
   private final String summarizationPrompt;
@@ -103,26 +92,27 @@ public class ChatbotAgent {
   // Max API calls we allow per question (so the LLM doesn't DOS our server)
   private final int maxToolCalls;
 
-  private final String defaultModel;
-  private final int maxPagesPerAnswer;
-  private final int pageSizePerCall;
   private final boolean requireSafeScope;
 
   @Inject
   public ChatbotAgent(LLMClient llmClient,
-                      ToolExecutor toolExecutor,
+                      ReconQueryExecutor reconQueryExecutor,
+                      ReconApiAllowlist reconApiAllowlist,
+                      LlmToolSpecFactory llmToolSpecFactory,
                       OzoneConfiguration configuration) {
     this.llmClient = llmClient;
-    this.toolExecutor = toolExecutor;
+    this.reconQueryExecutor = reconQueryExecutor;
+    this.reconApiAllowlist = reconApiAllowlist;
+    this.llmToolSpecFactory = llmToolSpecFactory;
 
     // Read the Schema (Cheat Sheet) from the resources' folder.
-    this.apiSchema = loadApiSchema();
-
     // Load prompt texts from classpath resources so they can be edited as plain text
     // without touching Java code. If a file is missing the method returns "" and the
     // prompt builder falls back to an inline default.
     this.toolSelectionPreamble = ChatbotUtils.loadResourceFromClasspath(
         "chatbot/recon-tool-selection-prompt-preamble.txt");
+    this.apiGuide = ChatbotUtils.loadResourceFromClasspath(
+        "chatbot/recon-tool-semantics.md");
     this.summarizationPrompt = ChatbotUtils.loadResourceFromClasspath(
         "chatbot/recon-summarization-prompt.txt");
     this.fallbackPromptTemplate = ChatbotUtils.loadResourceFromClasspath(
@@ -130,6 +120,9 @@ public class ChatbotAgent {
 
     if (!toolSelectionPreamble.isEmpty()) {
       LOG.info("Loaded tool-selection prompt preamble from classpath");
+    }
+    if (!apiGuide.isEmpty()) {
+      LOG.info("Loaded semantic API guide for tool selection from classpath");
     }
     if (!summarizationPrompt.isEmpty()) {
       LOG.info("Loaded summarization prompt from classpath");
@@ -142,22 +135,11 @@ public class ChatbotAgent {
     this.maxToolCalls = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT);
-    this.defaultModel = configuration.get(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL_DEFAULT);
-    this.maxPagesPerAnswer = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT);
-    this.pageSizePerCall = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT);
     this.requireSafeScope = configuration.getBoolean(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE_DEFAULT);
 
-    LOG.info("ChatbotAgent initialized with model={}, maxPages={}, " +
-            "pageSize={}, requireSafeScope={}",
-        defaultModel, maxPagesPerAnswer, pageSizePerCall, requireSafeScope);
+    LOG.info("ChatbotAgent initialized with requireSafeScope={}", requireSafeScope);
   }
 
   /**
@@ -183,20 +165,20 @@ public class ChatbotAgent {
       throw new ChatbotException("Query cannot be empty");
     }
 
-    // Use default model if the user didn't specify one.
-    String effectiveModel = (model != null && !model.isEmpty()) ? model : defaultModel;
-
-    LOG.info("Processing query with model: {}, provider: {}", effectiveModel, provider == null ? "auto" : provider);
+    // Provider and model are resolved in LangChain4jDispatcher (defaults applied there).
+    LOG.info("Processing query with model: {}, provider: {}",
+        model == null || model.isEmpty() ? "default" : model,
+        provider == null || provider.isEmpty() ? "default" : provider);
 
     try {
       // STEP 1: Ask the LLM what API tools it wants to use to answer the question.
-      ToolCall toolCall = getToolCall(userQuery, effectiveModel, provider);
+      ToolCall toolCall = getToolCall(userQuery, model, provider);
 
       // If the LLM doesn't know what API to call...
       if (toolCall == null) {
         // No suitable endpoint found
         LOG.info("Tool selection result: NO_SUITABLE_ENDPOINT; using fallback");
-        return handleFallback(userQuery, effectiveModel, provider);
+        return handleFallback(userQuery, model, provider);
       }
 
       // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
@@ -214,7 +196,7 @@ public class ChatbotAgent {
 
         if (toolCall.getToolCalls() == null || toolCall.getToolCalls().isEmpty()) {
           LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
-          return handleFallback(userQuery, effectiveModel, provider);
+          return handleFallback(userQuery, model, provider);
         }
         LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
             toolCall.getToolCalls().size());
@@ -227,9 +209,9 @@ public class ChatbotAgent {
           return clarification;
         }
         for (ToolCall selected : toolCall.getToolCalls()) {
-          LOG.info("Selected Recon API: method={}, endpoint={}, paramKeys={}, reasoning={}",
+          LOG.info("Selected Recon API: method={}, toolName={}, paramKeys={}, reasoning={}",
               selected.getMethod(),
-              selected.getEndpoint(),
+              selected.getToolName(),
               selected.getParameters() == null ? "[]" : selected.getParameters().keySet(),
               selected.getReasoning());
         }
@@ -239,33 +221,32 @@ public class ChatbotAgent {
 
         // Scenario B: LLM says we only need ONE API call
       } else {
-        if (toolCall.getEndpoint() == null || toolCall.getEndpoint().isEmpty()) {
-          LOG.warn("LLM returned SINGLE_ENDPOINT with empty endpoint");
-          return handleFallback(userQuery, effectiveModel, provider);
+        if (toolCall.getToolName() == null || toolCall.getToolName().isEmpty()) {
+          LOG.warn("LLM returned SINGLE_ENDPOINT with empty toolName");
+          return handleFallback(userQuery, model, provider);
         }
-        LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, paramKeys={}, reasoning={}",
+        LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, toolName={}, paramKeys={}, reasoning={}",
             toolCall.getMethod(),
-            toolCall.getEndpoint(),
+            toolCall.getToolName(),
             toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet(),
             toolCall.getReasoning());
         String clarification = validateToolCallForExecution(toolCall);
         if (clarification != null) {
-          LOG.info("Execution policy returned clarification for endpoint {}: {}",
-              toolCall.getEndpoint(), clarification);
+          LOG.info("Execution policy returned clarification for toolName {}: {}",
+              toolCall.getToolName(), clarification);
           return clarification;
         }
         try {
-          ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
-              toolCall.getEndpoint(),
+          ReconQueryRequest request = new ReconQueryRequest(
+              toolCall.getToolName(),
               toolCall.getMethod(),
-              toolCall.getParameters(),
-              maxPagesPerAnswer,
-              pageSizePerCall);
+              toolCall.getParameters());
+          ReconQueryResult outcome = reconQueryExecutor.execute(request);
 
           // Save the raw JSON data the API returned
           apiResponses = new HashMap<>();
-          apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
-          executionMetadata.put(toolCall.getEndpoint(), createExecutionMetadataMap(outcome));
+          apiResponses.put(toolCall.getToolName(), outcome.getResponseBody());
+          executionMetadata.put(toolCall.getToolName(), createExecutionMetadataMap(outcome));
         } catch (Exception e) {
           throw new ChatbotException("Error executing tool call: " + e.getMessage(), e);
         }
@@ -274,7 +255,7 @@ public class ChatbotAgent {
       // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
       LOG.info("Summarization input prepared: endpointCount={}, endpoints={}",
           apiResponses.size(), apiResponses.keySet());
-      return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, provider);
+      return summarizeResponse(userQuery, apiResponses, executionMetadata, model, provider);
 
     } catch (ChatbotException e) {
       throw e;
@@ -289,7 +270,9 @@ public class ChatbotAgent {
   private ToolCall getToolCall(String userQuery, String model,
                                String provider) throws LLMClient.LLMException, IOException {
 
-    // Build the "cheat sheet" prompt (includes the recon-api-guide.md)
+    // --- 1. BUILD THE PROMPT ---
+    // The system prompt teaches the LLM the Recon API schema and the rules for picking a tool.
+    // The user prompt is just the raw question the user typed.
     String systemPrompt = buildToolSelectionPrompt();
     String userPrompt = "User Query: " + userQuery;
 
@@ -297,15 +280,18 @@ public class ChatbotAgent {
     messages.add(new ChatMessage("system", systemPrompt));
     messages.add(new ChatMessage("user", userPrompt));
 
-    // Tuning the LLM: Temperature 0.1 means we want it to be very strict and robotic, not creative.
+    // --- 2. CONFIGURE GENERATION SETTINGS ---
+    // Temperature 0.1: very low creativity — we want strict, deterministic tool selection.
+    // max_tokens 8192: allow a large enough reply to fit all tool descriptions.
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.1);
     parameters.put("max_tokens", 8192);
-    if (provider != null && !provider.isEmpty()) {
-      parameters.put("_provider", provider);
-    }
 
-    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
+    // --- 3. SEND TO LLM WITH TOOL SPECS ---
+    // Attach all allowed Recon API tools so the LLM can pick which one to invoke.
+    // The LLM can either reply in text (JSON) or use native tool-call format.
+    List<ToolSpec> specs = llmToolSpecFactory.getToolSpecs();
+    LLMResponse response = llmClient.chatWithTools(messages, model, provider, parameters, specs);
 
     LOG.info("Tool selection LLM response: model={}, promptTokens={}, completionTokens={}, totalTokens={}",
         response.getModel(),
@@ -313,22 +299,66 @@ public class ChatbotAgent {
         response.getCompletionTokens(),
         response.getTotalTokens());
 
+    // --- 4. HANDLE NATIVE TOOL CALLS ---
+    // Modern models (e.g. GPT-4, Gemini) return structured tool-call objects instead of text.
+    // If the LLM picked one tool, parse it directly.
+    // If it picked multiple, wrap them in a MULTI_ENDPOINT ToolCall (capped at maxToolCalls).
+    if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
+      if (response.getToolCalls().size() == 1) {
+        return parseNativeToolCall(response.getToolCalls().get(0));
+      } else {
+        ToolCall multi = new ToolCall();
+        multi.setMultipleEndpoints(true);
+        List<ToolCall> calls = new ArrayList<>();
+        for (int i = 0; i < Math.min(response.getToolCalls().size(), maxToolCalls); i++) {
+          calls.add(parseNativeToolCall(response.getToolCalls().get(i)));
+        }
+        multi.setToolCalls(calls);
+        return multi;
+      }
+    }
+
+    // --- 5. FALLBACK: PARSE TEXT RESPONSE ---
+    // Older models (or when native tool calls are not triggered) reply with plain text.
     String content = response.getContent().trim();
 
+    // If the LLM decided no Recon API can answer the question, signal the caller to use fallback.
     if (content.contains("NO_SUITABLE_ENDPOINT")) {
       return null;
     }
 
-    // Extract the first complete JSON object from the response.
-    // LLMs sometimes wrap their JSON in prose text despite being instructed not to.
-    String jsonStr = ChatbotUtils.extractFirstJsonObject(content);
-    if (jsonStr == null) {
-      LOG.warn("No JSON found in LLM response");
-      return null;
+    if (!content.isEmpty()) {
+      // The LLM returned free text (e.g. a general Ozone question) — treat it as a direct answer.
+      ToolCall docQuery = new ToolCall();
+      docQuery.setDocumentationQuery(true);
+      docQuery.setAnswer(content);
+      docQuery.setReasoning("Direct text response from LLM");
+      return docQuery;
     }
 
-    JsonNode jsonNode = MAPPER.readTree(jsonStr);
-    return parseToolCall(jsonNode);
+    LOG.warn("Empty text response from LLM");
+    return null;
+  }
+
+  private ToolCall parseNativeToolCall(LLMClient.ToolCallRequest req) {
+    ToolCall call = new ToolCall();
+    call.setMethod("GET");
+
+    Map<String, String> params = new HashMap<>();
+    try {
+      JsonNode args = MAPPER.readTree(req.getArgumentsJson());
+      if (args != null && args.isObject()) {
+        args.fields().forEachRemaining(entry -> {
+          params.put(entry.getKey(), entry.getValue().asText());
+        });
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to parse native tool call arguments JSON: {}", req.getArgumentsJson(), e);
+    }
+    call.setToolName(req.getToolName());
+    call.setParameters(params);
+    call.setReasoning("Native tool call");
+    return call;
   }
 
   /**
@@ -342,22 +372,20 @@ public class ChatbotAgent {
       ToolCall toolCall = toolCalls.get(i);
       String responseKey = buildResponseKey(toolCall, i, toolCalls.size());
       try {
-        LOG.info("Executing Recon API call: method={}, endpoint={}", toolCall.getMethod(), toolCall.getEndpoint());
-        ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
-            toolCall.getEndpoint(),
+        LOG.info("Executing Recon API call: method={}, toolName={}", toolCall.getMethod(), toolCall.getToolName());
+        ReconQueryRequest request = new ReconQueryRequest(
+            toolCall.getToolName(),
             toolCall.getMethod(),
-            toolCall.getParameters(),
-            maxPagesPerAnswer,
-            pageSizePerCall);
+            toolCall.getParameters());
+        ReconQueryResult outcome = reconQueryExecutor.execute(request);
         responses.put(responseKey, outcome.getResponseBody());
         executionMetadata.put(responseKey, createExecutionMetadataMap(outcome));
-        LOG.info("Recon API call completed: endpoint={}, records={}, pages={}, truncated={}",
-            toolCall.getEndpoint(),
+        LOG.info("Recon API call completed: toolName={}, records={}, truncated={}",
+            toolCall.getToolName(),
             outcome.getRecordsProcessed(),
-            outcome.getPagesFetched(),
             outcome.isTruncated());
       } catch (Exception e) {
-        LOG.error("Tool call failed for endpoint: {}", toolCall.getEndpoint(), e);
+        LOG.error("Tool call failed for toolName: {}", toolCall.getToolName(), e);
         Map<String, Object> errorMap = new HashMap<>();
         errorMap.put("error", e.getMessage());
         responses.put(responseKey, errorMap);
@@ -393,12 +421,9 @@ public class ChatbotAgent {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.3);
     parameters.put("max_tokens", 2000);
-    if (provider != null && !provider.isEmpty()) {
-      parameters.put("_provider", provider);
-    }
 
     try {
-      LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
+      LLMResponse response = llmClient.chatCompletion(messages, model, provider, parameters);
 
       LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
               "completionTokens={}, totalTokens={}",
@@ -432,12 +457,9 @@ public class ChatbotAgent {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.5);
     parameters.put("max_tokens", 500);
-    if (provider != null && !provider.isEmpty()) {
-      parameters.put("_provider", provider);
-    }
 
     try {
-      LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
+      LLMResponse response = llmClient.chatCompletion(messages, model, provider, parameters);
 
       return response.getContent();
     } catch (Exception e) {
@@ -448,13 +470,19 @@ public class ChatbotAgent {
   /**
    * Creates the system prompt for tool selection (Step 1 LLM call).
    * <p>
-   * The preamble (security rules, task description, JSON format examples, safety rules)
-   * is loaded from {@code chatbot/recon-tool-selection-prompt-preamble.txt} at startup.
-   * The API specification is appended at runtime so the schema stays the single source
-   * of truth for available endpoints.
+   * Combines the preamble (security rules, examples, safety rules) with the semantic
+   * API guide. Tool names in the native tool list map to guide paths: {@code api_v1_X}
+   * corresponds to {@code /api/v1/X} with slashes replaced by underscores.
    */
   private String buildToolSelectionPrompt() {
-    return toolSelectionPreamble + "API Specification:\n" + apiSchema;
+    if (apiGuide.isEmpty()) {
+      return toolSelectionPreamble;
+    }
+    return toolSelectionPreamble
+        + "\n\n---\n\n## Semantic API Guide\n\n"
+        + "Use this guide to disambiguate difficult requests. Guide paths like `/keys/listKeys` "
+        + "map to tool names like `api_v1_keys_listKeys`.\n\n"
+        + apiGuide;
   }
 
   /**
@@ -527,29 +555,16 @@ public class ChatbotAgent {
    * bucket-scoped startPrefix to avoid memory exhaustion.
    */
   private String validateToolCallForExecution(ToolCall toolCall) {
-    if (toolCall == null || toolCall.getEndpoint() == null) {
+    if (toolCall == null || toolCall.getToolName() == null) {
       return null;
     }
-    String rawEndpoint = ChatbotUtils.normalizeEndpoint(toolCall.getEndpoint());
-    String endpoint = ChatbotUtils.canonicalizeEndpointPath(rawEndpoint);
-    if (endpoint.isEmpty()) {
-      LOG.warn("Blocked invalid endpoint path from LLM output: {}", rawEndpoint);
-      return "I can only query known Recon APIs. The requested endpoint '" +
-          rawEndpoint + "' is not in the list of permitted paths.";
-    }
+    String toolName = toolCall.getToolName();
 
-    // Layer 1: Allowlist — reject anything not in our known-safe prefix set.
-    boolean allowed = false;
-    for (String prefix : ALLOWED_ENDPOINT_PREFIXES) {
-      if (ChatbotUtils.matchesAllowedPrefix(endpoint, prefix)) {
-        allowed = true;
-        break;
-      }
-    }
-    if (!allowed) {
-      LOG.warn("Blocked disallowed endpoint from LLM output: {}", endpoint);
-      return "I can only query known Recon APIs. The requested endpoint '" +
-          endpoint + "' is not in the list of permitted paths.";
+    // Layer 1: Allowlist — reject anything not in our known-safe set.
+    if (!reconApiAllowlist.isRegistered(toolName)) {
+      LOG.warn("Blocked disallowed toolName from LLM output: {}", toolName);
+      return "I can only query known Recon APIs. The requested tool '" +
+          toolName + "' is not in the list of permitted tools.";
     }
 
     // Layer 2: Safe-scope check for endpoints that can return unbounded data.
@@ -557,7 +572,7 @@ public class ChatbotAgent {
       return null;
     }
 
-    if (!endpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX)) {
+    if (!LIST_KEYS_TOOL.equals(toolName)) {
       return null;
     }
 
@@ -566,210 +581,37 @@ public class ChatbotAgent {
       startPrefix = toolCall.getParameters().get("startPrefix");
     }
     if (!ChatbotUtils.isBucketScopedListKeysPrefix(startPrefix)) {
-      return "I need a bucket-scoped prefix to run listKeys safely. " +
-          "Please provide startPrefix in the form /<volume>/<bucket> " +
-          "(optionally with a deeper path), plus optional limit and page " +
-          "range if you want targeted analysis.";
+      return "I need a bucket-scoped prefix to run listKeys. " +
+          "This chatbot returns at most 1000 records per request and is not a " +
+          "cluster-wide search engine. Please provide startPrefix as " +
+          "/<volume>/<bucket> (optionally with a deeper path), and an optional " +
+          "limit up to 1000 to narrow the sample.";
     }
     return null;
   }
 
   private String buildResponseKey(ToolCall toolCall, int index, int total) {
-    String endpoint = toolCall == null ? "unknown" : toolCall.getEndpoint();
+    String toolName = toolCall == null ? "unknown" : toolCall.getToolName();
     if (total <= 1) {
-      return endpoint;
+      return toolName;
     }
-    return endpoint + " [call " + (index + 1) + "]";
+    return toolName + " [call " + (index + 1) + "]";
   }
 
   private Map<String, Object> createExecutionMetadataMap(
-      ToolExecutor.ToolExecutionOutcome outcome) {
+      ReconQueryResult outcome) {
     Map<String, Object> metadata = new HashMap<>();
     metadata.put("recordsProcessed", outcome.getRecordsProcessed());
-    metadata.put("pagesFetched", outcome.getPagesFetched());
     metadata.put("truncated", outcome.isTruncated());
-    metadata.put("nextCursor", outcome.getNextCursor());
-    metadata.put("limitsApplied", outcome.getLimitsApplied());
+    metadata.put("maxRecords", outcome.getMaxRecords());
     return metadata;
-  }
-
-  /**
-   * Parses the LLM's JSON response into a {@link ToolCall}.
-   *
-   * <p>The LLM always returns a unified JSON envelope with a {@code "type"} field that
-   * identifies one of three response shapes. All three share the same outer structure,
-   * differing only in which additional fields are present:
-   *
-   * <pre>
-   * SINGLE_ENDPOINT  — one Recon API call needed:
-   * {
-   *   "type": "SINGLE_ENDPOINT",
-   *   "endpoint": "/api/v1/datanodes",
-   *   "method": "GET",
-   *   "parameters": { "limit": "10" },
-   *   "reasoning": "..."
-   * }
-   *
-   * MULTI_ENDPOINT   — several Recon API calls needed:
-   * {
-   *   "type": "MULTI_ENDPOINT",
-   *   "reasoning": "why multiple endpoints are needed",
-   *   "tool_calls": [
-   *     { "endpoint": "/api/v1/clusterState", "method": "GET", "parameters": {}, "reasoning": "..." },
-   *     { "endpoint": "/api/v1/datanodes",    "method": "GET", "parameters": {}, "reasoning": "..." }
-   *   ]
-   * }
-   *
-   * DOCUMENTATION_QUERY — general question answered directly from the LLM's knowledge:
-   * {
-   *   "type": "DOCUMENTATION_QUERY",
-   *   "answer": "Apache Ozone is ...",
-   *   "reasoning": "..."
-   * }
-   * </pre>
-   *
-   * <p>The {@code type} field is the single discriminator. Having it present on every response
-   * lets the parser be a simple {@code switch} rather than a chain of field-existence checks.</p>
-   *
-   * <p><b>Unrecognized or missing type:</b> Since all three response shapes always include a
-   * {@code "type"} field, a missing or unrecognized value means the LLM returned something
-   * completely unexpected. In that case this method returns {@code null}. The caller
-   * ({@link #getToolCall}) propagates {@code null} to {@link #processQuery}, which then calls
-   * {@link #handleFallback} to produce a graceful "I cannot answer this" response.</p>
-   */
-  private ToolCall parseToolCall(JsonNode jsonNode) {
-    String type = jsonNode.path("type").asText("");
-
-    switch (type) {
-    case "SINGLE_ENDPOINT":
-      return parseSingleToolCall(jsonNode);
-    case "MULTI_ENDPOINT":
-      return parseMultiEndpointToolCall(jsonNode);
-    case "DOCUMENTATION_QUERY":
-      return parseDocumentationQueryToolCall(jsonNode);
-    default:
-      // "type" is missing or unrecognized — the LLM returned something unexpected.
-      // Return null so the caller triggers handleFallback() with a graceful error response.
-      LOG.warn("Unrecognized LLM response type '{}' — cannot parse tool call, using fallback", type);
-      return null;
-    }
-  }
-
-  private ToolCall parseMultiEndpointToolCall(JsonNode jsonNode) {
-    ToolCall toolCall = new ToolCall();
-    toolCall.setMultipleEndpoints(true);
-    toolCall.setToolCalls(parseToolCallList(jsonNode.get("tool_calls")));
-    return toolCall;
-  }
-
-  private ToolCall parseDocumentationQueryToolCall(JsonNode jsonNode) {
-    ToolCall toolCall = new ToolCall();
-    toolCall.setDocumentationQuery(true);
-    toolCall.setAnswer(jsonNode.path("answer").asText(""));
-    toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
-    return toolCall;
-  }
-
-  /**
-   * Parses the {@code tool_calls} array from a {@code MULTI_ENDPOINT} response into a list
-   * of individual {@link ToolCall} objects, capped at {@link #maxToolCalls}.
-   *
-   * <p>Each element in the array has the same shape as a {@code SINGLE_ENDPOINT} response
-   * (endpoint, method, parameters, reasoning), so {@link #parseSingleToolCall} is reused.
-   * Entries with a missing or empty endpoint are silently skipped.</p>
-   */
-  private List<ToolCall> parseToolCallList(JsonNode toolCallsArray) {
-    List<ToolCall> result = new ArrayList<>();
-    if (toolCallsArray == null || !toolCallsArray.isArray()) {
-      return result;
-    }
-    for (JsonNode tc : toolCallsArray) {
-      if (result.size() >= maxToolCalls) {
-        LOG.info("Truncating tool_calls from LLM to maxToolCalls={}", maxToolCalls);
-        break;
-      }
-      ToolCall parsed = parseSingleToolCall(tc);
-      if (parsed.getEndpoint() != null && !parsed.getEndpoint().isEmpty()) {
-        result.add(parsed);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Parses a single endpoint entry from JSON.
-   *
-   * <p>Used both for standalone {@code SINGLE_ENDPOINT} responses and for each element
-   * inside the {@code tool_calls} array of a {@code MULTI_ENDPOINT} response. The shape
-   * is identical in both cases:
-   * <pre>
-   * {
-   *   "endpoint":   "/api/v1/datanodes",
-   *   "method":     "GET",
-   *   "parameters": { "key": "value" },
-   *   "reasoning":  "..."
-   * }
-   * </pre>
-   * All fields have safe defaults: {@code endpoint} defaults to {@code ""}, {@code method}
-   * defaults to {@code "GET"}, and missing parameters produce an empty map.</p>
-   */
-  private ToolCall parseSingleToolCall(JsonNode jsonNode) {
-    ToolCall toolCall = new ToolCall();
-    toolCall.setEndpoint(jsonNode.path("endpoint").asText(""));
-    toolCall.setMethod(jsonNode.path("method").asText("GET"));
-
-    Map<String, String> parameters = new HashMap<>();
-    JsonNode paramsNode = jsonNode.get("parameters");
-    if (paramsNode != null && paramsNode.isObject()) {
-      paramsNode.fields().forEachRemaining(entry ->
-          parameters.put(entry.getKey(), entry.getValue().asText()));
-    }
-    toolCall.setParameters(parameters);
-    toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
-    return toolCall;
-  }
-
-  /**
-   * Loads the API context for the LLM tool-selection prompt.
-   *
-   * <p>Both documents are always loaded and concatenated:
-   * <ul>
-   *   <li>{@code recon-api-guide.md} — human-readable guide written for LLM consumption,
-   *       describing what each endpoint returns and how to use it.</li>
-   *   <li>{@code recon-api.yaml} — full OpenAPI specification with exact paths, parameters,
-   *       and response shapes, giving the LLM precise endpoint details.</li>
-   * </ul>
-   * </p>
-   */
-  private String loadApiSchema() {
-    String guide = ChatbotUtils.loadResourceFromClasspath("chatbot/recon-api-guide.md");
-    String yaml = ChatbotUtils.loadResourceFromClasspath("chatbot/recon-api.yaml");
-
-    if (guide.isEmpty() && yaml.isEmpty()) {
-      LOG.warn("Neither recon-api-guide.md nor recon-api.yaml found on classpath — using empty schema");
-      return "";
-    }
-
-    StringBuilder schema = new StringBuilder();
-    if (!guide.isEmpty()) {
-      LOG.info("Loaded API guide from classpath: chatbot/recon-api-guide.md");
-      schema.append(guide);
-    }
-    if (!yaml.isEmpty()) {
-      LOG.info("Loaded API spec from classpath: chatbot/recon-api.yaml");
-      if (schema.length() > 0) {
-        schema.append("\n\n---\n\n");
-      }
-      schema.append(yaml);
-    }
-    return schema.toString();
   }
 
   /**
    * Data Transfer Object representing the JSON tool call the LLM returned.
    */
   private static class ToolCall {
-    private String endpoint;
+    private String toolName;
     private String method;
     private Map<String, String> parameters;
     private String reasoning;
@@ -778,12 +620,12 @@ public class ChatbotAgent {
     private boolean multipleEndpoints;
     private List<ToolCall> toolCalls;
 
-    public String getEndpoint() {
-      return endpoint;
+    public String getToolName() {
+      return toolName;
     }
 
-    public void setEndpoint(String endpoint) {
-      this.endpoint = endpoint;
+    public void setToolName(String toolName) {
+      this.toolName = toolName;
     }
 
     public String getMethod() {
