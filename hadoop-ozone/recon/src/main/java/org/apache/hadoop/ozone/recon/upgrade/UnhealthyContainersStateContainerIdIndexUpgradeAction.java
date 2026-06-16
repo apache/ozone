@@ -19,10 +19,9 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.indexExists;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
@@ -48,7 +47,7 @@ public class UnhealthyContainersStateContainerIdIndexUpgradeAction
         return;
       }
 
-      if (indexExists(conn, INDEX_NAME)) {
+      if (indexExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, INDEX_NAME)) {
         LOG.info("Index {} already exists on {}", INDEX_NAME,
             UNHEALTHY_CONTAINERS_TABLE_NAME);
         return;
@@ -66,20 +65,5 @@ public class UnhealthyContainersStateContainerIdIndexUpgradeAction
       throw new SQLException("Failed to create " + INDEX_NAME
           + " on " + UNHEALTHY_CONTAINERS_TABLE_NAME, e);
     }
-  }
-
-  private boolean indexExists(Connection conn, String indexName)
-      throws SQLException {
-    DatabaseMetaData metaData = conn.getMetaData();
-    try (ResultSet rs = metaData.getIndexInfo(
-        null, null, UNHEALTHY_CONTAINERS_TABLE_NAME, false, false)) {
-      while (rs.next()) {
-        String existing = rs.getString("INDEX_NAME");
-        if (existing != null && existing.equalsIgnoreCase(indexName)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 }
