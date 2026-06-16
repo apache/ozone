@@ -67,7 +67,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -252,7 +251,7 @@ public class TestScmSafeMode {
             HddsProtos.LifeCycleEvent.FINALIZE);
         mapping.updateContainerState(c.containerID(),
             LifeCycleEvent.CLOSE);
-      } catch (IOException | InvalidStateTransitionException e) {
+      } catch (IOException e) {
         LOG.info("Failed to change state of open containers.", e);
       }
     });

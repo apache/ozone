@@ -546,8 +546,7 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+       ContainerID id) throws IOException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
