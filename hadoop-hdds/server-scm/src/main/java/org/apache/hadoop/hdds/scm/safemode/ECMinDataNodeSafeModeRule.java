@@ -86,7 +86,7 @@ public class ECMinDataNodeSafeModeRule
   }
 
   @Override
-  protected boolean validate() {
+  protected synchronized boolean validate() {
     if (!enabled) {
       return true;
     }
@@ -97,7 +97,7 @@ public class ECMinDataNodeSafeModeRule
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport report) {
+  protected synchronized void process(NodeRegistrationContainerReport report) {
     if (!enabled) {
       return;
     }
@@ -114,12 +114,12 @@ public class ECMinDataNodeSafeModeRule
   }
 
   @Override
-  protected void cleanup() {
+  protected synchronized void cleanup() {
     registeredDnSet.clear();
   }
 
   @Override
-  public String getStatusText() {
+  public synchronized String getStatusText() {
     if (!enabled) {
       return "ECMinDataNodeSafeModeRule is not applicable "
           + "(default replication is not EC)";
@@ -137,11 +137,6 @@ public class ECMinDataNodeSafeModeRule
   @VisibleForTesting
   int getRequiredDns() {
     return requiredDns;
-  }
-
-  @VisibleForTesting
-  int getRegisteredDns() {
-    return registeredDns;
   }
 
   @VisibleForTesting
