@@ -201,12 +201,10 @@ public class ChatbotAgent {
         LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
             toolCall.getToolCalls().size());
 
-        // Check if the LLM asked for something dangerous (like scanning the whole cluster without a limit)
-        String clarification = buildClarificationForToolCalls(toolCall.getToolCalls());
-        if (clarification != null) {
-          LOG.info("Execution policy returned clarification for multi-endpoint " +
-              "request: {}", clarification);
-          return clarification;
+        String error = validateToolCalls(toolCall.getToolCalls());
+        if (error != null) {
+          LOG.info("Blocked multi-tool request: {}", error);
+          return error;
         }
         for (ToolCall selected : toolCall.getToolCalls()) {
           LOG.info("Selected Recon API: method={}, toolName={}, paramKeys={}, reasoning={}",
@@ -230,11 +228,10 @@ public class ChatbotAgent {
             toolCall.getToolName(),
             toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet(),
             toolCall.getReasoning());
-        String clarification = validateToolCallForExecution(toolCall);
-        if (clarification != null) {
-          LOG.info("Execution policy returned clarification for toolName {}: {}",
-              toolCall.getToolName(), clarification);
-          return clarification;
+        String error = validateToolCall(toolCall);
+        if (error != null) {
+          LOG.info("Blocked tool call {}: {}", toolCall.getToolName(), error);
+          return error;
         }
         try {
           ReconQueryRequest request = new ReconQueryRequest(
@@ -418,9 +415,11 @@ public class ChatbotAgent {
     messages.add(new ChatMessage("user", userPrompt));
 
     // Temperature 0.3 allows a tiny bit more natural/human-like language creativity.
+    // max_tokens 8192: reasoning models (e.g. gemini-2.5-pro) may use tokens on internal
+    // thinking before visible text; a low cap yields null content from the provider.
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.3);
-    parameters.put("max_tokens", 2000);
+    parameters.put("max_tokens", 8192);
 
     try {
       LLMResponse response = llmClient.chatCompletion(messages, model, provider, parameters);
@@ -432,7 +431,12 @@ public class ChatbotAgent {
           response.getCompletionTokens(),
           response.getTotalTokens());
 
-      return response.getContent();
+      String summary = response.getContent();
+      if (StringUtils.isBlank(summary)) {
+        return "I retrieved the cluster data but could not generate a summary. "
+            + "Please try again or rephrase your question.";
+      }
+      return summary;
     } catch (Exception e) {
       throw new ChatbotException("Error generating response: " + e.getMessage(), e);
     }
@@ -525,36 +529,35 @@ public class ChatbotAgent {
     return sb.toString();
   }
 
-  private String buildClarificationForToolCalls(List<ToolCall> toolCalls) {
-    List<String> clarificationMessages = new ArrayList<>();
+  /**
+   * Validates each tool call and returns the first error message, if any.
+   *
+   * @return error message when a tool call is not allowed; {@code null} when all pass
+   */
+  private String validateToolCalls(List<ToolCall> toolCalls) {
     for (ToolCall toolCall : toolCalls) {
-      String clarification = validateToolCallForExecution(toolCall);
-      if (clarification != null) {
-        clarificationMessages.add(clarification);
+      String error = validateToolCall(toolCall);
+      if (error != null) {
+        return error;
       }
     }
-    if (clarificationMessages.isEmpty()) {
-      return null;
-    }
-    return clarificationMessages.get(0);
+    return null;
   }
 
   /**
-   * Safety check: validates the endpoint the LLM wants to call before ToolExecutor
-   * makes any network request.
-   * <p>
-   * Two layers of defence:
-   * <p>
-   * 1. Allowlist check (always active): the normalised endpoint path must start with
-   * one of the known Recon API prefixes in ALLOWED_ENDPOINT_PREFIXES. This is the
-   * hard Java-side guard against prompt injection — regardless of what the LLM
-   * was tricked into outputting, only pre-approved paths can ever be called.
-   * <p>
-   * 2. Safe-scope check (when requireSafeScope is true): additional validation for
-   * endpoints that can return unbounded data, e.g. /keys/listKeys requires a
-   * bucket-scoped startPrefix to avoid memory exhaustion.
+   * Safety check before executing a tool call.
+   *
+   * <p>Returns {@code null} when the call is allowed. Otherwise returns a message shown
+   * directly to the user explaining why execution was blocked.
+   *
+   * <p>Two layers of defence:
+   * <ol>
+   *   <li>Allowlist — only registered tool names from {@link ReconApiAllowlist} may run.</li>
+   *   <li>Safe-scope (when {@code requireSafeScope} is true) — {@code api_v1_keys_listKeys}
+   *       requires a bucket-scoped {@code startPrefix}.</li>
+   * </ol>
    */
-  private String validateToolCallForExecution(ToolCall toolCall) {
+  private String validateToolCall(ToolCall toolCall) {
     if (toolCall == null || toolCall.getToolName() == null) {
       return null;
     }

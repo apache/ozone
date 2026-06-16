@@ -239,7 +239,19 @@ public class LangChain4jDispatcher implements LLMClient {
       ChatRequest chatRequest = requestBuilder.build();
       // This is the actual network call to the AI provider
       // ChatResponse (LangChain4j class) is the reply that comes back
-      ChatResponse response = chatModel.chat(chatRequest);
+      ChatResponse response;
+      try {
+        response = chatModel.chat(chatRequest);
+      } catch (IllegalArgumentException e) {
+        // LangChain4j 0.35.0 throws when the provider returns content=null (common with
+        // reasoning models that exhaust max_tokens on thinking before visible text).
+        if (isNullTextContentFromProvider(e)) {
+          LOG.warn("Model returned null text for provider={}, model={}; treating as empty response",
+              provider, actualModel);
+          return emptyTextResponse(provider, actualModel);
+        }
+        throw e;
+      }
 
       // --- 4. GET THE TEXT REPLY ---
       // Pull out the AI's text answer; default to empty string if it returned none
@@ -287,6 +299,17 @@ public class LangChain4jDispatcher implements LLMClient {
       throw new LLMException(
           "LLM request failed for provider '" + provider + "': " + e.getMessage(), e);
     }
+  }
+
+  private static boolean isNullTextContentFromProvider(IllegalArgumentException e) {
+    return e.getMessage() != null && e.getMessage().contains("text cannot be null");
+  }
+
+  private static LLMResponse emptyTextResponse(String provider, String model) {
+    Map<String, Object> metadata = new HashMap<>();
+    metadata.put("provider", provider);
+    metadata.put("finish_reason", "LENGTH");
+    return new LLMResponse("", model, 0, 0, metadata, null);
   }
 
   /**

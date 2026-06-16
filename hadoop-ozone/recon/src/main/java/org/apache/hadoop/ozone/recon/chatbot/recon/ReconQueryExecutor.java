@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotUtils;
  * </ol>
  *
  * <p>Endpoint-level safety checks (e.g. requiring a bucket-scoped {@code startPrefix} for
- * {@code listKeys}) are the responsibility of {@code ChatbotAgent.validateToolCallForExecution},
+ * {@code listKeys}) are the responsibility of {@code ChatbotAgent.validateToolCall},
  * which runs before this class is ever invoked.
  */
 @Singleton
