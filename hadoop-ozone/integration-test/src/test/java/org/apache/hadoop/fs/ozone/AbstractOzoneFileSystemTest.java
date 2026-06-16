@@ -21,14 +21,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
-import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_CREATE;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_GET_FILE_STATUS;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_MKDIRS;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPEN;
-import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -76,7 +73,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -387,26 +383,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testCreateWithInvalidPaths() throws Exception {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
-
-    // Test for path with ..
-    Path parent = new Path("../../../../../d1/d2/");
-    Path file1 = new Path(parent, "key1");
-    checkInvalidPath(file1);
-
-    // Test for path with :
-    file1 = new Path("/:/:");
-    checkInvalidPath(file1);
-
-    // Test for path with scheme and authority.
-    file1 = new Path(fs.getUri() + "/:/:");
-    checkInvalidPath(file1);
-  }
-
-  private void checkInvalidPath(Path path) {
-    InvalidPathException pathException = GenericTestUtils.assertThrows(
-        InvalidPathException.class, () -> fs.create(path, false)
-    );
-    assertThat(pathException.getMessage()).contains("Invalid path Name");
+    createWithInvalidPaths();
   }
 
   @Test
@@ -529,38 +506,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   @Test
   public void testFileDelete() throws Exception {
-    Path grandparent = new Path("/testBatchDelete");
-    Path parent = new Path(grandparent, "parent");
-    Path childFolder = new Path(parent, "childFolder");
-    // BatchSize is 5, so we're going to set a number that's not a
-    // multiple of 5. In order to test the final number of keys less than
-    // batchSize can also be deleted.
-    for (int i = 0; i < 8; i++) {
-      Path childFile = new Path(parent, "child" + i);
-      Path childFolderFile = new Path(childFolder, "child" + i);
-      ContractTestUtils.touch(fs, childFile);
-      ContractTestUtils.touch(fs, childFolderFile);
-    }
-
-    assertEquals(1, fs.listStatus(grandparent).length);
-    assertEquals(9, fs.listStatus(parent).length);
-    assertEquals(8, fs.listStatus(childFolder).length);
-
-    assertTrue(fs.delete(grandparent, true));
-    assertFalse(fs.exists(grandparent));
-    for (int i = 0; i < 8; i++) {
-      Path childFile = new Path(parent, "child" + i);
-      // Make sure all keys under testBatchDelete/parent should be deleted
-      assertFalse(fs.exists(childFile));
-
-      // Test to recursively delete child folder, make sure all keys under
-      // testBatchDelete/parent/childFolder should be deleted.
-      Path childFolderFile = new Path(childFolder, "child" + i);
-      assertFalse(fs.exists(childFolderFile));
-    }
-    // Will get: WARN  ozone.BasicOzoneFileSystem delete: Path does not exist.
-    // This will return false.
-    assertFalse(fs.delete(parent, true));
+    fileDelete(ROOT);
   }
 
   @Test
@@ -1468,33 +1414,12 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   @Test
   public void testFileSystemDeclaresCapability() throws Throwable {
-    Path root = new Path(OZONE_URI_DELIMITER);
-    assertHasPathCapabilities(fs, root, FS_ACLS);
-    assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
+    fileSystemDeclaresCapability(new Path(OZONE_URI_DELIMITER));
   }
 
   @Test
   public void testSetTimes() throws Exception {
-    // Create a file
-    String testKeyName = "testKey1";
-    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
-      stream.write(1);
-    }
-
-    long mtime = 1000;
-    fs.setTimes(path, mtime, 2000);
-
-    FileStatus fileStatus = fs.getFileStatus(path);
-    // verify that mtime is updated as expected.
-    assertEquals(mtime, fileStatus.getModificationTime());
-
-    long mtimeDontUpdate = -1;
-    fs.setTimes(path, mtimeDontUpdate, 2000);
-
-    fileStatus = fs.getFileStatus(path);
-    // verify that mtime is NOT updated as expected.
-    assertEquals(mtime, fileStatus.getModificationTime());
+    setTimes(ROOT);
   }
 
   @Test
