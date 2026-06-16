@@ -122,7 +122,9 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
     if (capacity <= 0) {
       return 0;
     }
-    long free = usage.getAvailable() - volume.getCommittedBytes();
+    // Clamp at 0: committed can exceed available, and a negative ratio would skew the
+    // comparison (matches the guard in HddsVolume.checkVolumeUsages).
+    long free = Math.max(0, usage.getAvailable() - volume.getCommittedBytes());
     return (double) free / capacity;
   }
 }

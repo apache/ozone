@@ -177,6 +177,24 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
+  public void testFreeSpaceRatioIsClampedToZeroWhenOverCommitted() throws Exception {
+    // committed exceeds available, so the raw free space is negative.
+    // The ratio must clamp to 0 rather than return a negative value.
+    SpaceUsageSource source = MockSpaceUsageSource.fixed(1000, 50);
+    HddsVolume volume = new HddsVolume.Builder(baseDir + "overcommitted")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            source, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    try {
+      volume.incCommittedBytes(100);
+      assertEquals(0.0, CapacityVolumeChoosingPolicy.freeSpaceRatio(volume));
+    } finally {
+      volume.shutdown();
+    }
+  }
+
+  @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
     Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 500));
