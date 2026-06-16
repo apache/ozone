@@ -88,8 +88,13 @@ public class TestSCMFailoverProxyProviderRefresh {
   @Test
   public void testRefreshNoopWhenIpUnchanged() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, "localhost");
-    conf.set(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "localhost:9863");
+    // Numeric loopback so re-resolution is deterministic: a literal IP
+    // parses back to itself, independent of how "localhost" happens to
+    // resolve (IPv4 vs IPv6, or multi-A/AAAA ordering) between the two
+    // lookups. That ambiguity could otherwise surface as a spurious swap
+    // and flake this no-op assertion.
+    conf.set(OZONE_SCM_NAMES, "127.0.0.1");
+    conf.set(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:9863");
 
     SCMBlockLocationFailoverProxyProvider provider =
         new SCMBlockLocationFailoverProxyProvider(conf);

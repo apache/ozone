@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.proxy;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -29,6 +30,7 @@ import java.net.SocketTimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,13 +45,27 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSCMFailoverProxyProviderRefreshWired {
 
+  private static final String SCM_SERVICE_ID = "scmservice";
+  private static final String SCM_NODE_1 = "scm1";
+  private static final String SCM_NODE_2 = "scm2";
+
   private OzoneConfiguration conf;
 
   @BeforeEach
   public void setUp() {
+    // A 2-node SCM HA config so the failover ring has a second node to
+    // advance to. With a single non-HA entry, SCMNodeInfo.buildNodeInfo
+    // yields one dummy node and performFailover can never move, which
+    // would make the pinning assertion below vacuous. See TestSCMNodeInfo
+    // for the canonical HA config shape.
     conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_NAMES, "localhost");
-    conf.set(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "localhost:9863");
+    conf.set(OZONE_SCM_SERVICE_IDS_KEY, SCM_SERVICE_ID);
+    conf.set(OZONE_SCM_NODES_KEY + "." + SCM_SERVICE_ID,
+        SCM_NODE_1 + "," + SCM_NODE_2);
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        SCM_SERVICE_ID, SCM_NODE_1), "localhost");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        SCM_SERVICE_ID, SCM_NODE_2), "localhost");
   }
 
   /**
@@ -116,8 +132,11 @@ public class TestSCMFailoverProxyProviderRefreshWired {
   }
 
   /**
-   * When refresh succeeds, performFailover must stay on the current
-   * nodeId (via updatedLeaderNodeID) rather than advancing the ring.
+   * After advancing to the second SCM node, a connection failure whose
+   * DNS refresh succeeds must PIN the provider on that second node: the
+   * next performFailover stays put instead of round-robining back to the
+   * first node. A single-node ring cannot observe this (there is nowhere
+   * to advance), which is why setUp() configures two HA nodes.
    */
   @Test
   public void testRefreshSuccessPinsCurrentNodeId() throws Exception {
@@ -130,18 +149,23 @@ public class TestSCMFailoverProxyProviderRefreshWired {
           }
         };
 
-    String beforeNode = provider.getCurrentProxySCMNodeId();
+    String firstNode = provider.getCurrentProxySCMNodeId();
+    // Round-robin advance to the second node.
+    provider.performFailover(null);
+    String secondNode = provider.getCurrentProxySCMNodeId();
+    assertNotEquals(firstNode, secondNode,
+        "2-node HA ring must advance to a distinct second node");
+
     RetryPolicy policy = provider.getRetryPolicy();
-
-    // Pre-advance the failover ring with a non-connection-class error.
-    policy.shouldRetry(new IOException("not-a-connection-failure"),
-        0, 0, false);
-
+    // Connection failure + successful refresh pins updatedLeaderNodeID to
+    // the current (second) node, so the next performFailover stays put.
+    // If the pin regressed, performFailover would round-robin back to the
+    // first node and the assertion below would fail.
     policy.shouldRetry(new ConnectException("refused"), 0, 1, false);
     provider.performFailover(null);
-    assertEquals(beforeNode, provider.getCurrentProxySCMNodeId(),
+
+    assertEquals(secondNode, provider.getCurrentProxySCMNodeId(),
         "after a successful refresh, performFailover must stay on the "
-            + "original nodeId");
-    assertNotNull(beforeNode);
+            + "second node rather than round-robining back to the first");
   }
 }

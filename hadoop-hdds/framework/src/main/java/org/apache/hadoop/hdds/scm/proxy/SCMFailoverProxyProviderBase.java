@@ -299,7 +299,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
    *         preserved, the IP is unchanged, the lookup failed, or the
    *         nodeId is unknown.
    */
-  @VisibleForTesting
   boolean refreshProxyAddressIfChanged(String nodeId) {
     // Read the cached info first so we can do the DNS lookup outside
     // any monitor. A slow / dead resolver while holding the provider
