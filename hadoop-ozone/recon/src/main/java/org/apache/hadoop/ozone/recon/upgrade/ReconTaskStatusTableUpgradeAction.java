@@ -21,6 +21,8 @@ import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
+import static org.apache.ozone.recon.schema.SqlDbUtils.columnExists;
+import static org.apache.ozone.recon.schema.SqlDbUtils.isColumnNullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
@@ -43,13 +45,30 @@ import org.slf4j.LoggerFactory;
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final String LAST_TASK_RUN_STATUS = "last_task_run_status";
+  private static final String IS_CURRENT_TASK_RUNNING = "is_current_task_running";
 
-  private void addColumnToTable(DSLContext dslContext, String columnName) {
+  private void addColumnIfMissing(Connection conn, DSLContext dslContext, String columnName)
+      throws SQLException {
+    if (columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, columnName)) {
+      LOG.info("Column '{}' already exists on {}, skipping add.", columnName, RECON_TASK_STATUS_TABLE_NAME);
+      return;
+    }
+    LOG.info("Adding '{}' column to task status table", columnName);
     dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-        .addColumn(columnName, SQLDataType.INTEGER.nullable(true)).execute();
+        .addColumn(columnName, SQLDataType.INTEGER.nullable(true))
+        .execute();
   }
 
-  private void setColumnAsNonNullable(DSLContext dslContext, String columnName) {
+  private void setColumnAsNonNullableIfNeeded(Connection conn, DSLContext dslContext, String columnName)
+      throws SQLException {
+    if (!columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, columnName)) {
+      return;
+    }
+    if (!isColumnNullable(conn, RECON_TASK_STATUS_TABLE_NAME, columnName)) {
+      LOG.info("Column '{}' is already NOT NULL on {}, skipping.", columnName, RECON_TASK_STATUS_TABLE_NAME);
+      return;
+    }
     dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
         .alterColumn(DSL.name(columnName)).setNotNull()
         .execute();
@@ -77,13 +96,13 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
         Arrays.toString(enumStates));
   }
 
-  private void upgradeTaskStatusTable(DSLContext dslContext) {
+  private void upgradeTaskStatusTable(Connection conn, DSLContext dslContext) throws SQLException {
     // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
     // for multiple columns. Hence, we run it as two separate steps.
     LOG.info("Adding 'last_task_run_status' column to task status table");
-    addColumnToTable(dslContext, "last_task_run_status");
+    addColumnIfMissing(conn, dslContext, "last_task_run_status");
     LOG.info("Adding 'is_current_task_running' column to task status table");
-    addColumnToTable(dslContext, "is_current_task_running");
+    addColumnIfMissing(conn, dslContext, "is_current_task_running");
 
     //Handle previous table values with new columns default values
     int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
@@ -93,12 +112,12 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
     LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
 
     // Now we will set the column as not-null to enforce constraints
-    setColumnAsNonNullable(dslContext, "last_task_run_status");
-    setColumnAsNonNullable(dslContext, "is_current_task_running");
+    setColumnAsNonNullableIfNeeded(conn, dslContext, LAST_TASK_RUN_STATUS);
+    setColumnAsNonNullableIfNeeded(conn, dslContext, IS_CURRENT_TASK_RUNNING);
   }
 
   @Override
-  public void execute(DataSource dataSource) throws Exception {
+  public void execute(DataSource dataSource) throws DataAccessException, SQLException {
     try (Connection conn = dataSource.getConnection()) {
       DSLContext dslContext = DSL.using(conn);
 
@@ -107,7 +126,7 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
       }
 
       if (TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
-        upgradeTaskStatusTable(dslContext);
+        upgradeTaskStatusTable(conn, dslContext);
       }
     } catch (SQLException | DataAccessException ex) {
       LOG.error("Error while upgrading for TASK_STATUS_STATISTICS.", ex);
