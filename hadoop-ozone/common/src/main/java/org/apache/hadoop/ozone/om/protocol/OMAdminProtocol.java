@@ -46,7 +46,7 @@ public interface OMAdminProtocol extends Closeable {
    *
    * @param columnFamily              column family name
    * @param bottommostLevelCompaction rocksId of BottommostLevelCompaction
-   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce)
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized)
    */
   void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException;
 
