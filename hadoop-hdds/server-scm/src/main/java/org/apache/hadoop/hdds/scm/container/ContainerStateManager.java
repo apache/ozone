@@ -179,7 +179,7 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
                                           HddsProtos.LifeCycleEvent event,
                                           Long sequenceId)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException;
 
 
   /**

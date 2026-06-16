@@ -478,12 +478,8 @@ public class PipelineManagerImpl implements PipelineManager {
     for (ContainerID containerID : containerIDs) {
       if (containerManager.getContainer(containerID).getState()
             == HddsProtos.LifeCycleState.OPEN) {
-        try {
-          containerManager.updateContainerState(containerID,
-              HddsProtos.LifeCycleEvent.FINALIZE);
-        } catch (InvalidStateTransitionException ex) {
-          throw new IOException(ex);
-        }
+        containerManager.updateContainerState(containerID,
+            HddsProtos.LifeCycleEvent.FINALIZE);
       }
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);

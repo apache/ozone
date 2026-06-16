@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -275,8 +274,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void updateContainerState(final ContainerID cid,
-                                   final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+                                   final LifeCycleEvent event) throws IOException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {

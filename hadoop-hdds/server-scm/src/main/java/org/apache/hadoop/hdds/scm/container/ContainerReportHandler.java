@@ -234,7 +234,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     try {
       processContainerReplica(datanodeDetails, container, replicaProto, publisher, detailsForLogging);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException e) {
       getLogger().error("Failed to process {}", detailsForLogging, e);
     }
   }

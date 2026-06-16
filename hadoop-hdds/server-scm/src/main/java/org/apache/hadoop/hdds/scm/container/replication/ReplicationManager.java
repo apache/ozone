@@ -737,7 +737,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
                                    HddsProtos.LifeCycleEvent event) {
     try {
       containerManager.updateContainerState(containerID, event);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException e) {
       LOG.error("Failed to update the state of container {}, update Event {}",
           containerID, event, e);
     }

@@ -181,7 +181,7 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
 
       @Override
       public void updateContainerStateWithSequenceId(HddsProtos.ContainerID arg0, LifeCycleEvent arg1, Long arg2) throws
-          IOException, InvalidStateTransitionException {
+          IOException {
         final Object[] args = {arg0, arg1, arg2};
         invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
       }
