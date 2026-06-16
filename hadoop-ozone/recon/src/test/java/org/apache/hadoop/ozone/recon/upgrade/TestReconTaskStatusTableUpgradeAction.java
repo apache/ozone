@@ -18,10 +18,17 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.columnExists;
+import static org.apache.ozone.recon.schema.SqlDbUtils.isColumnNullable;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -31,7 +38,9 @@ import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,22 +49,26 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTest {
 
-  private ReconTaskStatusTableUpgradeAction upgradeAction;
+  private static final String LAST_TASK_RUN_STATUS = "last_task_run_status";
+  private static final String IS_CURRENT_TASK_RUNNING = "is_current_task_running";
+
   private DSLContext dslContext;
+  private DataSource dataSource;
+  private ReconTaskStatusTableUpgradeAction upgradeAction;
 
   @BeforeEach
   public void setUp() throws SQLException {
     dslContext = getDslContext();
+    dataSource = getInjector().getInstance(DataSource.class);
     upgradeAction = new ReconTaskStatusTableUpgradeAction();
 
-    DataSource dataSource = getInjector().getInstance(DataSource.class);
     try (Connection conn = dataSource.getConnection()) {
       DatabaseMetaData dbMetaData = conn.getMetaData();
       ResultSet tables = dbMetaData.getTables(null, null, UNHEALTHY_CONTAINERS_TABLE_NAME, null);
       if (!tables.next()) {
         dslContext.createTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
-            .column("container_id", org.jooq.impl.SQLDataType.BIGINT.nullable(false))
-            .column("container_state", org.jooq.impl.SQLDataType.VARCHAR(16).nullable(false))
+            .column("container_id", SQLDataType.BIGINT.nullable(false))
+            .column("container_state", SQLDataType.VARCHAR(16).nullable(false))
             .constraint(DSL.constraint("pk_container_id")
                 .primaryKey("container_id", "container_state"))
             .execute();
@@ -64,7 +77,51 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
   }
 
   @Test
-  public void testUpgradeAppliesConstraintModificationForAllStates() throws Exception {
+  public void testExecuteAddsColumnsToLegacyTable() throws Exception {
+    createLegacyTaskStatusTable();
+    try (Connection conn = dataSource.getConnection()) {
+      assertFalse(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, LAST_TASK_RUN_STATUS));
+      assertFalse(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, IS_CURRENT_TASK_RUNNING));
+    }
+
+    upgradeAction.execute(dataSource);
+
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, LAST_TASK_RUN_STATUS));
+      assertTrue(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, IS_CURRENT_TASK_RUNNING));
+      assertFalse(isColumnNullable(conn, RECON_TASK_STATUS_TABLE_NAME, LAST_TASK_RUN_STATUS));
+      assertFalse(isColumnNullable(conn, RECON_TASK_STATUS_TABLE_NAME, IS_CURRENT_TASK_RUNNING));
+    }
+  }
+
+  @Test
+  public void testExecuteIsIdempotentOnLegacyTable() throws Exception {
+    createLegacyTaskStatusTable();
+    upgradeAction.execute(dataSource);
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, LAST_TASK_RUN_STATUS));
+      assertTrue(columnExists(conn, RECON_TASK_STATUS_TABLE_NAME, IS_CURRENT_TASK_RUNNING));
+      assertFalse(isColumnNullable(conn, RECON_TASK_STATUS_TABLE_NAME, LAST_TASK_RUN_STATUS));
+      assertFalse(isColumnNullable(conn, RECON_TASK_STATUS_TABLE_NAME, IS_CURRENT_TASK_RUNNING));
+    }
+  }
+
+  @Test
+  public void testExecuteIsIdempotentOnCurrentSchema() {
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testNoOpWhenTableMissing() throws SQLException {
+    dropTaskStatusTableIfPresent();
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testUpgradeAppliesConstraintModificationForAllStates() {
     upgradeAction.upgradeUnhealthyContainersConstraintForTesting(dslContext);
 
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :
@@ -90,7 +147,7 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
     assertEquals(ContainerSchemaDefinition.UnHealthyContainerStates.values().length,
         count, "Expected one record for each valid state");
 
-    assertThrows(org.jooq.exception.DataAccessException.class, () ->
+    assertThrows(DataAccessException.class, () ->
             dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
                 .columns(
                     field(name("container_id")),
@@ -153,5 +210,32 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
           .values(200L, "MISSING", System.currentTimeMillis(), 3, 2, 1, "Duplicate insertion")
           .execute();
     }, "Inserting a duplicate primary key should fail due to the primary key constraint");
+  }
+
+  private void createLegacyTaskStatusTable() throws SQLException {
+    dropTaskStatusTableIfPresent();
+    try (Connection conn = dataSource.getConnection()) {
+      DSLContext legacyDsl = DSL.using(conn);
+      // Derby rejects explicit "null" in CREATE TABLE for BIGINT columns; add them via ALTER instead.
+      legacyDsl.createTable(RECON_TASK_STATUS_TABLE_NAME)
+          .column("task_name", SQLDataType.VARCHAR(766).nullable(false))
+          .constraint(DSL.constraint("pk_task_name")
+              .primaryKey("task_name"))
+          .execute();
+      legacyDsl.alterTable(RECON_TASK_STATUS_TABLE_NAME)
+          .addColumn("last_updated_timestamp", SQLDataType.BIGINT)
+          .execute();
+      legacyDsl.alterTable(RECON_TASK_STATUS_TABLE_NAME)
+          .addColumn("last_updated_seq_number", SQLDataType.BIGINT)
+          .execute();
+    }
+  }
+
+  private void dropTaskStatusTableIfPresent() throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+      if (TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
+        dslContext.dropTable(RECON_TASK_STATUS_TABLE_NAME).execute();
+      }
+    }
   }
 }
