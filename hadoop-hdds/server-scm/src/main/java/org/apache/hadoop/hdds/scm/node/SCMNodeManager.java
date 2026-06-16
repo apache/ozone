@@ -728,7 +728,7 @@ public class SCMNodeManager implements NodeManager {
   public void processVersionReport(DatanodeDetails datanodeDetails,
                                    LayoutVersionProto versionReport) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Layout Version report from [datanode={}]",
+      LOG.debug("Processing version report from [datanode={}]",
           datanodeDetails.getHostName());
     }
     if (LOG.isTraceEnabled()) {
@@ -741,7 +741,7 @@ public class SCMNodeManager implements NodeManager {
       nodeStateManager.updateLastKnownVersionInfo(datanodeDetails,
           versionReport);
     } catch (NodeNotFoundException e) {
-      LOG.error("SCM trying to process Layout Version from an " +
+      LOG.error("SCM trying to process version from an " +
           "unregistered node {}.", datanodeDetails);
       return;
     }
@@ -758,6 +758,8 @@ public class SCMNodeManager implements NodeManager {
     ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
     ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
 
+    // All versions are validated when Datanodes register after they restart.
+    // After that, their apparent version should only increase, and their software version should remain constant.
     if (shouldFenceDatanode(datanodeDetails, dnSoftwareVersion, dnApparentVersion)) {
       LOG.error("Invalid datanode in the cluster : {}. " +
               "Datanode software version = {}, " +
@@ -2024,33 +2026,39 @@ public class SCMNodeManager implements NodeManager {
     return shouldFenceDatanode(dnDetails, dnSoftwareVersion, dnApparentVersion);
   }
 
-  /**
-   * TODO Update this method to fence datanodes based on their software and apparent version and log the results.
-   * For now, maintain the non-rolling upgrade requirement that DN and SCM must have the same software version.
-   * Datanodes still cannot have a higher apparent version than SCM.
-   */
-  private boolean shouldFenceDatanode(DatanodeDetails dnDetails, ComponentVersion softwareVersion,
-                                        ComponentVersion apparentVersion) {
-    // Check datanode software version against SCM.
-    if (!versionManager.getSoftwareVersion().equals(softwareVersion)) {
-      // TODO Once SCM implementation for ZDU is complete, Datanodes with lower software versions will be allowed as
-      //  long as SCM is pre-finalized.
-      LOG.error("Datanode {} with software version {} which does not match SCM software version {} will not be " +
-              "allowed to join the cluster. This requirement will be lifted when ZDU is complete.",
-          dnDetails, softwareVersion, versionManager.getSoftwareVersion());
+  private boolean shouldFenceDatanode(DatanodeDetails dnDetails, ComponentVersion dnSoftwareVersion,
+                                        ComponentVersion dnApparentVersion) {
+    ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
+    ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
+
+    // DN software newer than SCM violates upgrade order. SCM must always be upgraded first.
+    if (!dnSoftwareVersion.isSupportedBy(scmSoftwareVersion)) {
+      LOG.error("Datanode {} has software version {} which is newer than SCM software version {}. " +
+          "SCM must be upgraded before datanodes.",
+          dnDetails, dnSoftwareVersion, scmSoftwareVersion);
       return true;
     }
 
-    // Check datanode apparent version against SCM.
-    if (!versionManager.isAllowed(apparentVersion)) {
-      // Datanodes can never have a higher apparent version than SCM.
-      LOG.error("Datanode {} with apparent version {} which is larger than SCM's apparent version {} will not be " +
-          "allowed to join the cluster.", dnDetails, apparentVersion, versionManager.getApparentVersion());
+    // If DN software is older than SCM and SCM is finalized, the old DNs must be upgraded before rejoining.
+    if (!scmSoftwareVersion.isSupportedBy(dnSoftwareVersion) && !versionManager.needsFinalization()) {
+      LOG.error("Datanode {} has software version {} which is older than SCM software version {} and SCM is " +
+              "finalized. Datanode must be upgraded to join the cluster.",
+          dnDetails, dnSoftwareVersion, scmSoftwareVersion);
       return true;
     }
 
-    // Datanodes with lower apparent version than SCM are allowed in the cluster but will be instructed to finalize
-    // if SCM has finalized.
+    // DN apparent version cannot be higher than SCM apparent version. SCM must finalize first.
+    if (!versionManager.isAllowed(dnApparentVersion)) {
+      LOG.error("Datanode {} has apparent version {} which is higher than SCM apparent version {}. " +
+          "SCM must finalize before datanodes.",
+          dnDetails, dnApparentVersion, scmApparentVersion);
+      return true;
+    }
+
+    // Else, either:
+    // DN software is older than SCM but SCM is pre-finalized: expected since DNs are upgraded after SCM.
+    // DN software matches SCM and DN apparent version <= SCM apparent version: DN can register and will be given a
+    //  finalize command if needed.
     return false;
   }
 }
