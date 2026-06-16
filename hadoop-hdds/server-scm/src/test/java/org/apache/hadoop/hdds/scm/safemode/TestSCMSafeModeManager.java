@@ -784,6 +784,8 @@ public class TestSCMSafeModeManager {
 
     assertThat(SafeModeRuleFactory.getInstance()
         .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNull();
     ECMinDataNodeSafeModeRule ecMinDnRule = SafeModeRuleFactory.getInstance()
         .getSafeModeRule(ECMinDataNodeSafeModeRule.class);
     assertThat(ecMinDnRule).isNotNull();
@@ -821,6 +823,8 @@ public class TestSCMSafeModeManager {
 
     assertThat(SafeModeRuleFactory.getInstance()
         .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNotNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNotNull();
     assertThat(SafeModeRuleFactory.getInstance()
         .getSafeModeRule(ECMinDataNodeSafeModeRule.class)).isNotNull();
   }

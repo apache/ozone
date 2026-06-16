@@ -49,7 +49,6 @@ public class ECMinDataNodeSafeModeRule
   private final String ecConfigLabel;
   private final NodeManager nodeManager;
   private final Set<DatanodeID> registeredDnSet;
-  private int registeredDns = 0;
 
   public ECMinDataNodeSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
@@ -91,7 +90,7 @@ public class ECMinDataNodeSafeModeRule
       return true;
     }
     if (validateBasedOnReportProcessing()) {
-      return registeredDns >= requiredDns;
+      return getRegisteredDns() >= requiredDns;
     }
     return nodeManager.getNodes(NodeStatus.inServiceHealthy()).size() >= requiredDns;
   }
@@ -103,12 +102,11 @@ public class ECMinDataNodeSafeModeRule
     }
     DatanodeID dnId = report.getDatanodeDetails().getID();
     if (registeredDnSet.add(dnId)) {
-      registeredDns = registeredDnSet.size();
       if (scmInSafeMode()) {
         SCMSafeModeManager.getLogger().info(
             "SCM in safe mode. EC rule progress: {} of {} required "
                 + "DataNodes registered for EC {}.",
-            registeredDns, requiredDns, ecConfigLabel);
+            getRegisteredDns(), requiredDns, ecConfigLabel);
       }
     }
   }
@@ -126,7 +124,7 @@ public class ECMinDataNodeSafeModeRule
     }
     return String.format(
         "EC (%s) safemode: registered DataNodes (=%d) >= required DataNodes (=%d)",
-        ecConfigLabel, registeredDns, requiredDns);
+        ecConfigLabel, getRegisteredDns(), requiredDns);
   }
 
   @Override
@@ -137,6 +135,11 @@ public class ECMinDataNodeSafeModeRule
   @VisibleForTesting
   int getRequiredDns() {
     return requiredDns;
+  }
+
+  @VisibleForTesting
+  synchronized int getRegisteredDns() {
+    return registeredDnSet.size();
   }
 
   @VisibleForTesting

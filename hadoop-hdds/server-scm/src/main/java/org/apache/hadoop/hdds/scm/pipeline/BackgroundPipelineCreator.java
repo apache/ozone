@@ -240,12 +240,14 @@ public class BackgroundPipelineCreator implements SCMService {
   List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
     List<ReplicationConfig> list = new ArrayList<>();
     ReplicationConfig defaultReplicationConfig = getDefaultReplicationConfig();
+    if (defaultReplicationConfig == null) {
+      LOG.warn("Skipping background pipeline creation: default replication "
+          + "config is invalid.");
+      return list;
+    }
     // TODO: #CLUTIL Different replication factor may need to be supported
-    HddsProtos.ReplicationType type = defaultReplicationConfig != null
-        ? defaultReplicationConfig.getReplicationType()
-        : HddsProtos.ReplicationType.valueOf(conf.get(
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    HddsProtos.ReplicationType type =
+        defaultReplicationConfig.getReplicationType();
     if (type == EC) {
       if (createRatisThreeForEcDefault) {
         list.add(ReplicationConfig.fromProtoTypeAndFactor(RATIS,

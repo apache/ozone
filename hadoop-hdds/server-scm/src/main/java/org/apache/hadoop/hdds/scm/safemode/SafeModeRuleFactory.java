@@ -99,30 +99,39 @@ public final class SafeModeRuleFactory {
     }
 
     if (pipelineManager != null) {
-      if (shouldEnableHealthyPipelineRule()) {
+      if (shouldEnableRatisThreePipelineRules()) {
         safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
             pipelineManager, safeModeManager, config, scmContext, nodeManager));
+        safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
+            safeModeManager, config));
       } else {
-        SCMSafeModeManager.getLogger().info("HealthyPipelineSafeModeRule is "
-            + "disabled for EC-default cluster because "
-            + "{} is false.",
+        SCMSafeModeManager.getLogger().info(
+            "RATIS/THREE pipeline safemode rules are disabled because "
+                + "{} is false for an EC-default cluster or the default "
+                + "replication config is invalid.",
             ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE);
       }
-      safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config));
     }
 
   }
 
-  private boolean shouldEnableHealthyPipelineRule() {
+  /**
+   * Returns true when RATIS/THREE pipeline safemode rules should be active.
+   * For EC-default clusters, these rules are only meaningful when RATIS/THREE
+   * background pipeline creation is also enabled (same flag); if no
+   * RATIS/THREE pipelines are created, requiring them in safemode would block
+   * safemode exit.
+   */
+  private boolean shouldEnableRatisThreePipelineRules() {
     ReplicationConfig defaultReplicationConfig;
     try {
       defaultReplicationConfig = ReplicationConfig.getDefault(config);
     } catch (IllegalArgumentException e) {
-      SCMSafeModeManager.getLogger().warn("Falling back to enabling "
-          + "HealthyPipelineSafeModeRule because default replication config "
-          + "could not be parsed.", e);
-      return true;
+      SCMSafeModeManager.getLogger().warn(
+          "Disabling RATIS/THREE pipeline safemode rules because default "
+              + "replication config could not be parsed.",
+          e);
+      return false;
     }
 
     if (defaultReplicationConfig.getReplicationType()
