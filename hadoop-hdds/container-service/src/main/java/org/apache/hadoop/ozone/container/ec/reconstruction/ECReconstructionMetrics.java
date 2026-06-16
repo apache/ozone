@@ -62,7 +62,7 @@ public final class ECReconstructionMetrics {
     blockGroupReconstructionFailsTotal.incr(count);
   }
 
-  public void incReconstructpwdionTotal() {
+  public void incReconstructionTotal() {
     reconstructionTotal.incr();
   }
 
