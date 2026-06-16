@@ -172,13 +172,6 @@ public class SCMStateMachine extends BaseStateMachine {
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
       }
-
-      // After previous term transactions are applied, still in safe mode,
-      // perform refreshAndValidate to update the safemode rule state.
-      // This is applicable only when periodic refresh is disabled.
-      if (scm.isInSafeMode() && isStateMachineReady.get()) {
-        scm.getScmSafeModeManager().refreshAndValidate();
-      }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
