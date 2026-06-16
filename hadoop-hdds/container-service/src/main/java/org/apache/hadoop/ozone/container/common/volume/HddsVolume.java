@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ScanTransientIOUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
@@ -304,23 +306,81 @@ public class HddsVolume extends StorageVolume {
     return checkDbHealth(dbFile);
   }
 
+  /**
+   * Verifies the per-volume RocksDB's global state files (CURRENT, MANIFEST,
+   * OPTIONS) by opening the DB in secondary mode. A successful open implies
+   * those files are readable and internally consistent and that the
+   * referenced SST file names match what RocksDB expects.
+   *
+   * <p>This check intentionally does <b>not</b> read or checksum SST file
+   * contents or any individual key/value. Per-block / per-key integrity is
+   * verified by the container data scanner, which scans containers (and
+   * their RocksDB rows) on its own schedule.
+   *
+   * <p>The volume is only marked {@link VolumeCheckResult#FAILED} once the
+   * configured threshold of failures is exceeded, matching the parent class's
+   * intermittent-error tolerance. Open failures whose underlying RocksDB
+   * status is {@code IOError(NoSpace)} are not counted: {@code openAsSecondary}
+   * writes its info LOG into the disk-check directory, so an out-of-space
+   * failure there is unrelated to DB integrity. Any other status — permission
+   * denied, missing path, corruption, generic IO error — is still counted as
+   * a real failure.
+   */
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
     if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
       return VolumeCheckResult.HEALTHY;
     }
 
+    File secondaryDir = new File(getDiskCheckDir(), "rocksdb-secondary-" + Time.now());
+    try {
+      Files.createDirectories(secondaryDir.toPath());
+    } catch (IOException e) {
+      LOG.error("Failed to create secondary instance dir {} for volume {}", secondaryDir, getStorageDir(), e);
+
+      if (!isNoSpaceAvailable(e) && !ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        getIoTestSlidingWindow().add();
+      }
+
+      return getIoTestSlidingWindow().isExceeded()
+          ? VolumeCheckResult.FAILED
+          : VolumeCheckResult.HEALTHY;
+    }
+
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+         ManagedRocksDB ignored =
+             ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), secondaryDir.getPath())) {
       // Do nothing. Only check if rocksdb is accessible.
       LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
     } catch (Exception e) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("Check of database for volume " + this + " interrupted.");
       }
-      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      getIoTestSlidingWindow().add();
+
+      // openAsSecondary writes its info LOG into secondaryDir. If that write
+      // fails because the disk is full, RocksDB surfaces the failure as
+      // IOError(NoSpace) (mapped from ENOSPC). That is unrelated to DB
+      // integrity, so don't count it against the sliding window. Any other
+      // status (permission denied, missing path, corruption, generic IO
+      // error) is still treated as a real failure.
+      if (ManagedRocksDB.isNoSpaceFailure(e)) {
+        LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
+            "secondary open returned IOError(NoSpace) for {}.", this, secondaryDir, e);
+      } else if (ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
+            "secondary open hit file descriptor exhaustion for {}.", this, secondaryDir, e);
+      } else {
+        LOG.error("Could not open Volume DB located at {}", dbFile, e);
+        getIoTestSlidingWindow().add();
+      }
+    } finally {
+      try {
+        FileUtils.deleteDirectory(secondaryDir);
+      } catch (IOException e) {
+        LOG.warn("Failed to delete RocksDB secondary instance dir {}", secondaryDir, e);
+      }
     }
+
 
     if (getIoTestSlidingWindow().isExceeded()) {
       LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
