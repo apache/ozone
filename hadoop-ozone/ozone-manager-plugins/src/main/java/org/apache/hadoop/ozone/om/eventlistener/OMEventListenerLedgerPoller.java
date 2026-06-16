@@ -113,6 +113,10 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
     @Override
     public BackgroundTaskResult call() {
       if (shouldRun()) {
+        if (!seekPosition.verifyCheckpointAccess()) {
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running OMEventListenerLedgerPoller");
         }

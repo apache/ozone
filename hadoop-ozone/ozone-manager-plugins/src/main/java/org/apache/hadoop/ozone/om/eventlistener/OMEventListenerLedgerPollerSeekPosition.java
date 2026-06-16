@@ -24,21 +24,27 @@ import org.slf4j.LoggerFactory;
 /**
  * This is a helper class to get/set the seek position used by the
  * OMEventListenerLedgerPoller.
- *
- * XXX: the seek position should be persisted (and ideally distributed to
- * all OMs) but at the moment it only lives in memory
  */
 public class OMEventListenerLedgerPollerSeekPosition {
   public static final Logger LOG = LoggerFactory.getLogger(OMEventListenerLedgerPollerSeekPosition.class);
 
   private final AtomicReference<String> seekPosition;
+  private final NotificationCheckpointStrategy checkpointStrategy;
+  private volatile boolean checkpointVerified = false;
 
-  public OMEventListenerLedgerPollerSeekPosition() {
-    this.seekPosition = new AtomicReference(initSeekPosition());
+  public OMEventListenerLedgerPollerSeekPosition(NotificationCheckpointStrategy checkpointStrategy) {
+    this.checkpointStrategy = checkpointStrategy;
+    this.seekPosition = new AtomicReference<>(initSeekPosition());
   }
 
-  // TODO: load this from persistent storage
   public String initSeekPosition() {
+    try {
+      if (checkpointStrategy != null) {
+        return checkpointStrategy.load();
+      }
+    } catch (Exception ex) {
+      LOG.error("Failed to load initial seek position from checkpoint strategy", ex);
+    }
     return null;
   }
 
@@ -46,12 +52,42 @@ public class OMEventListenerLedgerPollerSeekPosition {
     return seekPosition.get();
   }
 
+  public boolean verifyCheckpointAccess() {
+    if (checkpointVerified) {
+      return true;
+    }
+    try {
+      if (checkpointStrategy != null) {
+        // Lightweight read-only check: loading from the strategy verifies that
+        // the underlying checkpoint volume and bucket exist and are accessible.
+        String loaded = checkpointStrategy.load();
+        if (seekPosition.get() == null) {
+          seekPosition.set(loaded);
+        }
+      }
+      checkpointVerified = true;
+      return true;
+    } catch (Exception ex) {
+      LOG.warn("Checkpoint storage is not accessible: {}", ex.getMessage());
+      return false;
+    }
+  }
+
   public void set(String val) {
     LOG.debug("Setting seek position {}", val);
-    // NOTE: this in-memory view of the seek position needs to be kept
-    // up to date because the OMEventListenerLedgerPoller has a
-    // reference to it
-    seekPosition.set(val);
+    try {
+      if (checkpointStrategy != null) {
+        checkpointStrategy.save(val);
+      }
+      // NOTE: this in-memory view of the seek position must only be kept
+      // up to date after we successfully persist it, so that any save
+      // failures prevent the poller from advancing and running away.
+      seekPosition.set(val);
+      checkpointVerified = true; // successful save confirms checkpoint is verified
+    } catch (Exception ex) {
+      checkpointVerified = false; // fail-safe: any save failure makes us unverified
+      LOG.error("Failed to save seek position checkpoint {}. Progress will not be advanced in-memory.", val, ex);
+    }
   }
 
   @Override
