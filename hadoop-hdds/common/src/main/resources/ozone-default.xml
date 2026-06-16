@@ -3914,6 +3914,39 @@
   </property>
 
   <property>
+    <name>ozone.client.failover.resolve-needed</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT, OM, SCM, HA</tag>
+    <description>When true, RPC clients (DN heartbeat, OM client, SCM
+      client) re-resolve cached hostnames on connection-class failures
+      (ConnectException, SocketTimeoutException, NoRouteToHostException,
+      UnknownHostException, EOFException, SocketException) and rebuild
+      the proxy if the resolved IP has changed. Set to true in
+      environments where server pod IPs may change while DNS names
+      remain stable, such as Kubernetes. Default false preserves
+      pre-fix behaviour. Mirrors the design intent of HADOOP-17068 /
+      HDFS-14118.
+
+      Required co-config for SECURE clusters: when this flag is true,
+      operators must ALSO set hadoop.security.token.service.use_ip=false
+      (in core-site.xml). Reason: the Hadoop delegation-token service
+      identifier defaults to an IP:port string. After a refresh, the
+      per-OM service identifier built from the new IP no longer matches
+      the IP-based service captured on long-lived tokens, and token
+      selection (OzoneDelegationTokenSelector) silently fails for the
+      refreshed peer. With use_ip=false the service identifier is the
+      stable hostname:port, which survives any IP change. Insecure
+      clusters do not need the co-config.
+
+      Note: ozone.network.jvm.address.cache.enabled controls a related
+      but distinct concern -- the JVM-level positive DNS cache TTL.
+      That setting only affects future name lookups; this setting
+      additionally rebuilds long-lived RPC proxies whose
+      InetSocketAddress was frozen at process start.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
