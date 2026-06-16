@@ -366,6 +366,9 @@ public class HddsVolume extends StorageVolume {
       if (ManagedRocksDB.isNoSpaceFailure(e)) {
         LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
             "secondary open returned IOError(NoSpace) for {}.", this, secondaryDir, e);
+      } else if (ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
+            "secondary open hit file descriptor exhaustion for {}.", this, secondaryDir, e);
       } else {
         LOG.error("Could not open Volume DB located at {}", dbFile, e);
         getIoTestSlidingWindow().add();
