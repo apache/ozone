@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketA
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -96,13 +97,9 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
 
   @Override
   public String load() throws IOException {
-    try {
-      OmBucketInfo bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
-      if (bucketInfo != null && bucketInfo.getMetadata() != null) {
-        return bucketInfo.getMetadata().get(METDATA_KEY);
-      }
-    } catch (IOException ex) {
-      LOG.info("Error loading notification checkpoint from bucket /{}/{} - {}", volume, bucket, ex.getMessage());
+    OmBucketInfo bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
+    if (bucketInfo != null && bucketInfo.getMetadata() != null) {
+      return bucketInfo.getMetadata().get(METDATA_KEY);
     }
     return null;
   }
@@ -113,13 +110,20 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
       return;
     }
     long previousSaveCount = saveCount.getAndIncrement();
-    // Throttle database commits: persist checkpoint based on configured interval to avoid write storms
+    // Throttle database commits: persist checkpoint based on configured interval to avoid write storms.
     if (previousSaveCount == 0 || previousSaveCount % saveInterval == 0) {
-      saveImpl(val);
+      try {
+        saveImpl(val);
+      } catch (IOException e) {
+        // If save fails, reset saveCount to 0 so that the next save attempt
+        // will bypass throttling and try to write immediately upon recovery.
+        saveCount.set(0);
+        throw e;
+      }
     }
   }
 
-  private void saveImpl(String val) {
+  private void saveImpl(String val) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(volume)
         .setBucketName(bucket)
@@ -163,12 +167,18 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
     return userInfo.build();
   }
 
-  private OMResponse submitRequest(OMRequest omRequest) {
+  private OMResponse submitRequest(OMRequest omRequest) throws IOException {
     try {
-      return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
+      OMResponse response = OzoneManagerRatisUtils.submitRequest(
+          ozoneManager, omRequest, clientId, callId.incrementAndGet());
+      if (response != null && response.getStatus() != Status.OK) {
+        throw new IOException("Failed to persist checkpoint: " + response.getStatus() +
+            (StringUtils.isNotBlank(response.getMessage()) ? " - " + response.getMessage() : ""));
+      }
+      return response;
     } catch (ServiceException e) {
-      LOG.error("Set bucket metadata " + omRequest.getCmdType() + " request failed. Will retry at next run.", e);
+      LOG.error("Set bucket metadata " + omRequest.getCmdType() + " request failed.", e);
+      throw new IOException(e);
     }
-    return null;
   }
 }

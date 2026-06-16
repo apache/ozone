@@ -67,6 +67,7 @@ public class TestOzoneFileCheckpointStrategy {
       utils.when(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
           any(OzoneManagerProtocolProtos.OMRequest.class),
           any(ClientId.class), any(Long.class))).thenReturn(mockOmResponse);
+      when(mockOmResponse.getStatus()).thenReturn(OzoneManagerProtocolProtos.Status.OK);
 
       // Check its saved on first iteration
       ozoneFileCheckpointStrategy.save("00000000000000000001");
@@ -102,7 +103,7 @@ public class TestOzoneFileCheckpointStrategy {
   @Test
   public void testLoadStrategyWhenBucketDoesNotExist() throws IOException {
     when(mockOzoneManager.getBucketInfo(any(), any())).thenThrow(IOException.class);
-    Assertions.assertNull(ozoneFileCheckpointStrategy.load());
+    Assertions.assertThrows(IOException.class, () -> ozoneFileCheckpointStrategy.load());
   }
 
   @Test
@@ -111,5 +112,50 @@ public class TestOzoneFileCheckpointStrategy {
     when(mockBucketInfo.getMetadata()).thenReturn(
         com.google.common.collect.ImmutableMap.of("notification-checkpoint", "00000000000000000017"));
     Assertions.assertEquals("00000000000000000017", ozoneFileCheckpointStrategy.load());
+  }
+
+  @Test
+  public void testSaveStrategyBypassesThrottlingUponFailureRecovery() throws IOException, ServiceException {
+    try (MockedStatic<OzoneManagerRatisUtils> utils = mockStatic(OzoneManagerRatisUtils.class)) {
+      utils.when(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class))).thenReturn(mockOmResponse);
+
+      // First save succeeds (saveCount becomes 1)
+      when(mockOmResponse.getStatus()).thenReturn(OzoneManagerProtocolProtos.Status.OK);
+      ozoneFileCheckpointStrategy.save("1");
+      utils.verify(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class)), Mockito.times(1));
+
+      // Saves 2 to 100 are throttled
+      for (int i = 2; i <= 100; i++) {
+        ozoneFileCheckpointStrategy.save(String.valueOf(i));
+      }
+      utils.verify(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class)), Mockito.times(1));
+
+      // Save 101 tries to write and fails!
+      when(mockOmResponse.getStatus()).thenReturn(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
+      Assertions.assertThrows(IOException.class, () -> ozoneFileCheckpointStrategy.save("101"));
+      utils.verify(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class)), Mockito.times(2));
+
+      // Save 102 would normally be throttled, but because 101 failed,
+      // it should bypass throttling and try to write immediately!
+      when(mockOmResponse.getStatus()).thenReturn(OzoneManagerProtocolProtos.Status.OK);
+      ozoneFileCheckpointStrategy.save("102");
+      utils.verify(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class)), Mockito.times(3));
+
+      // Save 103 is throttled again (throttling restored)
+      ozoneFileCheckpointStrategy.save("103");
+      utils.verify(() -> OzoneManagerRatisUtils.submitRequest(any(OzoneManager.class),
+          any(OzoneManagerProtocolProtos.OMRequest.class),
+          any(ClientId.class), any(Long.class)), Mockito.times(3));
+    }
   }
 }
