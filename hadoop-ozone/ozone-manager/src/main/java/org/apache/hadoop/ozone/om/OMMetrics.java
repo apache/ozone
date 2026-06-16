@@ -262,6 +262,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private final DBCheckpointMetrics dbCheckpointMetrics;
   private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
 
+  // Bucket Tagging Metrics
+  private @Metric MutableCounterLong numGetBucketTagging;
+  private @Metric MutableCounterLong numPutBucketTagging;
+  private @Metric MutableCounterLong numDeleteBucketTagging;
+  private @Metric MutableCounterLong numGetBucketTaggingFails;
+  private @Metric MutableCounterLong numPutBucketTaggingFails;
+  private @Metric MutableCounterLong numDeleteBucketTaggingFails;
+
   public OMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
     this.maxRatisEvents = maxRatisEvents;
@@ -1569,6 +1577,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incEcBucketCreateFailsTotal() {
     ecBucketCreateFailsTotal.incr();
+  }
+
+  @Override
+  public void incNumGetBucketTagging() {
+    numGetBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  @Override
+  public void incNumGetBucketTaggingFails() {
+    numGetBucketTaggingFails.incr();
+  }
+
+  public void incNumPutBucketTagging() {
+    numPutBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumPutBucketTaggingFails() {
+    numPutBucketTaggingFails.incr();
+  }
+
+  public void incNumDeleteBucketTagging() {
+    numDeleteBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumDeleteBucketTaggingFails() {
+    numDeleteBucketTaggingFails.incr();
   }
 
   public void incNumRecoverLease() {
