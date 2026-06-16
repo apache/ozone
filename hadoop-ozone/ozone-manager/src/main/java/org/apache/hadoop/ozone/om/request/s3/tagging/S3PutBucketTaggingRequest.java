@@ -65,9 +65,35 @@ public class S3PutBucketTaggingRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    PutBucketTaggingRequest.Builder req =
-        getOmRequest().getPutBucketTaggingRequest().toBuilder();
+    PutBucketTaggingRequest putBucketTaggingRequest =
+        getOmRequest().getPutBucketTaggingRequest();
+    Objects.requireNonNull(putBucketTaggingRequest, "putBucketTaggingRequest == null");
+
+    BucketArgs bucketArgs = putBucketTaggingRequest.getBucketArgs();
+    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+    String volumeName = bucketArgs.getVolumeName();
+    String bucketName = bucketArgs.getBucketName();
+
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName), this);
+
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
+            resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      } catch (IOException ex) {
+        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
+            OMAction.PUT_BUCKET_TAGGING,
+            resolvedBucket.audit(omBucketArgs.toAuditMap()), ex,
+            getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
+
+    PutBucketTaggingRequest.Builder req = putBucketTaggingRequest.toBuilder();
     req.setModificationTime(Time.now());
+    req.setBucketArgs(resolvedBucket.update(bucketArgs));
     return getOmRequest().toBuilder()
         .setPutBucketTaggingRequest(req.build())
         .setUserInfo(getUserInfo())
@@ -101,28 +127,14 @@ public class S3PutBucketTaggingRequest extends OMClientRequest {
     boolean acquiredBucketLock = false;
     boolean success = true;
     OMClientResponse omClientResponse = null;
-    ResolvedBucket resolvedBucket = null;
-    String realVolume = null;
-    String realBucket = null;
     try {
-      resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(volumeName, bucketName), this);
-      realVolume = resolvedBucket.realVolume();
-      realBucket = resolvedBucket.realBucket();
-
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
-            realVolume, realBucket, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, realVolume, realBucket));
+          BUCKET_LOCK, volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      String bucketKey = omMetadataManager.getBucketKey(realVolume, realBucket);
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo dbBucketInfo = OzoneManagerUtils.getBucketInfo(
-          omMetadataManager, realVolume, realBucket);
+          omMetadataManager, volumeName, bucketName);
 
       Map<String, String> tags =
           KeyValueUtil.getFromProtobuf(bucketArgs.getTagsList());
@@ -149,15 +161,13 @@ public class S3PutBucketTaggingRequest extends OMClientRequest {
     } finally {
       if (acquiredBucketLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, realVolume, realBucket));
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
-    Map<String, String> auditMap = resolvedBucket != null
-        ? resolvedBucket.audit(omBucketArgs.toAuditMap())
-        : omBucketArgs.toAuditMap();
+    Map<String, String> auditMap = omBucketArgs.toAuditMap();
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.PUT_BUCKET_TAGGING, auditMap, exception,
         getOmRequest().getUserInfo()));

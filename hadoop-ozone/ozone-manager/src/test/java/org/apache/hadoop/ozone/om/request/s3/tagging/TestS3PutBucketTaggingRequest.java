@@ -127,6 +127,9 @@ public class TestS3PutBucketTaggingRequest extends TestBucketRequest {
       assertNotNull(value);
       assertEquals(tag.getValue(), value);
     }
+    assertThat(updatedBucketInfo.getModificationTime())
+        .isGreaterThan(bucketInfo.getModificationTime());
+    assertEquals(2L, updatedBucketInfo.getUpdateID());
   }
 
   @Test
@@ -192,7 +195,7 @@ public class TestS3PutBucketTaggingRequest extends TestBucketRequest {
     OmBucketInfo updatedBucketInfo = getBucketFromDb(volumeName, bucketName);
     assertEquals(bucketInfo.getVolumeName(), updatedBucketInfo.getVolumeName());
     assertEquals(bucketInfo.getBucketName(), updatedBucketInfo.getBucketName());
-    assertTrue(bucketInfo.getTags().isEmpty());
+    assertTrue(updatedBucketInfo.getTags().isEmpty());
     assertEquals(tags.size(), updatedBucketInfo.getTags().size());
   }
 

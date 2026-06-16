@@ -120,6 +120,9 @@ public class TestS3DeleteBucketTaggingRequest extends TestBucketRequest {
     assertEquals(bucketInfo.getVolumeName(), updatedBucketInfo.getVolumeName());
     assertEquals(bucketInfo.getBucketName(), updatedBucketInfo.getBucketName());
     assertEquals(0, updatedBucketInfo.getTags().size());
+    assertThat(updatedBucketInfo.getModificationTime())
+        .isGreaterThan(bucketInfo.getModificationTime());
+    assertEquals(2L, updatedBucketInfo.getUpdateID());
   }
 
   @Test

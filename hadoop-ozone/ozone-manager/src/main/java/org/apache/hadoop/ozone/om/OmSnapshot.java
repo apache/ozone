@@ -193,6 +193,10 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    if (args == null) {
+      return null;
+    }
+
     return omMetadataReader.getBucketTagging(args);
   }
 
