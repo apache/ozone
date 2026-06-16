@@ -41,8 +41,6 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -60,6 +58,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,7 +70,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
-  private AtomicLong testClock;
+  private TestClock testClock;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -94,11 +93,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
     ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
     ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
-    testClock = new AtomicLong(1000L);
-    LongSupplier timeSource = testClock::get;
+    testClock = TestClock.newInstance();
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
-        reconGlobalStatsManager, reconFileMetadataManager, timeSource);
+        reconGlobalStatsManager, reconFileMetadataManager, testClock);
     reconTaskController.start();
   }
 
@@ -590,7 +588,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Iterations 1-6: should return RETRY_LATER and increment retry count
     for (int i = 1; i <= 6; i++) {
       if (i > 1) {
-        testClock.addAndGet(2100); // Advance virtual time past the retry delay
+        testClock.fastForward(2100); // Advance virtual time past the retry delay
       }
       result = controllerSpy.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
@@ -601,7 +599,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     // Iteration 7: should return MAX_RETRIES_EXCEEDED (eventProcessRetryCount is now 6,
     // which >= MAX_EVENT_PROCESS_RETRIES)
-    testClock.addAndGet(2100); // Advance virtual time past the retry delay
+    testClock.fastForward(2100); // Advance virtual time past the retry delay
     result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
@@ -682,7 +680,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertTrue(controllerSpy.hasTasksFailed(), "tasksFailed should still be true, triggering retry");
     
     // Advance virtual time past the retry delay before attempting to queue again (RETRY_DELAY_MS = 2000)
-    testClock.addAndGet(2100);
+    testClock.fastForward(2100);
     
     // Queue another reinitialization event (simulating what syncDataFromOM does)
     ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
