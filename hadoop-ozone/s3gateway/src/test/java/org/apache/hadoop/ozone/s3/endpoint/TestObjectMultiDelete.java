@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.util.Collections.singleton;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -116,10 +116,7 @@ public class TestObjectMultiDelete {
       mdr.getObjects().add(new DeleteObject("key-" + i));
     }
 
-    OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> rest.multiDelete("b1", "", mdr));
-    assertEquals("MalformedXML", ex.getCode());
-    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertErrorResponse(MALFORMED_XML, () -> rest.multiDelete("b1", "", mdr));
   }
 
   @Test
