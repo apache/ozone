@@ -24,7 +24,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -134,15 +137,16 @@ public class RatisPipelineProvider
   }
 
   @Override
-  public synchronized Pipeline create(RatisReplicationConfig replicationConfig)
+  public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
+      StorageTier storageTier)
       throws IOException {
     return create(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
       String limitInfo = (datanodePipelineLimit > 0)
@@ -161,9 +165,11 @@ public class RatisPipelineProvider
         replicationConfig.getReplicationFactor();
     switch (factor) {
     case ONE:
-      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes);
+      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes, storageTier);
       break;
     case THREE:
+      StorageTierUtil.validateNotEmpty(storageTier);
+      StorageType storageType = StorageTierUtil.getStorageTypeForUniformStorageTier(storageTier, replicationConfig);
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
       if (!excludeDueToEngagement.isEmpty()) {
         if (excludedNodes.isEmpty()) {
@@ -174,7 +180,7 @@ public class RatisPipelineProvider
       }
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSizeBytes);
+          containerSizeBytes, storageType);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());

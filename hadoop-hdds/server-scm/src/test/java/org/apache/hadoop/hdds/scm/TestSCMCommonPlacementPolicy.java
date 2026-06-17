@@ -47,6 +47,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -462,14 +463,14 @@ public class TestSCMCommonPlacementPolicy {
               List<DatanodeDetails> excludedNodes,
               List<DatanodeDetails> favoredNodes,
               int nodesRequired, long metadataSizeRequired,
-              long dataSizeRequired) {
+              long dataSizeRequired, StorageType storageType) {
             usedNodesIdentity.set(usedNodesPassed(usedNodes));
             return null;
           }
         };
-    dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
+    dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1, StorageType.DEFAULT);
     assertFalse(usedNodesIdentity.get());
-    dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
+    dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1, StorageType.DEFAULT);
     assertTrue(usedNodesIdentity.get());
   }
 
@@ -521,11 +522,11 @@ public class TestSCMCommonPlacementPolicy {
     //                                                  100000
     //
     // Summary: 101000 - 500 > 100000 == true
-    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
+    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000, StorageType.DEFAULT));
 
     // 1000 committed bytes:
     // Summary: 101000 - 1000 > 100000 == false
-    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
+    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000, StorageType.DEFAULT));
   }
 
   /**

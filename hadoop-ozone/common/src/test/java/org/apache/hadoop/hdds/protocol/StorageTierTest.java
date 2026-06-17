@@ -35,9 +35,9 @@ class StorageTierTest {
 
   @Test
   void testUniformStorageType() {
-    assertTrue(StorageTier.SSD.isUniformStorageType());
-    assertTrue(StorageTier.DISK.isUniformStorageType());
-    assertTrue(StorageTier.ARCHIVE.isUniformStorageType());
+    assertTrue(StorageTier.SSD.isUniform());
+    assertTrue(StorageTier.DISK.isUniform());
+    assertTrue(StorageTier.ARCHIVE.isUniform());
   }
 
   @Test
@@ -51,15 +51,15 @@ class StorageTierTest {
 
     // Assert uniform storage types
     Arrays.asList(StorageTier.SSD, StorageTier.DISK, StorageTier.ARCHIVE, StorageTier.EMPTY)
-        .forEach(tier -> assertTrue(tier.isUniformStorageType()));
+        .forEach(tier -> assertTrue(tier.isUniform()));
 
     for (StorageTier tier : StorageTier.values()) {
-      if (!tier.isUniformStorageType()) {
+      if (!tier.isUniform()) {
         return;
       }
       for (ReplicationConfig replicationConfig : Arrays.asList(ratisOne, ratisThree,
           standaloneOne, standaloneThree)) {
-        List<StorageType> storageTypes = tier.getStorageTypes(replicationConfig);
+        List<StorageType> storageTypes = tier.getStorageTypes(replicationConfig.getRequiredNodes());
         if (tier.equals(StorageTier.EMPTY)) {
           assertEquals(0, storageTypes.size());
         } else {

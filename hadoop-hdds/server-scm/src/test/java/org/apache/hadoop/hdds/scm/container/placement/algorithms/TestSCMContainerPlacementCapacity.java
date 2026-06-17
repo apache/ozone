@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -136,7 +137,7 @@ public class TestSCMContainerPlacementCapacity {
 
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15, 15);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15, StorageType.DEFAULT);
 
       //then
       assertEquals(1, datanodeDetails.size());
