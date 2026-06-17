@@ -533,6 +533,26 @@ public class TestContainerReplicaPendingOps {
     assertNull(scheduled.get(dn2.getID()));
   }
 
+  @Test
+  public void failedAddCommandRemovesPendingOpAndDecrementsCount() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+    assertEquals(1, pendingOps.getPendingOpCount(ADD));
+
+    pendingOps.onReplicationCommandFailed(cmd.getId());
+
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    assertTrue(pendingOps.getPendingOps(containerID).isEmpty());
+  }
+
+  @Test
+  public void failedCommandWithUnknownIdIsNoOp() {
+    pendingOps.onReplicationCommandFailed(999999L);
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+  }
+
   /**
    * Tests that only the size of containers with expired ops is reduced from the map tracking size of pending ops.
    * For example, if target Datanode DN1 has two pending ADD ops 10GB + 15GB, and the first op expires, then only
