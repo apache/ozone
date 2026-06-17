@@ -48,6 +48,11 @@ public class ECReconstructionCoordinatorTask
   }
 
   @Override
+  public long getCommandId() {
+    return reconstructionCommandInfo.getId();
+  }
+
+  @Override
   public String getMetricName() {
     return METRIC_NAME;
   }

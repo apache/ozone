@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -52,6 +53,7 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -422,9 +424,11 @@ public final class ReplicationSupervisor {
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
           failureCounter.get(task.getMetricName()).incrementAndGet();
+          updateCommandStatus(task, CommandStatus::markAsFailed);
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.get(task.getMetricName()).incrementAndGet();
+          updateCommandStatus(task, CommandStatus::markAsExecuted);
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
           skippedCounter.get(task.getMetricName()).incrementAndGet();
@@ -433,12 +437,23 @@ public final class ReplicationSupervisor {
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
+        updateCommandStatus(task, CommandStatus::markAsFailed);
       } finally {
         queuedCounter.get(task.getMetricName()).decrementAndGet();
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
+    }
+
+    private void updateCommandStatus(AbstractReplicationTask t,
+        Consumer<CommandStatus> updater) {
+      long cmdId = t.getCommandId();
+      if (context == null || cmdId == 0) {
+        // No SCM context (test) or no tracked command (e.g. reconcile task).
+        return;
+      }
+      context.updateCommandStatus(cmdId, updater);
     }
 
     @Override

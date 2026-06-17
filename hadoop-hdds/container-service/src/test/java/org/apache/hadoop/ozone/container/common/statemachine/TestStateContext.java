@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -753,6 +754,21 @@ public class TestStateContext {
     assertTrue(termOfLeaderSCM.isPresent());
     assertEquals(originalTerm, termOfLeaderSCM.getAsLong());
     assertNull(subject.getNextCommand());
+  }
+
+  @Test
+  public void addCmdStatusRegistersPendingForReplication() throws IOException {
+    StateContext ctx = createSubject();
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(1L, Collections.emptyList());
+    ctx.addCmdStatus(cmd);
+    CommandStatus status = ctx.getCommandStatusMap().get(cmd.getId());
+    assertNotNull(status);
+    assertEquals(SCMCommandProto.Type.replicateContainerCommand, status.getType());
+    assertEquals(
+        org.apache.hadoop.hdds.protocol.proto
+            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING,
+        status.getStatus());
   }
 
   private static StateContext createSubject() throws IOException {

@@ -844,6 +844,37 @@ public class TestReplicationSupervisor {
     }
   }
 
+  @org.junit.jupiter.api.Test
+  public void reportsExecutedStatusOnSuccess() {
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.DONE));
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(1L, Collections.emptyList());
+    cmd.setTerm(CURRENT_TERM);
+    context.addCmdStatus(cmd);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(
+        org.apache.hadoop.hdds.protocol.proto
+            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.EXECUTED,
+        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @org.junit.jupiter.api.Test
+  public void reportsFailedStatusOnFailure() {
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(2L, Collections.emptyList());
+    cmd.setTerm(CURRENT_TERM);
+    context.addCmdStatus(cmd);
+    ReplicationSupervisor supervisor = supervisorWith(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.FAILED),
+        newDirectExecutorService());
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(
+        org.apache.hadoop.hdds.protocol.proto
+            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED,
+        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
   private static class BlockingTask extends AbstractReplicationTask {
 
     private final CountDownLatch runningLatch;

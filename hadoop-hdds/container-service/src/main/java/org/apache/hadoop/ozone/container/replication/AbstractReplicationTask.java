@@ -66,6 +66,15 @@ public abstract class AbstractReplicationTask {
     return containerId;
   }
 
+  /**
+   * Returns the id of the SCM command that scheduled this task, or 0 if this
+   * task is not associated with a tracked command. Subclasses backed by an
+   * {@link org.apache.hadoop.ozone.protocol.commands.SCMCommand} override this.
+   */
+  public long getCommandId() {
+    return 0;
+  }
+
   public Status getStatus() {
     return status;
   }

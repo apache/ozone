@@ -42,9 +42,11 @@ public class ECReconstructionCommandInfo {
   private final ByteString missingContainerIndexes;
   private final long deadlineMsSinceEpoch;
   private final long term;
+  private final long commandId;
 
   public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
     this.containerID = cmd.getContainerID();
+    this.commandId = cmd.getId();
     this.ecReplicationConfig = cmd.getEcReplicationConfig();
     this.missingContainerIndexes = cmd.getMissingContainerIndexes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
@@ -95,6 +97,10 @@ public class ECReconstructionCommandInfo {
 
   public long getTerm() {
     return term;
+  }
+
+  public long getId() {
+    return commandId;
   }
 
 }
