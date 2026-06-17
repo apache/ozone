@@ -63,8 +63,22 @@ public class OzoneDataStreamOutputStub extends OzoneDataStreamOutput {
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return closed ? new OmMultipartCommitUploadPartInfo(partName,
-        getMetadata().get(OzoneConsts.ETAG)) : null;
+    final KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (closed && keyDataStreamOutput != null) {
+      return new OmMultipartCommitUploadPartInfo(
+          partName, getMetadata().get(OzoneConsts.ETAG), keyDataStreamOutput.getModificationTime());
+    }
+    return null;
+  }
+
+  @Override
+  public long getModificationTime() {
+    final KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (keyDataStreamOutput != null) {
+      return keyDataStreamOutput.getModificationTime();
+    }
+    throw new IllegalStateException(
+        "OutputStream is not a KeyDataStreamOutput: " + getByteBufStreamOutput().getClass());
   }
 
   @Override
