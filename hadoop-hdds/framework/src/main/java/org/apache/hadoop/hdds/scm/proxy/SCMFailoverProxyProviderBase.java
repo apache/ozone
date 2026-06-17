@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -304,21 +305,21 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     // any monitor. A slow / dead resolver while holding the provider
     // monitor would freeze every concurrent getProxy() / shouldRetry()
     // caller.
-    String hostAndPort;
-    InetSocketAddress cachedAddress;
-    String serviceId;
+    SCMProxyInfo cached;
     synchronized (this) {
-      SCMProxyInfo cached = scmProxyInfoMap.get(nodeId);
-      if (cached == null) {
-        return false;
-      }
-      hostAndPort = cached.getHostAndPort();
-      if (hostAndPort == null) {
-        return false;
-      }
-      cachedAddress = cached.getAddress();
-      serviceId = cached.getServiceId();
+      cached = scmProxyInfoMap.get(nodeId);
     }
+    // SCMProxyInfo is immutable, so its fields can be read outside the
+    // monitor once the reference has been fetched safely from the map.
+    if (cached == null) {
+      return false;
+    }
+    String hostAndPort = cached.getHostAndPort();
+    if (hostAndPort == null) {
+      return false;
+    }
+    InetSocketAddress cachedAddress = cached.getAddress();
+    String serviceId = cached.getServiceId();
     InetSocketAddress refreshed;
     try {
       refreshed = NetUtils.createSocketAddr(hostAndPort);
@@ -337,7 +338,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     // cachedAddress.getAddress() is null and a successful
     // re-resolution is genuinely a change -- proceed to swap rather
     // than NPE on .equals().
-    java.net.InetAddress cachedIp = cachedAddress.getAddress();
+    InetAddress cachedIp = cachedAddress.getAddress();
     if (cachedIp != null
         && refreshed.getAddress().equals(cachedIp)) {
       return false;
@@ -461,12 +462,12 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           refreshed = refreshProxyAddressIfChanged(getCurrentProxySCMNodeId());
         }
 
-        if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
-          setUpdatedLeaderNodeID();
-        } else if (refreshed) {
+        if (refreshed) {
           // Stay on this nodeId so the next attempt dials the newly
           // resolved IP; advancing the failover ring here would bypass
           // the freshly-fixed peer for N-1 attempts.
+          setUpdatedLeaderNodeID();
+        } else if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           setUpdatedLeaderNodeID();
         } else {
           performFailoverToAssignedLeader(null, e);
