@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -160,6 +161,11 @@ public class OzoneBucket extends WithMetadata {
    */
   private long pendingDeleteNamespace;
 
+  /**
+   * S3-style bucketTags on the bucket.
+   */
+  private final Map<String, String> bucketTags = new HashMap<>();
+
   protected OzoneBucket(Builder builder) {
     super(builder);
     this.proxy = builder.proxy;
@@ -201,6 +207,9 @@ public class OzoneBucket extends WithMetadata {
       this.bucketLayout = builder.bucketLayout;
     }
     this.owner = builder.owner;
+    if (builder.tags != null) {
+      this.bucketTags.putAll(builder.tags);
+    }
   }
 
   /**
@@ -265,6 +274,15 @@ public class OzoneBucket extends WithMetadata {
    */
   public Instant getModificationTime() {
     return modificationTime;
+  }
+
+  /**
+   * Returns the bucketTags of the bucket.
+   *
+   * @return bucket bucketTags.
+   */
+  public Map<String, String> getBucketTags() {
+    return Collections.unmodifiableMap(bucketTags);
   }
 
   /**
@@ -1214,6 +1232,52 @@ public class OzoneBucket extends WithMetadata {
     proxy.deleteObjectTagging(volumeName, name, keyName);
   }
 
+  /**
+   * Gets the bucketTags for this bucket.
+   * @return Tags for this bucket.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public Map<String, String> getBucketTagging() throws IOException {
+    return proxy.getBucketTagging(volumeName, name);
+  }
+
+  /**
+   * Sets bucketTags on this bucket (replaces existing tag set).
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    proxy.putBucketTagging(volumeName, name, tags);
+    applyBucketTaggingUpdate(tags);
+  }
+
+  /**
+   * Removes all bucketTags from this bucket.
+   * @throws IOException
+   */
+  public void deleteBucketTagging() throws IOException {
+    proxy.deleteBucketTagging(volumeName, name);
+    applyBucketTaggingDelete();
+  }
+
+  /**
+   * Updates cached bucket tags after a successful put.
+   */
+  protected void applyBucketTaggingUpdate(Map<String, String> tags) {
+    bucketTags.clear();
+    if (tags != null) {
+      bucketTags.putAll(tags);
+    }
+  }
+
+  /**
+   * Updates cached bucket tags after a successful delete tagging call.
+   */
+  protected void applyBucketTaggingDelete() {
+    bucketTags.clear();
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }
@@ -1252,6 +1316,7 @@ public class OzoneBucket extends WithMetadata {
     private String owner;
     private long pendingDeleteBytes;
     private long pendingDeleteNamespace;
+    private Map<String, String> tags;
 
     protected Builder() {
     }
@@ -1355,6 +1420,11 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setPendingDeleteNamespace(long pendingDeleteNamespace) {
       this.pendingDeleteNamespace = pendingDeleteNamespace;
+      return this;
+    }
+
+    public Builder setTags(Map<String, String> tags) {
+      this.tags = tags;
       return this;
     }
 

@@ -17,169 +17,113 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketSetPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutBucketTaggingResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles PutBucketTagging (S3 bucket tagging).
  */
-public class S3PutBucketTaggingRequest extends OMClientRequest {
+public class S3PutBucketTaggingRequest extends S3BucketTaggingRequestBase {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3PutBucketTaggingRequest.class);
-
+  /**
+   * Creates a put-bucket-tagging request from the incoming OM RPC payload.
+   */
   public S3PutBucketTaggingRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  /**
+   * Returns bucket args from the put-bucket-tagging sub-request.
+   */
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager)
-      throws IOException {
+  protected BucketArgs getRequestBucketArgs(OMRequest omRequest) {
     PutBucketTaggingRequest putBucketTaggingRequest =
-        getOmRequest().getPutBucketTaggingRequest();
-    Objects.requireNonNull(putBucketTaggingRequest, "putBucketTaggingRequest == null");
+        omRequest.getPutBucketTaggingRequest();
+    Objects.requireNonNull(putBucketTaggingRequest,
+        "putBucketTaggingRequest == null");
+    return putBucketTaggingRequest.getBucketArgs();
+  }
 
-    BucketArgs bucketArgs = putBucketTaggingRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
-    String volumeName = bucketArgs.getVolumeName();
-    String bucketName = bucketArgs.getBucketName();
+  /**
+   * Returns the modification time stamped during preExecute.
+   */
+  @Override
+  protected long getModificationTime(OMRequest omRequest) {
+    return omRequest.getPutBucketTaggingRequest().getModificationTime();
+  }
 
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(volumeName, bucketName), this);
-
-    if (ozoneManager.getAclsEnabled()) {
-      try {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
-            resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
-      } catch (IOException ex) {
-        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-            OMAction.PUT_BUCKET_TAGGING,
-            resolvedBucket.audit(omBucketArgs.toAuditMap()), ex,
-            getOmRequest().getUserInfo()));
-        throw ex;
-      }
-    }
-
+  /**
+   * Rebuilds the OM request with resolved bucket args and modification time.
+   */
+  @Override
+  protected OMRequest buildUpdatedOMRequest(OMRequest baseRequest,
+      BucketArgs bucketArgs, long modificationTime) throws IOException {
+    PutBucketTaggingRequest putBucketTaggingRequest =
+        baseRequest.getPutBucketTaggingRequest();
     PutBucketTaggingRequest.Builder req = putBucketTaggingRequest.toBuilder();
-    req.setModificationTime(Time.now());
-    req.setBucketArgs(resolvedBucket.update(bucketArgs));
-    return getOmRequest().toBuilder()
+    req.setModificationTime(modificationTime);
+    req.setBucketArgs(bucketArgs);
+    return baseRequest.toBuilder()
         .setPutBucketTaggingRequest(req.build())
         .setUserInfo(getUserInfo())
         .build();
   }
 
+  /**
+   * Converts request tag list into the map persisted on bucket metadata.
+   */
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+  protected Map<String, String> getTagsToApply(BucketArgs bucketArgs) {
+    return KeyValueUtil.getFromProtobuf(bucketArgs.getTagsList());
+  }
 
-    PutBucketTaggingRequest putBucketTaggingRequest =
-        getOmRequest().getPutBucketTaggingRequest();
-    Objects.requireNonNull(putBucketTaggingRequest, "putBucketTaggingRequest == null");
+  /**
+   * Sets the successful put-bucket-tagging response on the OM response.
+   */
+  @Override
+  protected void setSuccessResponse(OMResponse.Builder omResponse) {
+    omResponse.setPutBucketTaggingResponse(
+        PutBucketTaggingResponse.newBuilder().build());
+  }
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OMMetrics omMetrics = ozoneManager.getMetrics();
+  /**
+   * Returns the audit action for put bucket tagging.
+   */
+  @Override
+  protected OMAction getAuditAction() {
+    return OMAction.PUT_BUCKET_TAGGING;
+  }
+
+  /**
+   * Increments the put-bucket-tagging request metric.
+   */
+  @Override
+  protected void incRequestMetric(OMMetrics omMetrics) {
     omMetrics.incNumPutBucketTagging();
+  }
 
-    BucketArgs bucketArgs = putBucketTaggingRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
-
-    String volumeName = bucketArgs.getVolumeName();
-    String bucketName = bucketArgs.getBucketName();
-
-    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
-        getOmRequest());
-    OmBucketInfo omBucketInfo = null;
-
-    Exception exception = null;
-    boolean acquiredBucketLock = false;
-    boolean success = true;
-    OMClientResponse omClientResponse = null;
-    try {
-      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName));
-      acquiredBucketLock = getOmLockDetails().isLockAcquired();
-
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo dbBucketInfo = OzoneManagerUtils.getBucketInfo(
-          omMetadataManager, volumeName, bucketName);
-
-      Map<String, String> tags =
-          KeyValueUtil.getFromProtobuf(bucketArgs.getTagsList());
-
-      omBucketInfo = dbBucketInfo.toBuilder()
-          .setTags(tags)
-          .setUpdateID(transactionLogIndex)
-          .setModificationTime(putBucketTaggingRequest.getModificationTime())
-          .build();
-
-      omMetadataManager.getBucketTable().addCacheEntry(
-          new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
-
-      omResponse.setPutBucketTaggingResponse(
-          PutBucketTaggingResponse.newBuilder().build());
-      omClientResponse = new OMBucketSetPropertyResponse(
-          omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
-      success = false;
-      exception = ex;
-      omClientResponse = new OMBucketSetPropertyResponse(
-          createErrorOMResponse(omResponse, exception));
-    } finally {
-      if (acquiredBucketLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      }
-      if (omClientResponse != null) {
-        omClientResponse.setOmLockDetails(getOmLockDetails());
-      }
-    }
-    Map<String, String> auditMap = omBucketArgs.toAuditMap();
-    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.PUT_BUCKET_TAGGING, auditMap, exception,
-        getOmRequest().getUserInfo()));
-
-    if (success) {
-      LOG.debug("Put bucket tagging for bucket:{} in volume:{}",
-          bucketName, volumeName);
-      return omClientResponse;
-    }
+  /**
+   * Increments the put-bucket-tagging failure metric.
+   */
+  @Override
+  protected void incRequestFailMetric(OMMetrics omMetrics) {
     omMetrics.incNumPutBucketTaggingFails();
-    LOG.error("Put bucket tagging failed for bucket:{} in volume:{}",
-        bucketName, volumeName, exception);
-    return omClientResponse;
+  }
+
+  /**
+   * Returns the operation label used in debug and error logs.
+   */
+  @Override
+  protected String getOperationName() {
+    return "Put";
   }
 }

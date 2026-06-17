@@ -742,6 +742,21 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
   }
 
+  @Override
+  public Map<String, String> getBucketTagging() throws IOException {
+    return getBucketTags();
+  }
+
+  @Override
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    applyBucketTaggingUpdate(tags);
+  }
+
+  @Override
+  public void deleteBucketTagging() throws IOException {
+    applyBucketTaggingDelete();
+  }
+
   /**
    * Class used to hold part information in a upload part request.
    */

@@ -1219,10 +1219,24 @@ public interface OzoneManagerProtocol
    * @return Tags associated with the bucket.
    */
   @Override
-  default Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
-    // This will be removed in the follow-up ticket HDDS-15511.
+  Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException;
+
+  /**
+   * Sets tags on an existing bucket (replaces existing tag set).
+   * @param args Bucket args
+   */
+  default void putBucketTagging(OmBucketArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented, as bucket tagging client support is pending.");
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Removes all tags from the specified bucket.
+   * @param args Bucket args
+   */
+  default void deleteBucketTagging(OmBucketArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
   }
 
   /**
