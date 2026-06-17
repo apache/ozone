@@ -202,9 +202,12 @@ public class TestSCMSafeModeWithPipelineRules {
         .getSafeModeRule(ECMinDataNodeSafeModeRule.class);
 
     assertTrue(ecRule.isEnabled());
+    ecRule.setValidateBasedOnReportProcessing(false);
     GenericTestUtils.waitFor(ecRule::validate, 1000, 60000);
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000,
-        60000);
+    GenericTestUtils.waitFor(() -> {
+      scmSafeModeManager.refreshAndValidate();
+      return !scmSafeModeManager.getInSafeMode();
+    }, 1000, 60000);
   }
 
   @AfterEach
