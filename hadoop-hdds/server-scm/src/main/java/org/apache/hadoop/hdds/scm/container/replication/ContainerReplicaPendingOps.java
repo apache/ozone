@@ -337,8 +337,9 @@ public class ContainerReplicaPendingOps {
               releaseScheduledContainerSize(op);
             }
             decrementCounter(op.getOpType(), op.getReplicaIndex());
-            commandIdToContainer.remove(cmdId);
           }
+          // Always drop the index entry; DELETE ops stay in the list for resend but no longer need tracking.
+          commandIdToContainer.remove(cmdId);
           failedOps.add(op);
         }
       }
