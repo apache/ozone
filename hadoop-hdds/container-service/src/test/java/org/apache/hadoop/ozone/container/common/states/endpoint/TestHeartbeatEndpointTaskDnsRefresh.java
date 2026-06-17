@@ -265,18 +265,15 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
     private final HeartbeatEndpointTask task;
     private final EndpointStateMachine endpoint;
     private final SCMConnectionManager connectionManager;
-    private final DatanodeStateMachine datanodeStateMachine;
     private final StateContext context;
     private final StorageContainerDatanodeProtocolClientSideTranslatorPB scm;
 
     Fixture(HeartbeatEndpointTask task, EndpointStateMachine endpoint,
-            SCMConnectionManager mgr, DatanodeStateMachine dsm,
-            StateContext ctx,
+            SCMConnectionManager mgr, StateContext ctx,
             StorageContainerDatanodeProtocolClientSideTranslatorPB scm) {
       this.task = task;
       this.endpoint = endpoint;
       this.connectionManager = mgr;
-      this.datanodeStateMachine = dsm;
       this.context = ctx;
       this.scm = scm;
     }
@@ -320,7 +317,6 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
         .setEndpointStateMachine(endpoint)
         .build();
 
-    return new Fixture(task, endpoint, connectionManager,
-        datanodeStateMachine, context, scm);
+    return new Fixture(task, endpoint, connectionManager, context, scm);
   }
 }
