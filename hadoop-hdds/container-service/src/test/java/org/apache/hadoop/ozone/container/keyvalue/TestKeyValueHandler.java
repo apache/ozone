@@ -703,6 +703,46 @@ public class TestKeyValueHandler {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenChunkDirCannotBeListed(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+        mock(ContainerMetrics.class), c -> { },
+        new ContainerChecksumTreeManager(conf));
+    KeyValueContainer container = createContainerWithChunksPath(layoutVersion,
+        Files.createFile(tempDir.resolve("chunks-file")));
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to list chunks under")
+        .hasMessageContaining("for unreferenced block 1")
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenFileDeletionFails(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    FailingUnreferencedDeleteKeyValueHandler keyValueHandler =
+        new FailingUnreferencedDeleteKeyValueHandler(conf);
+    Path chunkDir = Files.createDirectory(tempDir.resolve("chunks"));
+    Path chunkFile = Files.createFile(chunkDir.resolve(
+        getUnreferencedChunkName(layoutVersion, 1L)));
+    KeyValueContainer container =
+        createContainerWithChunksPath(layoutVersion, chunkDir);
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to delete unreferenced chunk/block")
+        .hasMessageContaining(chunkFile.toString())
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+    assertTrue(Files.exists(chunkFile));
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testUpdateContainerChecksum(ContainerLayoutVersion layoutVersion) throws Exception {
     conf = new OzoneConfiguration();
     KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
@@ -1085,6 +1125,41 @@ public class TestKeyValueHandler {
       }
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
+    }
+  }
+
+  private KeyValueContainer createContainerWithChunksPath(
+      ContainerLayoutVersion layoutVersion, Path chunksPath) {
+    KeyValueContainerData data = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion, GB, PipelineID.randomId().toString(), DATANODE_UUID);
+    data.setChunksPath(chunksPath.toString());
+    return new KeyValueContainer(data, conf);
+  }
+
+  private static String getUnreferencedChunkName(
+      ContainerLayoutVersion layoutVersion, long localID) {
+    switch (layoutVersion) {
+    case FILE_PER_BLOCK:
+      return localID + ".block";
+    case FILE_PER_CHUNK:
+      return localID + "_chunk_0";
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported container layout version " + layoutVersion);
+    }
+  }
+
+  private static final class FailingUnreferencedDeleteKeyValueHandler
+      extends KeyValueHandler {
+    private FailingUnreferencedDeleteKeyValueHandler(OzoneConfiguration conf) {
+      super(conf, DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+          mock(ContainerMetrics.class), c -> { },
+          new ContainerChecksumTreeManager(conf));
+    }
+
+    @Override
+    boolean deleteUnreferencedFile(File file) {
+      return false;
     }
   }
 }

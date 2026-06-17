@@ -15,19 +15,47 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+package org.apache.hadoop.ozone.om.ha;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is enabled.
+ * Interface for stateful background service in OM.
+ *
+ * Provide a fine-grained method to manipulate the status of these background
+ * services.
  */
-@EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-class TestOmSnapshotFsoWithNativeLibWithLinkedBuckets extends TestOmSnapshot {
-  TestOmSnapshotFsoWithNativeLibWithLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false, true);
+public interface OMService {
+  /**
+   * Notify raft or safe mode related status changed.
+   */
+  void notifyStatusChanged();
+
+  /**
+   * @return true, if next iteration of Service should take effect,
+   *         false, if next iteration of Service should be skipped.
+   */
+  boolean shouldRun();
+
+  /**
+   * @return name of the Service.
+   */
+  String getServiceName();
+
+  /**
+   * Status of Service.
+   */
+  enum ServiceStatus {
+    RUNNING,
+    PAUSING
   }
+
+  /**
+   * starts the OM service.
+   */
+  void start() throws OMServiceException;
+
+  /**
+   * stops the OM service.
+   */
+  void stop();
+
 }

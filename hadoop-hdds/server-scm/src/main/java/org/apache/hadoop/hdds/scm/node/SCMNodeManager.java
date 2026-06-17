@@ -905,7 +905,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       int dnCount = getNodeQueuedCommandCount(datanodeDetails, cmdType);
       if (dnCount == -1) {
-        LOG.warn("No command count information for datanode {} and command {}" +
+        LOG.debug("No command count information for datanode {} and command {}" +
             ". Assuming zero", datanodeDetails, cmdType);
         dnCount = 0;
       }
@@ -1074,7 +1074,7 @@ public class SCMNodeManager implements NodeManager {
       return nodeStateManager.getNode(dn);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getUuid());
+          dn.getID());
       return null;
     }
   }

@@ -44,10 +44,20 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   private final FilterPipelineOptions filterOptions = new FilterPipelineOptions();
 
   @CommandLine.Option(
-      names = {"-s", "--state", "-fst", "--filterByState", "--filter-by-state"},
+      names = {"-s", "--state", "--filterByState", "--filter-by-state"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;
+
+  /** For backward compatibility. */
+  @CommandLine.Option(
+      names = {"-fst"},
+      hidden = true,
+      defaultValue = ""
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private String deprecatedState;
 
   @CommandLine.Option(
       names = {"--json"},
@@ -63,9 +73,10 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     if (replicationFilter.isPresent()) {
       stream = stream.filter(replicationFilter.get());
     }
-    if (!Strings.isNullOrEmpty(state)) {
+    String effectiveState = getState();
+    if (!Strings.isNullOrEmpty(effectiveState)) {
       stream = stream.filter(p -> p.getPipelineState().toString()
-          .compareToIgnoreCase(state) == 0);
+          .compareToIgnoreCase(effectiveState) == 0);
     }
 
     if (json) {
@@ -75,5 +86,12 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     } else {
       stream.forEach(System.out::println);
     }
+  }
+
+  private String getState() {
+    if (!Strings.isNullOrEmpty(state)) {
+      return state;
+    }
+    return deprecatedState;
   }
 }

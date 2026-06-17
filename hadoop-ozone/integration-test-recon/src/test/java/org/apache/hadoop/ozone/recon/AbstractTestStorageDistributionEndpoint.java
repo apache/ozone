@@ -156,7 +156,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
 
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionInterval(Duration.ofMillis(30000));
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(5000));
     conf.setFromObject(dnConf);
 
     recon = new ReconService(conf);
@@ -212,6 +212,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
 
   protected boolean verifyStorageDistributionAfterKeyCreation() {
     try {
+      syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(STORAGE_DIST_ENDPOINT);
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);

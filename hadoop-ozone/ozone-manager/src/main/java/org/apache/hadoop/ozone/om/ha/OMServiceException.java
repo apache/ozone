@@ -15,16 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+package org.apache.hadoop.ozone.om.ha;
 
 /**
- * Test OmSnapshot for Object Store bucket type.
+ * Checked exceptions thrown by an {@link OMService}.
  */
-public class TestOmSnapshotObjectStoreWithLinkedBuckets extends TestOmSnapshot {
+public class OMServiceException extends Exception {
 
-  public TestOmSnapshotObjectStoreWithLinkedBuckets() throws Exception {
-    super(OBJECT_STORE, false, false, false, true);
+  public OMServiceException() {
+    super();
+  }
+
+  public OMServiceException(String s) {
+    super(s);
+  }
+
+  public OMServiceException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+  public OMServiceException(Throwable cause) {
+    super(cause);
   }
 }

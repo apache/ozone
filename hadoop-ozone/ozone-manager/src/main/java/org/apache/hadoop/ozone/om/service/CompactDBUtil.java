@@ -90,4 +90,23 @@ public final class CompactDBUtil {
     }
     return level;
   }
+
+  /**
+   * Converts the given RocksDB id to a
+   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum value.
+   * Defaults to {@code kSkip} if the id is invalid.
+   *
+   * @param bottommostLevelCompaction RocksDB id
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized).
+   */
+  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
+      int bottommostLevelCompaction) {
+    ManagedCompactRangeOptions.BottommostLevelCompaction level =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(bottommostLevelCompaction);
+    if (level == null) {
+      LOG.warn("Invalid bottommost level compaction id: {}. Using default: kSkip.", bottommostLevelCompaction);
+      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
+    }
+    return level;
+  }
 }

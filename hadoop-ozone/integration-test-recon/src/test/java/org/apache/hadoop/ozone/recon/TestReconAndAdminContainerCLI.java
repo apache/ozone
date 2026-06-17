@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -103,6 +104,16 @@ import org.slf4j.event.Level;
 class TestReconAndAdminContainerCLI {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
+
+  /** Pause between SCM/Recon checks while waiting for matching reports. */
+  private static final int RM_RECON_COMPARE_POLL_INTERVAL_MS = 1000;
+  /** Max wait (Recon can trail SCM briefly). */
+  private static final int RM_RECON_COMPARE_WAIT_MS = 90_000;
+  /**
+   * Two matches in a row on purpose. A single agreeing poll can be luck while RM and Recon counts
+   * are still drifting past each other (HDDS-15223).
+   */
+  private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -186,7 +197,6 @@ class TestReconAndAdminContainerCLI {
    * but it's easier to test with Ratis ONE.
    */
   @Test
-  @Flaky("HDDS-15223")
   void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
     long containerID = setupRatisKey(recon, keyNameR1,
@@ -311,18 +321,22 @@ class TestReconAndAdminContainerCLI {
   }
 
   /**
-   * The purpose of this method, isn't to validate the numbers
-   * but to make sure that they are consistent between
-   * Recon and the ReplicationManager.
+   * Checks that SCM's replication manager and Recon show the same unhealthy stats
+   * (counts and RM sample IDs in Recon's list). Waits until that lines up for a short
+   * stretch of time so a one-off tick does not hide a real mismatch (HDDS-15223).
    */
   private static void compareRMReportToReconResponse(UnHealthyContainerStates containerState)
       throws Exception {
     assertNotNull(containerState);
 
-    // Both threads are running every 1 second.
-    // Wait until all values are equal.
-    GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
-        1000, 40000);
+    AtomicInteger stablePolls = new AtomicInteger(0);
+    GenericTestUtils.waitFor(() -> {
+      if (assertReportsMatch(containerState)) {
+        return stablePolls.incrementAndGet() >= RM_RECON_COMPARE_STABLE_POLLS;
+      }
+      stablePolls.set(0);
+      return false;
+    }, RM_RECON_COMPARE_POLL_INTERVAL_MS, RM_RECON_COMPARE_WAIT_MS);
   }
 
   private static boolean assertReportsMatch(UnHealthyContainerStates state) {
