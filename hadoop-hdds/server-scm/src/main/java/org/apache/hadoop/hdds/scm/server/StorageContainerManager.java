@@ -603,6 +603,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
     eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS,
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
+    eventQueue.addHandler(SCMEvents.REPLICATION_STATUS,
+        (status, publisher) -> status.getCmdStatus().forEach(cmdStatus ->
+            containerReplicaPendingOps.onReplicationCommandFailed(
+                cmdStatus.getCmdId())));
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.RECONCILE_CONTAINER, reconcileContainerEventHandler);
