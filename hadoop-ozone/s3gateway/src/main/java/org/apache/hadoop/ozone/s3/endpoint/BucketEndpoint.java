@@ -181,11 +181,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (maxKeys > 0) {
       while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
         OzoneKey next = ozoneKeyIterator.next();
-        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
-            StringUtils.isNotEmpty(prefix) &&
-            !next.getName().startsWith(prefix)) {
-          // prefix has delimiter but key don't have
-          // example prefix: dir1/ key: dir123
+        if (StringUtils.isNotEmpty(prefix) && !next.getName().startsWith(prefix)) {
           continue;
         }
         if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
@@ -425,6 +421,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     // initialize handlers
     BucketOperationHandler chain = BucketOperationHandlerChain.newBuilder(this)
+        .add(new BucketGetLocationHandler())
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
         .add(new BucketCrudHandler())

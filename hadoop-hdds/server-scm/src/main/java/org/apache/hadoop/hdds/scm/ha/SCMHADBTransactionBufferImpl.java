@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -53,6 +54,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final AtomicReference<SnapshotInfo> latestSnapshot
       = new AtomicReference<>();
   private final AtomicLong txFlushPending = new AtomicLong(0);
+  private final AtomicInteger applyingTransactions = new AtomicInteger(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
@@ -124,28 +126,62 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public void flush() throws RocksDatabaseException, CodecException {
     rwLock.writeLock().lock();
     try {
-      // write latest trx info into trx table in the same batch
-      Table<String, TransactionInfo> transactionInfoTable
-          = metadataStore.getTransactionInfoTable();
-      transactionInfoTable.putWithBatch(currentBatchOperation,
-          TRANSACTION_INFO_KEY, latestTrxInfo);
-
-      metadataStore.getStore().commitBatchOperation(currentBatchOperation);
-      currentBatchOperation.close();
-      this.latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
-      // reset batch operation
-      currentBatchOperation = metadataStore.getStore().initBatchOperation();
-
-      DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
-          .getDeletedBlockLog();
-      Preconditions.checkArgument(
-          deletedBlockLog instanceof DeletedBlockLogImpl);
-      ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
+      flushUnderWriteLock();
     } finally {
-      txFlushPending.set(0);
-      lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
+  }
+
+  @Override
+  public void flushIfNeeded(long snapshotWaitTime)
+      throws RocksDatabaseException, CodecException {
+    rwLock.writeLock().lock();
+    try {
+      if (applyingTransactions.get() > 0) {
+        return;
+      }
+      long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
+      if (txFlushPending.get() > 0 && timeDiff > snapshotWaitTime) {
+        LOG.debug("Running TransactionFlushTask");
+        flushUnderWriteLock();
+      }
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
+  private void flushUnderWriteLock()
+      throws RocksDatabaseException, CodecException {
+    // write latest trx info into trx table in the same batch
+    Table<String, TransactionInfo> transactionInfoTable
+        = metadataStore.getTransactionInfoTable();
+    transactionInfoTable.putWithBatch(currentBatchOperation,
+        TRANSACTION_INFO_KEY, latestTrxInfo);
+
+    metadataStore.getStore().commitBatchOperation(currentBatchOperation);
+    currentBatchOperation.close();
+    this.latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
+    // reset batch operation
+    currentBatchOperation = metadataStore.getStore().initBatchOperation();
+
+    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
+        .getDeletedBlockLog();
+    Preconditions.checkArgument(
+        deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
+
+    txFlushPending.set(0);
+    lastSnapshotTimeMs = scm.getSystemClock().millis();
+  }
+
+  @Override
+  public void beginApplyingTransaction() {
+    applyingTransactions.incrementAndGet();
+  }
+
+  @Override
+  public void endApplyingTransaction() {
+    applyingTransactions.decrementAndGet();
   }
 
   @Override

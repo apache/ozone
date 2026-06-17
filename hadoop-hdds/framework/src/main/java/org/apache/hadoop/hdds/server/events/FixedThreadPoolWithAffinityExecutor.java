@@ -145,7 +145,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     // For messages that need to be routed to the same thread need to
     // implement hashCode to match the messages. This should be safe for
     // other messages that implement the native hash.
-    int index = message.hashCode() & (workQueues.size() - 1);
+    int index = Math.floorMod(message.hashCode(), workQueues.size());
     BlockingQueue<Q> queue = workQueues.get(index);
     queue.add((Q) message);
     if (queue instanceof IQueueMetrics) {

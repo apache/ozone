@@ -74,14 +74,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
       this.retryInvocationHandler = retryInvocationHandler;
     }
 
-    int getCallId() {
-      return callId;
-    }
-
-    Counters getCounters() {
-      return counters;
-    }
-
     synchronized Long getWaitTime(final long now) {
       return retryInfo == null? null: retryInfo.retryTime - now;
     }
@@ -120,12 +112,9 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     /**
      * It first processes the wait time, if there is any,
      * and then invokes {@link #processRetryInfo()}.
+     * If the wait time is positive, it sleeps.
      *
-     * If the wait time is positive, it either sleeps for synchronous calls
-     * or immediately returns for asynchronous calls.
-     *
-     * @return {@link CallReturn#RETRY} if the retryInfo is processed;
-     *         otherwise, return {@link CallReturn#WAIT_RETRY}.
+     * @return {@link CallReturn#RETRY}
      */
     CallReturn processWaitTimeAndRetryInfo() throws InterruptedIOException {
       final Long waitTime = getWaitTime(Time.monotonicNow());
@@ -133,7 +122,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
           callId, retryInfo, waitTime);
       if (waitTime != null && waitTime > 0) {
         try {
-          Thread.sleep(retryInfo.delay);
+          Thread.sleep(waitTime);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           if (LOG.isDebugEnabled()) {
@@ -165,8 +154,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
     Object invokeMethod() throws Throwable {
       if (isRpc && SET_CALL_ID_FOR_TEST.get()) {
-        Client.setCallIdAndRetryCount(callId, counters.retries,
-            retryInvocationHandler.asyncCallHandler);
+        Client.setCallIdAndRetryCount(callId, counters.retries);
       }
       return retryInvocationHandler.invokeMethod(method, args);
     }
@@ -185,10 +173,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     private int retries;
     /** Counter for method invocation has been failed over. */
     private int failovers;
-
-    boolean isZeros() {
-      return retries == 0 && failovers == 0;
-    }
   }
 
   private static class ProxyDescriptor<T> {
@@ -323,8 +307,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
   private final RetryPolicy defaultPolicy;
   private final Map<String,RetryPolicy> methodNameToPolicyMap;
 
-  private final AsyncCallHandler asyncCallHandler = new AsyncCallHandler();
-
   protected RetryInvocationHandler(FailoverProxyProvider<T> proxyProvider,
       RetryPolicy retryPolicy) {
     this(proxyProvider, retryPolicy, Collections.<String, RetryPolicy>emptyMap());
@@ -349,11 +331,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
   private Call newCall(Method method, Object[] args, boolean isRpc,
                        int callId) {
-    if (Client.isAsynchronousMode()) {
-      return asyncCallHandler.newAsyncCall(method, args, isRpc, callId, this);
-    } else {
-      return new Call(method, args, isRpc, callId, this);
-    }
+    return new Call(method, args, isRpc, callId, this);
   }
 
   @Override
@@ -366,9 +344,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     while (true) {
       final CallReturn c = call.invokeOnce();
       final CallReturn.State state = c.getState();
-      if (state == CallReturn.State.ASYNC_INVOKED) {
-        return null; // return null for async calls
-      } else if (c.getState() != CallReturn.State.RETRY) {
+      if (state != CallReturn.State.RETRY) {
         return c.getReturnValue();
       }
     }
@@ -406,7 +382,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
       // If successful calls were made to this proxy, log info even for first
       // failover
-      info = hasSuccessfulCall || asyncCallHandler.hasSuccessfulCall();
+      info = hasSuccessfulCall;
       if (!info && !LOG.isDebugEnabled()) {
         return;
       }

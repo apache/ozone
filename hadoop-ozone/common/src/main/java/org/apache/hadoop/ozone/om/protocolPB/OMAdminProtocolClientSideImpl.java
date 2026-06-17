@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -216,9 +216,10 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   }
 
   @Override
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException {
     CompactRequest compactRequest = CompactRequest.newBuilder()
         .setColumnFamily(columnFamily)
+        .setBottommostLevelCompaction(bottommostLevelCompaction)
         .build();
     CompactResponse response;
     try {

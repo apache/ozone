@@ -17,13 +17,14 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
+    <classpath.skip>false</classpath.skip>
     <!-- Hadoop Docker image for current version; multi-arch Hadoop only available from ghcr.io currently -->
     <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
     <!-- suffix appended to Hadoop version to get Docker image version -->
@@ -40,6 +41,7 @@
     <maven.test.skip>true</maven.test.skip>
     <!-- rpm usage-->
     <rpm.needArch>true</rpm.needArch>
+    <spotbugs.skip>true</spotbugs.skip>
   </properties>
 
   <dependencies>
@@ -78,6 +80,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-debug</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-interactive</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -153,6 +160,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-vapor</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
     </dependency>
   </dependencies>

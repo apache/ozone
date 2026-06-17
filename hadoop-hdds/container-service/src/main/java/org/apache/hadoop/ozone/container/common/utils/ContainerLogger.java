@@ -181,40 +181,38 @@ public final class ContainerLogger {
   /**
    * Logged when a container is successfully moved from one data volume to another.
    *
-   * @param containerId The ID of the moved container.
+   * @param containerData The container after it has been moved to the destination volume.
    * @param sourceVolume The source volume path.
    * @param destinationVolume The destination volume path.
    * @param containerSize The size of data moved from container in bytes.
    * @param timeTaken The time taken for the move in milliseconds.
    */
-  public static void logMoveSuccess(long containerId, StorageVolume sourceVolume,
+  public static void logMoveSuccess(ContainerData containerData, StorageVolume sourceVolume,
       StorageVolume destinationVolume, long containerSize, long timeTaken) {
-    LOG.info(getMessage(containerId, sourceVolume, destinationVolume, containerSize, timeTaken));
+    LOG.info(getMessage(containerData,
+        "SrcVolume=" + sourceVolume,
+        "DestVolume=" + destinationVolume,
+        "Size=" + containerSize + " bytes",
+        "TimeTaken=" + timeTaken + " ms",
+        "Container is moved from SrcVolume to DestVolume"));
   }
 
-  private static String getMessage(ContainerData containerData,
-                                   String message) {
+  private static String getMessage(ContainerData containerData, String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);
   }
 
-  private static String getMessage(ContainerData containerData) {
+  private static String getMessage(ContainerData containerData, String... fields) {
     return String.join(FIELD_SEPARATOR,
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
         "State=" + containerData.getState(),
-        "Volume=" + containerData.getVolume(),
-        "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
+        String.join(FIELD_SEPARATOR, fields));
   }
 
-  private static String getMessage(long containerId, StorageVolume sourceVolume,
-      StorageVolume destinationVolume, long containerSize, long timeTaken) {
-    return String.join(FIELD_SEPARATOR,
-        "ID=" + containerId,
-        "SrcVolume=" + sourceVolume,
-        "DestVolume=" + destinationVolume,
-        "Size=" + containerSize + " bytes",
-        "TimeTaken=" + timeTaken + " ms",
-        "Container is moved from SrcVolume to DestVolume");
+  private static String getMessage(ContainerData containerData) {
+    return getMessage(containerData,
+        "Volume=" + containerData.getVolume(),
+        "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }
 }

@@ -22,10 +22,7 @@ import static java.util.Objects.requireNonNull;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -78,7 +75,6 @@ public class SCMStateMachine extends BaseStateMachine {
       LoggerFactory.getLogger(SCMStateMachine.class);
 
   private StorageContainerManager scm;
-  private Map<RequestType, Object> handlers;
   private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SCMMetrics metrics;
@@ -96,7 +92,6 @@ public class SCMStateMachine extends BaseStateMachine {
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
-    this.handlers = new EnumMap<>(RequestType.class);
     this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     this.metrics = scm.getMetrics();
@@ -118,10 +113,6 @@ public class SCMStateMachine extends BaseStateMachine {
   public SCMStateMachine() {
     isInitialized = false;
     this.metrics = null;
-  }
-
-  public void registerHandler(RequestType type, Object handler) {
-    handlers.put(type, handler);
   }
 
   private void addRatisEvent(String message) {
@@ -160,6 +151,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    transactionBuffer.beginApplyingTransaction();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -180,46 +172,22 @@ public class SCMStateMachine extends BaseStateMachine {
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
       }
-
-      // After previous term transactions are applied, still in safe mode,
-      // perform refreshAndValidate to update the safemode rule state.
-      if (scm.isInSafeMode() && isStateMachineReady.get()) {
-        scm.getScmSafeModeManager().refreshAndValidate();
-      }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
     final ScmInvoker<?> invoker = invokers.get(request.getType());
-    if (invoker != null) {
-      return invoker.invokeLocal(request.getOperation(), request.getArguments());
-    }
-    return process(request, handlers.get(request.getType()));
-  }
-
-  public static Message process(final SCMRatisRequest request, Object handler) throws Exception {
-    try {
-      if (handler == null) {
-        throw new IOException("No handler found for request type " +
-            request.getType());
-      }
-
-      final Method method = handler.getClass().getMethod(request.getOperation(), request.getParameterTypes());
-      final Object result = method.invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result, method.getReturnType());
-    } catch (NoSuchMethodException | SecurityException ex) {
-      throw new InvalidProtocolBufferException(ex.getMessage());
-    } catch (InvocationTargetException e) {
-      final Exception targetEx = (Exception) e.getTargetException();
-      throw targetEx != null ? targetEx : e;
-    }
+    requireNonNull(invoker, "invoker == null");
+    return invoker.invokeLocal(request.getOperation(), request.getArguments());
   }
 
   @Override
@@ -363,23 +331,28 @@ public class SCMStateMachine extends BaseStateMachine {
       return lastAppliedIndex;
     }
 
-    long startTime = Time.monotonicNow();
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      long startTime = Time.monotonicNow();
 
-    TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
-    final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
+      TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
+      final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
 
-    if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
-      transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
-      transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
-    } else {
-      lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
+        transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
+        transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
+      } else {
+        lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      }
+
+      transactionBuffer.flush();
+
+      LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
+          lastAppliedIndex, Time.monotonicNow() - startTime);
+      return lastAppliedIndex;
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
-
-    transactionBuffer.flush();
-
-    LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
-        lastAppliedIndex, Time.monotonicNow() - startTime);
-    return lastAppliedIndex;
   }
 
   @Override
@@ -399,7 +372,12 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      transactionBuffer.beginApplyingTransaction();
+      try {
+        transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      } finally {
+        transactionBuffer.endApplyingTransaction();
+      }
     }
 
     if (currentLeaderTerm.get() == term) {

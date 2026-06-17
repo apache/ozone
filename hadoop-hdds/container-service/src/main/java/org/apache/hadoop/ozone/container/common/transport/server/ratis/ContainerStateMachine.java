@@ -790,26 +790,45 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
     try {
-      metrics.incNumWriteStateMachineOps();
-      long writeStateMachineStartTime = Time.monotonicNowNanos();
-      final Context context = (Context) trx.getStateMachineContext();
-      Objects.requireNonNull(context, "context == null");
-      final ContainerCommandRequestProto requestProto = context.getRequestProto();
-      final Type cmdType = requestProto.getCmdType();
-
-      // For only writeChunk, there will be writeStateMachineData call.
-      // CreateContainer will happen as a part of writeChunk only.
-      switch (cmdType) {
-      case WriteChunk:
-        return writeStateMachineData(requestProto, entry.getIndex(),
-            entry.getTerm(), writeStateMachineStartTime);
-      default:
-        throw new IllegalStateException("Cmd Type:" + cmdType
-            + " should not have state machine data");
-      }
-    } catch (Exception e) {
-      metrics.incNumWriteStateMachineFails();
+      return writeImpl(entry, trx).whenComplete((r, e) -> {
+        if (e != null) {
+          closeServer(e);
+        }
+      });
+    } catch (Throwable e) {
+      closeServer(e);
       return completeExceptionally(e);
+    }
+  }
+
+  private CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
+    metrics.incNumWriteStateMachineOps();
+    long writeStateMachineStartTime = Time.monotonicNowNanos();
+    final Context context = (Context) trx.getStateMachineContext();
+    Objects.requireNonNull(context, "context == null");
+    final ContainerCommandRequestProto requestProto = context.getRequestProto();
+    final Type cmdType = requestProto.getCmdType();
+
+    // For only writeChunk, there will be writeStateMachineData call.
+    // CreateContainer will happen as a part of writeChunk only.
+    switch (cmdType) {
+    case WriteChunk:
+      return writeStateMachineData(requestProto, entry.getIndex(),
+          entry.getTerm(), writeStateMachineStartTime);
+    default:
+      throw new IllegalStateException("Cmd Type:" + cmdType
+          + " should not have state machine data");
+    }
+  }
+
+  private void closeServer(Throwable e) {
+    metrics.incNumWriteStateMachineFails();
+    try {
+      LOG.error("{}: Failed to writeStateMachineData, close server", getId(), e);
+      getServer().get().getDivision(getGroupId()).close();
+    } catch (Throwable t) {
+      e.addSuppressed(t);
+      LOG.error("{}: Failed to close server", getId(), t);
     }
   }
 
@@ -1228,7 +1247,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache.removeIf(k -> k <= index);
   }
 
-  private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
+  private static <T> CompletableFuture<T> completeExceptionally(Throwable e) {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;
