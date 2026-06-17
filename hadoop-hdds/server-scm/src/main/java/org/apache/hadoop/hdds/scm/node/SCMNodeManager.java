@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -1493,7 +1494,7 @@ public class SCMNodeManager implements NodeManager {
 
     /**
      * Returns true if the datanode has both an available data slot (via
-     * {@link PendingContainerTracker}) and sufficient metadata volume space.
+     * {@link PendingContainerTracker}) and sufficient Ratis metadata volume space.
      */
     private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
       if (!tracker.hasAvailableSpace(dn)) {
@@ -1502,7 +1503,7 @@ public class SCMNodeManager implements NodeManager {
       if (minRatisVolumeSizeBytes <= 0) {
         return true;
       }
-      for (StorageReportProto report : dn.getStorageReports()) {
+      for (MetadataStorageReportProto report : dn.getMetadataStorageReports()) {
         if (report.getRemaining() > minRatisVolumeSizeBytes) {
           return true;
         }

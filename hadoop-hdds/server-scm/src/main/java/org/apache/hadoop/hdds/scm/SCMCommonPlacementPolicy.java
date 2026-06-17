@@ -250,7 +250,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
 
     return filterNodesWithSpace(healthyNodes, nodesRequired,
-        metadataSizeRequired, dataSizeRequired);
+        metadataSizeRequired);
   }
 
   /**
@@ -268,7 +268,7 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      int nodesRequired, long metadataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
         hasEnoughSpace(d, metadataSizeRequired, nodeManager))
@@ -276,10 +276,9 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (nodesWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
-              "space requirement of %d bytes for metadata and %d bytes for " +
-              "data in healthy node set. Required %d. Found %d.",
-          metadataSizeRequired, dataSizeRequired, nodesRequired,
-          nodesWithSpace.size());
+              "space requirement of %d bytes for metadata and an available " +
+              "container slot in healthy node set. Required %d. Found %d.",
+          metadataSizeRequired, nodesRequired, nodesWithSpace.size());
       LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
