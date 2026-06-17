@@ -42,15 +42,9 @@ public class ScmOption extends AbstractMixin {
       description = "The destination scm (host:port)")
   private String scm;
 
-  @CommandLine.Option(names = {"--service-id"}, description =
+  @CommandLine.Option(names = {"--service-id", "-id"}, description =
       "ServiceId of SCM HA Cluster")
   private String scmServiceId;
-
-  /** For backward compatibility. */
-  @CommandLine.Option(names = {"-id"}, hidden = true)
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private String deprecatedScmServiceId;
 
   public ScmClient createScmClient() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
@@ -76,9 +70,8 @@ public class ScmOption extends AbstractMixin {
 
     // Use the scm service Id passed from the client.
 
-    String serviceId = getScmServiceId();
-    if (StringUtils.isNotEmpty(serviceId)) {
-      conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, serviceId);
+    if (StringUtils.isNotEmpty(scmServiceId)) {
+      conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
     } else if (StringUtils.isBlank(HddsUtils.getScmServiceId(conf))) {
       // Scm service id is not passed, and scm service id is not defined in
       // the config, assuming it should be non-HA cluster.
@@ -104,12 +97,5 @@ public class ScmOption extends AbstractMixin {
 
   public String getScm() {
     return scm;
-  }
-
-  public String getScmServiceId() {
-    if (StringUtils.isNotEmpty(scmServiceId)) {
-      return scmServiceId;
-    }
-    return deprecatedScmServiceId;
   }
 }
