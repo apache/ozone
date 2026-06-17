@@ -271,7 +271,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, nodeManager))
+        hasEnoughSpace(d, metadataSizeRequired, nodeManager))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -289,14 +289,21 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   /**
-   * Returns true if this node has enough space to meet our requirement.
+   * Returns true if this node has enough space to satisfy the placement request.
    *
-   * @param datanodeDetails DatanodeDetails
-   * @return true if we have enough space.
+   * <p>Data-space is checked via {@link NodeManager#hasAvailableSpace}, which
+   * delegates to {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
+   * and accounts for both current disk usage and in-flight allocations.
+   * The check always uses {@code maxContainerSize} as the unit of allocation,
+   * regardless of the actual container's used bytes.
+   *
+   * @param datanodeDetails the datanode to evaluate
+   * @param metadataSizeRequired minimum metadata volume space required in bytes
+   * @param nodeManager used to check slot availability via PendingContainerTracker
+   * @return true if the datanode has both an available data slot and enough metadata space
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
-                                       long dataSizeRequired,
                                        NodeManager nodeManager) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
@@ -306,11 +313,10 @@ public abstract class SCMCommonPlacementPolicy implements
 
     // Data-space check: use PendingContainerTracker slot availability.
     // This accounts for both current disk usage and in-flight allocations.
-    if (dataSizeRequired > 0) {
-      if (!nodeManager.hasAvailableSpace(datanodeInfo)) {
-        LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
-        return false;
-      }
+    // Always slot-based (maxContainerSize unit).
+    if (!nodeManager.hasAvailableSpace(datanodeInfo)) {
+      LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
+      return false;
     }
 
     if (metadataSizeRequired > 0) {
@@ -530,7 +536,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
     if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-        dataSizeRequired, nodeManager))) {
+        nodeManager))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

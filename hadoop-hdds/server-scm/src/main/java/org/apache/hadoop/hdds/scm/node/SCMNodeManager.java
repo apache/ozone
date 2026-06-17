@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -213,7 +212,7 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
-    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf, this);
+    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf, pendingContainerTracker);
   }
 
   @Override
@@ -1472,10 +1471,9 @@ public class SCMNodeManager implements NodeManager {
 
     private final long blockSize;
     private final long minRatisVolumeSizeBytes;
-    private final long containerSize;
-    private final NodeManager nodeManager;
+    private final PendingContainerTracker tracker;
 
-    NonWritableNodeFilter(ConfigurationSource conf, NodeManager nodeManager) {
+    NonWritableNodeFilter(ConfigurationSource conf, PendingContainerTracker tracker) {
       blockSize = (long) conf.getStorageSize(
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1484,18 +1482,32 @@ public class SCMNodeManager implements NodeManager {
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
           StorageUnit.BYTES);
-      containerSize = (long) conf.getStorageSize(
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-          StorageUnit.BYTES);
-      this.nodeManager = nodeManager;
+      this.tracker = tracker;
     }
 
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, nodeManager)
-          && !hasEnoughCommittedVolumeSpace(dn));
+          || (!hasEnoughSpaceForNode(dn) && !hasEnoughCommittedVolumeSpace(dn));
+    }
+
+    /**
+     * Returns true if the datanode has both an available data slot (via
+     * {@link PendingContainerTracker}) and sufficient metadata volume space.
+     */
+    private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
+      if (!tracker.hasAvailableSpace(dn)) {
+        return false;
+      }
+      if (minRatisVolumeSizeBytes <= 0) {
+        return true;
+      }
+      for (StorageReportProto report : dn.getStorageReports()) {
+        if (report.getRemaining() > minRatisVolumeSizeBytes) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /**
