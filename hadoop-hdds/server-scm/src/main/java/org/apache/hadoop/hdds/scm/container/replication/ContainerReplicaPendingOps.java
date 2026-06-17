@@ -303,13 +303,20 @@ public class ContainerReplicaPendingOps {
   }
 
   /**
-   * Handle a failure report for a replication or reconstruction command from a
-   * datanode. The matching ADD op is removed and its counter decremented so the
+   * Handle a failure report for a failed replication or reconstruction (ADD)
+   * command from a datanode. This is called by
+   * {@code CommandStatusReportHandler} only for FAILED
+   * {@code replicateContainerCommand} and {@code reconstructECContainersCommand}
+   * statuses; DELETE command IDs are never routed here by the current
+   * command-status tracking path.
+   *
+   * <p>The matching ADD op is removed and its counter decremented so the
    * inflight quota is freed immediately instead of waiting for the event
-   * timeout. DELETE ops are left in place (so they can be resent), mirroring
-   * {@link #removeExpiredEntries()}. Subscribers are notified with
-   * timedOut=true so the ReplicationManager treats a failed command the same as
-   * an expired one.
+   * timeout. The DELETE branch below is defensive code that is not reached
+   * in practice (DELETE ops are left in place to be resent, mirroring
+   * {@link #removeExpiredEntries()}). Subscribers are notified with
+   * timedOut=true so the ReplicationManager treats a failed command the same
+   * as an expired one.
    *
    * @param cmdId the id of the failed command, as reported by the datanode
    */

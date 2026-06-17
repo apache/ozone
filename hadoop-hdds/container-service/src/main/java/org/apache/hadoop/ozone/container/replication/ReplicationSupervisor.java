@@ -428,6 +428,7 @@ public final class ReplicationSupervisor {
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.get(task.getMetricName()).incrementAndGet();
+          // Mark EXECUTED (non-PENDING) so CommandStatusReportPublisher drains this entry from the status map.
           updateCommandStatus(task, CommandStatus::markAsExecuted);
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
