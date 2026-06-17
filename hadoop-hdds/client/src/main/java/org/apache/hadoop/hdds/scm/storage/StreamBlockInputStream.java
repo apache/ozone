@@ -181,8 +181,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!hasRemaining(readBuffer)) {
       readBuffer = streamingReader.read(length, preRead);
     }
-    Preconditions.assertTrue(hasRemaining(readBuffer));
-    return true;
+    return hasRemaining(readBuffer);
   }
 
   private synchronized void advancePosition(long delta, boolean preRead) {
@@ -217,7 +216,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
     readBuffer = reuseReadBuffer(readBuffer, pos);
     position = pos;
-    requestedLength = pos;
+    if (readBuffer == null) {
+      // Only rewind the request high-watermark when the buffered (already requested/served) data cannot be reused;
+      // otherwise we would re-request data that is still buffered.
+      requestedLength = pos;
+    }
   }
 
   static ReadBuffer reuseReadBuffer(ReadBuffer previous, long blockOffset) {
