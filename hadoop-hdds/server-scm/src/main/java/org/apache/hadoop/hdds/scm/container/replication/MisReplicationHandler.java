@@ -162,16 +162,10 @@ public abstract class MisReplicationHandler implements
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
 
-    int count;
-    try {
-      count = sendReplicateCommands(container, replicasToBeReplicated,
-          availableSources, targetDatanodes);
-    } catch (CommandTargetOverloadedException | NotLeaderException e) {
-      // No commands were dispatched; roll back all recorded PendingContainerTracker slots.
-      ReplicationManagerUtil.rollbackTargets(
-          targetDatanodes, container, replicationManager.getNodeManager());
-      throw e;
-    }
+    // Each sendReplicateCommands implementation rolls back only the slots
+    // for targets whose commands were not actually dispatched.
+    int count = sendReplicateCommands(container, replicasToBeReplicated,
+        availableSources, targetDatanodes);
 
     int found = targetDatanodes.size();
     if (found < requiredNodes) {

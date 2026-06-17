@@ -90,7 +90,19 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
         LOG.debug("Unable to replicate container {} and index {} from {} to {}"
                 + " because the source is overloaded",
             containerID, replica.getReplicaIndex(), source, target);
+        // Roll back only this target's slot — the loop continues for other
+        // replicas, so we must not roll back targets that may still succeed.
+        ReplicationManagerUtil.rollbackTargets(
+            Collections.singletonList(target), containerInfo,
+            replicationManager.getNodeManager());
         overloadedException = e;
+      } catch (NotLeaderException e) {
+        // No further commands can be dispatched. Roll back the slot
+        // for this target and all remaining targets that were never attempted.
+        ReplicationManagerUtil.rollbackTargets(
+            targetDns.subList(datanodeIdx, targetDns.size()), containerInfo,
+            replicationManager.getNodeManager());
+        throw e;
       }
       datanodeIdx += 1;
     }

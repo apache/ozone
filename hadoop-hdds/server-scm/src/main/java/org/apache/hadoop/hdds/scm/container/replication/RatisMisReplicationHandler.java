@@ -66,16 +66,27 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
     long containerID = containerInfo.getContainerID();
 
     int commandsSent = 0;
-    for (DatanodeDetails target : targetDns) {
-      if (replicationManager.getConfig().isPush()) {
-        replicationManager.sendThrottledReplicationCommand(containerInfo,
-            sources, target, 0);
-      } else {
-        ReplicateContainerCommand cmd = ReplicateContainerCommand
-            .fromSources(containerID, sources);
-        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+    for (int i = 0; i < targetDns.size(); i++) {
+      DatanodeDetails target = targetDns.get(i);
+      try {
+        if (replicationManager.getConfig().isPush()) {
+          replicationManager.sendThrottledReplicationCommand(containerInfo,
+              sources, target, 0);
+        } else {
+          ReplicateContainerCommand cmd = ReplicateContainerCommand
+              .fromSources(containerID, sources);
+          replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+        }
+        commandsSent++;
+      } catch (CommandTargetOverloadedException | NotLeaderException e) {
+        // Roll back the slot for this target and all remaining targets:
+        // this target's command was not dispatched, and the exception
+        // prevents dispatching to any subsequent targets.
+        ReplicationManagerUtil.rollbackTargets(
+            targetDns.subList(i, targetDns.size()), containerInfo,
+            replicationManager.getNodeManager());
+        throw e;
       }
-      commandsSent++;
     }
 
     return commandsSent;
