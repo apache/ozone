@@ -310,7 +310,7 @@ class PipelineStateMap {
    */
   int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    return getPipeline(pipelineID).containers.size();
+    return getPipeline(pipelineID).getContainers().size();
   }
 
   /**
