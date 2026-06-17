@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import picocli.CommandLine;
@@ -48,6 +49,16 @@ public final class DeprecatedCliOption {
     options.put("-pct", "--prepare-check-interval");
     options.put("-pt", "--prepare-timeout");
     return options;
+  }
+
+  public static boolean isDeprecated(String name) {
+    return DEPRECATED_OPTIONS.containsKey(name);
+  }
+
+  public static String[] withoutDeprecated(String[] names) {
+    return Arrays.stream(names)
+        .filter(name -> !isDeprecated(name))
+        .toArray(String[]::new);
   }
 
   /**
