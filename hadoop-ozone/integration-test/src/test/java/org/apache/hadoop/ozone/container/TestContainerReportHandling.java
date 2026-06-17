@@ -92,9 +92,6 @@ public class TestContainerReportHandling {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
-    // Without a short container report interval, the replica deletion is only triggered by the one-shot full
-    // container report a datanode sends on restart. If that report is disrupted, the next periodic report is 60
-    // minutes away (default), so deletion cannot recover within the wait below (HDDS-14774).
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
 
     Path clusterPath = null;
