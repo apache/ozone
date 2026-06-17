@@ -34,7 +34,7 @@ Get OM DB SST Files Size
 
 Compact OM DB Column Family
     [Arguments]        ${column_family}
-    Execute    ozone repair om compact --cf=${column_family} --service-id ${OM_SERVICE_ID} --node-id om1
+    Execute    ozone repair om compact --cf=${column_family} --service-id ${OM_SERVICE_ID} --node-id om1 --blc 2
 
 *** Test Cases ***
 Testing OM DB Size Reduction After Compaction
