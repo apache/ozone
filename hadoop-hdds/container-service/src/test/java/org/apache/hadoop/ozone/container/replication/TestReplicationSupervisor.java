@@ -24,6 +24,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.EXECUTED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -117,6 +119,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -844,7 +847,7 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @org.junit.jupiter.api.Test
+  @Test
   public void reportsExecutedStatusOnSuccess() {
     ReplicationSupervisor supervisor = supervisorWithReplicator(
         __ -> task -> task.setStatus(AbstractReplicationTask.Status.DONE));
@@ -854,12 +857,11 @@ public class TestReplicationSupervisor {
     context.addCmdStatus(cmd);
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
     assertEquals(
-        org.apache.hadoop.hdds.protocol.proto
-            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.EXECUTED,
+        EXECUTED,
         context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
-  @org.junit.jupiter.api.Test
+  @Test
   public void reportsFailedStatusOnFailure() {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(2L, Collections.emptyList());
@@ -870,8 +872,7 @@ public class TestReplicationSupervisor {
         newDirectExecutorService());
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
     assertEquals(
-        org.apache.hadoop.hdds.protocol.proto
-            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED,
+        FAILED,
         context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 

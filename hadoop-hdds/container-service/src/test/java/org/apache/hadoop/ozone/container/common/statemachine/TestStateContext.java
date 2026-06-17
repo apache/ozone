@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -766,8 +767,7 @@ public class TestStateContext {
     assertNotNull(status);
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, status.getType());
     assertEquals(
-        org.apache.hadoop.hdds.protocol.proto
-            .StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING,
+        PENDING,
         status.getStatus());
   }
 
