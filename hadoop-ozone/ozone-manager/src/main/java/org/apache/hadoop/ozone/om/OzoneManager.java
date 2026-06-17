@@ -5667,8 +5667,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void compactOMDB(String columnFamily,
       ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
-    ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction =
-        CompactDBUtil.getBottommostLevelCompaction(configuration);
     CompletableFuture<Void> compactFuture =
         CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
