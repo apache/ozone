@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.common;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.Objects;
@@ -28,6 +30,16 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
 public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoCloseable {
+
+  /**
+   * When true, {@link #allocate} uses direct ByteBuffers instead of heap ByteBuffers.
+   * Set only by {@link BlockOutputStreamWriteBenchmark} to compare allocation strategies
+   * within a single benchmark run; must never be modified in production code.
+   */
+  @VisibleForTesting
+  // CHECKSTYLE:OFF VisibilityModifier
+  AtomicBoolean ALLOCATE_DIRECT = new AtomicBoolean(false);
+  // CHECKSTYLE:ON VisibilityModifier
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -45,7 +57,13 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
     if (increment > 0 && increment < capacity) {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
-    CodecBuffer codecBuffer = CodecBuffer.allocateDirect(capacity);
+    // Heap buffer: UnsafeByteOperations.unsafeWrap() returns a BoundedByteString
+    // with a backing array, enabling a single System.arraycopy into the gRPC/Netty
+    // wire buffer instead of the slow byte-by-byte NioByteString path for direct buffers.
+    // ALLOCATE_DIRECT is flipped only by BlockOutputStreamWriteBenchmark.
+    CodecBuffer codecBuffer = ALLOCATE_DIRECT.get()
+        ? CodecBuffer.allocateDirect(capacity)
+        : CodecBuffer.allocateHeap(capacity);
     return new ChunkBufferImplWithByteBuffer(codecBuffer.asWritableByteBuffer(), codecBuffer);
   }
 
