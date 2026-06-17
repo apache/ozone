@@ -403,7 +403,7 @@ class PipelineStateMap {
     }
 
     NavigableSet<ContainerID> getContainers() {
-      return Collections.unmodifiableNavigableSet(containers);
+      return new TreeSet<>(containers);
     }
 
     void addContainerToOpenPipeline(ContainerID containerID) throws InvalidPipelineStateException {
