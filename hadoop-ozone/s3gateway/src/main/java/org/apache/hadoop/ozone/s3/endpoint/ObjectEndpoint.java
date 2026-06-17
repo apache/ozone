@@ -955,9 +955,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
-        final Instant lastModified = omMultipartCommitUploadPartInfo.getModificationTime().isPresent()
-            ? Instant.ofEpochMilli(omMultipartCommitUploadPartInfo.getModificationTime().getAsLong())
-            : Instant.now();
+        final Instant lastModified = Instant.ofEpochMilli(omMultipartCommitUploadPartInfo.getModificationTime());
         return Response.ok(new CopyPartResult(eTag, lastModified)).build();
       } else {
         getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
@@ -1039,20 +1037,18 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       copyLength = copyResult.getSize();
       modificationTime = copyResult.getModificationTime();
     } else {
-      Map<String, String> destMetadata;
-      try (OzoneOutputStream dest = openKeyForPut(
+      final OzoneOutputStream destStream = openKeyForPut(
           volume.getName(), destBucket, destKey, srcKeyLen,
-          replication, metadata, tags, writeConditions)) {
+          replication, metadata, tags, writeConditions);
+      try (OzoneOutputStream dest = destStream) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
         eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
-        destMetadata = dest.getMetadata();
-        destMetadata.put(OzoneConsts.ETAG, eTag);
+        destStream.getMetadata().put(OzoneConsts.ETAG, eTag);
       }
-
-      modificationTime = S3Utils.getModificationTimeOrDefault(destMetadata, Time.now());
+      modificationTime = destStream.getModificationTime();
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
     perf.appendSizeBytes(copyLength);

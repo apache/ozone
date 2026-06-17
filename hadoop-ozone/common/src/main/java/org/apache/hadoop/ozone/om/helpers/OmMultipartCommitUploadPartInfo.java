@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.OptionalLong;
-
 /**
  * This class holds information about the response from commit multipart
  * upload part request.
@@ -29,13 +27,9 @@ public class OmMultipartCommitUploadPartInfo {
 
   private final String eTag;
 
-  private final Long modificationTime;
+  private final long modificationTime;
 
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag) {
-    this(partName, eTag, null);
-  }
-
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag, Long modificationTime) {
+  public OmMultipartCommitUploadPartInfo(String partName, String eTag, long modificationTime) {
     this.partName = partName;
     this.eTag = eTag;
     this.modificationTime = modificationTime;
@@ -49,7 +43,7 @@ public class OmMultipartCommitUploadPartInfo {
     return partName;
   }
 
-  public OptionalLong getModificationTime() {
-    return modificationTime == null ? OptionalLong.empty() : OptionalLong.of(modificationTime);
+  public long getModificationTime() {
+    return modificationTime;
   }
 }

@@ -193,22 +193,20 @@ final class ObjectEndpointStreaming {
       throws IOException {
     long writeLen;
     String eTag;
-    Map<String, String> metadata;
-    try (OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
+    final OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
         keyPath, length, replicationConfig, keyMetadata, tags,
-        writeConditions)) {
+        writeConditions);
+    try (OzoneDataStreamOutput stream = streamOutput) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
-      metadata = streamOutput.getMetadata();
-      metadata.put(OzoneConsts.ETAG, eTag);
+      streamOutput.getMetadata().put(OzoneConsts.ETAG, eTag);
     }
 
-    final long modificationTime = S3Utils.getModificationTimeOrDefault(metadata, Time.now());
-    return new CopyResult(eTag, writeLen, modificationTime);
+    return new CopyResult(eTag, writeLen, streamOutput.getModificationTime());
   }
 
   private static long writeToStreamOutput(OzoneDataStreamOutput streamOutput,

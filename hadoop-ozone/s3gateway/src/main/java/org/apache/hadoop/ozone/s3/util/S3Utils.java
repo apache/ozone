@@ -45,7 +45,6 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -274,27 +273,6 @@ public final class S3Utils {
     } catch (IllegalArgumentException ex) {
       throw newError(INVALID_DIGEST, resource);
     }
-  }
-
-  /**
-   * Extracts the modification time from the metadata map or returns the default time.
-   *
-   * @param metadata    the metadata map
-   * @param defaultTime the default time to return if not found or malformed
-   * @return the modification time
-   */
-  public static long getModificationTimeOrDefault(Map<String, String> metadata, long defaultTime) {
-    if (metadata != null) {
-      String modificationTimeStr = metadata.get(OzoneConsts.MODIFICATION_TIME);
-      if (modificationTimeStr != null) {
-        try {
-          return Long.parseLong(modificationTimeStr);
-        } catch (NumberFormatException ignore) {
-          // Fall back to defaultTime
-        }
-      }
-    }
-    return defaultTime;
   }
 
 }

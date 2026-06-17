@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -254,6 +253,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -824,13 +824,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void commitKey(OmKeyArgs args, long clientId)
+  public long commitKey(OmKeyArgs args, long clientId)
           throws IOException {
-    updateKey(args, clientId, false, false);
-  }
-
-  @Override
-  public OptionalLong commitKeyWithModificationTime(OmKeyArgs args, long clientId) throws IOException {
     return updateKeyAndGetModificationTime(args, clientId, false, false);
   }
 
@@ -859,7 +854,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     updateKeyAndGetModificationTime(args, clientId, hsync, recovery);
   }
 
-  private OptionalLong updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
+  private long updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -888,9 +883,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final OMResponse resp = handleError(submitRequest(omRequest));
     if (resp.hasCommitKeyResponse() && resp.getCommitKeyResponse().hasModificationTime()) {
-      return OptionalLong.of(resp.getCommitKeyResponse().getModificationTime());
+      return resp.getCommitKeyResponse().getModificationTime();
     }
-    return OptionalLong.empty();
+    return Time.now();
   }
 
   @Override
@@ -1807,7 +1802,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
         .getCommitMultiPartUploadResponse();
 
-    final Long modificationTime = response.hasModificationTime() ? response.getModificationTime() : null;
+    final long modificationTime = response.hasModificationTime() ? response.getModificationTime() : Time.now();
     return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag(), modificationTime);
   }
 

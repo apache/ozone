@@ -22,7 +22,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 import java.util.UUID;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -245,23 +244,13 @@ public interface OzoneManagerProtocol
    *
    * @param args the key to commit
    * @param clientID the client identification
+   * @return the modification time of the committed key in epoch milliseconds
    * @throws IOException
    */
-  default void commitKey(OmKeyArgs args, long clientID)
+  default long commitKey(OmKeyArgs args, long clientID)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
-  }
-
-  /**
-   * Commit a key and optionally return the stored modification time (epoch millis).
-   * <p>
-   * This is backward compatible with older OM versions which do not return
-   * the value in {@code CommitKeyResponse}.
-   */
-  default OptionalLong commitKeyWithModificationTime(OmKeyArgs args, long clientID) throws IOException {
-    commitKey(args, clientID);
-    return OptionalLong.empty();
   }
 
   /**
