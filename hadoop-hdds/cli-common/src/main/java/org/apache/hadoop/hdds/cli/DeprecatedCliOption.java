@@ -69,15 +69,9 @@ public final class DeprecatedCliOption {
       return;
     }
 
-    for (CommandLine cli : parseResult.asCommandLineList()) {
-      CommandLine.ParseResult subcommandResult = cli.getParseResult();
-      if (subcommandResult.matchedOptions().isEmpty()) {
-        continue;
-      }
-      for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
-        if (subcommandResult.hasMatchedOption(entry.getKey())) {
-          warn(cli.getErr(), entry.getKey(), entry.getValue());
-        }
+    for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
+      if (parseResult.expandedArgs().contains(entry.getKey())) {
+        warn(parseResult.commandSpec().commandLine().getErr(), entry.getKey(), entry.getValue());
       }
     }
   }
