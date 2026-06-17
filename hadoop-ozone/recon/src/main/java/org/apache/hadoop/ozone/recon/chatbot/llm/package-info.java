@@ -15,19 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-
 /**
- * Test OmSnapshot for FSO bucket type when native lib is enabled.
+ * LLM client abstraction for the Recon Chatbot.
  */
-@EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-class TestOmSnapshotFsoWithNativeLibWithLinkedBuckets extends TestOmSnapshot {
-  TestOmSnapshotFsoWithNativeLibWithLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false, true);
-  }
-}
+package org.apache.hadoop.ozone.recon.chatbot.llm;

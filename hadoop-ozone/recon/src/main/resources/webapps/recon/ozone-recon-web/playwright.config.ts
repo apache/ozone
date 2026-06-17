@@ -15,16 +15,28 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+import { defineConfig, devices } from '@playwright/test';
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
-
-/**
- * Test OmSnapshot for Legacy bucket type.
- */
-public class TestOmSnapshotWithBucketLinkingLegacy extends TestOmSnapshot {
-
-  public TestOmSnapshotWithBucketLinkingLegacy() throws Exception {
-    super(LEGACY, false, false, false, true);
-  }
-}
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+  webServer: {
+    command: 'pnpm start',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+});

@@ -38,8 +38,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -112,7 +114,8 @@ public class DiskBalancerService extends BackgroundService {
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
   private Set<ContainerID> inProgressContainers;
-  private ConcurrentSkipListMap<Long, Container> pendingDeletionContainers = new ConcurrentSkipListMap();
+  private final ConcurrentSkipListMap<Long, Queue<Container>> pendingDeletionContainers =
+      new ConcurrentSkipListMap<>();
   private static FaultInjector injector;
 
   /**
@@ -639,14 +642,16 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(clock.millis() + replicaDeletionDelay,
-              container);
+          long deadline = clock.millis() + replicaDeletionDelay;
+          pendingDeletionContainers
+              .computeIfAbsent(deadline, ignored -> new ConcurrentLinkedQueue<>())
+              .add(container);
           ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
         postCall(moveSucceeded && newContainer != null, startTime);
 
-        // pick one expired container from pendingDeletionContainers to delete
+        // Attempt to delete any pending-deletion buckets whose deadline has elapsed.
         tryCleanupOnePendingDeletionContainer();
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
@@ -686,7 +691,8 @@ public class DiskBalancerService extends BackgroundService {
     }
   }
 
-  private void cleanupPendingDeletionContainers() {
+  @VisibleForTesting
+  public void cleanupPendingDeletionContainers() {
     // delete all pending deletion containers before stop the service
     boolean ret;
     do {
@@ -695,18 +701,18 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private boolean tryCleanupOnePendingDeletionContainer() {
-    Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
-    if (entry != null) {
-      if (entry.getKey() <= clock.millis()) {
-        // entry container is expired
-        deleteContainer(entry.getValue());
-        return true;
-      } else {
-        // put back the container
-        pendingDeletionContainers.put(entry.getKey(), entry.getValue());
-      }
+    // peek first, only remove when expired
+    Map.Entry<Long, Queue<Container>> entry = pendingDeletionContainers.firstEntry();
+    if (entry == null || entry.getKey() > clock.millis()) {
+      return false;
     }
-    return false;
+    if (!pendingDeletionContainers.remove(entry.getKey(), entry.getValue())) {
+      return false;
+    }
+    for (Container pending : entry.getValue()) {
+      deleteContainer(pending);
+    }
+    return true;
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
@@ -750,6 +756,7 @@ public class DiskBalancerService extends BackgroundService {
       VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
           .setTotalCapacity(v.getUsage().getCapacity())
+          .setOzoneAvailable(v.getUsage().getAvailable())
           .setUsedSpace(v.getUsage().getUsedSpace())
           .setCommittedBytes(volume.getCommittedBytes())
           .setEffectiveUsedSpace(v.getEffectiveUsed())
@@ -885,5 +892,17 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public void setReplicaDeletionDelay(long durationMills) {
     this.replicaDeletionDelay = durationMills;
+  }
+
+  @VisibleForTesting
+  public int getPendingDeletionDeadlineCount() {
+    return pendingDeletionContainers.size();
+  }
+
+  @VisibleForTesting
+  public int getPendingDeletionQueueSize() {
+    return pendingDeletionContainers.values().stream()
+        .mapToInt(Queue::size)
+        .sum();
   }
 }

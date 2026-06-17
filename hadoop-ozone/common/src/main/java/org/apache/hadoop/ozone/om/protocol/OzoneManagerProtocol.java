@@ -1214,6 +1214,18 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Gets the tags for the specified bucket.
+   * @param args Bucket args
+   * @return Tags associated with the bucket.
+   */
+  @Override
+  default Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    // This will be removed in the follow-up ticket HDDS-15511.
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as bucket tagging client support is pending.");
+  }
+
+  /**
    * Get status of last triggered quota repair in OM.
    * @return String
    * @throws IOException

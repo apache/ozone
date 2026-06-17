@@ -206,6 +206,15 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Java property: hadoop.root.logger
 # export OZONE_DAEMON_ROOT_LOGGER=INFO,RFA
 
+# Default log4j setting for the HTTP request log of interactive commands
+# Java property: ozone.http.request.logger
+# export OZONE_HTTP_REQUEST_LOGGER=INFO,console
+
+# Default log4j setting for the HTTP request log of daemons spawned explicitly by
+# --daemon option of ozone command.
+# Java property: ozone.http.request.logger
+# export OZONE_DAEMON_HTTP_REQUEST_LOGGER=INFO,HttpAccess
+
 # Default log level and output location for security-related messages.
 # You will almost certainly want to change this on a per-daemon basis via
 # the Java property (i.e., -Dhadoop.security.logger=foo).
