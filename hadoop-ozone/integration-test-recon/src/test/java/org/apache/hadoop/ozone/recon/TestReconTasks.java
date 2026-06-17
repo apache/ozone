@@ -185,7 +185,7 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconCm.getContainers().size();
     assertNotEquals(scmContainersCount, reconContainersCount);
-    reconScm.triggerTargetedSCMContainerSync();
+    reconScm.triggerSCMContainerSync();
     reconContainersCount = reconCm.getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
   }
@@ -604,7 +604,7 @@ public class TestReconTasks {
     DatanodeDetails primaryDn = pipeline.getFirstNode();
     DatanodeDetails secondDn = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails)
-        .filter(dd -> !dd.getUuid().equals(primaryDn.getUuid()))
+        .filter(dd -> !dd.getID().equals(primaryDn.getID()))
         .findFirst()
         .orElseThrow(() -> new AssertionError("No second datanode available"));
 

@@ -46,11 +46,11 @@ Check failure with non-admin user to start, stop and update diskbalancer with --
 Check success with admin user for start, stop and update diskbalancer with --in-service-datanodes
     Run Keyword         Kinit test user                 testuser                testuser.keytab
     ${result} =         Execute                         ozone admin datanode diskbalancer start --in-service-datanodes
-                        Should Contain                  ${result}                Started DiskBalancer on all IN_SERVICE nodes.
+                        Should Contain                  ${result}                Started DiskBalancer on all IN_SERVICE and HEALTHY nodes.
     ${result} =         Execute                         ozone admin datanode diskbalancer stop --in-service-datanodes
-                        Should Contain                  ${result}                Stopped DiskBalancer on all IN_SERVICE nodes.
+                        Should Contain                  ${result}                Stopped DiskBalancer on all IN_SERVICE and HEALTHY nodes.
     ${result} =         Execute                         ozone admin datanode diskbalancer update -t 0.0002 --in-service-datanodes
-                        Should Contain                  ${result}                Updated DiskBalancer configuration on all IN_SERVICE nodes.
+                        Should Contain                  ${result}                Updated DiskBalancer configuration on all IN_SERVICE and HEALTHY nodes.
 
 Check success with non-admin user for status and report diskbalancer with --in-service-datanodes
     Run Keyword         Kinit test user                 testuser2               testuser2.keytab

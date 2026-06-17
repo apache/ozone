@@ -81,7 +81,7 @@ subset of its capabilities.  The restrictions are outlined below:
 
 - The only supported prefix in ResourceArn is `arn:aws:s3:::` - all others will be rejected.  **Note**: a ResourceArn 
 of `*` is supported as well.
-- The only supported Condition operator is `StringEquals` - all others will be rejected.
+- The only supported Condition operators are `StringEquals` and `StringLike` - all others will be rejected.
 - The only supported Condition key is `s3:prefix` - all others will be rejected.
 - Only one Condition operator per Statement is supported - a Statement with more than one Condition will be rejected.
 - The only supported Effect is `Allow` - all others will be rejected.
@@ -135,9 +135,9 @@ to make S3 API calls
 - sessionPolicy - when using the RangerOzoneAuthorizer, if Ranger successfully authorizes the AssumeRole call,
 it will return a String representing the role the token was authorized for.  Furthermore, if an AWS IAM Session Policy 
 was included with the AssumeRole request, the String return value will also include resources (i.e. buckets, keys, etc.) 
-and permissions (i.e. ACLType) corresponding to the AWS IAM Session Policy.  These resources and permissions, if present, 
-would further limit the scope of the permissions and resources granted by the role in Ranger, such that the temporary 
-credential will have the permissions comprising the intersection of the role permissions and the sessionPolicy permissions.
+, permissions (i.e. ACLType - for legacy purposes), and actions (i.e. GetObject, GetObjectTagging, etc.) corresponding to the AWS IAM Session Policy.  These resources, permissions and actions, if present, 
+would further limit the scope of the permissions, resources and actions granted by the role in Ranger, such that the temporary 
+credential will have the permissions and actions comprising the intersection of the role permissions and actions and the sessionPolicy permissions and actions.
 - HMAC-SHA256 signature - used to ensure the sessionToken was created by Ozone and was not altered since it was created.
 - expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
 - UUID of the OzoneManager secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
@@ -189,14 +189,24 @@ components:
 The grants parameter is optional, and would only be present if the AssumeRole API call had an IAM session policy JSON 
 parameter supplied.  A conversion utility, `IamSessionPolicyResolver` will process the IAM policy and convert it to a 
 `Set<AssumeRoleRequest.OzoneGrant>`, in effect translating from S3 nomenclature for resources and actions to Ozone nomenclature of 
-`IOzoneObj` and `ACLType`.  Ranger would use all of this information to determine if the AssumeRole call should be 
+`IOzoneObj`, `ACLType` and actions without the s3: prefix (such as GetObject or PutObject).  Ranger would use all of this information to determine if the AssumeRole call should be 
 successfully authorized, and if so, it will return a String representation of the granted permissions and paths.  
 
 The format of this String is entirely up to the Ranger team.  What is required from the Ozone side is to supply this String to Ranger when any
 subsequent S3 API calls are made that use STS tokens.  In order to achieve this, the sessionPolicy String from Ranger will 
 be included in the sessionToken response to the AssumeRole API call (as mentioned above), and Ozone will supply this String
 to Ranger whenever STS tokens are used on S3 API calls via a new `RequestContext.sessionPolicy` field in the 
-`IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)` call.
+`IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)` call.  Another requirement from the Ozone side is to pass the action (without the s3: prefix) corresponding to the S3 api call into the `RequestContext.s3Action` field.
+
+### 3.6.2 Additional Context on Permissions and Actions
+
+In a prior iteration of this design, only permissions corresponding to Ozone `ACLType` (i.e. read, write, create, read_acl, etc.) were included in Ranger roles and session policies.
+However, after testing against AWS, it was found that ACLs used by Ozone and Ranger are not granular enough. For example, read on volume, read on bucket, and write on key can be used by either the S3 PutObjectTagging api (requiring `s3:PutObjectTagging` action) or the S3 DeleteObjectTagging api (requiring `s3:DeleteObjectTagging` action). 
+Similarly, because the S3 PutObject api (`s3:PutObject` action) requires read on volume, read on bucket, and create and write on key, someone with `s3:PutObject` access could previously also call the S3 PutObjectTagging api, even though they did not have access to the `s3:PutObjectTagging` action (as an example). 
+AWS does not allow an STS token that is restricted for one action to issue calls to an api that is associated with a different action.  To prevent having more access than requested (or different access than requested), ACL permissions can be constrained further by S3 actions.
+
+To do this constraining, the `RequestContext.s3Action` field is introduced so that if populated, the RangerOzoneAuthorizer would further restrict the permissions according to the action.
+Additionally, the OzoneGrant would contain a Set<String> representing the S3 actions that are allowed for an inline policy. If all actions are allowed, then the Set<String> would be empty or null.
 
 ## 3.7 Overall Flow
 
