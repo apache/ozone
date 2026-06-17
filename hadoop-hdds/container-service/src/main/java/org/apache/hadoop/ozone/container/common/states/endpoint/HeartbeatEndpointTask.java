@@ -237,8 +237,8 @@ public class HeartbeatEndpointTask
       }
     } catch (IOException refreshEx) {
       LOG.warn("Failed to refresh SCM address {} after {} missed "
-              + "heartbeats: {}", oldAddress,
-          rpcEndpoint.getMissedCount(), refreshEx.getMessage());
+              + "heartbeats", oldAddress,
+          rpcEndpoint.getMissedCount(), refreshEx);
     }
   }
 

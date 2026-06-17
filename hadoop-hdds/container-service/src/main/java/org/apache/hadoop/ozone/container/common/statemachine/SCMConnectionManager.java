@@ -341,8 +341,7 @@ public class SCMConnectionManager
     try {
       staleEndpoint.close();
     } catch (RuntimeException closeEx) {
-      LOG.warn("Failed to close stale endpoint {}: {}", oldAddress,
-          closeEx.getMessage());
+      LOG.warn("Failed to close stale endpoint {}", oldAddress, closeEx);
     }
     LOG.info("DNS re-resolution: SCM endpoint {} -> {} (host {}).",
         oldAddress, refreshed, hostAndPort);
