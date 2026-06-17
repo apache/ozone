@@ -227,9 +227,10 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.ETAG_NOT_AVAILABLE,
         omClientResponse.getOMResponse().getStatus());
-    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(ozoneKey));
   }
 
   @Test
