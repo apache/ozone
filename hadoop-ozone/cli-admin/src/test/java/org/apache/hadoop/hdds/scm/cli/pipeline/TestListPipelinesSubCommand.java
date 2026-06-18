@@ -124,7 +124,7 @@ public class TestListPipelinesSubCommand {
   @Test
   public void testLegacyFactorWithoutType() throws IOException {
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("-ffc", "THREE");
+    c.parseArgs("--filter-by-factor", "THREE");
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
@@ -135,7 +135,7 @@ public class TestListPipelinesSubCommand {
   @Test
   public void factorAndReplicationAreMutuallyExclusive() {
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("-r", "THREE", "-ffc", "ONE");
+    c.parseArgs("-r", "THREE", "--filter-by-factor", "ONE");
     assertThrows(IllegalArgumentException.class, () -> cmd.execute(scmClient));
   }
 
@@ -165,7 +165,7 @@ public class TestListPipelinesSubCommand {
   @Test
   public void testLegacyFactorAndState() throws IOException {
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("-ffc", "THREE", "-fst", "OPEN");
+    c.parseArgs("--filter-by-factor", "THREE", "--state", "OPEN");
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
