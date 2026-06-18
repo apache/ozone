@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -137,6 +138,11 @@ public class BlockOutputStream extends OutputStream {
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
+  // Running checksum updated alongside write() to avoid a second data read in writeChunkToContainer().
+  // Non-null only for CRC32/CRC32C; other types fall back to checksum.computeChecksum().
+  private final ChecksumByteBuffer runningCrc;
+  private int runningCrcBytesInSegment;
+  private final List<ByteString> runningCrcChecksums;
 
   //number of buffers used before doing a flush/putBlock.
   private int flushPeriod;
@@ -233,6 +239,9 @@ public class BlockOutputStream extends OutputStream {
     failedServers = new CopyOnWriteArrayList<>();
     ioException = new AtomicReference<>(null);
     this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
+    this.runningCrc = this.checksum.newChecksumByteBuffer();
+    this.runningCrcBytesInSegment = 0;
+    this.runningCrcChecksums = new ArrayList<>();
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
@@ -351,6 +360,14 @@ public class BlockOutputStream extends OutputStream {
       allocateNewBufferIfNeeded();
       currentBuffer.put((byte) b);
       currentBufferRemaining--;
+      if (runningCrc != null) {
+        runningCrc.update(b);
+        if (++runningCrcBytesInSegment == config.getBytesPerChecksum()) {
+          runningCrcChecksums.add(Checksum.int2ByteString((int) runningCrc.getValue()));
+          runningCrc.reset();
+          runningCrcBytesInSegment = 0;
+        }
+      }
       updateWrittenDataLength(1);
       writeChunkIfNeeded();
       doFlushOrWatchIfNeeded();
@@ -385,6 +402,9 @@ public class BlockOutputStream extends OutputStream {
         allocateNewBufferIfNeeded();
         final int writeLen = Math.min(currentBufferRemaining, len);
         currentBuffer.put(b, off, writeLen);
+        if (runningCrc != null) {
+          accumulateRunningCrc(b, off, writeLen);
+        }
         currentBufferRemaining -= writeLen;
         updateWrittenDataLength(writeLen);
         writeChunkIfNeeded();
@@ -412,6 +432,38 @@ public class BlockOutputStream extends OutputStream {
         handleFullBuffer();
       }
     }
+  }
+
+  private void accumulateRunningCrc(byte[] b, int off, int len) {
+    while (len > 0) {
+      final int space = config.getBytesPerChecksum() - runningCrcBytesInSegment;
+      final int toUpdate = Math.min(space, len);
+      runningCrc.update(b, off, toUpdate);
+      runningCrcBytesInSegment += toUpdate;
+      if (runningCrcBytesInSegment == config.getBytesPerChecksum()) {
+        runningCrcChecksums.add(Checksum.int2ByteString((int) runningCrc.getValue()));
+        runningCrc.reset();
+        runningCrcBytesInSegment = 0;
+      }
+      off += toUpdate;
+      len -= toUpdate;
+    }
+  }
+
+  // Returns a ChecksumData built from the running CRC accumulated during write(), then clears
+  // the running state. Returns null if no running CRC is available (retry path, non-CRC types).
+  private ChecksumData consumeRunningCrc() {
+    if (runningCrc == null || (runningCrcChecksums.isEmpty() && runningCrcBytesInSegment == 0)) {
+      return null;
+    }
+    final List<ByteString> checksumList = new ArrayList<>(runningCrcChecksums);
+    if (runningCrcBytesInSegment > 0) {
+      checksumList.add(Checksum.int2ByteString((int) runningCrc.getValue()));
+      runningCrc.reset();
+      runningCrcBytesInSegment = 0;
+    }
+    runningCrcChecksums.clear();
+    return new ChecksumData(config.getChecksumType(), config.getBytesPerChecksum(), checksumList);
   }
 
   private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
@@ -903,8 +955,12 @@ public class BlockOutputStream extends OutputStream {
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    // chunk is incremental, don't cache its checksum
-    ChecksumData checksumData = checksum.computeChecksum(chunk, false);
+    // Use running CRC accumulated during write() when available (avoids a second full read over the chunk).
+    // Falls back to computeChecksum for the retry path (fresh stream, runningCrc empty) and non-CRC32 types.
+    ChecksumData checksumData = consumeRunningCrc();
+    if (checksumData == null) {
+      checksumData = checksum.computeChecksum(chunk, false);
+    }
     // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
     // current impl does not support caching both
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()

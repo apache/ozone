@@ -149,6 +149,19 @@ public class Checksum {
   }
 
   /**
+   * Creates a new {@link ChecksumByteBuffer} for the configured checksum type, suitable for incremental CRC
+   * accumulation alongside a write path. Returns {@code null} for types that do not support incremental
+   * updates via {@link ChecksumByteBuffer} (NONE, SHA-256, MD5).
+   */
+  public ChecksumByteBuffer newChecksumByteBuffer() {
+    switch (checksumType) {
+    case CRC32: return ChecksumByteBufferFactory.crc32Impl();
+    case CRC32C: return ChecksumByteBufferFactory.crc32CImpl();
+    default: return null;
+    }
+  }
+
+  /**
    * Computes checksum for give data.
    * @param data input data.
    * @return ChecksumData computed for input data.
