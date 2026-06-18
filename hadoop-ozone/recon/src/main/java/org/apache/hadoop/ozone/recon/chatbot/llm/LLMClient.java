@@ -36,17 +36,20 @@ public interface LLMClient {
   /**
    * The core action: Send a conversation to an AI and wait for its answer.
    *
+   * <p>When {@code tools} is non-null, the model may reply with native tool calls instead of (or in
+   * addition to) text. Text-only callers (summarization, fallback) pass {@code null}.</p>
+   *
    * <p>API keys are always resolved server-side via
    * {@link org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper} from
    * the Hadoop credential store or {@code ozone-site.xml}. There is no per-request
    * key parameter — all callers should be cluster admins using the shared server key.</p>
    *
-   * @param messages   The back-and-forth chat history so far (System Prompts, User Questions, etc.)
-   * @param model      Requested model name (optional; falls back to configured default when unsupported)
-   * @param provider   Requested provider name (optional; falls back via routing rules when unsupported)
-   * @param parameters Extra rules like {@code temperature} or {@code max_tokens}, applied when
-   *                   building the provider model (LangChain4j 0.35.0 does not support per-request
-   *                   overrides on {@code ChatRequest})
+   * @param messages The back-and-forth chat history so far (System Prompts, User Questions, etc.)
+   * @param model    Requested model name (optional; falls back to configured default when unsupported)
+   * @param provider Requested provider name (optional; falls back via routing rules when unsupported)
+   * @param params   Generation settings (temperature, max tokens), applied when building the provider
+   *                 model (LangChain4j 0.35.0 does not support per-request overrides on {@code ChatRequest})
+   * @param tools    Tools the model may call, or {@code null} for a plain text-only completion
    * @return A standardized LLMResponse object containing the AI's final text.
    * @throws LLMException if the network fails, the API key is missing, or the provider returns an error.
    */
@@ -54,16 +57,7 @@ public interface LLMClient {
       List<ChatMessage> messages,
       String model,
       String provider,
-      Map<String, Object> parameters) throws LLMException;
-
-  /**
-   * Send a conversation to an AI and wait for its answer, providing a list of tools it can call.
-   */
-  LLMResponse chatWithTools(
-      List<ChatMessage> messages,
-      String model,
-      String provider,
-      Map<String, Object> parameters,
+      GenParams params,
       List<ToolSpec> tools) throws LLMException;
 
   /**
@@ -124,27 +118,16 @@ public interface LLMClient {
     // How many "words" the AI answered with
     private final int completionTokens;
 
-    // Extra sneaky information about the answer (like why it stopped typing)
-    private final Map<String, Object> metadata;
-
     // Native tool calls requested by the LLM
     private final List<ToolCallRequest> toolCalls;
 
     public LLMResponse(String content, String model,
                        int promptTokens, int completionTokens,
-                       Map<String, Object> metadata) {
-      this(content, model, promptTokens, completionTokens, metadata, null);
-    }
-
-    public LLMResponse(String content, String model,
-                       int promptTokens, int completionTokens,
-                       Map<String, Object> metadata,
                        List<ToolCallRequest> toolCalls) {
       this.content = content;
       this.model = model;
       this.promptTokens = promptTokens;
       this.completionTokens = completionTokens;
-      this.metadata = metadata;
       this.toolCalls = toolCalls;
     }
 
@@ -167,10 +150,6 @@ public interface LLMClient {
     // Helps us track total costs! AI companies charge by the Total Token.
     public int getTotalTokens() {
       return promptTokens + completionTokens;
-    }
-
-    public Map<String, Object> getMetadata() {
-      return metadata;
     }
 
     public List<ToolCallRequest> getToolCalls() {
@@ -227,29 +206,12 @@ public interface LLMClient {
    */
   class LLMException extends Exception {
 
-    // Keep track of the HTTP Error Code (like 401 Unauthorized or 404 Not Found)
-    private final int statusCode;
-
     public LLMException(String message) {
-      this(message, -1);
-    }
-
-    public LLMException(String message, int statusCode) {
       super(message);
-      this.statusCode = statusCode;
     }
 
     public LLMException(String message, Throwable cause) {
-      this(message, -1, cause);
-    }
-
-    public LLMException(String message, int statusCode, Throwable cause) {
       super(message, cause);
-      this.statusCode = statusCode;
-    }
-
-    public int getStatusCode() {
-      return statusCode;
     }
   }
 }

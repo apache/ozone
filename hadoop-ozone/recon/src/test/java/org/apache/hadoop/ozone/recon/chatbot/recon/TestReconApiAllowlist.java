@@ -38,7 +38,6 @@ public class TestReconApiAllowlist {
     assertTrue(catalog.isRegistered("api_v1_containers"));
     assertTrue(catalog.isRegistered("api_v1_keys_listKeys"));
     assertTrue(catalog.isRegistered("api_v1_containers_unhealthy_state"));
-    assertTrue(catalog.isRegistered("api_v1_metrics_api"));
   }
 
   @Test

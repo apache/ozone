@@ -224,12 +224,6 @@ public class LlmToolSpecFactory {
             + "questions at a path — not for listing keys.",
         nsParams));
 
-    specs.add(createSpec("api_v1_metrics_api",
-        "Query Prometheus metrics exposed by Recon. Required: api (metrics subsystem name) and "
-            + "query (PromQL or endpoint-specific query string). Use only when the user explicitly "
-            + "asks for Prometheus/metrics time-series — not for Recon REST inventory endpoints.",
-        paramMap("api", "string", "query", "string")));
-
     return specs;
   }
 

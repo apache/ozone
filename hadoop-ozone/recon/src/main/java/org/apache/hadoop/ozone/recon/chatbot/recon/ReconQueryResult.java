@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.chatbot.recon;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 /**
  * JSON payload and execution metadata returned by {@link ReconQueryExecutor}.
  *
@@ -30,12 +32,12 @@ package org.apache.hadoop.ozone.recon.chatbot.recon;
  * </ul>
  */
 public class ReconQueryResult {
-  private final Object responseBody;
+  private final JsonNode responseBody;
   private final int recordsProcessed;
   private final boolean truncated;
   private final int maxRecords;
 
-  public ReconQueryResult(Object responseBody,
+  public ReconQueryResult(JsonNode responseBody,
                           int recordsProcessed,
                           boolean truncated,
                           int maxRecords) {
@@ -45,7 +47,7 @@ public class ReconQueryResult {
     this.maxRecords = maxRecords;
   }
 
-  public Object getResponseBody() {
+  public JsonNode getResponseBody() {
     return responseBody;
   }
 

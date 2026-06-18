@@ -15,36 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.chatbot.recon;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+package org.apache.hadoop.ozone.recon.chatbot.llm;
 
 /**
- * Request to fetch data from a Recon API path on behalf of the chatbot.
+ * Immutable generation settings for a single LLM call.
+ *
+ * <p>Replaces the previous untyped {@code Map<String, Object>} parameter bag. Both values
+ * are always supplied by callers, so they are primitives rather than nullable boxes.
+ * LangChain4j 0.35.0 does not support per-request overrides on {@code ChatRequest}, so these
+ * are applied when the provider model is built (and are part of the model cache key).</p>
  */
-public class ReconQueryRequest {
-  private final String toolName;
-  private final String method;
-  private final Map<String, String> parameters;
-  public ReconQueryRequest(String toolName, String method, Map<String, String> parameters) {
-    this.toolName = toolName;
-    this.method = method;
-    this.parameters = parameters == null
-        ? Collections.emptyMap()
-        : Collections.unmodifiableMap(new HashMap<>(parameters));
+public final class GenParams {
+
+  private final double temperature;
+  private final int maxTokens;
+
+  public GenParams(double temperature, int maxTokens) {
+    this.temperature = temperature;
+    this.maxTokens = maxTokens;
   }
 
-  public String getToolName() {
-    return toolName;
+  public double temperature() {
+    return temperature;
   }
 
-  public String getMethod() {
-    return method;
-  }
-
-  public Map<String, String> getParameters() {
-    return parameters;
+  public int maxTokens() {
+    return maxTokens;
   }
 }

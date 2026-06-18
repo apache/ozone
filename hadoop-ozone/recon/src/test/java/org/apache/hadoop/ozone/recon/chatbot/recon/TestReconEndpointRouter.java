@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
-import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.hadoop.ozone.recon.api.BucketEndpoint;
 import org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
@@ -78,12 +77,10 @@ public class TestReconEndpointRouter {
     nsSummaryEndpoint = mock(NSSummaryEndpoint.class);
     reconApiAllowlist = mock(ReconApiAllowlist.class);
 
-    org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory factory = mock(org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory.class);
-    when(factory.getMetricsServiceProvider()).thenReturn(mock(org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider.class));
     router = new ReconEndpointRouter(
         clusterStateEndpoint, nodeEndpoint, pipelineEndpoint, containerEndpoint,
         omdbInsightEndpoint, volumeEndpoint, bucketEndpoint, taskStatusService,
-        utilizationEndpoint, nsSummaryEndpoint, reconApiAllowlist, factory);
+        utilizationEndpoint, nsSummaryEndpoint, reconApiAllowlist);
   }
 
   @Test
@@ -120,33 +117,6 @@ public class TestReconEndpointRouter {
     assertEquals(mockResponse, response);
     verify(containerEndpoint).getUnhealthyContainers("MISSING", 1000, 0L, 0L);
   }
-
-  @Test
-  public void testRouteMetricsApi() throws Exception {
-    org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider metricsServiceProvider = mock(org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider.class);
-    org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory factory = mock(org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory.class);
-    when(factory.getMetricsServiceProvider()).thenReturn(metricsServiceProvider);
-
-    ReconEndpointRouter metricsRouter = new ReconEndpointRouter(
-        clusterStateEndpoint, nodeEndpoint, pipelineEndpoint, containerEndpoint,
-        omdbInsightEndpoint, volumeEndpoint, bucketEndpoint, taskStatusService,
-        utilizationEndpoint, nsSummaryEndpoint, reconApiAllowlist, factory);
-
-    java.net.HttpURLConnection conn = mock(java.net.HttpURLConnection.class);
-    when(metricsServiceProvider.getMetricsResponse(eq("jvm"), eq("query=test"))).thenReturn(conn);
-    when(conn.getResponseCode()).thenReturn(200);
-    when(conn.getInputStream()).thenReturn(new java.io.ByteArrayInputStream("{\"status\":\"success\"}".getBytes("UTF-8")));
-
-    Map<String, String> params = new HashMap<>();
-    params.put("api", "jvm");
-    params.put("query", "query=test");
-    
-    Response response = metricsRouter.route("api_v1_metrics_api", params);
-    assertEquals(200, response.getStatus());
-    JsonNode node = (JsonNode) response.getEntity();
-    assertEquals("success", node.get("status").asText());
-  }
-
 
   @Test
   public void testRouteInvalidPath() {

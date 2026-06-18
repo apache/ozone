@@ -22,20 +22,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
 import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
-import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryRequest;
 import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,7 +97,7 @@ public class TestChatbotAgentExecutionPolicy {
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, true);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
-    lenient().when(mockReconQueryExecutor.execute(any(ReconQueryRequest.class)))
+    lenient().when(mockReconQueryExecutor.execute(anyString(), anyMap()))
         .thenReturn(defaultOutcome());
 
     lenient().when(mockReconApiAllowlist.isRegistered(anyString())).thenAnswer(invocation -> {
@@ -115,7 +117,7 @@ public class TestChatbotAgentExecutionPolicy {
     String maliciousJson = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/admin/delete\",\"method\":\"POST\"," +
         "\"parameters\":{},\"reasoning\":\"injected\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(maliciousJson));
 
     String result = agent.processQuery(
@@ -126,9 +128,9 @@ public class TestChatbotAgentExecutionPolicy {
             result.toLowerCase().contains("permitted"),
         "Response should inform user the endpoint is not permitted");
     // The executor must NEVER be called for a disallowed endpoint
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
     // No summarization LLM call — clarification is returned directly
-    verify(mockLlmClient, never()).chatCompletion(anyList(), any(), any(), any());
+    verify(mockLlmClient, never()).chatCompletion(anyList(), any(), any(), any(), isNull());
   }
 
   @Test
@@ -138,13 +140,13 @@ public class TestChatbotAgentExecutionPolicy {
     String maliciousJson = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"http://evil.com/api/v1/clusterState\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"exfiltrate\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(maliciousJson));
 
     String result = agent.processQuery("Show cluster state", null, null);
 
     assertNotNull(result);
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
@@ -153,13 +155,13 @@ public class TestChatbotAgentExecutionPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/internal/secrets\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"fishing\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("Show secrets", null, null);
 
     assertNotNull(result);
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   // ── SEC-02: Allowlist hardening (prefix boundary + path canonicalization) ───
@@ -169,7 +171,7 @@ public class TestChatbotAgentExecutionPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys2\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"prefix confusion\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("List something", null, null);
@@ -177,7 +179,7 @@ public class TestChatbotAgentExecutionPolicy {
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("permitted"),
         "Response should indicate the endpoint is not permitted");
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
@@ -185,7 +187,7 @@ public class TestChatbotAgentExecutionPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/../../admin/config\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"traversal attempt\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("Show admin config", null, null);
@@ -193,7 +195,7 @@ public class TestChatbotAgentExecutionPolicy {
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("permitted"),
         "Canonicalized traversal path must be blocked by the allowlist");
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   // ── Multi-endpoint: one invalid blocks all calls ──────────────────────────
@@ -209,14 +211,14 @@ public class TestChatbotAgentExecutionPolicy {
         "{\"endpoint\":\"/api/v1/admin/delete\",\"method\":\"POST\"," +
         "\"parameters\":{},\"reasoning\":\"injected\"}" +
         "]}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(json));
 
     String result = agent.processQuery("Show state and delete admin", null, null);
 
     assertNotNull(result);
     // Neither the valid nor the invalid call is executed — all blocked
-    verify(mockReconQueryExecutor, never()).execute(any(ReconQueryRequest.class));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   // ── Response must not leak internals ─────────────────────────────────────
@@ -228,7 +230,7 @@ public class TestChatbotAgentExecutionPolicy {
     String maliciousJson = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/admin/config\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"fishing\"}";
-    when(mockLlmClient.chatWithTools(anyList(), any(), any(), any(), anyList()))
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenReturn(resp(maliciousJson));
 
     String result = agent.processQuery("Show admin config", null, null);
@@ -245,11 +247,11 @@ public class TestChatbotAgentExecutionPolicy {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private LLMClient.LLMResponse resp(String content) {
-    return new LLMClient.LLMResponse(content, "test-model", 10, 20, null, null);
+    return new LLMClient.LLMResponse(content, "test-model", 10, 20, null);
   }
 
   private ReconQueryResult defaultOutcome() {
-    return new ReconQueryResult(
-        new HashMap<>(), 0, false, 1000);
+    JsonNode body = JsonNodeFactory.instance.objectNode();
+    return new ReconQueryResult(body, 0, false, 1000);
   }
 }

@@ -18,16 +18,15 @@
 package org.apache.hadoop.ozone.recon.chatbot.recon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.argThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
@@ -51,8 +50,8 @@ public class TestReconQueryExecutorListKeys {
 
   @Test
   public void testListKeysMissingPrefix() {
-    ReconQueryRequest req = new ReconQueryRequest("/api/v1/keys/listKeys", "GET", Collections.emptyMap());
-    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> handler.execute(req));
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        () -> handler.execute("api_v1_keys_listKeys", Collections.emptyMap()));
     assertTrue(ex.getMessage().contains("requires 'startPrefix'"));
   }
 
@@ -60,8 +59,8 @@ public class TestReconQueryExecutorListKeys {
   public void testListKeysRootPrefix() {
     Map<String, String> params = new HashMap<>();
     params.put("startPrefix", "/");
-    ReconQueryRequest req = new ReconQueryRequest("/api/v1/keys/listKeys", "GET", params);
-    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> handler.execute(req));
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        () -> handler.execute("api_v1_keys_listKeys", params));
     assertTrue(ex.getMessage().contains("requires 'startPrefix'"));
   }
 
@@ -75,20 +74,19 @@ public class TestReconQueryExecutorListKeys {
     Map<String, Object> entity = new HashMap<>();
     entity.put("keys", Collections.nCopies(1000, Collections.singletonMap("key", "k1")));
     Response mockResponse = Response.ok(entity).build();
-    
+
     // Verify params passed to router have prevKey removed and limit clamped
     when(router.route(anyString(), argThat(p -> {
       return !p.containsKey("prevKey") && "1000".equals(p.get("limit"));
     }))).thenReturn(mockResponse);
 
-    ReconQueryRequest req = new ReconQueryRequest("/api/v1/keys/listKeys", "GET", params);
-    ReconQueryResult outcome = handler.execute(req);
+    ReconQueryResult outcome = handler.execute("api_v1_keys_listKeys", params);
 
     verify(router, times(1)).route(anyString(), any());
     assertEquals(1000, outcome.getRecordsProcessed());
     assertTrue(outcome.isTruncated()); // 1000 >= effective (1000)
 
-    JsonNode resultNode = (JsonNode) outcome.getResponseBody();
+    JsonNode resultNode = outcome.getResponseBody();
     assertEquals(1000, resultNode.get("keys").size());
   }
 
@@ -97,8 +95,8 @@ public class TestReconQueryExecutorListKeys {
     Map<String, String> params = new HashMap<>();
     params.put("startPrefix", "/vol1/bucket1");
     params.put("limit", "-1");
-    ReconQueryRequest req = new ReconQueryRequest("/api/v1/keys/listKeys", "GET", params);
-    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> handler.execute(req));
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        () -> handler.execute("api_v1_keys_listKeys", params));
     assertTrue(ex.getMessage().contains("limit must be a positive integer"));
   }
 }

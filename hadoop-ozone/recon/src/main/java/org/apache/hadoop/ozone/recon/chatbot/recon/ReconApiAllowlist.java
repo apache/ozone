@@ -58,8 +58,7 @@ public class ReconApiAllowlist {
       "api_v1_namespace_summary",
       "api_v1_namespace_usage",
       "api_v1_namespace_quota",
-      "api_v1_namespace_dist",
-      "api_v1_metrics_api"
+      "api_v1_namespace_dist"
   )));
 
   public boolean isRegistered(String toolName) {

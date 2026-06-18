@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
@@ -55,13 +54,13 @@ public class TestLangChain4jDispatcher {
   public void testEmptyMessagesThrows() {
     List<LLMClient.ChatMessage> messages = new ArrayList<>();
     assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "gpt-4.1", null, new HashMap<>()));
+        dispatcher.chatCompletion(messages, "gpt-4.1", null, new GenParams(0.1, 1000), null));
   }
 
   @Test
   public void testNullMessagesThrows() {
     assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(null, "gpt-4.1", null, new HashMap<>()));
+        dispatcher.chatCompletion(null, "gpt-4.1", null, new GenParams(0.1, 1000), null));
   }
 
   @Test
@@ -98,7 +97,7 @@ public class TestLangChain4jDispatcher {
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "some-unknown-model", null, new HashMap<>()));
+        dispatcher.chatCompletion(messages, "some-unknown-model", null, new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
         "Unknown model should fall back to default provider gemini");
@@ -113,7 +112,7 @@ public class TestLangChain4jDispatcher {
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "some-unknown-model", null, new HashMap<>()));
+        dispatcher.chatCompletion(messages, "some-unknown-model", null, new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().contains("LLM request failed"),
         "Should attempt call with default gemini model after fallback");
@@ -128,7 +127,7 @@ public class TestLangChain4jDispatcher {
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "gpt-4.1", null, new HashMap<>()));
+        dispatcher.chatCompletion(messages, "gpt-4.1", null, new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().toLowerCase().contains("openai"),
         "gpt-4.1 should route to openai even when only gemini key is configured");
@@ -140,7 +139,7 @@ public class TestLangChain4jDispatcher {
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "any-model-name", "openai", new HashMap<>()));
+        dispatcher.chatCompletion(messages, "any-model-name", "openai", new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().toLowerCase().contains("openai"),
         "Explicit provider should route to openai");
@@ -156,7 +155,7 @@ public class TestLangChain4jDispatcher {
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "gemini-2.5-flash", "openai", new HashMap<>()));
+        dispatcher.chatCompletion(messages, "gemini-2.5-flash", "openai", new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
         "Mismatched pair should fall back to default gemini provider");

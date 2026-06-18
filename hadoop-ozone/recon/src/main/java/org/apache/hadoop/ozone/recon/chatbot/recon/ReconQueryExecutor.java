@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
@@ -62,14 +63,15 @@ public class ReconQueryExecutor {
   /**
    * Executes a single authorized Recon query and returns the result with metadata.
    *
-   * @param request the endpoint path, HTTP method, and query parameters
+   * @param toolName   registered tool name to dispatch (e.g. {@code api_v1_datanodes})
+   * @param parameters query parameters from the LLM tool call (defensively copied; never mutated)
    * @return the JSON response body, estimated record count, truncation flag, and enforced cap
    * @throws IOException if the underlying endpoint call fails
    */
-  public ReconQueryResult execute(ReconQueryRequest request) throws IOException {
-    String toolName = request.getToolName();
-
-    Map<String, String> params = new HashMap<>(request.getParameters());
+  public ReconQueryResult execute(String toolName, Map<String, String> parameters)
+      throws IOException {
+    Map<String, String> params = new HashMap<>(
+        parameters == null ? Collections.emptyMap() : parameters);
     // The chatbot never auto-paginates; always strip any cursor the LLM may have included.
     params.remove("prevKey");
 

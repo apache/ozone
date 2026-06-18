@@ -44,16 +44,13 @@ public class TestReconQueryExecutor {
   public void testExecute() throws Exception {
     ReconEndpointRouter router = mock(ReconEndpointRouter.class);
     when(router.hasRoute("api_v1_clusterState")).thenReturn(true);
-    
     Response mockResponse = Response.ok(Collections.singletonMap("state", "OK")).build();
     when(router.route(anyString(), any())).thenReturn(mockResponse);
 
     ReconQueryExecutor handler = new ReconQueryExecutor(router);
 
-    ReconQueryRequest req = new ReconQueryRequest("/api/v1/clusterState", "GET", Collections.emptyMap());
-
-    ReconQueryResult outcome = handler.execute(req);
-    JsonNode body = (JsonNode) outcome.getResponseBody();
+    ReconQueryResult outcome = handler.execute("api_v1_clusterState", Collections.emptyMap());
+    JsonNode body = outcome.getResponseBody();
     assertEquals("OK", body.get("state").asText());
     assertFalse(outcome.isTruncated());
   }
@@ -76,9 +73,7 @@ public class TestReconQueryExecutor {
     Map<String, String> params = new HashMap<>();
     params.put("limit", "5000"); // Should clamp to 1000
     params.put("prevKey", "someKey"); // Should be stripped
-    ReconQueryRequest req = new ReconQueryRequest("api_v1_datanodes", "GET", params);
-
-    ReconQueryResult outcome = handler.execute(req);
+    ReconQueryResult outcome = handler.execute("api_v1_datanodes", params);
 
     verify(router, times(1)).route(anyString(), any());
     assertEquals(1000, outcome.getRecordsProcessed());
