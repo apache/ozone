@@ -160,25 +160,50 @@ simple key-value mutation.
 
 ```
                          LEADER                                   FOLLOWER
-                   +------------------+                     +------------------+
-  Client Request   | startTransaction |                     | applyTransaction |
-  ------------->   |                  |                     |                  |
-                   |  1. Create       |   Ratis log entry   |  1. Parse proto  |
-                   |     PlannedReq   |   (serialized       |  2. For each     |
-                   |  2. preProcess   |    OMRequest with   |     DBDelta:     |
-                   |  3. authorize    |    embedded         |     table.put/   |
-                   |  4. acquireLock  |    BatchedState     |     delete       |
-                   |  5. plan()       |    Transitions)     |  3. Commit batch |
-                   |     -> deltas    | ------------------> |                  |
-                   |  6. releaseLock  |                     |  (zero business  |
-                   |  7. Build proto  |                     |   logic)         |
+                   +------------------+
+  Client Request   | startTransaction |
+  ------------->   |  (leader only)   |
+                   |                  |
+                   |  1. Create       |
+                   |     PlannedReq   |
+                   |  2. preProcess   |
+                   |  3. authorize    |
+                   |  4. acquireLock  |
+                   |  5. plan()       |
+                   |     -> deltas    |
+                   |  6. releaseLock  |
+                   |  7. Build proto  |
+                   +--------+---------+
+                            |
+                            | Ratis log entry
+                            | (OMRequest with embedded
+                            |  BatchedStateTransitions)
+                            |
+                   +--------v---------+                     +------------------+
+                   | applyTransaction |                     | applyTransaction |
+                   |  (leader)        |                     |  (follower)      |
+                   |                  |                     |                  |
+                   |  1. Parse proto  |                     |  1. Parse proto  |
+                   |  2. For each     |                     |  2. For each     |
+                   |     DBDelta:     |                     |     DBDelta:     |
+                   |     table.put/   |                     |     table.put/   |
+                   |     delete       |                     |     delete       |
+                   |  3. Commit batch |                     |  3. Commit batch |
+                   |                  |                     |                  |
+                   |  (zero business  |                     |  (zero business  |
+                   |   logic)         |                     |   logic)         |
                    +------------------+                     +------------------+
 ```
 
-The leader runs the full execution steps. The result is a list of raw
-`{table, key_bytes, value_bytes, PUT/DELETE}` operations packed into a
-`ReplicatedStateTransition` proto. Followers simply open a RocksDB batch,
-loop through the deltas, and commit.
+**Important:** The leader does NOT write to RocksDB during `startTransaction`.
+It only computes the deltas (the list of puts and deletes). The actual DB write
+happens later in `applyTransaction`, which runs on **both leader and followers**
+after Ratis commits the log entry. This ensures all nodes have the same DB state.
+
+The result of planning is a list of raw `{table, key_bytes, value_bytes,
+PUT/DELETE}` operations packed into a `ReplicatedStateTransition` proto. The
+apply step on all nodes opens a RocksDB batch, loops through the deltas, and
+commits.
 
 ### 3.2 Proto Format: ReplicatedStateTransition
 
@@ -224,6 +249,25 @@ whether to use the new apply path.
 comes from the Ratis `transactionLogIndex`. In the new model, planning happens
 in `startTransaction()` (before the log entry is written), so the Ratis index
 is not yet available.
+
+**Why must objectId be decided during planning?**
+
+The `objectID` is part of the value that gets serialized into the DB delta. For
+example, when we create a new key:
+1. We build an `OmKeyInfo` object — this object contains the `objectID` field
+2. We serialize this `OmKeyInfo` to raw bytes via the codec
+3. These raw bytes go into the `DBDelta` proto
+
+The raw bytes are frozen at planning time. They get written as-is to RocksDB
+during apply. We cannot "fill in" the objectId later during apply because the
+bytes are already serialized and embedded in the Ratis log entry.
+
+In the current architecture, this is not a problem: `validateAndUpdateCache`
+runs during `applyTransaction` where the Ratis log index is already known. So
+it uses `transactionLogIndex` directly as the objectId.
+
+In the new architecture, planning runs in `startTransaction` which happens
+**before** Ratis assigns a log index. So we need our own counter.
 
 **Solution:** An OM-managed `AtomicLong` counter (`ManagedIndexService`) that:
 - Returns a unique, always-increasing value via `getAndIncrement()`.
@@ -279,9 +323,41 @@ public final class TransitionBuilder {
 }
 ```
 
-The builder uses existing `Codec<V>` to convert values to raw bytes at
-planning time. This ensures the bytes written during apply are the same as
-what `TypedTable` would produce.
+**How are the raw bytes computed?**
+
+Ozone already has `Codec<V>` classes for every value type stored in RocksDB.
+For example, `OmKeyInfo` has `OmKeyInfo.getCodec()` which converts an
+`OmKeyInfo` Java object into the exact `byte[]` that gets stored in RocksDB.
+These codecs are the same ones used by `TypedTable.put()` today.
+
+The `TransitionBuilder.put()` method does this:
+1. Takes the Java domain object (e.g., an `OmKeyInfo` instance)
+2. Calls the codec's `toPersistedFormat()` to get the protobuf representation
+3. Serializes the protobuf to `byte[]` — these are the raw bytes
+4. Stores them in a `DBDelta` proto message
+
+Example — what happens inside `TransitionBuilder.put("keyTable", key, omKeyInfo, codec)`:
+```java
+void <V> put(String tableName, String key, V value, Codec<V> codec) {
+  byte[] keyBytes = CodecRegistry.asRawBytes(key);
+  byte[] valueBytes = codec.toPersistedFormat(value);  // same bytes TypedTable would write
+  deltas.add(DBDelta.newBuilder()
+      .setTableName(tableName)
+      .setKey(ByteString.copyFrom(keyBytes))
+      .setValue(ByteString.copyFrom(valueBytes))
+      .setType(DeltaType.PUT)
+      .build());
+}
+```
+
+At apply time (on all nodes), the engine writes these exact bytes to the
+RocksDB column family — no deserialization or re-serialization needed.
+
+**In short:** We are using the same serialization code that OM already uses
+when writing to RocksDB. The only difference is that we serialize the value
+during planning (on the leader), store the raw bytes in the Ratis log entry,
+and then write those bytes to RocksDB during apply (on all nodes). Today, the
+serialization happens at write time on every node independently.
 
 #### LeaderPlanner (orchestrator)
 
