@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,19 @@ public class TestOzoneManagerRatisRequest {
             ozoneManager));
     assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
         omException.getResult());
+  }
+
+  @Test
+  public void testStartFinalizeUpgradeRequestIsDispatched() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+
+    OzoneManager mockOm = mock(OzoneManager.class);
+    assertInstanceOf(OMStartFinalizeUpgradeRequest.class,
+        OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm));
   }
 
   @Test
