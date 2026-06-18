@@ -22,6 +22,7 @@ import static java.util.Collections.emptyList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
@@ -42,6 +43,7 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
+  private int peerApparentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
 
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -82,6 +84,14 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  public void setPeerApparentVersion(int version) {
+    this.peerApparentVersion = version;
+  }
+
+  public int getPeerApparentVersion() {
+    return peerApparentVersion;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -105,6 +115,7 @@ public final class ReplicateContainerCommand
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
     builder.setPriority(priority);
+    builder.setPeerApparentVersion(peerApparentVersion);
     return builder.build();
   }
 
@@ -130,6 +141,10 @@ public final class ReplicateContainerCommand
     }
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
+    }
+    if (protoMessage.hasPeerApparentVersion()) {
+      cmd.setPeerApparentVersion(
+          protoMessage.getPeerApparentVersion());
     }
     return cmd;
   }
@@ -170,6 +185,8 @@ public final class ReplicateContainerCommand
       sb.append(", sourceNodes=").append(sourceDatanodes);
     }
     sb.append(", priority=").append(priority);
+    sb.append(", peerApparentVersion=")
+        .append(peerApparentVersion);
     return sb.toString();
   }
 }

@@ -84,6 +84,12 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
             downloadReplicator : pushReplicator;
 
     ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
+
+    int serverVersion = replicateCommand.getPeerApparentVersion();
+    int localVersion = context.getParent().getVersionManager()
+        .getApparentVersion().serialize();
+    task.setLowestCommonApparentVersion(Math.min(localVersion, serverVersion));
+
     supervisor.addTask(task);
   }
 

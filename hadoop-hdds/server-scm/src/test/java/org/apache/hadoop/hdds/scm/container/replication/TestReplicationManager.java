@@ -87,8 +87,10 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -1799,6 +1801,80 @@ public class TestReplicationManager {
               reconstructCount.apply(dn));
           return counts;
         });
+  }
+
+  @Test
+  public void testPeerApparentVersionSetForPushCommand()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+
+    DatanodeInfo targetInfo = mock(DatanodeInfo.class);
+    when(targetInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
+    when(nodeManager.getDatanodeInfo(target)).thenReturn(targetInfo);
+
+    ReplicateContainerCommand command =
+        ReplicateContainerCommand.toTarget(
+            containerInfo.getContainerID(), target);
+    command.setReplicaIndex(1);
+    replicationManager.sendDatanodeCommand(command, containerInfo, source);
+
+    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
+        command.getPeerApparentVersion());
+  }
+
+  @Test
+  public void testPeerApparentVersionSetForPullCommand()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails source1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+
+    DatanodeInfo source1Info = mock(DatanodeInfo.class);
+    when(source1Info.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
+    DatanodeInfo source2Info = mock(DatanodeInfo.class);
+    when(source2Info.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
+
+    when(nodeManager.getDatanodeInfo(source1)).thenReturn(source1Info);
+    when(nodeManager.getDatanodeInfo(source2)).thenReturn(source2Info);
+
+    ReplicateContainerCommand command =
+        ReplicateContainerCommand.fromSources(
+            containerInfo.getContainerID(),
+            Lists.newArrayList(source1, source2));
+    replicationManager.sendDatanodeCommand(command, containerInfo, target);
+
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize(),
+        command.getPeerApparentVersion());
+  }
+
+  @Test
+  public void testPeerApparentVersionDefaultWhenNodeNotFound()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+
+    when(nodeManager.getDatanodeInfo(target)).thenReturn(null);
+
+    ReplicateContainerCommand command =
+        ReplicateContainerCommand.toTarget(
+            containerInfo.getContainerID(), target);
+    replicationManager.sendDatanodeCommand(command, containerInfo, source);
+
+    assertEquals(HDDSVersion.DEFAULT_VERSION.serialize(),
+        command.getPeerApparentVersion());
   }
 
 }

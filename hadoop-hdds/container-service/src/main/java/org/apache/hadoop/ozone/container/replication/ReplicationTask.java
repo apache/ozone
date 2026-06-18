@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
@@ -32,6 +33,8 @@ public class ReplicationTask extends AbstractReplicationTask {
   private final String debugString;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
+
+  private int lowestCommonApparentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
 
   /**
    * Counter for the transferred bytes.
@@ -123,6 +126,14 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   public void setTransferredBytes(long transferredBytes) {
     this.transferredBytes = transferredBytes;
+  }
+
+  public int getLowestCommonApparentVersion() {
+    return lowestCommonApparentVersion;
+  }
+
+  public void setLowestCommonApparentVersion(int lowestCommonApparentVersion) {
+    this.lowestCommonApparentVersion = lowestCommonApparentVersion;
   }
 
   DatanodeDetails getTarget() {

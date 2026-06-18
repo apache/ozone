@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -78,6 +79,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealt
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -670,9 +672,34 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadline);
+    if (command.getType() == Type.replicateContainerCommand) {
+      enrichReplicateCommandWithPeerVersion(
+          (ReplicateContainerCommand) command);
+    }
     nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
+  }
+
+  private void enrichReplicateCommandWithPeerVersion(
+      ReplicateContainerCommand cmd) {
+    if (cmd.getTargetDatanode() != null) {
+      cmd.setPeerApparentVersion(
+          lookupApparentVersion(cmd.getTargetDatanode()));
+    } else {
+      int min = cmd.getSourceDatanodes().stream()
+          .mapToInt(this::lookupApparentVersion)
+          .min()
+          .orElse(HDDSVersion.DEFAULT_VERSION.serialize());
+      cmd.setPeerApparentVersion(min);
+    }
+  }
+
+  private int lookupApparentVersion(DatanodeDetails dn) {
+    DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+    return info != null
+        ? info.getLastKnownApparentVersion().serialize()
+        : HDDSVersion.DEFAULT_VERSION.serialize();
   }
 
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,

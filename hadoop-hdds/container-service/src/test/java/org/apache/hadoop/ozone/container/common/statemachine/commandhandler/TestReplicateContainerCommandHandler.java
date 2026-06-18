@@ -27,21 +27,25 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Test cases to verify {@link ReplicateContainerCommandHandler}.
@@ -64,6 +68,14 @@ public class TestReplicateContainerCommandHandler {
     ozoneContainer = mock(OzoneContainer.class);
     connectionManager = mock(SCMConnectionManager.class);
     stateContext = mock(StateContext.class);
+
+    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
+    DatanodeVersionManager versionManager =
+        mock(DatanodeVersionManager.class);
+    when(stateContext.getParent()).thenReturn(dsm);
+    when(dsm.getVersionManager()).thenReturn(versionManager);
+    when(versionManager.getApparentVersion())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
   }
 
   @Test
@@ -115,5 +127,101 @@ public class TestReplicateContainerCommandHandler {
     } finally {
       metrics.unRegister();
     }
+  }
+
+  @Test
+  public void testEffectiveVersionServerIsOlder() {
+    ArgumentCaptor<ReplicationTask> captor =
+        ArgumentCaptor.forClass(ReplicationTask.class);
+    doNothing().when(supervisor).addTask(captor.capture());
+
+    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
+    DatanodeVersionManager versionManager =
+        mock(DatanodeVersionManager.class);
+    when(stateContext.getParent()).thenReturn(dsm);
+    when(dsm.getVersionManager()).thenReturn(versionManager);
+    when(versionManager.getApparentVersion())
+        .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
+
+    ReplicateContainerCommandHandler handler =
+        new ReplicateContainerCommandHandler(conf, supervisor,
+            downloadReplicator, pushReplicator);
+
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    List<DatanodeDetails> sources = new ArrayList<>();
+    sources.add(source);
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(1, sources);
+    cmd.setPeerApparentVersion(
+        HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize());
+
+    handler.handle(cmd, ozoneContainer, stateContext, connectionManager);
+
+    ReplicationTask task = captor.getValue();
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize(),
+        task.getLowestCommonApparentVersion());
+  }
+
+  @Test
+  public void testEffectiveVersionLocalIsOlder() {
+    ArgumentCaptor<ReplicationTask> captor =
+        ArgumentCaptor.forClass(ReplicationTask.class);
+    doNothing().when(supervisor).addTask(captor.capture());
+
+    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
+    DatanodeVersionManager versionManager =
+        mock(DatanodeVersionManager.class);
+    when(stateContext.getParent()).thenReturn(dsm);
+    when(dsm.getVersionManager()).thenReturn(versionManager);
+    when(versionManager.getApparentVersion())
+        .thenReturn(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
+
+    ReplicateContainerCommandHandler handler =
+        new ReplicateContainerCommandHandler(conf, supervisor,
+            downloadReplicator, pushReplicator);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1, target);
+    cmd.setPeerApparentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
+
+    handler.handle(cmd, ozoneContainer, stateContext, connectionManager);
+
+    ReplicationTask task = captor.getValue();
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize(),
+        task.getLowestCommonApparentVersion());
+  }
+
+  @Test
+  public void testEffectiveVersionDefaultWhenNotSet() {
+    ArgumentCaptor<ReplicationTask> captor =
+        ArgumentCaptor.forClass(ReplicationTask.class);
+    doNothing().when(supervisor).addTask(captor.capture());
+
+    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
+    DatanodeVersionManager versionManager =
+        mock(DatanodeVersionManager.class);
+    when(stateContext.getParent()).thenReturn(dsm);
+    when(dsm.getVersionManager()).thenReturn(versionManager);
+    when(versionManager.getApparentVersion())
+        .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
+
+    ReplicateContainerCommandHandler handler =
+        new ReplicateContainerCommandHandler(conf, supervisor,
+            downloadReplicator, pushReplicator);
+
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    List<DatanodeDetails> sources = new ArrayList<>();
+    sources.add(source);
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(1, sources);
+
+    handler.handle(cmd, ozoneContainer, stateContext, connectionManager);
+
+    ReplicationTask task = captor.getValue();
+    assertEquals(HDDSVersion.DEFAULT_VERSION.serialize(),
+        task.getLowestCommonApparentVersion());
   }
 }
