@@ -876,6 +876,43 @@ public class TestReplicationSupervisor {
         context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
+  @Test
+  public void reportsExecutedStatusOnSkip() {
+    // A SKIPPED task (replica already exists) should drain its PENDING status entry to EXECUTED
+    // so CommandStatusReportPublisher removes it instead of re-sending it forever.
+    ReplicationSupervisor supervisor = supervisorWith(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.SKIPPED),
+        newDirectExecutorService());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(3L, Collections.emptyList());
+    cmd.setTerm(CURRENT_TERM);
+    context.addCmdStatus(cmd);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(
+        EXECUTED,
+        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsFailedStatusWhenDeadlinePassed() {
+    // A task dropped because its deadline has passed should mark the status FAILED
+    // so the PENDING entry drains and SCM can reschedule promptly.
+    ReplicationSupervisor supervisor = supervisorWith(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.DONE),
+        newDirectExecutorService());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(4L, Collections.emptyList());
+    cmd.setTerm(CURRENT_TERM);
+    cmd.setDeadline(clock.millis() + 5000);
+    context.addCmdStatus(cmd);
+    // Advance clock past the deadline
+    clock.fastForward(10000);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(
+        FAILED,
+        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
   private static class BlockingTask extends AbstractReplicationTask {
 
     private final CountDownLatch runningLatch;

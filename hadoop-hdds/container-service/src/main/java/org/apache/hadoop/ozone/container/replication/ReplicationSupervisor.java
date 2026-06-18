@@ -397,6 +397,8 @@ public final class ReplicationSupervisor {
           LOG.info("Ignoring {} since the deadline has passed ({} < {})",
               this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
           timeoutCounter.get(task.getMetricName()).incrementAndGet();
+          // FAILED drains the PENDING status entry so SCM can clear and reschedule promptly.
+          updateCommandStatus(task, CommandStatus::markAsFailed);
           return;
         }
 
@@ -407,6 +409,7 @@ public final class ReplicationSupervisor {
               && task.shouldOnlyRunOnInServiceDatanodes()) {
             LOG.info("Ignoring {} since datanode is not in service ({})",
                 this, dn.getPersistedOpState());
+            updateCommandStatus(task, CommandStatus::markAsFailed);
             return;
           }
 
@@ -415,6 +418,7 @@ public final class ReplicationSupervisor {
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
             LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
                 this, taskTerm, currentTerm.getAsLong());
+            updateCommandStatus(task, CommandStatus::markAsFailed);
             return;
           }
         }
@@ -433,6 +437,8 @@ public final class ReplicationSupervisor {
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
           skippedCounter.get(task.getMetricName()).incrementAndGet();
+          // SKIPPED means the replica already exists; EXECUTED drains the entry.
+          updateCommandStatus(task, CommandStatus::markAsExecuted);
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);

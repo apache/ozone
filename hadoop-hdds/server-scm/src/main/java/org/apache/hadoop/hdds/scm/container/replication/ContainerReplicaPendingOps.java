@@ -310,13 +310,11 @@ public class ContainerReplicaPendingOps {
    * statuses; DELETE command IDs are never routed here by the current
    * command-status tracking path.
    *
-   * <p>The matching ADD op is removed and its counter decremented so the
-   * inflight quota is freed immediately instead of waiting for the event
-   * timeout. The DELETE branch below is defensive code that is not reached
-   * in practice (DELETE ops are left in place to be resent, mirroring
-   * {@link #removeExpiredEntries()}). Subscribers are notified with
-   * timedOut=true so the ReplicationManager treats a failed command the same
-   * as an expired one.
+   * <p>The matched op is removed from the pending list and its counter
+   * decremented so the inflight quota is freed immediately instead of waiting
+   * for the event timeout. For ADD ops the scheduled container size is also
+   * released. Subscribers are notified with timedOut=true so the
+   * ReplicationManager re-evaluates the container as it would for an expired op.
    *
    * @param cmdId the id of the failed command, as reported by the datanode
    */
@@ -338,14 +336,11 @@ public class ContainerReplicaPendingOps {
       while (iterator.hasNext()) {
         ContainerReplicaOp op = iterator.next();
         if (op.getCommand() != null && op.getCommand().getId() == cmdId) {
-          if (op.getOpType() != DELETE) {
-            iterator.remove();
-            if (op.getOpType() == ADD) {
-              releaseScheduledContainerSize(op);
-            }
-            decrementCounter(op.getOpType(), op.getReplicaIndex());
+          iterator.remove();
+          if (op.getOpType() == ADD) {
+            releaseScheduledContainerSize(op);
           }
-          // Always drop the index entry; DELETE ops stay in the list for resend but no longer need tracking.
+          decrementCounter(op.getOpType(), op.getReplicaIndex());
           commandIdToContainer.remove(cmdId);
           failedOps.add(op);
         }
@@ -357,6 +352,8 @@ public class ContainerReplicaPendingOps {
       unlock(lock);
     }
     if (!failedOps.isEmpty()) {
+      // Failures reuse timedOut=true so ReplicationManager re-evaluates like an expired op.
+      // Timeout metrics are not updated here.
       notifySubscribers(failedOps, containerID, true);
     }
   }
