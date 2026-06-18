@@ -42,6 +42,9 @@ public class CopyPartResult {
   @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
+  public CopyPartResult() {
+  }
+
   public CopyPartResult(String eTag, Instant lastModified) {
     this.eTag = eTag;
     this.lastModified = lastModified;
