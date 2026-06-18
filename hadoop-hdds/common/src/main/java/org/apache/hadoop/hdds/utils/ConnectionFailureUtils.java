@@ -82,9 +82,11 @@ public final class ConnectionFailureUtils {
   public static boolean isConnectionFailure(Throwable t) {
     Throwable cause = t;
     for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
-      if (cause instanceof ConnectException
-          || cause instanceof SocketTimeoutException
-          || cause instanceof NoRouteToHostException
+      // ConnectException and NoRouteToHostException both extend
+      // SocketException, so the SocketException check below already matches
+      // them. They remain listed in this class's Javadoc as connection-
+      // failure shapes for documentation.
+      if (cause instanceof SocketTimeoutException
           || cause instanceof UnknownHostException
           || cause instanceof EOFException
           || cause instanceof SocketException) {

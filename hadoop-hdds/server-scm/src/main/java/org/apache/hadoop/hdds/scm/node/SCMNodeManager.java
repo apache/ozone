@@ -905,7 +905,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       int dnCount = getNodeQueuedCommandCount(datanodeDetails, cmdType);
       if (dnCount == -1) {
-        LOG.warn("No command count information for datanode {} and command {}" +
+        LOG.debug("No command count information for datanode {} and command {}" +
             ". Assuming zero", datanodeDetails, cmdType);
         dnCount = 0;
       }

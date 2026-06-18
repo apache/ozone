@@ -140,25 +140,25 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
             LOG.debug("Skipping Snapshot Deletion processing because " +
-                "the snapshot is active or DB changes are not flushed: {}", snapInfo.getTableKey());
+                "the snapshot is active or DB changes are not flushed: {}", formatSnapshotForLog(snapInfo));
             continue;
           }
-          LOG.info("Started Snapshot Deletion Processing for snapshot : {}", snapInfo.getTableKey());
+          LOG.info("Started Snapshot Deletion Processing for snapshot : {}", formatSnapshotForLog(snapInfo));
           SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapInfo);
           // Continue if the next snapshot is not active. This is to avoid unnecessary copies from one snapshot to
           // another.
           if (nextSnapshot != null &&
               nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
             LOG.info("Skipping Snapshot Deletion processing for : {} because the next snapshot is DELETED.",
-                snapInfo.getTableKey());
+                formatSnapshotForLog(snapInfo));
             continue;
           }
           // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
-            LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
+            LOG.info("Snapshot: {} entries will be moved to AOS.", formatSnapshotForLog(snapInfo));
           } else {
             LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
-                snapInfo.getTableKey(), nextSnapshot.getTableKey());
+                formatSnapshotForLog(snapInfo), formatSnapshotForLog(nextSnapshot));
           }
           lockIds.clear();
           lockIds.add(snapInfo.getSnapshotId());
@@ -458,5 +458,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   public long getSuccessfulRunCount() {
     return successRunCount.get();
+  }
+
+  private static String formatSnapshotForLog(SnapshotInfo snapshotInfo) {
+    return snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')";
   }
 }

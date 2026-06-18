@@ -650,9 +650,9 @@ final class TestSecureOzoneCluster {
       // Start SCM
       scm.start();
 
-      // Setup secure OM for start.
-      int tokenMaxLifetime = 1000;
-      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
+      // Setup secure OM for start.  Generous token lifetime so the renewer and
+      // tampered-token cases below do not race token expiry.
+      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
       setupOm(conf);
       OzoneManager.setTestSecureOmFlag(true);
       om.setCertClient(new CertificateClientTestImpl(conf));
@@ -683,10 +683,15 @@ final class TestSecureOzoneCluster {
       omLogs.clearOutput();
 
       // Test failure of delegation renewal
-      // 1. When token maxExpiryTime exceeds
-      Thread.sleep(tokenMaxLifetime);
+      // 1. When token maxExpiryTime exceeds (maxDate in the past)
+      OzoneTokenIdentifier expiredId = OzoneTokenIdentifier.readProtoBuf(
+          token.getIdentifier());
+      expiredId.setMaxDate(System.currentTimeMillis() - 1000);
+      Token<OzoneTokenIdentifier> expiredToken = new Token<>(
+          expiredId.getBytes(), token.getPassword(), token.getKind(),
+          token.getService());
       OMException ex = assertThrows(OMException.class,
-          () -> omClient.renewDelegationToken(token));
+          () -> omClient.renewDelegationToken(expiredToken));
       assertEquals(TOKEN_EXPIRED, ex.getResult());
       omLogs.clearOutput();
 
