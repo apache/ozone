@@ -162,7 +162,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
       omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
-      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
+      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty || keyStatus.isDirectory());
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -332,5 +333,73 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // This should succeed after the fix
     assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus(),
         "Parent delete should succeed after children deleted");
+  }
+
+  @Test
+  public void testSnapshotUsedNamespaceAfterDirectoryDeleteAndPurge() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String dirName = "dir1";
+    String dirKeyPath = addKeyToDirTable(volumeName, bucketName, dirName);
+
+    long parentObjectID = 0L;
+    long dirObjectID = 12345L;
+    OmDirectoryInfo omDirectoryInfo = OMRequestTestUtils.createOmDirectoryInfo(dirName, dirObjectID, parentObjectID);
+    omMetadataManager.getDirectoryTable().put(dirKeyPath, omDirectoryInfo);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertNotNull(omBucketInfo);
+    // Initialize used namespace and snapshot used namespace for test predictability
+    omBucketInfo.incrUsedNamespace(1);
+    omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+
+    // Delete the directory
+    long txnId = 100L;
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(dirName, false));
+    OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(deleteRequest);
+    OMClientResponse deleteResponse = omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, txnId++);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, deleteResponse.getOMResponse().getStatus());
+
+    OmBucketInfo bucketInfoAfterDelete = omMetadataManager.getBucketTable().get(bucketKey);
+
+    // Perform purge
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
+        OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
+
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = bucketInfoAfterDelete.getObjectID();
+
+    OzoneManagerProtocolProtos.PurgePathRequest purgePathRequest =
+        OzoneManagerProtocolProtos.PurgePathRequest.newBuilder()
+            .setVolumeId(volumeId)
+            .setBucketId(bucketId)
+            .setDeletedDir(dirKeyPath)
+            .build();
+
+    purgeDirRequest.addDeletedPath(purgePathRequest);
+    purgeDirRequest.addBucketNameInfos(
+        OzoneManagerProtocolProtos.BucketNameInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketId(bucketId)
+            .setVolumeId(volumeId)
+            .build());
+
+    OMRequest purgeRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+        .setPurgeDirectoriesRequest(purgeDirRequest)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+
+    OMDirectoriesPurgeRequestWithFSO omPurgeRequest = new OMDirectoriesPurgeRequestWithFSO(purgeRequest);
+    OMClientResponse purgeResponse = omPurgeRequest.validateAndUpdateCache(ozoneManager, txnId);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, purgeResponse.getOMResponse().getStatus());
+
+    OmBucketInfo bucketInfoAfterPurge = omMetadataManager.getBucketTable().get(bucketKey);
+
+    // We expect snapshotUsedNamespace to not go negative
+    assertTrue(bucketInfoAfterPurge.getSnapshotUsedNamespace() >= 0,
+        "SnapshotUsedNamespace went negative (" + bucketInfoAfterPurge.getSnapshotUsedNamespace() + ") due to bug.");
   }
 }
