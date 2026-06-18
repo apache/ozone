@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 public final class StringToSignProducer {
 
   public static final String X_AMAZ_DATE = "x-amz-date";
+  private static final String X_AMZ_ACL = "x-amz-acl";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -370,8 +371,8 @@ public final class StringToSignProducer {
       if (!(canonicalHeaders.contains(header + ":"))) {
         // According to AWS Signature V4 documentation using Authorization Header
         // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-        // The x-amz-content-sha256 header is not required for CanonicalHeaders
-        if (X_AMZ_CONTENT_SHA256.equals(header)) {
+        // The x-amz-content-sha256 and x-amz-acl header is not required for CanonicalHeaders
+        if (X_AMZ_CONTENT_SHA256.equals(header) || X_AMZ_ACL.equals(header)) {
           continue;
         }
         LOG.error("The SignedHeaders list must include all "
