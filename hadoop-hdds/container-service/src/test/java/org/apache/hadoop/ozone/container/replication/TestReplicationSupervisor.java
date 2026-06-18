@@ -865,9 +865,8 @@ public class TestReplicationSupervisor {
         ReplicateContainerCommand.fromSources(2L, Collections.emptyList());
     cmd.setTerm(CURRENT_TERM);
     context.addCmdStatus(cmd);
-    ReplicationSupervisor supervisor = supervisorWith(
-        __ -> task -> task.setStatus(AbstractReplicationTask.Status.FAILED),
-        newDirectExecutorService());
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.FAILED));
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
     assertEquals(FAILED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
@@ -876,9 +875,8 @@ public class TestReplicationSupervisor {
   public void reportsExecutedStatusOnSkip() {
     // A SKIPPED task (replica already exists) should drain its PENDING status entry to EXECUTED
     // so CommandStatusReportPublisher removes it instead of re-sending it forever.
-    ReplicationSupervisor supervisor = supervisorWith(
-        __ -> task -> task.setStatus(AbstractReplicationTask.Status.SKIPPED),
-        newDirectExecutorService());
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.SKIPPED));
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(3L, Collections.emptyList());
     cmd.setTerm(CURRENT_TERM);
@@ -1230,6 +1228,61 @@ public class TestReplicationSupervisor {
 
     rs.nodeStateUpdated(IN_SERVICE);
     assertEquals(3, threadPoolSize.get());
+  }
+
+  @Test
+  public void reportsFailedStatusWhenQueueFull() {
+    // A task dropped because the queue is full should drain its PENDING entry to FAILED
+    // so SCM can free the inflight quota and reschedule promptly.
+    final int maxQueueSize = 1;
+    DatanodeConfiguration datanodeConfig = new DatanodeConfiguration();
+    datanodeConfig.setCommandQueueLimit(maxQueueSize);
+    ReplicationServer.ReplicationConfig repConf = new ReplicationServer.ReplicationConfig();
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(new DiscardingExecutorService())
+        .datanodeConfig(datanodeConfig)
+        .replicationConfig(repConf)
+        .clock(clock)
+        .build();
+
+    // Fill the queue to capacity with one task so the next addTask is dropped.
+    ReplicateContainerCommand fillCmd = createCommand(100L);
+    supervisor.addTask(new ReplicationTask(fillCmd, noopReplicator));
+    assertEquals(maxQueueSize, supervisor.getTotalInFlightReplications());
+
+    // Now register a PENDING status for a second command and try to add it.
+    ReplicateContainerCommand droppedCmd = createCommand(200L);
+    context.addCmdStatus(droppedCmd);
+    supervisor.addTask(new ReplicationTask(droppedCmd, noopReplicator));
+
+    // The dropped task's status should be FAILED so the PENDING entry is drained.
+    assertEquals(FAILED, context.getCommandStatusMap().get(droppedCmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsExecutedStatusWhenDuplicate() {
+    // A duplicate task (same container already in-flight) should drain its own PENDING
+    // status entry to EXECUTED, because the already-queued task will report the real outcome.
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(new DiscardingExecutorService())
+        .clock(clock)
+        .build();
+
+    // Add the first task - accepted into the in-flight set.
+    ReplicateContainerCommand firstCmd = createCommand(300L);
+    supervisor.addTask(new ReplicationTask(firstCmd, noopReplicator));
+    assertEquals(1, supervisor.getTotalInFlightReplications());
+
+    // Register a PENDING status for a second command with the same container id.
+    ReplicateContainerCommand dupCmd = createCommand(300L);
+    context.addCmdStatus(dupCmd);
+    supervisor.addTask(new ReplicationTask(dupCmd, noopReplicator));
+
+    // The duplicate command's status should be EXECUTED (entry drained).
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(dupCmd.getId()).getStatus());
   }
 
   @ContainerLayoutTestInfo.ContainerTest

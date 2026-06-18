@@ -235,6 +235,9 @@ public final class ReplicationSupervisor {
     if (queueHasRoomFor(task)) {
       initCounters(task);
       addToQueue(task);
+    } else {
+      // Queue is full: drain the PENDING status entry so SCM can reschedule promptly.
+      updateCommandStatus(task, CommandStatus::markAsFailed);
     }
   }
 
@@ -278,7 +281,21 @@ public final class ReplicationSupervisor {
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
+    } else {
+      // Duplicate: an identical task is already in-flight; the in-flight copy will report the real
+      // outcome, so drain this command's PENDING entry now to avoid a status-map leak.
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
     }
+  }
+
+  private void updateCommandStatus(AbstractReplicationTask task,
+      Consumer<CommandStatus> updater) {
+    long cmdId = task.getCommandId();
+    if (context == null || cmdId == 0) {
+      // No SCM context (test) or no tracked command (e.g. reconcile task).
+      return;
+    }
+    context.updateCommandStatus(cmdId, updater);
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
@@ -455,12 +472,7 @@ public final class ReplicationSupervisor {
 
     private void updateCommandStatus(AbstractReplicationTask t,
         Consumer<CommandStatus> updater) {
-      long cmdId = t.getCommandId();
-      if (context == null || cmdId == 0) {
-        // No SCM context (test) or no tracked command (e.g. reconcile task).
-        return;
-      }
-      context.updateCommandStatus(cmdId, updater);
+      ReplicationSupervisor.this.updateCommandStatus(t, updater);
     }
 
     @Override
