@@ -1150,14 +1150,16 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().getContainerReport();
   }
 
+  /*
+   * This command is deprecated and is retained for backward compatibility. It no longer finalizes SCM
+   * as the process is driven from OM which will trigger the SCM finalize process.
+   */
   @Override
   @Deprecated
-  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
-      IOException {
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) {
     if (!scm.getVersionManager().needsFinalization()) {
       return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
     }
-    finalizeUpgrade();
     return new StatusAndMessages(STARTING_FINALIZATION, Collections.emptyList());
   }
 

@@ -19,12 +19,16 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -48,8 +52,11 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
@@ -179,6 +186,47 @@ public class TestSCMClientProtocolServer {
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeAlreadyFinalized() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(false, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(ALREADY_FINALIZED, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  @Test
+  public void testLegacyFinalizeScmUpgradeFinalizationRequired() throws Exception {
+    FinalizationManager mockFinalizationManager = mock(FinalizationManager.class);
+    SCMClientProtocolServer testServer = serverWithMockFinalization(true, mockFinalizationManager);
+    try {
+      StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
+      assertEquals(STARTING_FINALIZATION, result.status());
+      assertTrue(result.msgs().isEmpty());
+      verify(mockFinalizationManager, never()).finalizeUpgrade();
+    } finally {
+      testServer.stop();
+    }
+  }
+
+  private SCMClientProtocolServer serverWithMockFinalization(
+      boolean needsFinalization, FinalizationManager finalizationManager) throws IOException {
+    ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
+    when(mockVersionManager.needsFinalization()).thenReturn(needsFinalization);
+
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    when(mockScm.getVersionManager()).thenReturn(mockVersionManager);
+    when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
+
+    return new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
   }
 
   @Test
