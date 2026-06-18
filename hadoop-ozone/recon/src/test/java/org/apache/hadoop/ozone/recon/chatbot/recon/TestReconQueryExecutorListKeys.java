@@ -48,21 +48,9 @@ public class TestReconQueryExecutorListKeys {
     handler = new ReconQueryExecutor(router);
   }
 
-  @Test
-  public void testListKeysMissingPrefix() {
-    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-        () -> handler.execute("api_v1_keys_listKeys", Collections.emptyMap()));
-    assertTrue(ex.getMessage().contains("requires 'startPrefix'"));
-  }
-
-  @Test
-  public void testListKeysRootPrefix() {
-    Map<String, String> params = new HashMap<>();
-    params.put("startPrefix", "/");
-    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-        () -> handler.execute("api_v1_keys_listKeys", params));
-    assertTrue(ex.getMessage().contains("requires 'startPrefix'"));
-  }
+  // Note: bucket-scoped startPrefix validation for listKeys is enforced upstream by
+  // ChatbotAgent.validateToolCall (see TestChatbotAgentListKeysPolicy), not by this executor.
+  // ReconQueryExecutor is only responsible for the limit clamp and prevKey strip.
 
   @Test
   public void testListKeysLimitClampAndPrevKeyStrip() throws Exception {

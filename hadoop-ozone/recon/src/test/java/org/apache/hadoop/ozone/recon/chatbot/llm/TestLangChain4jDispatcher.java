@@ -135,14 +135,20 @@ public class TestLangChain4jDispatcher {
 
   @Test
   public void testExplicitProviderRoutesCorrectly() {
+    // An explicit provider is honored only when that provider is configured with an API key;
+    // routing never falls back to an unconfigured provider. Configure openai so the explicit
+    // request is actually routed there.
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "fake-openai-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+
     List<LLMClient.ChatMessage> messages = new ArrayList<>();
     messages.add(new LLMClient.ChatMessage("user", "hello"));
 
     LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-        dispatcher.chatCompletion(messages, "any-model-name", "openai", new GenParams(0.1, 1000), null));
+        dispatcher.chatCompletion(messages, "gpt-4.1", "openai", new GenParams(0.1, 1000), null));
 
     assertTrue(ex.getMessage().toLowerCase().contains("openai"),
-        "Explicit provider should route to openai");
+        "Explicit configured provider should route to openai");
   }
 
   @Test

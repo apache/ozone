@@ -67,4 +67,12 @@ public class ReconApiAllowlist {
     }
     return EXACT_ROUTES.contains(toolName);
   }
+
+  /**
+   * Returns the immutable set of registered tool names. Used to keep the allowlist, the LLM tool
+   * catalog, and the router in sync (see TestReconToolCatalogConsistency).
+   */
+  public Set<String> getRegisteredTools() {
+    return EXACT_ROUTES;
+  }
 }

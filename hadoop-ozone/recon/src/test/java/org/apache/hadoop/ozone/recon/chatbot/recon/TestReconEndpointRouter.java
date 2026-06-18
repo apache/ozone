@@ -122,4 +122,72 @@ public class TestReconEndpointRouter {
   public void testRouteInvalidPath() {
     assertThrows(IllegalArgumentException.class, () -> router.route("api_v1_invalid", Collections.emptyMap()));
   }
+
+  // ── Per-tool parameter extraction (catches a miswired case or transposed argument) ──────────
+
+  @Test
+  public void testRouteMissingContainersPassesLimit() throws Exception {
+    router.route("api_v1_containers_missing", params("limit", "250"));
+    verify(containerEndpoint).getMissingContainers(250);
+  }
+
+  @Test
+  public void testRouteContainersMismatchPassesMissingIn() throws Exception {
+    router.route("api_v1_containers_mismatch", params("missingIn", "OM"));
+    verify(containerEndpoint).getContainerMisMatchInsights(1000, 0L, "OM");
+  }
+
+  @Test
+  public void testRouteQuasiClosedPassesMinContainerId() throws Exception {
+    router.route("api_v1_containers_quasiClosed", params("minContainerId", "42"));
+    verify(containerEndpoint).getQuasiClosedContainers(1000, 42L);
+  }
+
+  @Test
+  public void testRouteOpenKeysPassesIncludeFlagsAndPrefix() throws Exception {
+    router.route("api_v1_keys_open",
+        params("includeFso", "true", "includeNonFso", "false", "startPrefix", "/vol1/bucket1"));
+    verify(omdbInsightEndpoint).getOpenKeyInfo(1000, "", "/vol1/bucket1", true, false);
+  }
+
+  @Test
+  public void testRouteListKeysPassesFilters() throws Exception {
+    router.route("api_v1_keys_listKeys",
+        params("replicationType", "EC", "keySize", "1024", "startPrefix", "/vol1/bucket1"));
+    verify(omdbInsightEndpoint).listKeys("EC", null, 1024L, "/vol1/bucket1", "", 1000);
+  }
+
+  @Test
+  public void testRouteBucketsPassesVolume() throws Exception {
+    router.route("api_v1_buckets", params("volume", "vol1"));
+    verify(bucketEndpoint).getBuckets("vol1", 1000, "");
+  }
+
+  @Test
+  public void testRouteFileCountPassesVolumeBucketSize() throws Exception {
+    router.route("api_v1_utilization_fileCount",
+        params("volume", "vol1", "bucket", "bucket1", "fileSize", "2048"));
+    verify(utilizationEndpoint).getFileCounts("vol1", "bucket1", 2048L);
+  }
+
+  @Test
+  public void testRouteContainerCountPassesSize() throws Exception {
+    router.route("api_v1_utilization_containerCount", params("containerSize", "4096"));
+    verify(utilizationEndpoint).getContainerCounts(4096L);
+  }
+
+  @Test
+  public void testRouteNamespaceUsagePassesPathAndFlags() throws Exception {
+    router.route("api_v1_namespace_usage",
+        params("path", "/vol1/bucket1", "files", "true", "replica", "true"));
+    verify(nsSummaryEndpoint).getDiskUsage("/vol1/bucket1", true, true, false);
+  }
+
+  private static Map<String, String> params(String... kv) {
+    Map<String, String> m = new HashMap<>();
+    for (int i = 0; i < kv.length; i += 2) {
+      m.put(kv[i], kv[i + 1]);
+    }
+    return m;
+  }
 }
