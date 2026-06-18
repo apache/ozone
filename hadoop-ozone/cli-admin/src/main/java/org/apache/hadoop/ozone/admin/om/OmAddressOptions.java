@@ -126,21 +126,8 @@ public final class OmAddressOptions {
     )
     private String serviceID;
 
-    /** For backward compatibility. */
-    @CommandLine.Option(
-        names = {"-id"},
-        hidden = true,
-        required = true
-    )
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    private String deprecatedID;
-
     public String getServiceID() {
-      if (serviceID != null) {
-        return serviceID;
-      }
-      return deprecatedID;
+      return serviceID;
     }
 
     @Override
@@ -159,18 +146,8 @@ public final class OmAddressOptions {
     )
     private String host;
 
-    /** For backward compatibility. */
-    @CommandLine.Option(
-        names = {"-host"},
-        hidden = true,
-        required = true
-    )
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    private String deprecatedHost;
-
     public String getHost() {
-      return host != null ? host : deprecatedHost;
+      return host;
     }
 
     @Override

@@ -23,11 +23,7 @@ import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,7 +56,7 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"-conf", "--conf"},
+  @Option(names = {"--conf"},
       description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
     config.addResource(new Path(configPath));
@@ -73,40 +69,14 @@ public abstract class GenericCli implements GenericParentCommand {
   public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
     ExtensibleParentCommand.addSubcommands(cmd);
+    cmd.getCommandSpec().preprocessor((args, commandSpec, argSpec, info) -> {
+      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, cmd.getErr()));
+      return false;
+    });
+
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
-    });
-    cmd.setExecutionStrategy(parseResult -> {
-      DeprecatedCliOption.warnIfMatched(parseResult);
-      return new CommandLine.RunLast().execute(parseResult);
-    });
-    cmd.setHelpFactory((commandSpec, colorScheme) -> new CommandLine.Help(commandSpec, colorScheme) {
-      @Override
-      public IOptionRenderer createDefaultOptionRenderer() {
-        IOptionRenderer delegate = super.createDefaultOptionRenderer();
-        return (option, parameterLabelRenderer, scheme) -> {
-          return delegate.render(withoutDeprecated(option), parameterLabelRenderer, scheme);
-        };
-      }
-
-      @Override
-      protected Ansi.Text createDetailedSynopsisOptionsText(Collection<CommandLine.Model.ArgSpec> done,
-          List<CommandLine.Model.OptionSpec> optionList, Comparator<CommandLine.Model.OptionSpec> optionSort,
-          boolean clusterBooleanOptions) {
-        List<CommandLine.Model.OptionSpec> withoutDeprecated = optionList.stream()
-            .map(this::withoutDeprecated)
-            .collect(Collectors.toList());
-        return super.createDetailedSynopsisOptionsText(done, withoutDeprecated, optionSort, clusterBooleanOptions);
-      }
-
-      private CommandLine.Model.OptionSpec withoutDeprecated(CommandLine.Model.OptionSpec option) {
-        String[] names = option.names();
-        String[] nonDeprecated = DeprecatedCliOption.withoutDeprecated(names);
-        return nonDeprecated.length < names.length
-            ? option.toBuilder().names(nonDeprecated).build()
-            : option;
-      }
     });
   }
 

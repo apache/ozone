@@ -67,12 +67,12 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
-  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
+  @CommandLine.Option(names = {"--nodeid"},
       description = "NodeID of the OM to be decommissioned.",
       required = true)
   private String decommNodeId;
 
-  @CommandLine.Option(names = {"-hostname", "--node-host-address"},
+  @CommandLine.Option(names = {"--node-host-address"},
       description = "Host name/address of the OM to be decommissioned.",
       required = true)
   private String hostname;

@@ -21,36 +21,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import org.apache.hadoop.hdds.scm.cli.pipeline.ListPipelinesSubcommand;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 /**
- * Tests for deprecated CLI option warnings.
+ * Tests for deprecated CLI option warnings of @{code ozone admin}.
  */
-public class TestDeprecatedCliOption {
+class TestOzoneAdminDeprecatedOptions {
+
+  private CommandLine cli;
   private StringWriter err;
 
   @BeforeEach
   public void setup() {
     err = new StringWriter();
+    cli = createCommandLine();
   }
 
-  private CommandLine createCommandLine(Object command) {
-    CommandLine cli = new CommandLine(command);
-    cli.setErr(new PrintWriter(err, true));
-    cli.setExecutionStrategy(parseResult -> {
-      DeprecatedCliOption.warnIfMatched(parseResult);
-      return CommandLine.ExitCode.OK;
-    });
-    return cli;
+  private CommandLine createCommandLine() {
+    OzoneAdmin command = new OzoneAdmin();
+    CommandLine cmd = command.getCmd();
+    cmd.setErr(new PrintWriter(err, true));
+    cmd.setExecutionStrategy(parseResult -> CommandLine.ExitCode.OK);
+    return cmd;
   }
 
-  @Test
-  public void warnsForDeprecatedOption() {
-    createCommandLine(new ListPipelinesSubcommand())
-        .execute("-ffc", "THREE");
+  @ParameterizedTest
+  @ValueSource(strings = {"-ffc THREE", "-ffc=ONE"})
+  public void warnsForDeprecatedOption(String arg) {
+    execute("pipeline list " + arg);
 
     assertThat(err.toString())
         .contains("WARNING: Option '-ffc' is deprecated")
@@ -59,19 +62,22 @@ public class TestDeprecatedCliOption {
 
   @Test
   public void warnsForMultipleDeprecatedOptions() {
-    createCommandLine(new ListPipelinesSubcommand())
-        .execute("-ffc", "THREE", "-fst", "OPEN");
+    execute("pipeline list -ffc THREE -fst OPEN");
 
     assertThat(err.toString())
         .contains("WARNING: Option '-ffc' is deprecated")
         .contains("WARNING: Option '-fst' is deprecated");
   }
 
-  @Test
-  public void doesNotWarnForLongOption() {
-    createCommandLine(new ListPipelinesSubcommand())
-        .execute("--filter-by-factor", "THREE");
+  @ParameterizedTest
+  @ValueSource(strings = {"--filter-by-factor=THREE", "--filter-by-factor ONE"})
+  public void doesNotWarnForLongOption(String arg) {
+    execute("pipeline list " + arg);
 
     assertThat(err.toString()).isEmpty();
+  }
+
+  private void execute(String cmd) {
+    cli.execute(cmd.split(" "));
   }
 }

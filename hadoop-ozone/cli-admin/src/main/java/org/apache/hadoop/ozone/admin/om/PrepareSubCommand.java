@@ -57,7 +57,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
-      names = {"-tawt", "--transaction-apply-wait-timeout"},
+      names = {"--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
       defaultValue = "120",
@@ -66,7 +66,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long txnApplyWaitTimeSeconds;
 
   @CommandLine.Option(
-      names = {"-tact", "--transaction-apply-check-interval"},
+      names = {"--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
           "all transactions to be applied to the OM DB.",
       defaultValue = "5",
@@ -75,7 +75,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long txnApplyCheckIntervalSeconds;
 
   @CommandLine.Option(
-      names = {"-pct", "--prepare-check-interval"},
+      names = {"--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
           " preparation.",
       defaultValue = "10",
@@ -84,7 +84,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long prepareCheckInterval;
 
   @CommandLine.Option(
-      names = {"-pt", "--prepare-timeout"},
+      names = {"--prepare-timeout"},
       description = "Max time in SECONDS to wait for all OMs to be prepared",
       defaultValue = "300",
       hidden = true
