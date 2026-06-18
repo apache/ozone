@@ -483,8 +483,8 @@ public class PipelineManagerImpl implements PipelineManager {
       if (containerManager.getContainer(containerID).getState() ==
           HddsProtos.LifeCycleState.CLOSING) {
         eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
-        LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
       }
+      LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
 
