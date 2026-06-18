@@ -80,6 +80,7 @@ import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
+import org.apache.hadoop.hdds.scm.command.ReplicationStatusHandler;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -604,9 +605,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS,
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.REPLICATION_STATUS,
-        (status, publisher) -> status.getCmdStatus().forEach(cmdStatus ->
-            containerReplicaPendingOps.onReplicationCommandFailed(
-                cmdStatus.getCmdId())));
+        new ReplicationStatusHandler(containerReplicaPendingOps, scmContext));
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.RECONCILE_CONTAINER, reconcileContainerEventHandler);
