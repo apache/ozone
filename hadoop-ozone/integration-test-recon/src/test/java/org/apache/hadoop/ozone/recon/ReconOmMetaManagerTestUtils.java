@@ -27,7 +27,7 @@ import org.apache.ozone.test.GenericTestUtils;
 /**
  * Utility methods for Recon OM metadata manager integration tests.
  */
-public final class ReconOmMetaManagerTestUtils {
+final class ReconOmMetaManagerTestUtils {
 
   private ReconOmMetaManagerTestUtils() {
   }
@@ -39,8 +39,7 @@ public final class ReconOmMetaManagerTestUtils {
    *
    * @return CompletableFuture that completes when buffer is empty
    */
-  public static CompletableFuture<Void> waitForEventBufferEmpty(
-      OMUpdateEventBuffer eventBuffer) {
+  static CompletableFuture<Void> waitForEventBufferEmpty(OMUpdateEventBuffer eventBuffer) {
     return CompletableFuture.runAsync(() -> {
       try {
         GenericTestUtils.waitFor(() -> eventBuffer.getQueueSize() == 0, 100, 30000);
@@ -64,7 +63,7 @@ public final class ReconOmMetaManagerTestUtils {
    * @param minimumCountPerContainer map of container ID to minimum inclusive key count
    * @throws Exception               if the condition is not met within the timeout or on interrupt
    */
-  public static void waitUntilReconKeyCounts(ReconContainerMetadataManager mgr,
+  static void waitUntilReconKeyCounts(ReconContainerMetadataManager mgr,
       Map<Long, Integer> minimumCountPerContainer) throws Exception {
     GenericTestUtils.waitFor(() -> {
       try {

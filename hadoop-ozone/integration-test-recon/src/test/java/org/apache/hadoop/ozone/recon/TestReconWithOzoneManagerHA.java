@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -143,7 +145,7 @@ public class TestReconWithOzoneManagerHA {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        ReconOmMetaManagerTestUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
@@ -151,7 +153,7 @@ public class TestReconWithOzoneManagerHA {
     long containerId = getContainerIdForKey(ozoneManager.get(), VOL_NAME, VOL_NAME, keyPrefix);
     Map<Long, Integer> requiredKeyCountByContainer =
         Collections.singletonMap(containerId, 1);
-    ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+    waitUntilReconKeyCounts(reconContainerMetadataManager,
         requiredKeyCountByContainer);
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
