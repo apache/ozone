@@ -176,8 +176,8 @@ public final class BlockOutputStreamWriteBenchmark {
         System.out.printf("===== writeSize=%dKB scaling study =====%n%n", writeSize / 1024);
         for (int threadCount : threadCounts) {
           for (boolean heapBuffer : new boolean[] {false, true}) {
-              final Result result = runProfile(sourceBuffer, writeSize, heapBuffer,
-                checksumType, threadCount, sharedClient);
+            final Result result = runProfile(sourceBuffer, writeSize, heapBuffer, checksumType,
+                threadCount, sharedClient);
             rows.add(new ScalingRow(writeSize, threadCount, heapBuffer, result.mbPerSec));
             System.out.println();
           }
@@ -301,9 +301,9 @@ public final class BlockOutputStreamWriteBenchmark {
       BenchmarkMockXceiverClient client)
       throws Exception {
     runTimedWrite(sourceBuffer, writeSize, heapBuffer, checksumType,
-        threadCount, WARMUP_SECONDS, "warmup", client);
+        threadCount, WARMUP_SECONDS, client);
     return runTimedWrite(sourceBuffer, writeSize, heapBuffer, checksumType,
-        threadCount, BENCHMARK_SECONDS, "benchmark", client);
+        threadCount, BENCHMARK_SECONDS, client);
   }
 
   private static int[] resolveWriteSizes() {
@@ -337,7 +337,7 @@ public final class BlockOutputStreamWriteBenchmark {
 
   private static Result runTimedWrite(byte[] sourceBuffer, int writeSize,
       boolean heapBuffer, ChecksumType checksumType, int threadCount,
-      int seconds, String phase, BenchmarkMockXceiverClient client) throws Exception {
+      int seconds, BenchmarkMockXceiverClient client) throws Exception {
     final long writeChunksBefore =
         ContainerClientMetrics.acquire().getWriteChunksDuringWrite().value();
     final long flushesBefore =
@@ -366,15 +366,13 @@ public final class BlockOutputStreamWriteBenchmark {
 
       final long elapsedNanos = System.nanoTime() - start;
       final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
-      System.out.printf("%s complete (%.2fs)%n", phase, elapsedSeconds);
+      System.out.printf("complete (%.2fs)%n", elapsedSeconds);
 
       return new Result(
           bytesWritten,
           writeOps,
           blocksWritten,
           elapsedSeconds,
-          bytesWritten / elapsedSeconds / (1024.0 * 1024.0),
-          writeOps == 0 ? 0 : (double) elapsedNanos / writeOps,
           ContainerClientMetrics.acquire().getWriteChunksDuringWrite().value()
               - writeChunksBefore,
           ContainerClientMetrics.acquire().getFlushesDuringWrite().value()
@@ -513,14 +511,13 @@ public final class BlockOutputStreamWriteBenchmark {
     private final long flushesDuringWrite;
 
     private Result(long bytesWritten, long writeOps, long blocksWritten, double elapsedSeconds,
-        double mbPerSec, double nsPerWrite, long writeChunksDuringWrite,
-        long flushesDuringWrite) {
+        long writeChunksDuringWrite, long flushesDuringWrite) {
       this.bytesWritten = bytesWritten;
       this.writeOps = writeOps;
       this.blocksWritten = blocksWritten;
       this.elapsedSeconds = elapsedSeconds;
-      this.mbPerSec = mbPerSec;
-      this.nsPerWrite = nsPerWrite;
+      this.mbPerSec = bytesWritten / elapsedSeconds / (1024.0 * 1024.0);
+      this.nsPerWrite = writeOps == 0 ? 0 : elapsedSeconds * 1e9 / writeOps;
       this.writeChunksDuringWrite = writeChunksDuringWrite;
       this.flushesDuringWrite = flushesDuringWrite;
     }
