@@ -72,7 +72,15 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private String snapshotPath; // snapshot mask
   private boolean deepClean;
   private boolean sstFiltered;
+  /**
+   * The total logical data size (in bytes, unreplicated) referenced by the snapshot
+   * at the time of its creation.
+   */
   private long referencedSize;
+  /**
+   * The total replicated data size (in bytes, replicated) referenced by the snapshot
+   * at the time of its creation.
+   */
   private long referencedReplicatedSize;
   /**
    * The amount of data (in bytes, unreplicated) exclusively referenced by this snapshot,
@@ -345,13 +353,18 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    /** @param referencedSize - Snapshot referenced size. */
+    /**
+     * @param referencedSize - The total logical data size (in bytes, unreplicated)
+     * referenced by the snapshot at the time of its creation.
+     */
     public Builder setReferencedSize(long referencedSize) {
       this.referencedSize = referencedSize;
       return this;
     }
 
-    /** @param referencedReplicatedSize - Snapshot referenced size w/ replication. */
+    /**
+     * @param referencedReplicatedSize - Same as referencedSize, but scaled by the replication factor.
+     */
     public Builder setReferencedReplicatedSize(long referencedReplicatedSize) {
       this.referencedReplicatedSize = referencedReplicatedSize;
       return this;
@@ -593,6 +606,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedSize = referencedSize;
   }
 
+  /**
+   * Returns the total logical data size (in bytes, unreplicated) referenced by the snapshot
+   * at the time of its creation.
+   */
   public long getReferencedSize() {
     return referencedSize;
   }
@@ -601,6 +618,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = referencedReplicatedSize;
   }
 
+  /**
+   * Returns the total replicated data size (in bytes, replicated) referenced by the snapshot
+   * at the time of its creation.
+   */
   public long getReferencedReplicatedSize() {
     return referencedReplicatedSize;
   }
