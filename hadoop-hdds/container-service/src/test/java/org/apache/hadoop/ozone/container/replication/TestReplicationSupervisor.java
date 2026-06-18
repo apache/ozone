@@ -856,9 +856,7 @@ public class TestReplicationSupervisor {
     cmd.setTerm(CURRENT_TERM);
     context.addCmdStatus(cmd);
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
-    assertEquals(
-        EXECUTED,
-        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
   @Test
@@ -871,9 +869,7 @@ public class TestReplicationSupervisor {
         __ -> task -> task.setStatus(AbstractReplicationTask.Status.FAILED),
         newDirectExecutorService());
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
-    assertEquals(
-        FAILED,
-        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+    assertEquals(FAILED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
   @Test
@@ -888,9 +884,7 @@ public class TestReplicationSupervisor {
     cmd.setTerm(CURRENT_TERM);
     context.addCmdStatus(cmd);
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
-    assertEquals(
-        EXECUTED,
-        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
   @Test
@@ -908,9 +902,7 @@ public class TestReplicationSupervisor {
     // Advance clock past the deadline
     clock.fastForward(10000);
     supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
-    assertEquals(
-        FAILED,
-        context.getCommandStatusMap().get(cmd.getId()).getStatus());
+    assertEquals(FAILED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
   private static class BlockingTask extends AbstractReplicationTask {

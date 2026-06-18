@@ -766,9 +766,7 @@ public class TestStateContext {
     CommandStatus status = ctx.getCommandStatusMap().get(cmd.getId());
     assertNotNull(status);
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, status.getType());
-    assertEquals(
-        PENDING,
-        status.getStatus());
+    assertEquals(PENDING, status.getStatus());
   }
 
   private static StateContext createSubject() throws IOException {
