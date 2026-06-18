@@ -184,9 +184,8 @@ public final class ReplicateContainerCommand
     } else {
       sb.append(", sourceNodes=").append(sourceDatanodes);
     }
-    sb.append(", priority=").append(priority);
-    sb.append(", peerApparentVersion=")
-        .append(peerApparentVersion);
+    sb.append(", priority=").append(priority)
+        .append(", peerApparentVersion=").append(peerApparentVersion);
     return sb.toString();
   }
 }

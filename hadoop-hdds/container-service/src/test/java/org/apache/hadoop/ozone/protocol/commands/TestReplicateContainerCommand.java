@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
 import java.util.List;
@@ -97,8 +98,7 @@ public class TestReplicateContainerCommand {
         HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
 
     String str = cmd.toString();
-    assertEquals(true,
-        str.contains("peerApparentVersion="
-            + HDDSVersion.STREAM_BLOCK_SUPPORT.serialize()));
+    assertTrue(str.contains("peerApparentVersion="
+        + HDDSVersion.STREAM_BLOCK_SUPPORT.serialize()));
   }
 }
