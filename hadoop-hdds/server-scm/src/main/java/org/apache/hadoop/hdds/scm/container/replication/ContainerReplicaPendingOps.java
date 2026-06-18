@@ -36,6 +36,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
@@ -63,6 +65,7 @@ public class ContainerReplicaPendingOps {
   // tracks how much data is pending to be added to a target Datanode because of pending ADD ops
   private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
   private ReplicationManager.ReplicationManagerConfiguration rmConf;
+  private volatile NodeManager nodeManager;
 
   /**
    * Creates a ContainerReplicaPendingOps with all parameters.
@@ -75,6 +78,10 @@ public class ContainerReplicaPendingOps {
     this.clock = clock;
     this.rmConf = rmConf;
     resetCounters();
+  }
+
+  public void setNodeManager(NodeManager nm) {
+    this.nodeManager = nm;
   }
 
   /**
@@ -350,6 +357,13 @@ public class ContainerReplicaPendingOps {
         });
       }
       incrementCounter(opType, replicaIndex);
+      // Record container allocation to the pending tracker.
+      if (opType == ADD && nodeManager != null) {
+        DatanodeInfo dnInfo = nodeManager.getDatanodeInfo(target);
+        if (dnInfo != null) {
+          nodeManager.recordAllocationForDatanode(dnInfo, containerID);
+        }
+      }
     } finally {
       unlock(lock);
     }
@@ -382,6 +396,13 @@ public class ContainerReplicaPendingOps {
                 }
                 return new SizeAndTime(newSize, v.getLastUpdatedTime());
               });
+              // Release the PendingContainerTracker slot for this ADD op.
+              if (nodeManager != null) {
+                DatanodeInfo dnInfo = nodeManager.getDatanodeInfo(target);
+                if (dnInfo != null) {
+                  nodeManager.removePendingAllocationForDatanode(dnInfo, containerID);
+                }
+              }
             }
             decrementCounter(op.getOpType(), replicaIndex);
           }

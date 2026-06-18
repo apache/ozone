@@ -157,13 +157,11 @@ public abstract class MisReplicationHandler implements
         .getTargetDatanodes(containerPlacement, requiredNodes,
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
-            container, replicationManager.getNodeManager());
+            container);
     List<DatanodeDetails> availableSources = sources.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
 
-    // Each sendReplicateCommands implementation rolls back only the slots
-    // for targets whose commands were not actually dispatched.
     int count = sendReplicateCommands(container, replicasToBeReplicated,
         availableSources, targetDatanodes);
 

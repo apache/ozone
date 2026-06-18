@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -581,5 +583,58 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries();
     assertNull(scheduled.get(dn2.getID()));
     assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+  }
+
+  /**
+   * scheduleAddReplica must call NodeManager#recordAllocationForDatanode for
+   * the target DN so the PendingContainerTracker slot is reserved.
+   */
+  @Test
+  public void testScheduleAddReplicaRecordsSlotInNodeManager() {
+    NodeManager nodeManager = mock(NodeManager.class);
+    DatanodeInfo dnInfo = mock(DatanodeInfo.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+    when(nodeManager.getDatanodeInfo(dn1)).thenReturn(dnInfo);
+
+    pendingOps.setNodeManager(nodeManager);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+
+    verify(nodeManager, times(1)).recordAllocationForDatanode(dnInfo, containerID);
+  }
+
+  /**
+   * scheduleDeleteReplica must NOT touch the NodeManager — only ADD ops
+   * consume container slots in the PendingContainerTracker.
+   */
+  @Test
+  public void testScheduleDeleteReplicaDoesNotRecordSlot() {
+    NodeManager nodeManager = mock(NodeManager.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+
+    pendingOps.setNodeManager(nodeManager);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
+
+    verifyNoMoreInteractions(nodeManager);
+  }
+
+  /**
+   * completeAddReplica (called by ICR handler) must release the slot via
+   * NodeManager#removePendingAllocationForDatanode.
+   */
+  @Test
+  public void testCompleteAddReplicaReleasesSlotInNodeManager() {
+    NodeManager nodeManager = mock(NodeManager.class);
+    DatanodeInfo dnInfo = mock(DatanodeInfo.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+    when(nodeManager.getDatanodeInfo(dn1)).thenReturn(dnInfo);
+
+    pendingOps.setNodeManager(nodeManager);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.completeAddReplica(containerID, dn1, 0);
+
+    verify(nodeManager, times(1)).recordAllocationForDatanode(dnInfo, containerID);
+    verify(nodeManager, times(1)).removePendingAllocationForDatanode(dnInfo, containerID);
   }
 }

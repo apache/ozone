@@ -413,8 +413,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     return ReplicationManagerUtil.getTargetDatanodes(
         containerPlacement, requiredNodes,
         usedNodes, excludedNodes,
-        currentContainerSize, container,
-        replicationManager.getNodeManager());
+        currentContainerSize, container);
   }
 
   /**
@@ -601,27 +600,19 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     DatanodeDetails target = iterator.next();
     final long containerID = container.getContainerID();
 
-    try {
-      if (push) {
-        replicationManager.sendThrottledReplicationCommand(
-            container, Collections.singletonList(source), target,
-            replica.getReplicaIndex());
-      } else {
-        ReplicateContainerCommand replicateCommand =
-            ReplicateContainerCommand.fromSources(containerID,
-            ImmutableList.of(source));
-        // For EC containers, we need to track the replica index which is
-        // to be replicated, so add it to the command.
-        replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-        replicationManager.sendDatanodeCommand(replicateCommand, container,
-            target);
-      }
-    } catch (CommandTargetOverloadedException | NotLeaderException e) {
-      // Roll back the PendingContainerTracker slot: target was recorded by getTargetDatanodes
-      // but no replication command was dispatched.
-      ReplicationManagerUtil.rollbackTargets(
-          Collections.singletonList(target), container, replicationManager.getNodeManager());
-      throw e;
+    if (push) {
+      replicationManager.sendThrottledReplicationCommand(
+          container, Collections.singletonList(source), target,
+          replica.getReplicaIndex());
+    } else {
+      ReplicateContainerCommand replicateCommand =
+          ReplicateContainerCommand.fromSources(containerID,
+          ImmutableList.of(source));
+      // For EC containers, we need to track the replica index which is
+      // to be replicated, so add it to the command.
+      replicateCommand.setReplicaIndex(replica.getReplicaIndex());
+      replicationManager.sendDatanodeCommand(replicateCommand, container,
+          target);
     }
     adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
   }

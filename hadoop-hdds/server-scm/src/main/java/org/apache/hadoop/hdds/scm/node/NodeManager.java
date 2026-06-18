@@ -196,6 +196,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
+   * Records a container allocation on the given datanode.
+   * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
+   * available space — it is called after the placement policy has already
+   * validated space and a replication command has been committed.
+   */
+  void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
    * Removes a pending container allocation from a datanode.
    *
    * @param datanodeInfo info about the datanode

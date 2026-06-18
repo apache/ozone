@@ -240,16 +240,12 @@ public class RatisUnderReplicationHandler
       // find a target for each source and send replicate command
       final List<DatanodeDetails> target =
           ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
-              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container,
-              replicationManager.getNodeManager());
+              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container);
       int count = 0;
       try {
         count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
       } catch (CommandTargetOverloadedException e) {
         LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
-        // Roll back the PendingContainerTracker slot: target was recorded by getTargetDatanodes
-        // but no replication command was dispatched.
-        ReplicationManagerUtil.rollbackTargets(target, container, replicationManager.getNodeManager());
         if (firstException == null) {
           firstException = e;
         }
@@ -467,8 +463,7 @@ public class RatisUnderReplicationHandler
 
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
         replicaCount.additionalReplicaNeeded(), used, excluded,
-        currentContainerSize, replicaCount.getContainer(),
-        replicationManager.getNodeManager());
+        currentContainerSize, replicaCount.getContainer());
   }
 
   private int sendReplicationCommands(

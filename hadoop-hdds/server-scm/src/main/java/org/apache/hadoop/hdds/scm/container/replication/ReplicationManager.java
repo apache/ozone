@@ -232,6 +232,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
+    this.containerReplicaPendingOps.setNodeManager(nodeManager);
     this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);

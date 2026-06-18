@@ -26,21 +26,14 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -51,14 +44,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -364,132 +354,6 @@ public class TestReplicationManagerUtil {
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(remove.getDatanodeDetails());
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(pendingDelete);
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(fullDn);
-  }
-
-  @Test
-  public void testGetTargetDatanodesRecordsAllConfirmedTargets()
-      throws Exception {
-    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-
-    DatanodeDetails target1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails target2 = MockDatanodeDetails.randomDatanodeDetails();
-
-    PlacementPolicy policy = mock(PlacementPolicy.class);
-    when(policy.chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong()))
-        .thenReturn(Arrays.asList(target1, target2));
-
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo info1 = mock(DatanodeInfo.class);
-    DatanodeInfo info2 = mock(DatanodeInfo.class);
-    when(nodeManager.getDatanodeInfo(target1)).thenReturn(info1);
-    when(nodeManager.getDatanodeInfo(target2)).thenReturn(info2);
-    when(nodeManager.checkSpaceAndRecordAllocation(any(), any())).thenReturn(true);
-
-    List<DatanodeDetails> result = ReplicationManagerUtil.getTargetDatanodes(
-        policy, 2, null, new ArrayList<>(), 5L * 1024 * 1024 * 1024, container, nodeManager);
-
-    assertEquals(2, result.size());
-    verify(nodeManager, times(1)).checkSpaceAndRecordAllocation(info1, container.containerID());
-    verify(nodeManager, times(1)).checkSpaceAndRecordAllocation(info2, container.containerID());
-  }
-
-  /**
-   * When checkSpaceAndRecordAllocation returns false for a candidate, that node is excluded
-   * and the placement policy is called again to find a replacement.
-   */
-  @Test
-  public void testGetTargetDatanodesRetriesWhenPendingTrackerRejects()
-      throws Exception {
-    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-
-    DatanodeDetails rejected = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails replacement = MockDatanodeDetails.randomDatanodeDetails();
-
-    PlacementPolicy policy = mock(PlacementPolicy.class);
-    when(policy.chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong()))
-        .thenReturn(Arrays.asList(rejected))
-        .thenReturn(Arrays.asList(replacement));
-
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo rejectedInfo = mock(DatanodeInfo.class);
-    DatanodeInfo replacementInfo = mock(DatanodeInfo.class);
-    when(nodeManager.getDatanodeInfo(rejected)).thenReturn(rejectedInfo);
-    when(nodeManager.getDatanodeInfo(replacement)).thenReturn(replacementInfo);
-    when(nodeManager.checkSpaceAndRecordAllocation(rejectedInfo, container.containerID()))
-        .thenReturn(false);
-    when(nodeManager.checkSpaceAndRecordAllocation(replacementInfo, container.containerID()))
-        .thenReturn(true);
-
-    List<DatanodeDetails> result = ReplicationManagerUtil.getTargetDatanodes(
-        policy, 1, null, new ArrayList<>(), 5L * 1024 * 1024 * 1024, container, nodeManager);
-
-    assertEquals(1, result.size());
-    assertEquals(replacement, result.get(0));
-    verify(policy, times(2)).chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong());
-    verify(nodeManager, times(1)).checkSpaceAndRecordAllocation(rejectedInfo, container.containerID());
-    verify(nodeManager, times(1)).checkSpaceAndRecordAllocation(replacementInfo, container.containerID());
-  }
-
-  /**
-   * When a node is not found in NodeManager, it is excluded and the policy is retried
-   * for a replacement node — same behaviour as a PendingContainerTracker rejection.
-   */
-  @Test
-  public void testGetTargetDatanodesRetriesForUnknownDatanode()
-      throws Exception {
-    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-
-    DatanodeDetails unknown = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails replacement = MockDatanodeDetails.randomDatanodeDetails();
-
-    PlacementPolicy policy = mock(PlacementPolicy.class);
-    when(policy.chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong()))
-        .thenReturn(Arrays.asList(unknown))
-        .thenReturn(Arrays.asList(replacement));
-
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo replacementInfo = mock(DatanodeInfo.class);
-    when(nodeManager.getDatanodeInfo(unknown)).thenReturn(null);
-    when(nodeManager.getDatanodeInfo(replacement)).thenReturn(replacementInfo);
-    when(nodeManager.checkSpaceAndRecordAllocation(replacementInfo, container.containerID()))
-        .thenReturn(true);
-
-    List<DatanodeDetails> result = ReplicationManagerUtil.getTargetDatanodes(
-        policy, 1, null, new ArrayList<>(), 5L * 1024 * 1024 * 1024, container, nodeManager);
-
-    assertEquals(1, result.size());
-    assertEquals(replacement, result.get(0));
-    verify(policy, times(2)).chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong());
-  }
-
-  /**
-   * If checkSpaceAndRecordAllocation keeps rejecting nodes until the policy exhausts
-   * the cluster, getTargetDatanodes throws SCMException (no nodes selected at all).
-   */
-  @Test
-  public void testGetTargetDatanodesThrowsWhenAllNodesRejected()
-      throws Exception {
-    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-
-    DatanodeDetails alwaysRejected = MockDatanodeDetails.randomDatanodeDetails();
-
-    PlacementPolicy policy = mock(PlacementPolicy.class);
-    when(policy.chooseDatanodes(any(), any(), anyInt(), anyLong(), anyLong()))
-        .thenReturn(Arrays.asList(alwaysRejected))
-        .thenThrow(new IOException("No nodes available"));
-
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo rejectedInfo = mock(DatanodeInfo.class);
-    when(nodeManager.getDatanodeInfo(alwaysRejected)).thenReturn(rejectedInfo);
-    when(nodeManager.checkSpaceAndRecordAllocation(any(), any())).thenReturn(false);
-
-    assertThrows(SCMException.class, () ->
-        ReplicationManagerUtil.getTargetDatanodes(
-            policy, 1, null, new ArrayList<>(), 5L * 1024 * 1024 * 1024, container, nodeManager));
   }
 
 }

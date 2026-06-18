@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManage
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -67,165 +65,56 @@ public final class ReplicationManagerUtil {
   }
 
   /**
-   * Selects target datanodes for replication using the given placement policy, then validates
-   * each candidate through {@link NodeManager#checkSpaceAndRecordAllocation}.
-   *
-   * <p>Selection proceeds as follows:</p>
-   * <ol>
-   *   <li>Ask the policy for the required number of candidates.</li>
-   *   <li>For each candidate, attempt to atomically check and record a slot in
-   *       {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}.</li>
-   *   <li>If a candidate is rejected (no slot available or DN not found), it is added to
-   *       a local exclusion list so the policy skips it on the next attempt.</li>
-   *   <li>If the policy itself cannot find enough nodes (IOException), the maximum acceptable
-   *       target count is decremented and selection continues with a lower goal.</li>
-   *   <li>If all candidates were accepted but fewer than needed, the lower count is accepted.</li>
-   * </ol>
-   *
+   * Using the passed placement policy attempt to select a list of datanodes to
+   * use as new targets. If the placement policy is unable to select enough
+   * nodes, the number of nodes requested will be reduced by 1 and the placement
+   * policy will be called again. This will continue until the placement policy
+   * is able to select enough nodes or the number of nodes requested is reduced
+   * to zero when an exception will be thrown.
    * @param policy The placement policy to use to select nodes.
    * @param requiredNodes The number of nodes required
    * @param usedNodes Any nodes already used by the container
    * @param excludedNodes Any Excluded nodes which cannot be selected
    * @param defaultContainerSize The cluster default max container size
    * @param container The container to select new replicas for
-   * @param nodeManager          Used to validate and record chosen targets.
    * @return A list of up to requiredNodes datanodes to use as targets for new
    *         replicas. Note the number of nodes returned may be less than the
    *         number of nodes requested if the placement policy is unable to
    *         return enough nodes.
-   * @throws SCMException If no targets can be found at all.
+   * @throws SCMException If no nodes can be selected.
    */
   public static List<DatanodeDetails> getTargetDatanodes(PlacementPolicy policy,
       int requiredNodes, List<DatanodeDetails> usedNodes,
       List<DatanodeDetails> excludedNodes, long defaultContainerSize,
-      ContainerInfo container, NodeManager nodeManager) throws SCMException {
+      ContainerInfo container) throws SCMException {
 
+    // Ensure that target datanodes have enough space to hold a complete
+    // container.
     final long dataSizeRequired =
-        HddsServerUtil.requiredReplicationSpace(
-            Math.max(container.getUsedBytes(), defaultContainerSize));
+        HddsServerUtil.requiredReplicationSpace(Math.max(container.getUsedBytes(), defaultContainerSize));
 
-    List<DatanodeDetails> confirmed = new ArrayList<>(requiredNodes);
-    List<DatanodeDetails> trackerRejected = new ArrayList<>();
-    int maxTargets = requiredNodes;
-
-    while (confirmed.size() < maxTargets) {
-      int needed = maxTargets - confirmed.size();
-      List<DatanodeDetails> effectiveExcluded = buildEffectiveExcluded(excludedNodes, trackerRejected);
-
-      List<DatanodeDetails> candidates;
+    int mutableRequiredNodes = requiredNodes;
+    while (mutableRequiredNodes > 0) {
       try {
         if (usedNodes == null) {
-          candidates = policy.chooseDatanodes(effectiveExcluded, null,
-              needed, 0, dataSizeRequired);
+          return policy.chooseDatanodes(excludedNodes, null,
+              mutableRequiredNodes, 0, dataSizeRequired);
         } else {
-          candidates = policy.chooseDatanodes(usedNodes, effectiveExcluded, null,
-              needed, 0, dataSizeRequired);
+          return policy.chooseDatanodes(usedNodes, excludedNodes, null,
+              mutableRequiredNodes, 0, dataSizeRequired);
         }
       } catch (IOException e) {
-        LOG.debug("Placement policy could not return {} nodes for container {}; "
-            + "accepting fewer targets.", needed, container.getContainerID(), e);
-        maxTargets--;
-        continue;
-      }
-
-      boolean anyRejected = validateAndRecord(candidates, container, nodeManager,
-          confirmed, trackerRejected);
-
-      if (!anyRejected && confirmed.size() < maxTargets) {
-        // Policy returned a partial result with no rejections.
-        maxTargets = confirmed.size();
+        LOG.debug("Placement policy was not able to return {} nodes for " +
+            "container {}.",
+            mutableRequiredNodes, container.getContainerID(), e);
+        mutableRequiredNodes--;
       }
     }
-
-    if (confirmed.isEmpty()) {
-      throw new SCMException(String.format(
-          "Placement Policy: %s did not return any nodes. Required %d, Data size %d. "
-              + "Container: %s, Used Nodes: %s, Excluded Nodes: %s.",
-          policy.getClass(), requiredNodes, dataSizeRequired, container,
-          formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-    }
-    return confirmed;
-  }
-
-  /**
-   * Validates each candidate against {@link NodeManager#checkSpaceAndRecordAllocation}.
-   * Confirmed nodes are added to {@code confirmed}; rejected nodes are added to
-   * {@code trackerRejected} so they are excluded from subsequent policy calls.
-   *
-   * @return {@code true} if at least one candidate was rejected, {@code false} if all accepted.
-   */
-  private static boolean validateAndRecord(
-      List<DatanodeDetails> candidates, ContainerInfo container,
-      NodeManager nodeManager, List<DatanodeDetails> confirmed,
-      List<DatanodeDetails> trackerRejected) {
-    boolean anyRejected = false;
-    for (DatanodeDetails candidate : candidates) {
-      DatanodeInfo dnInfo = nodeManager.getDatanodeInfo(candidate);
-      if (dnInfo == null) {
-        LOG.warn("Datanode {} not found in NodeManager for container {}; excluding.",
-            candidate, container.getContainerID());
-        trackerRejected.add(candidate);
-        anyRejected = true;
-        continue;
-      }
-      if (nodeManager.checkSpaceAndRecordAllocation(dnInfo, container.containerID())) {
-        LOG.debug("Confirmed replication target {} for container {}.", candidate, container.getContainerID());
-        confirmed.add(candidate);
-      } else {
-        LOG.warn("No slot available for container {} on {}; excluding and retrying.",
-            container.getContainerID(), candidate);
-        trackerRejected.add(candidate);
-        anyRejected = true;
-      }
-    }
-    return anyRejected;
-  }
-
-  /**
-   * Rolls back PendingContainerTracker slot reservations for the given targets when a
-   * replication command could not be sent (e.g. due to {@code CommandTargetOverloadedException}
-   * or {@code NotLeaderException}).
-   *
-   * <p>Slots are recorded in {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
-   * by {@link #getTargetDatanodes} before commands are dispatched.</p>
-   *
-   * @param targets     datanodes for which slots were recorded but commands were not sent
-   * @param container   the container being replicated
-   * @param nodeManager used to look up {@link DatanodeInfo} and remove the reservation
-   */
-  public static void rollbackTargets(List<DatanodeDetails> targets,
-      ContainerInfo container, NodeManager nodeManager) {
-    for (DatanodeDetails target : targets) {
-      DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(target);
-      if (datanodeInfo == null) {
-        LOG.debug("Cannot rollback PendingContainerTracker slot for container {} on {}: "
-            + "datanode not found in NodeManager.", container.getContainerID(), target);
-        continue;
-      }
-      nodeManager.removePendingAllocationForDatanode(datanodeInfo, container.containerID());
-      LOG.debug("Rolled back PendingContainerTracker slot for container {} on {}.",
-          container.getContainerID(), target);
-    }
-  }
-
-  /**
-   * Returns a combined exclude list of the original excludes plus any nodes that were
-   * rejected by {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}.
-   * If no nodes were rejected the original list is returned as-is (no copy).
-   */
-  private static List<DatanodeDetails> buildEffectiveExcluded(
-      List<DatanodeDetails> original, List<DatanodeDetails> trackerRejected) {
-    if (trackerRejected.isEmpty()) {
-      return original != null ? original : Collections.emptyList();
-    }
-    List<DatanodeDetails> merged = new ArrayList<>(
-        (original != null ? original.size() : 0) + trackerRejected.size());
-    if (original != null) {
-      merged.addAll(original);
-    }
-    merged.addAll(trackerRejected);
-    return merged;
+    throw new SCMException(String.format("Placement Policy: %s did not return"
+            + " any nodes. Number of required Nodes %d, Data size Required: %d. Container: %s, Used Nodes %s, " +
+            "Excluded Nodes: %s.", policy.getClass(), requiredNodes, dataSizeRequired, container,
+        formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
+        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
   /**
