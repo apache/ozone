@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.UuidCodec;
+import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.MemoizedSupplier;
 
 /**
@@ -50,6 +51,10 @@ public final class PipelineID {
 
   public static PipelineID randomId() {
     return new PipelineID(UUID.randomUUID());
+  }
+
+  public static PipelineID insecureRandomId() {
+    return new PipelineID(new UUID(UUIDUtil.insecureRandomUUIDBytes()));
   }
 
   public static PipelineID valueOf(UUID id) {
