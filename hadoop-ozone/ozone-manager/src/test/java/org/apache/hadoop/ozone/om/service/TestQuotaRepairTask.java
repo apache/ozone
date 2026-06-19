@@ -322,6 +322,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     assertEquals(0, repaired.getUsedBytes());
     assertEquals(0, repaired.getUsedNamespace());
     assertEquals(keyBytes, repaired.getSnapshotUsedBytes());
+    assertEquals(1, repaired.getSnapshotUsedNamespace());
   }
 
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,

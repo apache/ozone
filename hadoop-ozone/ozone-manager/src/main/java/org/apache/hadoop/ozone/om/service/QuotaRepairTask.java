@@ -348,10 +348,10 @@ public class QuotaRepairTask {
 
       Map<Long, OmBucketInfo> bucketById = buildBucketByObjectId(idBucketInfoMap);
 
-      tasks.add(executor.submit(() -> recalculateSnapshotDeletedKeyUsages(
+      tasks.add(executor.submit(() -> recalculateDeletedKeyUsages(
           metadataManager.getDeletedTable(), bucketById, snapshotDeletedKeyMap,
           "active DB checkpoint")));
-      tasks.add(executor.submit(() -> recalculateSnapshotDeletedDirNamespace(
+      tasks.add(executor.submit(() -> recalculateDeletedDirNamespace(
           metadataManager.getDeletedDirTable(), snapshotDeletedDirMap,
           "active DB checkpoint")));
       tasks.add(executor.submit(() -> {
@@ -479,13 +479,13 @@ public class QuotaRepairTask {
       Map<String, CountPair> snapshotDeletedKeyMap,
       Map<String, CountPair> snapshotDeletedDirMap,
       String sourceLabel) throws UncheckedIOException {
-    recalculateSnapshotDeletedKeyUsages(metadataManager.getDeletedTable(), bucketById,
+    recalculateDeletedKeyUsages(metadataManager.getDeletedTable(), bucketById,
         snapshotDeletedKeyMap, sourceLabel);
-    recalculateSnapshotDeletedDirNamespace(metadataManager.getDeletedDirTable(),
+    recalculateDeletedDirNamespace(metadataManager.getDeletedDirTable(),
         snapshotDeletedDirMap, sourceLabel);
   }
 
-  private void recalculateSnapshotDeletedKeyUsages(
+  private void recalculateDeletedKeyUsages(
       Table<String, RepeatedOmKeyInfo> deletedTable,
       Map<Long, OmBucketInfo> bucketById,
       Map<String, CountPair> snapshotCountByBucketNameKey,
@@ -520,7 +520,7 @@ public class QuotaRepairTask {
     }
   }
 
-  private void recalculateSnapshotDeletedDirNamespace(
+  private void recalculateDeletedDirNamespace(
       Table<String, OmKeyInfo> deletedDirTable,
       Map<String, CountPair> snapshotDirNsByIdPrefix,
       String sourceLabel)
