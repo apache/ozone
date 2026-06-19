@@ -47,6 +47,12 @@ public interface RequestParameters {
     }
   }
 
+  /**
+   * @return true if the query parameter is present, even when its value is
+   * an empty string (eg. {@code delimiter=}).
+   */
+  boolean containsKey(String key);
+
   /** Additional methods for tests. */
   interface Mutable extends RequestParameters {
 
@@ -70,6 +76,11 @@ public interface RequestParameters {
     @Override
     public String get(String key) {
       return params.getFirst(key);
+    }
+
+    @Override
+    public boolean containsKey(String key) {
+      return params.containsKey(key);
     }
 
     @Override

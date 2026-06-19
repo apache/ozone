@@ -62,6 +62,17 @@ public final class S3Utils {
     return URLEncoder.encode(str, UTF_8.name());
   }
 
+  /**
+   * Percent-encode a string for S3 {@code encoding-type=url} responses.
+   *
+   * <p>Unlike {@link URLEncoder} (application/x-www-form-urlencoded), AWS S3
+   * uses percent-encoding where spaces are {@code %20}, not {@code +}.
+   */
+  public static String s3urlEncode(String str)
+      throws UnsupportedEncodingException {
+    return urlEncode(str).replace("+", "%20");
+  }
+
   private S3Utils() {
     // no instances
   }

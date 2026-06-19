@@ -106,11 +106,13 @@ public class BucketEndpoint extends BucketOperationHandler {
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
-    final String delimiter = queryParams().get(QueryParams.DELIMITER);
+    final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
+        queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
-    String prefix = queryParams().get(QueryParams.PREFIX, "");
+    final boolean prefixSpecified = queryParams().containsKey(QueryParams.PREFIX);
+    final String prefix = prefixSpecified ? queryParams().get(QueryParams.PREFIX) : "";
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
@@ -157,17 +159,21 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
-
     // If you specify the encoding-type request parameter,should return
-    // encoded key name values in the following response elements:
-    //   Delimiter, Prefix, Key, and StartAfter.
+    // encoded key name values in the following response elements: Delimiter,
+    // Key, and StartAfter. The echoed Prefix request parameter is returned without URL encoding.
     //
     // For detail refer:
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     ListObjectResponse response = new ListObjectResponse();
-    response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+    // AWS omits Delimiter from the response when the client passes delimiter= or does not specify delimiter at all.
+    if (delimiter != null && !delimiter.isEmpty()) {
+      response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+    }
     response.setName(bucketName);
-    response.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
+    if (prefixSpecified) {
+      response.setPrefix(EncodingTypeObject.createNullable(prefix, null));
+    }
     response.setMarker(marker == null ? "" : marker);
     response.setMaxKeys(maxKeys);
     response.setEncodingType(encodingType);

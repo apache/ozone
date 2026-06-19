@@ -36,7 +36,7 @@ public class ObjectKeyNameAdapter extends
   public String marshal(EncodingTypeObject s)
       throws UnsupportedEncodingException {
     if (s.getEncodingType() != null && s.getEncodingType().equals("url")) {
-      return S3Utils.urlEncode(s.getName())
+      return S3Utils.s3urlEncode(s.getName())
           .replaceAll("%2F", "/");
     }
     return s.getName();

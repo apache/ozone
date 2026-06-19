@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
+import org.apache.hadoop.ozone.s3.commontypes.ObjectKeyNameAdapter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
@@ -214,6 +215,7 @@ public class TestBucketList {
 
     assertEquals(0, getBucketResponse.getCommonPrefixes().size());
     assertEquals(4, getBucketResponse.getContents().size());
+    assertNull(getBucketResponse.getDelimiter());
     assertEquals("dir1/",
         getBucketResponse.getContents().get(0).getKey().getName());
     assertEquals("dir1/dir2/",
@@ -401,7 +403,7 @@ public class TestBucketList {
         <?xml version="1.0" encoding="UTF-8"?>
           <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
               ...
-              <Prefix>data%3D</Prefix>
+              <Prefix>data=</Prefix>
               <StartAfter>data%3D</StartAfter>
               <Delimiter>%3D</Delimiter>
               <EncodingType>url</EncodingType>
@@ -415,7 +417,8 @@ public class TestBucketList {
               </CommonPrefixes>
           </ListBucketResult>
 
-      if encodingType == null , the = will not be encoded to "%3D"
+      Echoed Prefix is not URL-encoded. Delimiter, StartAfter, Key, and
+      CommonPrefixes are encoded when encodingType == url.
     * */
 
     OzoneClient ozoneClient =
@@ -437,9 +440,8 @@ public class TestBucketList {
     // The Object name will be encoded by ObjectKeyNameAdapter
     // if encodingType == url
     assertEncodingTypeObject(delimiter, encodingType, response.getDelimiter());
-    assertEncodingTypeObject(prefix, encodingType, response.getPrefix());
-    assertEncodingTypeObject(startAfter, encodingType,
-        response.getStartAfter());
+    assertEncodingTypeObject(prefix, null, response.getPrefix());
+    assertEncodingTypeObject(startAfter, encodingType, response.getStartAfter());
     assertNotNull(response.getCommonPrefixes());
     assertNotNull(response.getContents());
     assertEncodingTypeObject(prefix + delimiter, encodingType,
@@ -564,6 +566,56 @@ public class TestBucketList {
 
     // Assert: The number of returned keys should be capped at the configured limit
     assertEquals(Integer.parseInt(configuredMaxKeysLimit), response.getContents().size());
+  }
+
+  @Test
+  public void testListObjectsUrlEncodingUsesPercentTwentyForSpaces()
+      throws Exception {
+    OzoneClient client = createClientWithKeys(
+        "foo+1/bar", "foo/bar/xyzzy", "quux ab/thud", "asdf+b");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, ENCODING_TYPE);
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    ObjectKeyNameAdapter adapter = new ObjectKeyNameAdapter();
+    assertEquals("asdf%2Bb", adapter.marshal(response.getContents().get(0).getKey()));
+    assertEquals(3, response.getCommonPrefixes().size());
+    assertEquals("foo%2B1/", adapter.marshal(response.getCommonPrefixes().get(0).getPrefix()));
+    assertEquals("foo/", adapter.marshal(response.getCommonPrefixes().get(1).getPrefix()));
+    assertEquals("quux%20ab/", adapter.marshal(response.getCommonPrefixes().get(2).getPrefix()));
+  }
+
+  @Test
+  public void testListObjectsOmitsDelimiterWhenEmpty() throws Exception {
+    OzoneClient client = createClientWithKeys("bar", "baz", "cab", "foo");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertNull(response.getDelimiter());
+    assertEquals(4, response.getContents().size());
+    assertEquals(0, response.getCommonPrefixes().size());
+  }
+
+  @Test
+  public void testListObjectsPrefixWithNewline() throws Exception {
+    OzoneClient client = createClientWithKeys("foo/bar", "foo/baz", "quux");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    String prefix = String.valueOf((char) 0x0a);
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, prefix);
+    endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, ENCODING_TYPE);
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertNotNull(response.getPrefix());
+    assertEquals(prefix, response.getPrefix().getName());
+    assertNull(response.getPrefix().getEncodingType());
+    assertEquals(prefix, new ObjectKeyNameAdapter().marshal(response.getPrefix()));
+    assertEquals(0, response.getContents().size());
+    assertEquals(0, response.getCommonPrefixes().size());
   }
 
   private void assertEncodingTypeObject(
