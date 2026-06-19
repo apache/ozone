@@ -98,7 +98,8 @@ public class ReportSubcommand extends ScmSubcommand {
 
     int numOfSuccess = containerIDs.size() - failures;
     if (numOfSuccess > 0) {
-      out().println("\n" + (suppress ? "Suppressed " : "Unsuppressed ") + numOfSuccess + " container(s) successfully.");
+      blankLine();
+      out().println((suppress ? "Suppressed " : "Unsuppressed ") + numOfSuccess + " container(s) successfully.");
       out().println("Container report will be updated after the next Replication Manager cycle.");
     }
 
@@ -111,7 +112,8 @@ public class ReportSubcommand extends ScmSubcommand {
     ReplicationManagerReport report = scmClient.getReplicationManagerReport();
     if (report.getReportTimeStamp() == 0) {
       System.err.println("The Container Report is not available until Replication Manager completes" +
-          " its first run after startup or fail over. All values will be zero until that time.\n");
+          " its first run after startup or fail over. All values will be zero until that time.");
+      System.err.println();
     }
 
     if (json) {
@@ -172,7 +174,7 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void blankLine() {
-    System.out.print("\n");
+    System.out.println();
   }
 
   private void output(String s) {
@@ -184,6 +186,6 @@ public class ReportSubcommand extends ScmSubcommand {
     for (int i = 0; i < s.length(); i++) {
       System.out.print("=");
     }
-    System.out.print("\n");
+    System.out.println();
   }
 }

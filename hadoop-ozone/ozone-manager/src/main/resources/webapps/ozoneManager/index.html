@@ -34,7 +34,7 @@
 
 </head>
 
-<body ng-app="ozoneManager">
+<body ng-app="ozoneManager" ng-init="omExtraNavLinks = [{label: 'Deletion', href: '#!/metrics/deletion'}]">
 
 <header class="navbar navbar-inverse navbar-fixed-top bs-docs-nav">
     <div class="container-fluid">
@@ -49,6 +49,7 @@
             <a class="navbar-brand" href="#">Ozone Manager</a>
         </div>
         <navmenu
+            extra-nav-links="omExtraNavLinks"
                 metrics="{ 'OM metrics' : '#!/metrics/ozoneManager', 'Rpc metrics' : '#!/metrics/rpc'}"
                 snapshot="true"
                 snapshot-link-href="#!/snapshots"></navmenu>

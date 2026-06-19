@@ -21,7 +21,8 @@ on:
   schedule:
     - cron: '20 3 * * *'
 
+permissions: { }
+
 jobs:
   update:
     uses: ./.github/workflows/populate-cache.yml
-    secrets: inherit

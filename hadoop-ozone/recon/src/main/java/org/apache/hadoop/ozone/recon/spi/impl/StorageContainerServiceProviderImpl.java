@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
@@ -189,5 +190,20 @@ public class StorageContainerServiceProviderImpl
       ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
     return scmClient.getListOfContainerIDs(startContainerID, count, state);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to {@code SCM.listContainer(startId, count, state)} which
+   * already has server-side pagination support. This reuses the existing RPC
+   * without requiring a new protobuf message definition.
+   */
+  @Override
+  public List<ContainerInfo> getListOfContainerInfos(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.listContainer(
+        startContainerID.getId(), count, state).getContainerInfoList();
   }
 }

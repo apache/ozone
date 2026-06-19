@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOption;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -80,13 +82,22 @@ public abstract class Shell extends GenericCli {
     return name();
   }
 
+  /**
+   * Lines printed once when entering interactive mode (empty by default).
+   */
+  protected List<String> interactiveWelcomeLines() {
+    return Collections.emptyList();
+  }
+
   private int execute(CommandLine.ParseResult parseResult) {
+    DeprecatedCliOption.warnIfMatched(parseResult);
     name = spec.name();
 
     if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
       installBatchExceptionHandler();
-      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
+      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(),
+          executionMode.command, interactiveWelcomeLines());
       return 0;
     }
 

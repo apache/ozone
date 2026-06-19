@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
@@ -205,7 +206,7 @@ class TestOnDemandContainerScannerIntegration
         .getOnDemandScanner().getMetrics();
     int initialScannedCount = scannerMetrics.getNumContainersScanned();
 
-    // Create a PutBlock request with malformed block data to trigger internal error
+    // Create a PutBlock request for a chunk that was never written to trigger internal error
     ContainerProtos.ContainerCommandRequestProto writeFailureRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.PutBlock)
@@ -218,7 +219,13 @@ class TestOnDemandContainerScannerIntegration
                         .setLocalID(999L)
                         .setBlockCommitSequenceId(1)
                         .build())
-                    .setSize(1024) // Size mismatch with chunks
+                    .addChunks(ContainerProtos.ChunkInfo.newBuilder()
+                        .setChunkName("missing-chunk")
+                        .setOffset(0)
+                        .setLen(1024)
+                        .setChecksumData(Checksum.getNoChecksumDataProto())
+                        .build())
+                    .setSize(1024)
                     .build())
                 .build())
             .build();

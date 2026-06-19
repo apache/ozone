@@ -19,17 +19,22 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.FailingInputStream;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
@@ -39,9 +44,12 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +98,28 @@ public class TestUploadWithStream {
   @Test
   public void testUpload() throws Exception {
     assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
+  }
+
+  @Test
+  public void testUploadDoesNotCommitWhenBodyReadFails() throws Exception {
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
+    try (FailingInputStream failing = new FailingInputStream(keyContent, 5);
+        MultiDigestInputStream body = new MultiDigestInputStream(failing,
+            Collections.singletonList(
+                MessageDigest.getInstance(OzoneConsts.MD5_HASH)))) {
+
+      IOException ex = assertThrows(IOException.class,
+          () -> ObjectEndpointStreaming.put(bucket, S3KEY, keyContent.length,
+              ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                  ReplicationFactor.THREE), rest.getChunkSize(),
+              new HashMap<>(), new HashMap<>(), body, rest.getHeaders(), true,
+              new AuditLogger.PerformanceStringBuilder(),
+              S3ConditionalRequest.parseWriteConditions(rest.getHeaders(),
+                  S3KEY)));
+      assertEquals("upload interrupted", ex.getMessage());
+      assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
+    }
   }
 
   @Test

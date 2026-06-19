@@ -136,10 +136,10 @@ public class TestOMKeyRequest {
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
+    OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
     perfMetrics = OMPerformanceMetrics.register();
     delMetrics = DeletingServiceMetrics.create();
-    OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,

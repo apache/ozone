@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -188,6 +189,15 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
     return omMetadataReader.getObjectTagging(normalizeOmKeyArgs(args));
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    if (args == null) {
+      return null;
+    }
+
+    return omMetadataReader.getBucketTagging(args);
   }
 
   private OzoneObj normalizeOzoneObj(OzoneObj o) {

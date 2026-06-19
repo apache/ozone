@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -118,6 +119,8 @@ class TestSafeModeRuleFactory {
       OzoneConfiguration conf) {
     final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "0s");
     SafeModeRuleFactory.initialize(conf,
         SCMContext.emptyContext(), new EventQueue(), mock(
             PipelineManager.class),

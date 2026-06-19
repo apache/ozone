@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -100,6 +101,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -108,6 +110,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -155,6 +159,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SubmitSnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
@@ -348,6 +354,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             listSnapshotDiffJobs(request.getListSnapshotDiffJobRequest());
         responseBuilder.setListSnapshotDiffJobResponse(listSnapDiffResponse);
         break;
+      case SubmitSnapshotDiff:
+        SubmitSnapshotDiffResponse submitSnapshotDiff = submitSnapshotDiff(
+            request.getSubmitSnapshotDiffRequest());
+        responseBuilder.setSubmitSnapshotDiffResponse(submitSnapshotDiff);
+        break;
       case EchoRPC:
         EchoRPCResponse echoRPCResponse =
             echoRPC(request.getEchoRPCRequest());
@@ -390,6 +401,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
+        break;
+      case GetBucketTagging:
+        GetBucketTaggingResponse getBucketTaggingResponse =
+            getBucketTagging(request.getGetBucketTaggingRequest());
+        responseBuilder.setGetBucketTaggingResponse(getBucketTaggingResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1387,16 +1403,28 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
-    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response =
-        impl.snapshotDiff(
-            snapshotDiffRequest.getVolumeName(),
-            snapshotDiffRequest.getBucketName(),
-            snapshotDiffRequest.getFromSnapshot(),
-            snapshotDiffRequest.getToSnapshot(),
-            snapshotDiffRequest.getToken(),
-            snapshotDiffRequest.getPageSize(),
-            snapshotDiffRequest.getForceFullDiff(),
-            snapshotDiffRequest.getDisableNativeDiff());
+    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response;
+
+    if (snapshotDiffRequest.hasForceFullDiff() && snapshotDiffRequest.hasDisableNativeDiff()) {
+      response = impl.snapshotDiff(
+          snapshotDiffRequest.getVolumeName(),
+          snapshotDiffRequest.getBucketName(),
+          snapshotDiffRequest.getFromSnapshot(),
+          snapshotDiffRequest.getToSnapshot(),
+          snapshotDiffRequest.getToken(),
+          snapshotDiffRequest.getPageSize(),
+          snapshotDiffRequest.getForceFullDiff(),
+          snapshotDiffRequest.getDisableNativeDiff());
+    } else {
+      response = impl.snapshotDiff(
+          snapshotDiffRequest.getVolumeName(),
+          snapshotDiffRequest.getBucketName(),
+          snapshotDiffRequest.getFromSnapshot(),
+          snapshotDiffRequest.getToSnapshot(),
+          snapshotDiffRequest.getToken(),
+          snapshotDiffRequest.getPageSize());
+    }
+
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())
@@ -1408,6 +1436,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private SubmitSnapshotDiffResponse submitSnapshotDiff(
+      SubmitSnapshotDiffRequest submitSnapshotDiffRequest) throws IOException {
+
+    org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse response =
+        impl.submitSnapshotDiff(
+            submitSnapshotDiffRequest.getVolumeName(),
+            submitSnapshotDiffRequest.getBucketName(),
+            submitSnapshotDiffRequest.getFromSnapshot(),
+            submitSnapshotDiffRequest.getToSnapshot(),
+            submitSnapshotDiffRequest.getForceFullDiff(),
+            submitSnapshotDiffRequest.getDisableNativeDiff());
+
+    SubmitSnapshotDiffResponse.Builder builder = SubmitSnapshotDiffResponse
+        .newBuilder();
+
+    if (StringUtils.isNotEmpty(response.getResponse())) {
+      builder.setResponse(response.getResponse());
     }
 
     return builder.build();
@@ -1544,6 +1595,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetObjectTaggingResponse.newBuilder();
 
     Map<String, String> result = impl.getObjectTagging(omKeyArgs);
+
+    resp.addAllTags(KeyValueUtil.toProtobuf(result));
+    return resp.build();
+  }
+
+  private GetBucketTaggingResponse getBucketTagging(GetBucketTaggingRequest request)
+      throws IOException {
+    BucketArgs bucketArgs = request.getBucketArgs();
+    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+
+    GetBucketTaggingResponse.Builder resp =
+        GetBucketTaggingResponse.newBuilder();
+
+    Map<String, String> result = impl.getBucketTagging(omBucketArgs);
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();

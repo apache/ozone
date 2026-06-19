@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
@@ -107,6 +108,7 @@ import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,7 +200,6 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
-    clientProtocol.setIsS3Request(true);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -219,30 +220,6 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
-  }
-
-  protected OzoneBucket getBucket(String bucketName)
-      throws OS3Exception, IOException {
-    OzoneBucket bucket;
-    try {
-      bucket = client.getObjectStore().getS3Bucket(bucketName);
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
-          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else {
-        throw ex;
-      }
-    }
-    return bucket;
   }
 
   protected OzoneVolume getVolume() throws IOException {
@@ -387,7 +364,16 @@ public abstract class EndpointBase {
 
     List<NameValuePair> tagPairs = URLEncodedUtils.parse(tagString, UTF_8);
 
-    return validateAndGetTagging(tagPairs, NameValuePair::getName, NameValuePair::getValue);
+    // Put Object with x-amz-tagging header. A segment with no '=' (e.g."foo=bar&bar") is
+    // typically represented as (key=bar, value=null). AWS S3 treats that as an empty value for "bar".
+    // We map null → "" here only for this header path.
+    // PutObjectTagging is different: the XML/JSON API requires each Tag to
+    // include a Value element; so a missing Value stays null and fails validation.
+    return validateAndGetTagging(tagPairs, NameValuePair::getName,
+        pair -> {
+          String v = pair.getValue();
+          return v != null ? v : "";
+        });
   }
 
   protected static <KV> Map<String, String> validateAndGetTagging(
@@ -413,7 +399,8 @@ public abstract class EndpointBase {
       }
 
       if (tagValue == null) {
-        // For example for query parameter with only value (e.g. "tag1")
+        // Missing tag value is invalid for PutObjectTagging XML/JSON; x-amz-tagging must
+        // normalize null to "" in getTaggingFromHeaders before calling this method.
         OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("Some tag values are not specified, please specify the tag values");
         throw ex;
@@ -702,6 +689,19 @@ public abstract class EndpointBase {
 
   public static MessageDigest getSha256DigestInstance() {
     return SHA_256_PROVIDER.get();
+  }
+
+  protected static CheckedRunnable<IOException> validateContentLength(
+      long expectedLength, long actualLength, String keyPath) {
+    return () -> {
+      if (actualLength != expectedLength) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage(String.format(
+            "Request body length %d does not match expected length %d",
+            actualLength, expectedLength));
+        throw ex;
+      }
+    };
   }
 
   protected static String extractPartsCount(String eTag) {

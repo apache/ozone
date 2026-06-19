@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT;
 
@@ -29,12 +31,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,7 +44,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -61,11 +63,9 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsService {
   
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
-  private static final int MAX_POOL_SIZE = 500;
-  private static final int KEEP_ALIVE_TIME = 5;
   private static final int POLL_INTERVAL_MS = 200;
 
-  private final ThreadPoolExecutor executorService;
+  private final ExecutorService executorService;
   private final ReconNodeManager reconNodeManager;
   private final boolean httpsEnabled;
   private final int minimumApiDelayMs;
@@ -96,14 +96,15 @@ public class DataNodeMetricsService {
         OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime.set(-minimumApiDelayMs);
-    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
-    this.executorService = new ThreadPoolExecutor(
-        corePoolSize, MAX_POOL_SIZE,
-        KEEP_ALIVE_TIME, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder()
-            .setNameFormat("DataNodeMetricsCollector-%d")
-            .build());
+    int corePoolSize = config.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
+        OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
+    corePoolSize = corePoolSize > 0
+        ? corePoolSize
+        : OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat("DataNodeMetricsCollector-%d")
+        .build();
+    this.executorService = Executors.newFixedThreadPool(corePoolSize, threadFactory);
   }
 
   /**
@@ -123,7 +124,7 @@ public class DataNodeMetricsService {
       return;
     }
 
-    Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
+    List<DatanodeInfo> nodes = reconNodeManager.getAllNodes();
     if (nodes.isEmpty()) {
       LOG.warn("No datanodes found to query");
       resetState();
@@ -151,7 +152,7 @@ public class DataNodeMetricsService {
   /**
    * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
-  private void collectMetrics(Set<DatanodeDetails> nodes) {
+  private void collectMetrics(List<DatanodeInfo> nodes) {
     try {
       CollectionContext context = submitMetricsCollectionTasks(nodes);
       processCollectionFutures(context);
@@ -167,14 +168,14 @@ public class DataNodeMetricsService {
    * Submits metrics collection tasks for all given datanodes.
    * @return A context object containing tracking structures for the submitted futures.
    */
-  private CollectionContext submitMetricsCollectionTasks(Set<DatanodeDetails> nodes) {
+  private CollectionContext submitMetricsCollectionTasks(List<DatanodeInfo> nodes) {
     // Initialize state
     List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
     // Submit all collection tasks
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
 
     long submissionTime = System.currentTimeMillis();
-    for (DatanodeDetails node : nodes) {
+    for (DatanodeInfo node : nodes) {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
           node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
