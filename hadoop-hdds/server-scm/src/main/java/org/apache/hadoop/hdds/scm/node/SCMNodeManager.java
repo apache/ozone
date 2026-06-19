@@ -1435,7 +1435,9 @@ public class SCMNodeManager implements NodeManager {
     long capacityByte = 0;
     long scmUsedByte = 0;
     long remainingByte = 0;
+    long totalPending = 0;
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      totalPending += dni.getPendingContainerAllocations().getCount();
       List<StorageReportProto> storageReports = dni.getStorageReports();
       if (storageReports != null && !storageReports.isEmpty()) {
         for (StorageReportProto storageReport : storageReports) {
@@ -1445,6 +1447,7 @@ public class SCMNodeManager implements NodeManager {
         }
       }
     }
+    metrics.setTotalPendingContainerSlots(totalPending);
 
     long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
     if (nonScmUsedByte < 0) {

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -410,7 +411,37 @@ public class TestPendingContainerTracker {
     assertFalse(tracker.hasAvailableSpace(emptyDn));
   }
 
+  /**
+   * A failed volume has remaining=0 by DN convention, but the tracker should
+   * explicitly skip it (report.getFailed() == true) so a stale non-zero
+   * remaining value on a failed volume can never grant spurious slots.
+   */
+  @Test
+  public void testFailedVolumeNotCountedAsAllocatableSlot() {
+    StorageReportProto failed = createFailedStorageReport(dn1);
+    StorageReportProto healthy = createStorageReport(dn1,
+        10 * MAX_CONTAINER_SIZE, MAX_CONTAINER_SIZE, 0); // 1 real slot
+    dn1.updateStorageReports(new ArrayList<>(Arrays.asList(failed, healthy)));
+    assertTrue(tracker.hasAvailableSpace(dn1));                          // healthy vol → 1 slot
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dn1, container1));  // consumes it
+    assertFalse(tracker.hasAvailableSpace(dn1));                         // 0 slots left
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container2)); // rejected
+  }
+
+  @Test
+  public void testAllVolumesFailedReturnsFalse() {
+    dn1.updateStorageReports(new ArrayList<>(Arrays.asList((
+        createFailedStorageReport(dn1)),
+        createFailedStorageReport(dn1))));
+    assertFalse(tracker.hasAvailableSpace(dn1));
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container1));
+  }
+
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
+  }
+
+  private StorageReportProto createFailedStorageReport(DatanodeInfo dn) {
+    return HddsTestUtils.createStorageReport(dn.getID(), "", 0, 0, 0, null, true);
   }
 }

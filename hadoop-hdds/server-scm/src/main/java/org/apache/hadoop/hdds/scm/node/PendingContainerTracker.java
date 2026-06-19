@@ -160,6 +160,9 @@ public class PendingContainerTracker {
       final int pendingAllocationCount = getCount();
       long allocatableCount = 0;
       for (StorageReportProto report : storageReports) {
+        if (report.hasFailed() && report.getFailed()) {
+          continue;
+        }
         final long allocatableCountOnThisDisk =
             Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
         allocatableCount += allocatableCountOnThisDisk;
@@ -217,8 +220,8 @@ public class PendingContainerTracker {
    * available, accounting for pending in-flight allocations.
    *
    * <p>Slot availability is based on {@code maxContainerSize}: a slot exists for each
-   * {@code maxContainerSize}-worth of usable space on any volume. This read-only check
-   * is intended for the placement policy and does not consume a slot.
+   * {@code maxContainerSize}-worth of usable space on any volume. This check is intended for the placement policy.
+   * This rolls expired-window entries but does not consume a slot.
    *
    * @param datanodeInfo the datanode to check
    * @return true if at least one container slot is available
@@ -234,6 +237,9 @@ public class PendingContainerTracker {
     final int pendingCount = bucket.getCount();
     long allocatableCount = 0;
     for (StorageReportProto report : storageReports) {
+      if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
       allocatableCount += Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
       if (allocatableCount > pendingCount) {
         return true;
@@ -241,9 +247,6 @@ public class PendingContainerTracker {
     }
     LOG.debug("Datanode {} has no available container slots. Pending: {}, Allocatable: {}",
         datanodeInfo.getID(), pendingCount, allocatableCount);
-    if (metrics != null) {
-      metrics.incNumSkippedFullNodeContainerAllocation();
-    }
     return false;
   }
 
