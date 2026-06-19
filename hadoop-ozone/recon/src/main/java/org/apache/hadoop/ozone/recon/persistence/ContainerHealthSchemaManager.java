@@ -69,6 +69,24 @@ public class ContainerHealthSchemaManager {
    */
   static final int MAX_IN_CLAUSE_CHUNK_SIZE = 1_000;
 
+  /**
+   * Minimum length of a contiguous container-id run that justifies deleting it
+   * with a single range ({@code BETWEEN}) statement instead of folding the ids
+   * into a chunked {@code IN} delete.
+   *
+   * <p>A {@code BETWEEN} predicate is constant size and removes an entire
+   * contiguous range in one statement, whereas an {@code IN} delete is capped
+   * at {@link #MAX_IN_CLAUSE_CHUNK_SIZE} ids per statement to stay under
+   * Derby's 64 KB bytecode limit. Pulling a run out into its own
+   * {@code BETWEEN} only lowers the total statement count once the run is at
+   * least one IN-chunk long, so shorter runs and scattered ids stay in the IN
+   * batches. Real container-id lists are usually dense ranges broken up by gaps
+   * from deleted containers, so this keeps the common case to a handful of
+   * statements while never doing worse than plain IN chunking for sparse
+   * ids.</p>
+   */
+  static final int MIN_RANGE_DELETE_RUN = MAX_IN_CLAUSE_CHUNK_SIZE;
+
   private final ContainerSchemaDefinition containerSchemaDefinition;
   private final int unhealthyContainersFetchSize;
 
@@ -205,26 +223,74 @@ public class ContainerHealthSchemaManager {
 
   private int deleteScmStatesForContainers(DSLContext dslContext,
       List<Long> containerIds) {
+
+    // Sort and de-duplicate so contiguous runs are detectable regardless of the
+    // order in which the caller supplied the ids.
+    List<Long> sortedIds = containerIds.stream()
+        .distinct()
+        .sorted()
+        .collect(Collectors.toList());
+
     int totalDeleted = 0;
+    List<Long> inClauseBatch = new ArrayList<>(MAX_IN_CLAUSE_CHUNK_SIZE);
 
-    for (int from = 0; from < containerIds.size(); from += MAX_IN_CLAUSE_CHUNK_SIZE) {
-      int to = Math.min(from + MAX_IN_CLAUSE_CHUNK_SIZE, containerIds.size());
-      List<Long> chunk = containerIds.subList(from, to);
+    int i = 0;
+    while (i < sortedIds.size()) {
+      int runStart = i;
+      while (i + 1 < sortedIds.size()
+          && sortedIds.get(i + 1) == sortedIds.get(i) + 1) {
+        i++;
+      }
 
-      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
-          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
-              UnHealthyContainerStates.MISSING.toString(),
-              UnHealthyContainerStates.EMPTY_MISSING.toString(),
-              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-              UnHealthyContainerStates.OVER_REPLICATED.toString(),
-              UnHealthyContainerStates.MIS_REPLICATED.toString(),
-              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-          .execute();
-      totalDeleted += deleted;
+      if (i - runStart + 1 >= MIN_RANGE_DELETE_RUN) {
+        // Long contiguous run: a single constant-size BETWEEN removes the whole
+        // range without straining Derby's per-statement bytecode budget.
+        totalDeleted += deleteScmStatesByRange(dslContext,
+            sortedIds.get(runStart), sortedIds.get(i));
+      } else {
+        // Short run or isolated id: fold into IN batches that stay within the
+        // bytecode-safe chunk size.
+        for (int j = runStart; j <= i; j++) {
+          inClauseBatch.add(sortedIds.get(j));
+          if (inClauseBatch.size() == MAX_IN_CLAUSE_CHUNK_SIZE) {
+            totalDeleted += deleteScmStatesByIds(dslContext, inClauseBatch);
+            inClauseBatch.clear();
+          }
+        }
+      }
+      i++;
+    }
+
+    if (!inClauseBatch.isEmpty()) {
+      totalDeleted += deleteScmStatesByIds(dslContext, inClauseBatch);
     }
     return totalDeleted;
+  }
+
+  private int deleteScmStatesByRange(DSLContext dslContext,
+      long startContainerId, long endContainerId) {
+    return dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+        .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.between(startContainerId, endContainerId))
+        .and(scmGeneratedStatesCondition())
+        .execute();
+  }
+
+  private int deleteScmStatesByIds(DSLContext dslContext, List<Long> containerIds) {
+    return dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+        .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
+        .and(scmGeneratedStatesCondition())
+        .execute();
+  }
+
+  private Condition scmGeneratedStatesCondition() {
+    return UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+        UnHealthyContainerStates.MISSING.toString(),
+        UnHealthyContainerStates.EMPTY_MISSING.toString(),
+        UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+        UnHealthyContainerStates.OVER_REPLICATED.toString(),
+        UnHealthyContainerStates.MIS_REPLICATED.toString(),
+        UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+        UnHealthyContainerStates.REPLICA_MISMATCH.toString());
   }
 
   /**
