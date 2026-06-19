@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.V
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,15 +64,38 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
 
     long modificationTime = Time.now();
-    SetVolumePropertyRequest.Builder setPropertyRequestBuilde = getOmRequest()
+    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
-        .setSetVolumePropertyRequest(setPropertyRequestBuilde)
-        .setUserInfo(getUserInfo())
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        getOmRequest().getSetVolumePropertyRequest();
+    String volume = setVolumePropertyRequest.getVolumeName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
+            null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volume);
+        auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
+            String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.SET_QUOTA, auditMap, ex,
+                request.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return request.toBuilder()
+        .setSetVolumePropertyRequest(setPropertyRequestBuilder)
         .build();
   }
 
@@ -109,13 +133,6 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     boolean acquireVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
-            null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       acquireVolumeLock = getOmLockDetails().isLockAcquired();

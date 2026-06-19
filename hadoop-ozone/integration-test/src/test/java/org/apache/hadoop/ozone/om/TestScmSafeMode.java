@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
@@ -194,6 +195,29 @@ public class TestScmSafeMode {
       }
     }, 10, 1000 * 5);
 
+  }
+
+  @Test
+  void testClusterExitsSafeModeWithPeriodicRuleRefresh() throws Exception {
+    cluster.shutdown();
+    conf.set(HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "1s");
+    builder = MiniOzoneCluster.newBuilder(conf).setStartDataNodes(true);
+    cluster = builder.build();
+    cluster.waitForClusterToBeReady();
+    final StorageContainerManager scm = cluster.getStorageContainerManager();
+    TestDataUtil.createKeys(cluster, 100);
+    GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
+        100, 1000 * 30);
+
+    cluster.restartStorageContainerManager(false);
+
+    assertTrue(cluster.getStorageContainerManager().isInSafeMode(), "SCM should start in safe mode");
+    GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
+        100, 1000 * 15);
+
+    cluster.waitTobeOutOfSafeMode();
+
+    assertFalse(scm.isInSafeMode(), "SCM should exit safe mode with periodic rule refresh enabled");
   }
 
   @Test

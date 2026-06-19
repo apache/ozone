@@ -54,12 +54,14 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
@@ -110,6 +112,7 @@ public class TestOzoneManagerStateMachine {
   private RequestHandler handler;
   private ExecutorService executor;
   private OzoneManagerStateMachine sm;
+  private OMServiceManager serviceManager;
 
   @BeforeEach
   public void setup() {
@@ -118,6 +121,8 @@ public class TestOzoneManagerStateMachine {
     doubleBuffer = mock(OzoneManagerDoubleBuffer.class);
     handler = mock(RequestHandler.class);
     executor = Executors.newSingleThreadExecutor();
+    serviceManager = mock(OMServiceManager.class);
+    when(om.getOMServiceManager()).thenReturn(serviceManager);
     sm = new OzoneManagerStateMachine(om, doubleBuffer, handler, executor, null);
   }
 
@@ -877,6 +882,7 @@ public class TestOzoneManagerStateMachine {
     sm.notifyLeaderReady();
 
     verify(snapshotManager).resetInFlightSnapshotCount();
+    verify(serviceManager).notifyStatusChanged();
   }
 
   // --- getLatestSnapshot tests ---
@@ -1036,5 +1042,29 @@ public class TestOzoneManagerStateMachine {
             OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
         .build();
+  }
+
+  @Test
+  public void testRatisEventsRecording() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OMMetrics metrics = OMMetrics.create(conf);
+    when(om.getMetrics()).thenReturn(metrics);
+    when(om.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
+    when(om.getConfiguration()).thenReturn(conf);
+    AuditMessage auditMessage = mock(AuditMessage.class);
+    when(auditMessage.getOp()).thenReturn("LEADER_CHANGE");
+    when(om.buildAuditMessageForSuccess(any(), any())).thenReturn(auditMessage);
+    sm.notifyLeaderReady();
+    assertTrue(metrics.getRatisEvents().contains("Ready to serve requests as the leader"));
+
+    RaftGroupMemberId groupMemberId = mock(RaftGroupMemberId.class);
+    when(groupMemberId.getPeerId()).thenReturn(RaftPeerId.valueOf("peer1"));
+    sm.notifyLeaderChanged(groupMemberId, RaftPeerId.valueOf("peer1"));
+    assertTrue(metrics.getRatisEvents().contains("Leader changed to peer1"));
+
+    sm.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
+    assertTrue(metrics.getRatisEvents().contains("New peers [] added at term index "));
+
+    metrics.unRegister();
   }
 }

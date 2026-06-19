@@ -155,7 +155,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the last defrag time, in epoch milliseconds.
    * @param lastDefragTime Timestamp of the last defrag
    */
-  public void setLastDefragTime(Long lastDefragTime) {
+  public void setLastDefragTime(long lastDefragTime) {
     this.lastDefragTime = lastDefragTime;
   }
 

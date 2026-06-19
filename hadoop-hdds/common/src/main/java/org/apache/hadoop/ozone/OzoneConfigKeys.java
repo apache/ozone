@@ -177,10 +177,6 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
-      "ozone.client.max.ec.stripe.write.retries";
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
-      "10";
   public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
       "ozone.client.ec.grpc.retries.enabled";
   public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
@@ -495,6 +491,18 @@ public final class OzoneConfigKeys {
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
       500;
+  /**
+   * When true, RPC clients (DN heartbeat, OM client, SCM client) re-resolve
+   * cached hostnames on connection failure and rebuild the proxy if the
+   * resolved IP has changed. Set to true in environments where server pod
+   * IPs may change while DNS names remain stable, such as Kubernetes.
+   * Default false preserves pre-fix behavior. Mirrors the design intent of
+   * HADOOP-17068 / HDFS-14118.
+   */
+  public static final String OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY =
+          "ozone.client.failover.resolve-needed";
+  public static final boolean OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT =
+          false;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
@@ -557,6 +565,7 @@ public final class OzoneConfigKeys {
       "ozone.http.policy";
   public static final String OZONE_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
@@ -627,11 +636,6 @@ public final class OzoneConfigKeys {
       "FILE_SYSTEM_OPTIMIZED";
   public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
       "OBJECT_STORE";
-
-  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
-      "ozone.client.fs.default.bucket.layout";
-  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
-      OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
 
   public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY =
       "ozone.s3g.default.bucket.layout";

@@ -58,6 +58,11 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       arity = "1")
   private Boolean stopAfterDiskEven;
 
+  @Option(names = {"-c", "--container-states"},
+      description = "Comma-separated container lifecycle state names eligible for disk balancing "
+          + "(e.g. CLOSED,QUASI_CLOSED). Must be uppercase enum names.")
+  private String containerStates;
+
   @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
@@ -97,6 +102,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
     if (stopAfterDiskEven != null) {
       builder.setStopAfterDiskEven(stopAfterDiskEven);
     }
+    if (containerStates != null) {
+      builder.setContainerStates(containerStates);
+    }
     return builder.build();
   }
 
@@ -115,7 +123,7 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
                 .map(this::formatDatanodeDisplayName)
                 .collect(toList())));
       } else {
-        System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
+        System.out.println("Started DiskBalancer on all IN_SERVICE and HEALTHY nodes.");
       }
     } else {
       // Detailed message for specific nodes
@@ -153,6 +161,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
     }
     if (stopAfterDiskEven != null) {
       configMap.put("stopAfterDiskEven", stopAfterDiskEven);
+    }
+    if (containerStates != null) {
+      configMap.put("containerStates", containerStates);
     }
     return configMap.isEmpty() ? null : configMap;
   }

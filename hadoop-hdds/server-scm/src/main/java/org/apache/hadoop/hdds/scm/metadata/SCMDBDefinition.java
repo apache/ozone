@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -82,11 +83,11 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           TransactionInfo.getCodec());
 
-  public static final DBColumnFamilyDefinition<String, Long>
+  public static final DBColumnFamilyDefinition<SequenceIdType, Long>
       SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "sequenceId",
-          StringCodec.get(),
+          SequenceIdType.getCodec(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,

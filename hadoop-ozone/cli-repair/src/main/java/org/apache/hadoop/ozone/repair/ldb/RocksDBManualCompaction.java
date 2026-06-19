@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.util.Time;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -62,6 +63,13 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Column family name")
   private String columnFamilyName;
 
+  @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      description = "BottommostLevelCompaction option for RocksDB compaction." +
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
+      defaultValue = "0",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private int bottommostLevelCompaction;
+
   private String getConsoleReadLineWithFormat() {
     err().printf(WARNING_TO_STOP_SERVICE);
     return getScanner().nextLine().trim();
@@ -96,11 +104,14 @@ public class RocksDBManualCompaction extends RepairTool {
             " is not in a column family in DB for the given path.");
       }
 
-      info("Running compaction on " + columnFamilyName);
+      ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
+          CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
+      info("Running compaction on " + columnFamilyName +
+          " with bottommost level compaction: " + blcOption.name());
       long startTime = Time.monotonicNow();
       if (!isDryRun()) {
         ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();
-        compactOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+        compactOptions.setBottommostLevelCompaction(blcOption);
         db.get().compactRange(cfh, null, null, compactOptions);
       }
       long duration = Time.monotonicNow() - startTime;

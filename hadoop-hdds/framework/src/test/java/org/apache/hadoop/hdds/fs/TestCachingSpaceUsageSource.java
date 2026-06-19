@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.fs;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.newBuilder;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
@@ -31,6 +32,7 @@ import java.io.File;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.RandomUtils;
@@ -180,6 +182,54 @@ class TestCachingSpaceUsageSource {
     // available and used change by same amount (in opposite directions)
     assertEquals(original.getUsedSpace() + original.getAvailable(), subject.getUsedSpace());
     assertSnapshotIsUpToDate(subject);
+  }
+
+  // If negative values are passed, check that the state is unchanged
+  @Test
+  void incrementUsedSpaceIgnoresNegativeValue() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .withRefresh(Duration.ZERO)
+        .build();
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
+    SpaceUsageSource original = subject.snapshot();
+
+    subject.incrementUsedSpace(-1L);
+
+    // negative value should be ignored, leaving cached state unchanged
+    assertEquals(original.getUsedSpace(), subject.getUsedSpace());
+    assertEquals(original.getAvailable(), subject.getAvailable());
+    assertEquals(original.getCapacity(), subject.getCapacity());
+    assertSnapshotIsUpToDate(subject);
+  }
+
+  @Test
+  void decrementUsedSpaceIgnoresNegativeValue() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .withRefresh(Duration.ZERO)
+        .build();
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
+    SpaceUsageSource original = subject.snapshot();
+
+    subject.decrementUsedSpace(-1L);
+
+    // negative value should be ignored, leaving cached state unchanged
+    assertEquals(original.getUsedSpace(), subject.getUsedSpace());
+    assertEquals(original.getAvailable(), subject.getAvailable());
+    assertEquals(original.getCapacity(), subject.getCapacity());
+    assertSnapshotIsUpToDate(subject);
+  }
+
+  @Test
+  void testThreadName() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .build();
+    ThreadFactory subject = CachingSpaceUsageSource.threadFactoryFor(params);
+
+    for (int i = 0; i < 3; i++) {
+      assertThat(subject.newThread(() -> { }).getName())
+          .doesNotContain("\n")
+          .endsWith("-" + i);
+    }
   }
 
   private static void assertSnapshotIsUpToDate(SpaceUsageSource subject) {

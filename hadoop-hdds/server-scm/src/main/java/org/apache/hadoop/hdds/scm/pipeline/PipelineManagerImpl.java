@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -636,16 +636,28 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
-    for (DatanodeDetails node : pipeline.getNodes()) {
-      if (!(node instanceof DatanodeInfo)) {
-        node = nodeManager.getDatanodeInfo(node);
-      }
-      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize)) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
+    final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
+    for (DatanodeDetails dn : datanodeDetails) {
+      final DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+      if (info == null) {
+        LOG.warn("DatanodeInfo not found for {}", dn.getID());
         return false;
       }
+      datanodeInfos.add(info);
     }
 
+    final List<DatanodeInfo> successfulNodes = new ArrayList<>(datanodeInfos.size());
+    for (DatanodeInfo dn : datanodeInfos) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn, containerID)) {
+        for (DatanodeInfo rollbackNode : successfulNodes) {
+          nodeManager.removePendingAllocationForDatanode(rollbackNode, containerID);
+        }
+        return false;
+      }
+      successfulNodes.add(dn);
+    }
     return true;
   }
 

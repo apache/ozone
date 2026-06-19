@@ -19,6 +19,7 @@
 import { EChart } from '@/components/eChart/eChart';
 import { GraphLegendIcon } from '@/utils/themeIcons';
 import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
+import CapacityDetailError from '@/v2/pages/capacity/components/CapacityDetailError';
 import { Segment } from '@/v2/types/capacity.types';
 import { DownloadOutlined } from '@ant-design/icons';
 import { Card, Divider, Row, Select, Spin, Statistic } from 'antd';
@@ -30,6 +31,9 @@ type DataDetailItem = {
   size: number;
   breakdown: Segment[];
   loading?: boolean;
+  hasError?: boolean;
+  errorMessage?: string;
+  errorTestId?: string;
 }
 
 type CapacityDetailProps = {
@@ -159,25 +163,40 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
                   <div key={`data-detail-${data.title}-${idx}`} className='data-detail-item'>
                     <Statistic
                       title={data.title}
-                      value={size[0]}
-                      suffix={size[1]}
+                      value={data.hasError ? 'N/A' : size[0]}
+                      suffix={data.hasError ? undefined : size[1]}
                       valueStyle={statisticValueStyle}
                       className='data-detail-statistic'
                       loading={data.loading}
                     />
-                    {!data.loading && <Row className='data-detail-breakdown-container'>
-                      {data.breakdown.map((item, idx) => (
-                        <div key={`data-defailt-breakdown-${item.label}-${idx}`} className='data-detail-breakdown-item'>
-                          <GraphLegendIcon color={item.color} height={12} />
-                          <span className="data-detail-breakdown-label">{item.label}</span>
-                          <span className="data-detail-breakdown-value">{filesize(item.value, {round: 1})}</span>
-                        </div>
-                      ))}
-                      <EChart
-                        option={getEchartOptions(data.title, data)}
-                        style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
-                      {idx < dataDetails.length - 1 && <Divider />}
-                    </Row>}
+                    {!data.loading
+                      && (
+                        data.hasError
+                          ? (
+                            <>
+                              <CapacityDetailError
+                                message={data.errorMessage}
+                                testId={data.errorTestId}
+                              />
+                              {idx < dataDetails.length - 1 && <Divider />}
+                            </>
+                          )
+                          : (
+                            <Row className='data-detail-breakdown-container'>
+                              {data.breakdown.map((item, idx) => (
+                                <div key={`data-defailt-breakdown-${item.label}-${idx}`} className='data-detail-breakdown-item'>
+                                  <GraphLegendIcon color={item.color} height={12} />
+                                  <span className="data-detail-breakdown-label">{item.label}</span>
+                                  <span className="data-detail-breakdown-value">{filesize(item.value, {round: 1})}</span>
+                                </div>
+                              ))}
+                              <EChart
+                                option={getEchartOptions(data.title, data)}
+                                style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
+                              {idx < dataDetails.length - 1 && <Divider />}
+                            </Row>
+                          )
+                      )}
                   </div>
                 )
               })}

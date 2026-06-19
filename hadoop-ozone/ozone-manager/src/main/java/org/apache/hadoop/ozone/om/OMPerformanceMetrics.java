@@ -139,6 +139,15 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
 
+  @Metric(about = "resolveBucketLink latency in getBucketTagging")
+  private MutableRate getBucketTaggingResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check latency in getBucketTagging")
+  private MutableRate getBucketTaggingAclCheckLatencyNs;
+
+  @Metric(about = "End-to-end latency in getBucketTagging")
+  private MutableRate getBucketTaggingLatencyNs;
+
   @Metric(about = "Latency of each iteration of DirectoryDeletingService in ms")
   private MutableGaugeLong directoryDeletingServiceLatencyMs;
 
@@ -347,6 +356,18 @@ public class OMPerformanceMetrics {
 
   public void addGetObjectTaggingLatencyNs(long latencyInNs) {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getGetBucketTaggingResolveBucketLatencyNs() {
+    return getBucketTaggingResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetBucketTaggingAclCheckLatencyNs() {
+    return getBucketTaggingAclCheckLatencyNs;
+  }
+
+  public void addGetBucketTaggingLatencyNs(long latencyInNs) {
+    getBucketTaggingLatencyNs.add(latencyInNs);
   }
 
   public void setDirectoryDeletingServiceLatencyMs(long latencyInMs) {
