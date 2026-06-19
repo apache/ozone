@@ -130,7 +130,13 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
-    return createPipelineInternal(replicationConfig, dns, map);
+    return Pipeline.newBuilder()
+        .setId(PipelineID.insecureRandomId())
+        .setState(Pipeline.PipelineState.ALLOCATED)
+        .setReplicationConfig(replicationConfig)
+        .setNodes(dns)
+        .setReplicaIndexes(map)
+        .build();
   }
 
   private Pipeline createPipelineInternal(ECReplicationConfig repConfig,

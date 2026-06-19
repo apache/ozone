@@ -84,10 +84,14 @@ public class SimplePipelineProvider
   @Override
   public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
-        .stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+    return Pipeline.newBuilder()
+        .setId(PipelineID.insecureRandomId())
+        .setState(PipelineState.OPEN)
+        .setReplicationConfig(replicationConfig)
+        .setNodes(replicas.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .collect(Collectors.toList()))
+        .build();
   }
 
   @Override

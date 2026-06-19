@@ -225,10 +225,14 @@ public class RatisPipelineProvider
   public Pipeline createForRead(
       RatisReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
-        .stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+    return Pipeline.newBuilder()
+        .setId(PipelineID.insecureRandomId())
+        .setState(PipelineState.ALLOCATED)
+        .setReplicationConfig(replicationConfig)
+        .setNodes(replicas.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .collect(Collectors.toList()))
+        .build();
   }
 
   private List<DatanodeDetails> filterPipelineEngagement() {

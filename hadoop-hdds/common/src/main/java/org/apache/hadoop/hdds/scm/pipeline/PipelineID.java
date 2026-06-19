@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -54,7 +55,9 @@ public final class PipelineID {
   }
 
   public static PipelineID insecureRandomId() {
-    return new PipelineID(new UUID(UUIDUtil.insecureRandomUUIDBytes()));
+    byte[] bytes = UUIDUtil.insecureRandomUUIDBytes();
+    ByteBuffer buf = ByteBuffer.wrap(bytes);
+    return new PipelineID(new UUID(buf.getLong(), buf.getLong()));
   }
 
   public static PipelineID valueOf(UUID id) {
