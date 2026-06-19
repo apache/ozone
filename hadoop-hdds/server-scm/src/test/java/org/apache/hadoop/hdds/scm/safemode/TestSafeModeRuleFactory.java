@@ -82,7 +82,7 @@ class TestSafeModeRuleFactory {
     conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
         HddsProtos.ReplicationType.EC.name());
     conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
         false);
 
     SCMSafeModeManager safeModeManager = initializeSafeModeRuleFactory(conf);
@@ -100,7 +100,7 @@ class TestSafeModeRuleFactory {
     conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
         HddsProtos.ReplicationType.EC.name());
     conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
         true);
 
     SCMSafeModeManager safeModeManager = initializeSafeModeRuleFactory(conf);

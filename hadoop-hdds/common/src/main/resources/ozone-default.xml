@@ -1710,12 +1710,14 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.creation.ec.ratis.three.enabled</name>
+    <name>ozone.scm.pipeline.creation.ratis.three</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
-      If enabled, SCM creates RATIS/THREE background pipelines even when the
-      default replication type is EC.
+      When true, SCM creates RATIS/THREE pipelines in the background and
+      requires them during safemode. Applies only when the cluster default
+      replication type is EC. For RATIS-default clusters this flag has no
+      effect.
     </description>
   </property>
   <property>

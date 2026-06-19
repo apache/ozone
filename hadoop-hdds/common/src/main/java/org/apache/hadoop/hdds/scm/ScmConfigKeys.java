@@ -465,11 +465,11 @@ public final class ScmConfigKeys {
    * mixed-workload clusters. If false, RATIS/THREE pipeline creation is
    * skipped for EC-default clusters.
    */
-  public static final String OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE =
-      "ozone.scm.pipeline.creation.ec.ratis.three.enabled";
+  public static final String OZONE_SCM_PIPELINE_CREATE_RATIS_THREE =
+      "ozone.scm.pipeline.creation.ratis.three";
 
   public static final boolean
-      OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE_DEFAULT = true;
+      OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT = true;
 
   public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
       "ozone.scm.block.deletion.per.dn.distribution.factor";

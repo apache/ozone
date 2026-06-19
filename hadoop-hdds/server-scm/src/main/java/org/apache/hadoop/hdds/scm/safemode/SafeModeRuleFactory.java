@@ -109,7 +109,7 @@ public final class SafeModeRuleFactory {
             "RATIS/THREE pipeline safemode rules are disabled because "
                 + "{} is false for an EC-default cluster or the default "
                 + "replication config is invalid.",
-            ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE);
+            ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE);
       }
     }
 
@@ -139,8 +139,8 @@ public final class SafeModeRuleFactory {
       return true;
     }
 
-    return config.getBoolean(ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
-        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
+    return config.getBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
   }
 
   public static synchronized SafeModeRuleFactory getInstance() {

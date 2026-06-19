@@ -112,8 +112,8 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.createRatisThreeForEcDefault = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE,
-        ScmConfigKeys.OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
 
     threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
@@ -242,7 +242,7 @@ public class BackgroundPipelineCreator implements SCMService {
    * <p>If the default replication config is invalid, this returns an empty
    * list and skips pipeline creation to avoid guessing from raw config values.
    * For EC-default clusters, this only returns RATIS/THREE when
-   * {@link ScmConfigKeys#OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE} is enabled.
+   * {@link ScmConfigKeys#OZONE_SCM_PIPELINE_CREATE_RATIS_THREE} is enabled.
    */
   @VisibleForTesting
   List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
