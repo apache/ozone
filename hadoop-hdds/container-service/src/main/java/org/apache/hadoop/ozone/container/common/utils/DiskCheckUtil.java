@@ -33,6 +33,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
+import org.apache.commons.io.IOUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,7 +168,7 @@ public final class DiskCheckUtil {
       // Read data back from the test file.
       byte[] readBytes = new byte[numBytesToWrite];
       try (InputStream fis = Files.newInputStream(testFile.toPath())) {
-        int numBytesRead = fis.read(readBytes);
+        int numBytesRead = IOUtils.read(fis, readBytes);
         if (numBytesRead != numBytesToWrite) {
           logError(storageDir, String.format("%d bytes written to file %s " +
                   "but %d bytes were read back.", numBytesToWrite,
