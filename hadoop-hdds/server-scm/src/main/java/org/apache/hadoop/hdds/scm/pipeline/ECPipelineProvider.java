@@ -130,6 +130,8 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
     return Pipeline.newBuilder()
         .setId(PipelineID.insecureRandomId())
         .setState(Pipeline.PipelineState.ALLOCATED)

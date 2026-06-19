@@ -225,6 +225,8 @@ public class RatisPipelineProvider
   public Pipeline createForRead(
       RatisReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
     return Pipeline.newBuilder()
         .setId(PipelineID.insecureRandomId())
         .setState(PipelineState.ALLOCATED)

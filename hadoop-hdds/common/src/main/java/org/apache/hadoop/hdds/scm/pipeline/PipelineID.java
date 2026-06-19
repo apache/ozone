@@ -54,6 +54,13 @@ public final class PipelineID {
     return new PipelineID(UUID.randomUUID());
   }
 
+  /**
+   * Generates a random PipelineID using {@link java.util.Random} instead of
+   * {@link java.security.SecureRandom}. This avoids contention on the shared
+   * {@code SecureRandom} instance and is suitable for non-sensitive,
+   * throwaway IDs such as read pipelines, where predictability of the next
+   * ID has no security impact.
+   */
   public static PipelineID insecureRandomId() {
     byte[] bytes = UUIDUtil.insecureRandomUUIDBytes();
     ByteBuffer buf = ByteBuffer.wrap(bytes);
