@@ -298,12 +298,7 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
-      // resolve the bucket layout in case of Link Bucket
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-              new HashSet<>());
-
-      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), bucket.getBucketLayout());
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume

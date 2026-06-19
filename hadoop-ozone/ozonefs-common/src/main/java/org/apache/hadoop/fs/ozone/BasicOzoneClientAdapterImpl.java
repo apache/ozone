@@ -199,11 +199,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       bucketReplicationConfig = this.bucket.getReplicationConfig();
       nextReplicationConfigRefreshTime = clock.millis() + bucketRepConfigRefreshPeriodMS;
 
-      // resolve the bucket layout in case of Link Bucket
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore, new HashSet<>());
-
-      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), bucket.getBucketLayout());
     } catch (IOException | RuntimeException exception) {
       // in case of exception, the adapter object will not be
       // initialised making the client object unreachable, close the client
