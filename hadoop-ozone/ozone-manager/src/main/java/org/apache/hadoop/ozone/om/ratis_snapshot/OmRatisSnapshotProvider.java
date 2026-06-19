@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_KEY;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -50,7 +51,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -390,7 +390,9 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         }
         throw ex;
       } finally {
-        connection.disconnect();
+        if (connection != null) {
+          connection.disconnect();
+        }
       }
       return null;
     });

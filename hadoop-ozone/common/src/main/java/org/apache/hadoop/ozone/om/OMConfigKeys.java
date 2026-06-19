@@ -301,7 +301,7 @@ public final class OMConfigKeys {
    */
   public static final String OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY =
       "ozone.om.bootstrap.checkpoint.estimated.space.headroom.ratio";
-  public static final double OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT = 1.25D;
+  public static final double OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT = 2.0D;
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -39,11 +40,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -112,15 +112,15 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1019,26 +1019,27 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    * Follower bootstrap must abort before streaming when the leader's SST estimate header
    * implies more free space than is available (v2 inode-based checkpoint URL).
    */
-  @Test
-  public void testBootstrapSnapshotDownloadAbortsWhenDiskSpaceBelowLeaderSstEstimateV2()
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testBootstrapSnapshotDownloadAbortsWhenDiskSpaceBelowLeaderSstEstimate(boolean useInodeBasedTransfer)
       throws Exception {
     Path snapshotDir = folder.resolve("ratis-snap-space-v2-" + UUID.randomUUID());
     Files.createDirectories(snapshotDir);
-    Path downloadTarget = folder.resolve("checkpoint-target-v2-" + UUID.randomUUID() + ".tar");
+    Path downloadTarget = folder.resolve("checkpoint-target-" + UUID.randomUUID() + ".tar");
 
     long usable = Files.getFileStore(snapshotDir).getUsableSpace();
     long estimatedSstBytes = Math.addExact(Math.min(usable, Long.MAX_VALUE / 4), 1_000_000);
 
     OzoneConfiguration diskCheckConf = new OzoneConfiguration();
     diskCheckConf.set(OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY, "0B");
-    diskCheckConf.setBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, true);
+    diskCheckConf.setBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, useInodeBasedTransfer);
 
     Map<String, OMNodeDetails> peers = new HashMap<>();
     OMNodeDetails leaderDetails = mock(OMNodeDetails.class);
     String leaderId = "leader1";
     peers.put(leaderId, leaderDetails);
     URL checkpointUrl = mock(URL.class);
-    when(leaderDetails.getOMDBCheckpointEndpointUrl(eq(true), anyBoolean(), eq(true)))
+    when(leaderDetails.getOMDBCheckpointEndpointUrl(anyBoolean(), anyBoolean(), eq(true)))
         .thenReturn(checkpointUrl);
 
     HttpURLConnection connection = mock(HttpURLConnection.class);

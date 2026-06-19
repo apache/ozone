@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis_snapshot;
 
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -112,7 +113,7 @@ public class TestOmRatisSnapshotProvider {
     conf.set(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY, "0GB");
     OmRatisSnapshotProvider provider =
         new OmRatisSnapshotProvider(conf, snapshotDir, new HashMap<>());
-    assertDoesNotThrow(() -> provider.ensureBootstrapDiskSpace());
+    assertDoesNotThrow(provider::ensureBootstrapDiskSpace);
   }
 
   @Test
@@ -123,8 +124,7 @@ public class TestOmRatisSnapshotProvider {
         new OmRatisSnapshotProvider(conf, snapshotDir, new HashMap<>());
     IOException ex =
         assertThrows(IOException.class, provider::ensureBootstrapDiskSpace);
-    assertEquals(true,
-        ex.getMessage().contains(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY));
+    assertThat(ex.getMessage()).contains(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
   }
 
   @Test
