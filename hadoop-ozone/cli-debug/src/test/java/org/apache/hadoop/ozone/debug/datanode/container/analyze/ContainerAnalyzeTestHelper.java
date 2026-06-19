@@ -21,9 +21,19 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -109,5 +119,32 @@ final class ContainerAnalyzeTestHelper {
     File hddsRoot = new File(volumeRoot, HddsVolume.HDDS_VOLUME_DIR);
     File versionFile = StorageVolumeUtil.getVersionFile(hddsRoot);
     Files.write(versionFile.toPath(), new byte[0]);
+  }
+
+  /**
+   * Creates an offline {@code scm.db} with the given container states.
+   *
+   * @return path to the {@code scm.db} directory
+   */
+  File createScmDb(Map<Long, HddsProtos.LifeCycleState> containerStates) throws IOException {
+    Path scmRoot = tempDir.resolve("scm-metadata");
+    Files.createDirectories(scmRoot);
+    DBStore dbStore = DBStoreBuilder.newBuilder(conf, SCMDBDefinition.get(), OzoneConsts.SCM_DB_NAME, scmRoot).build();
+    try {
+      Table<ContainerID, ContainerInfo> containerTable = SCMDBDefinition.CONTAINERS.getTable(dbStore);
+      for (Map.Entry<Long, HddsProtos.LifeCycleState> entry : containerStates.entrySet()) {
+        long containerId = entry.getKey();
+        ContainerInfo containerInfo = new ContainerInfo.Builder()
+            .setContainerID(containerId)
+            .setState(entry.getValue())
+            .setOwner("test")
+            .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+            .build();
+        containerTable.put(ContainerID.valueOf(containerId), containerInfo);
+      }
+    } finally {
+      dbStore.close();
+    }
+    return scmRoot.resolve(OzoneConsts.SCM_DB_NAME).toFile();
   }
 }
