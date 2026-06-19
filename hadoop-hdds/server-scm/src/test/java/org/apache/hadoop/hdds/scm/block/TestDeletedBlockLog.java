@@ -961,6 +961,122 @@ public class TestDeletedBlockLog {
         .thenReturn(replicaSet);
   }
 
+  /**
+   * Regression test: summary goes negative when STORAGE_SPACE_DISTRIBUTION is first finalized
+   * on a cluster whose existing pending DeletedBlocksTransactions were written without a
+   * persisted summary (old leader, pre-accounting code).
+   *
+   * Scenario: "old leader" adds transactions to the deletedBlocks CF with size fields set
+   * (feature is finalized) but never writes a summary to statefulConfigTable.  The new leader
+   * finds no persisted summary, falls back to a one-time DB scan, recomputes the correct
+   * totals, and then drives them to exactly zero as DNs commit — never going negative.
+   */
+  @Test
+  public void testSummaryNotNegativeWhenPersistedSummaryAbsent() throws Exception {
+    final int txCount = 10;
+
+    // Simulate the "old leader": feature is finalized so size fields are populated in each
+    // transaction proto, but the summary path in addTransactions is suppressed so nothing
+    // is persisted to statefulConfigTable.
+    SCMDeletedBlockTransactionStatusManager.setDisableDataDistributionForTest(true);
+    try {
+      addTransactions(generateData(txCount), true);
+      mockContainerHealthResult(true);
+
+      SCMDeletedBlockTransactionStatusManager statusManager =
+          deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+      assertEquals(0L, statusManager.getTransactionSummary().getTotalTransactionCount(),
+          "Old leader left summary at zero");
+      assertEquals(0L, statusManager.getTransactionSummary().getTotalBlockSize(),
+          "Old leader left block size at zero");
+
+      // New leader takes over with the summary path re-enabled.
+      // initDataDistributionData() finds no persisted summary → triggers one-time DB scan.
+      SCMDeletedBlockTransactionStatusManager.setDisableDataDistributionForTest(false);
+      deletedBlockLog.onBecomeLeader();
+
+      HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
+      assertEquals(txCount, summary.getTotalTransactionCount(),
+          "DB scan must recover the correct transaction count");
+      assertTrue(summary.getTotalBlockSize() > 0,
+          "DB scan must recover a positive block size; got " + summary.getTotalBlockSize());
+      assertTrue(summary.getTotalBlockReplicatedSize() > 0,
+          "DB scan must recover a positive replicated size; got " + summary.getTotalBlockReplicatedSize());
+
+      // All DNs commit. descDeletedBlocksSummary fires for each transaction.
+      // Without the fix the counter starts at 0 and goes deeply negative.
+      // With the fix it starts at the DB-computed value and lands at exactly 0.
+      List<DeletedBlocksTransaction> blocks = getTransactions(txCount * BLOCKS_PER_TXN * THREE);
+      assertEquals(txCount * THREE, blocks.size());
+      commitTransactions(blocks);
+      scmHADBTransactionBuffer.flush();
+
+      summary = statusManager.getTransactionSummary();
+      assertThat(summary.getTotalBlockSize())
+          .as("Block size must not go negative after all transactions committed")
+          .isGreaterThanOrEqualTo(0L);
+      assertThat(summary.getTotalBlockReplicatedSize())
+          .as("Replicated block size must not go negative after all transactions committed")
+          .isGreaterThanOrEqualTo(0L);
+      assertEquals(0L, summary.getTotalBlockSize(),
+          "Block size must be exactly 0 after all pending transactions committed");
+      assertEquals(0L, summary.getTotalBlockReplicatedSize(),
+          "Replicated block size must be exactly 0 after all pending transactions committed");
+    } finally {
+      SCMDeletedBlockTransactionStatusManager.setDisableDataDistributionForTest(false);
+    }
+  }
+
+  /**
+   * Ensures the fast path (O(1) load from statefulConfigTable) is taken on a normal leader
+   * election where the persisted summary is valid (non-negative).  This is the common
+   * production path and must not trigger a DB scan.
+   *
+   * Verification: after a leader change the in-memory counters exactly match what was
+   * persisted by the previous leader, and they reach zero once all pending transactions
+   * are committed.
+   */
+  @Test
+  public void testSummaryFastPathOnNormalLeaderChange() throws Exception {
+    final int txCount = 10;
+    mockContainerHealthResult(true);
+
+    // Add transactions with full accounting enabled → persists a valid summary.
+    addTransactions(generateData(txCount), true);
+    scmHADBTransactionBuffer.flush();
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    HddsProtos.DeletedBlocksTransactionSummary before = statusManager.getTransactionSummary();
+    assertEquals(txCount, before.getTotalTransactionCount());
+    assertTrue(before.getTotalBlockSize() > 0);
+
+    // Simulate a leader change. initDataDistributionData() must take the fast path
+    // (the LOG output will say "loaded from persisted summary", not "recomputed from CF").
+    deletedBlockLog.onBecomeLeader();
+
+    HddsProtos.DeletedBlocksTransactionSummary after = statusManager.getTransactionSummary();
+    assertEquals(before.getTotalTransactionCount(), after.getTotalTransactionCount(),
+        "Fast path must restore the exact transaction count");
+    assertEquals(before.getTotalBlockSize(), after.getTotalBlockSize(),
+        "Fast path must restore the exact block size");
+    assertEquals(before.getTotalBlockReplicatedSize(), after.getTotalBlockReplicatedSize(),
+        "Fast path must restore the exact replicated block size");
+
+    // Commit all transactions; counters must reach 0 without going negative.
+    List<DeletedBlocksTransaction> blocks = getTransactions(txCount * BLOCKS_PER_TXN * THREE);
+    assertEquals(txCount * THREE, blocks.size());
+    commitTransactions(blocks);
+    scmHADBTransactionBuffer.flush();
+
+    HddsProtos.DeletedBlocksTransactionSummary done = statusManager.getTransactionSummary();
+    assertThat(done.getTotalBlockSize())
+        .as("Block size must not go negative after commit")
+        .isGreaterThanOrEqualTo(0L);
+    assertEquals(0L, done.getTotalBlockSize());
+    assertEquals(0L, done.getTotalBlockReplicatedSize());
+  }
+
   private void mockInadequateReplicaUnhealthyContainerInfo(long containerID,
       int count) throws IOException {
     List<DatanodeDetails> dns = dnList.subList(0, 2);

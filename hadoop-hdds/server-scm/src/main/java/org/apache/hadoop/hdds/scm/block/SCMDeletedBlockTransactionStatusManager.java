@@ -586,10 +586,10 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   private void descDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
-    totalTxCount.addAndGet(-1);
-    totalBlockCount.addAndGet(-txBlockInfo.getTotalBlockCount());
-    totalBlocksSize.addAndGet(-txBlockInfo.getTotalBlockSize());
-    totalReplicatedBlocksSize.addAndGet(-txBlockInfo.getTotalReplicatedBlockSize());
+    totalTxCount.updateAndGet(v -> Math.max(0, v - 1));
+    totalBlockCount.updateAndGet(v -> Math.max(0, v - txBlockInfo.getTotalBlockCount()));
+    totalBlocksSize.updateAndGet(v -> Math.max(0, v - txBlockInfo.getTotalBlockSize()));
+    totalReplicatedBlocksSize.updateAndGet(v -> Math.max(0, v - txBlockInfo.getTotalReplicatedBlockSize()));
   }
 
   @VisibleForTesting
@@ -675,15 +675,76 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   private void initDataDistributionData() throws IOException {
     DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
-    if (summary != null) {
+    if (isSummaryValid(summary)) {
+      // Fast path (O(1)): persisted summary exists and has no negative values.
+      // This is the normal path on every routine leader election.
       totalTxCount.set(summary.getTotalTransactionCount());
       totalBlockCount.set(summary.getTotalBlockCount());
       totalBlocksSize.set(summary.getTotalBlockSize());
       totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-      LOG.info("Storage space distribution is initialized with totalTxCount {}, totalBlockCount {}, " +
-              "totalBlocksSize {} and totalReplicatedBlocksSize {}", totalTxCount.get(),
-          totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+      LOG.info("Storage space distribution loaded from persisted summary: totalTxCount {}, totalBlockCount {}, " +
+              "totalBlocksSize {} and totalReplicatedBlocksSize {}",
+          totalTxCount.get(), totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+      return;
     }
+
+    // Slow path (O(pending-backlog)): the persisted summary is either absent (first boot
+    // after STORAGE_SPACE_DISTRIBUTION is finalized on a cluster that predates the
+    // accounting code) or it already contains negative values written by a pre-fix leader.
+    // In both cases the only reliable source of truth is the deletedBlocks CF itself.
+    // This scan runs at most once per cluster lifecycle: as soon as the corrected totals
+    // are written back via the next addTransactions / removeTransactions call, every
+    // subsequent leader election will take the fast path above.
+    if (summary == null) {
+      LOG.info("No persisted deleted-blocks summary found; recomputing from deletedBlocks CF.");
+    } else {
+      LOG.warn("Persisted deleted-blocks summary contains negative values " +
+          "(totalBlocksSize={}, totalReplicatedBlocksSize={}); " +
+          "recomputing from deletedBlocks CF to repair.",
+          summary.getTotalBlockSize(), summary.getTotalBlockReplicatedSize());
+    }
+    long txCount = 0;
+    long blockCount = 0;
+    long blockSize = 0;
+    long replicatedSize = 0;
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
+             deletedBlockLogStateManager.getReadOnlyIterator()) {
+      while (iter.hasNext()) {
+        DeletedBlocksTransaction tx = iter.next().getValue();
+        txCount++;
+        blockCount += tx.getLocalIDCount();
+        if (tx.hasTotalBlockSize()) {
+          blockSize += tx.getTotalBlockSize();
+        }
+        if (tx.hasTotalBlockReplicatedSize()) {
+          replicatedSize += tx.getTotalBlockReplicatedSize();
+        }
+      }
+    }
+    totalTxCount.set(txCount);
+    totalBlockCount.set(blockCount);
+    totalBlocksSize.set(blockSize);
+    totalReplicatedBlocksSize.set(replicatedSize);
+    LOG.info("Storage space distribution recomputed from deletedBlocks CF: totalTxCount {}, totalBlockCount {}, " +
+            "totalBlocksSize {} and totalReplicatedBlocksSize {}",
+        totalTxCount.get(), totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+  }
+
+  /**
+   * Returns true when the persisted summary can be used directly without a DB scan.
+   *
+   * Both size fields must be strictly positive. A zero value means either:
+   * (a) the deletedBlocks table is genuinely empty — in which case the DB scan is
+   *     O(0) and effectively free, or
+   * (b) the counter was clamped from a negative value by a previous leader running
+   *     buggy code — in which case the DB scan is the correct one-time repair.
+   * Treating zero the same as negative keeps the detection and repair path unified
+   * and ensures that a clamped-zero is never silently accepted as a valid starting point.
+   */
+  private static boolean isSummaryValid(DeletedBlocksTransactionSummary summary) {
+    return summary != null
+        && summary.getTotalBlockSize() > 0
+        && summary.getTotalBlockReplicatedSize() > 0;
   }
 
   private DeletedBlocksTransactionSummary loadDeletedBlocksSummary() throws IOException {
