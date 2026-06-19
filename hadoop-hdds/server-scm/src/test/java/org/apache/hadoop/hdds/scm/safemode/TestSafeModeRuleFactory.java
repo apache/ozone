@@ -116,12 +116,12 @@ class TestSafeModeRuleFactory {
   }
 
   private SCMSafeModeManager initializeSafeModeRuleFactory(
-      OzoneConfiguration conf) {
+      OzoneConfiguration configuration) {
     final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "0s");
-    SafeModeRuleFactory.initialize(conf,
+    configuration.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        "0s");
+    SafeModeRuleFactory.initialize(configuration,
         SCMContext.emptyContext(), new EventQueue(), mock(
             PipelineManager.class),
         mock(ContainerManager.class), mock(NodeManager.class));
