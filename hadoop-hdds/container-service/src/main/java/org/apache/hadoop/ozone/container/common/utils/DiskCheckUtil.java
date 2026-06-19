@@ -153,15 +153,18 @@ public final class DiskCheckUtil {
       } catch (SyncFailedException syncEx) {
         logError(storageDir, String.format("Could not sync file %s to disk.",
             testFile.getAbsolutePath()), syncEx);
+        FileUtils.deleteFileQuietly(testFile);
         return false;
       } catch (IOException ioEx) {
         String msg = ioEx.getMessage();
         if (msg != null && msg.contains(LINUX_DISK_FULL_MESSAGE)) {
           LOG.warn("Could not write file {} for volume check", testFile.getAbsolutePath(), ioEx);
+          FileUtils.deleteFileQuietly(testFile);
           return true;
         }
         logError(storageDir, String.format("Could not write file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
+        FileUtils.deleteFileQuietly(testFile);
         return false;
       }
 
@@ -173,15 +176,18 @@ public final class DiskCheckUtil {
           logError(storageDir, String.format("%d bytes written to file %s " +
                   "but %d bytes were read back.", numBytesToWrite,
               testFile.getAbsolutePath(), numBytesRead));
+          FileUtils.deleteFileQuietly(testFile);
           return false;
         }
       } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s " +
             "for volume check.", testFile.getAbsolutePath()), notFoundEx);
+        FileUtils.deleteFileQuietly(testFile);
         return false;
       } catch (IOException ioEx) {
         logError(storageDir, String.format("Could not read file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
+        FileUtils.deleteFileQuietly(testFile);
         return false;
       }
 
@@ -190,6 +196,7 @@ public final class DiskCheckUtil {
         logError(storageDir, String.format("%d Bytes read from file " +
                 "%s do not match the %d bytes that were written.",
             writtenBytes.length, testFile.getAbsolutePath(), readBytes.length));
+        FileUtils.deleteFileQuietly(testFile);
         return false;
       }
 

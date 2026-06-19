@@ -84,7 +84,10 @@ public class TestDiskCheckUtil {
   @Test
   public void testReadWrite() {
     assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
+    assertTestFileDeleted();
+  }
 
+  private void assertTestFileDeleted() {
     // Test file should have been deleted.
     File[] children = testDir.listFiles();
     assertNotNull(children);
@@ -105,6 +108,7 @@ public class TestDiskCheckUtil {
       // Test that checkReadWrite returns true for the disk full case
       boolean result = DiskCheckUtil.checkReadWrite(testDir, testDir, 1024);
       assertTrue(result, "checkReadWrite should return true when disk is full");
+      assertTestFileDeleted();
     }
   }
 }
