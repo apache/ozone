@@ -1352,12 +1352,9 @@ final class TestSecureOzoneCluster {
     if (m.matches()) {
       cn = m.group(1);
     }
-    String hostName = InetAddress.getLocalHost().getHostName();
-
     // Subject name should be om login user in real world but in this test
     // UGI has scm user context.
-    assertThat(cn).contains(SCM_SUB_CA);
-    assertThat(cn).contains(hostName);
+    assertThat(cn).isEqualTo(SCM_SUB_CA + "@localhost");
 
     LocalDate today = ZonedDateTime.now().toLocalDate();
     Date invalidDate;
