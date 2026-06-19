@@ -4,6 +4,7 @@ summary: FSO operations under leader-planned execution — multi-step chains, re
 date: 2026-06-12
 jira: HDDS-11898
 status: proposed
+author: Abhishek Pal
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");

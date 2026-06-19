@@ -4,6 +4,7 @@ summary: ManagedIndex, LeaderPlanner, ChangeRecorder, ApplyEngine, and State Mac
 date: 2026-06-12
 jira: HDDS-11898
 status: proposed
+author: Abhishek Pal
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
