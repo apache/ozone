@@ -365,6 +365,10 @@ public class ContainerBalancerSelectionCriteria {
     this.excludeContainersDueToFailure.add(container);
   }
 
+  Set<ContainerID> getExcludeDueToFailContainers() {
+    return excludeContainersDueToFailure;
+  }
+
   private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
