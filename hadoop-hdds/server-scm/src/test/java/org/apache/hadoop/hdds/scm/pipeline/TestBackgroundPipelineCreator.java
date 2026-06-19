@@ -100,11 +100,13 @@ public class TestBackgroundPipelineCreator {
   @Test
   public void testInvalidDefaultReplicationConfigCreatesNoPipelines() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE, HddsProtos.ReplicationType.RATIS.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        HddsProtos.ReplicationType.RATIS.name());
     conf.set(OzoneConfigKeys.OZONE_REPLICATION, "invalid-replication-value");
 
     BackgroundPipelineCreator creator =
-        new BackgroundPipelineCreator(mock(PipelineManager.class), conf, mock(SCMContext.class), Clock.systemUTC());
+        new BackgroundPipelineCreator(mock(PipelineManager.class), conf,
+            mock(SCMContext.class), Clock.systemUTC());
 
     List<ReplicationConfig> configs = creator.getReplicationConfigs(false);
 

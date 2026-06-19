@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -57,7 +58,9 @@ public class ECMinDataNodeSafeModeRule
     super(safeModeManager, eventQueue);
     this.nodeManager = nodeManager;
 
-    ReplicationConfig defaultConfig = getDefaultReplicationConfig(conf);
+    ReplicationConfig defaultConfig = ScmUtils.getDefaultReplicationConfig(
+        conf, SCMSafeModeManager.getLogger(),
+        ECMinDataNodeSafeModeRule.class.getSimpleName());
     if (defaultConfig != null
         && defaultConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
       ECReplicationConfig ecConfig = (ECReplicationConfig) defaultConfig;
@@ -142,21 +145,7 @@ public class ECMinDataNodeSafeModeRule
     return registeredDnSet.size();
   }
 
-  @VisibleForTesting
   boolean isEnabled() {
     return enabled;
-  }
-
-  private static ReplicationConfig getDefaultReplicationConfig(
-      ConfigurationSource conf) {
-    try {
-      return ReplicationConfig.getDefault(conf);
-    } catch (IllegalArgumentException e) {
-      SCMSafeModeManager.getLogger().warn(
-          "Could not parse default replication config for "
-              + "ECMinDataNodeSafeModeRule; disabling EC rule.",
-          e);
-      return null;
-    }
   }
 }

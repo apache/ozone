@@ -44,9 +44,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,10 +236,20 @@ public class BackgroundPipelineCreator implements SCMService {
     LOG.debug("BackgroundPipelineCreator createPipelines finished.");
   }
 
+  /**
+   * Returns replication configs eligible for background pipeline creation.
+   *
+   * <p>If the default replication config is invalid, this returns an empty
+   * list and skips pipeline creation to avoid guessing from raw config values.
+   * For EC-default clusters, this only returns RATIS/THREE when
+   * {@link ScmConfigKeys#OZONE_SCM_EC_PIPELINE_CREATE_RATIS_THREE} is enabled.
+   */
   @VisibleForTesting
   List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
     List<ReplicationConfig> list = new ArrayList<>();
-    ReplicationConfig defaultReplicationConfig = getDefaultReplicationConfig();
+    ReplicationConfig defaultReplicationConfig = ScmUtils
+        .getDefaultReplicationConfig(conf, LOG,
+            BackgroundPipelineCreator.class.getSimpleName());
     if (defaultReplicationConfig == null) {
       LOG.warn("Skipping background pipeline creation: default replication "
           + "config is invalid.");
@@ -248,11 +258,11 @@ public class BackgroundPipelineCreator implements SCMService {
     // TODO: #CLUTIL Different replication factor may need to be supported
     HddsProtos.ReplicationType type =
         defaultReplicationConfig.getReplicationType();
+    if (type == EC && createRatisThreeForEcDefault) {
+      list.add(ReplicationConfig.fromProtoTypeAndFactor(RATIS,
+          ReplicationFactor.THREE));
+    }
     if (type == EC) {
-      if (createRatisThreeForEcDefault) {
-        list.add(ReplicationConfig.fromProtoTypeAndFactor(RATIS,
-            ReplicationFactor.THREE));
-      }
       return list;
     }
 
@@ -272,21 +282,6 @@ public class BackgroundPipelineCreator implements SCMService {
       }
     }
     return list;
-  }
-
-  private ReplicationConfig getDefaultReplicationConfig() {
-    try {
-      return ReplicationConfig.getDefault(conf);
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Ignoring invalid default replication config: type={}, "
-              + "replication={}.",
-          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
-          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
-              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT),
-          e);
-      return null;
-    }
   }
 
   @Override
