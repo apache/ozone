@@ -717,7 +717,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(9)
-  @Slow("HDDS-15882")
+  @Slow("HDDS-15582")
   public void testBatchDeletePerformanceOneMillionRecords() {
     int deleteCount = CONTAINER_ID_RANGE;               // 200 000 container IDs
     int expectedDeleted = deleteCount * STATE_COUNT;    // 1 000 000 rows
@@ -769,7 +769,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(10)
-  @Slow("HDDS-15882")
+  @Slow("HDDS-15582")
   public void testCountByStateAfterFullDelete() {
     int expectedPerState = 0;
     LOG.info("--- Test 10: COUNT by state after full delete (expected {} each) ---",
