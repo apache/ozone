@@ -99,10 +99,8 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     when(replicationManager.getConfig())
-        .thenReturn(ozoneConfiguration.getObject(
+        .thenReturn(new OzoneConfiguration().getObject(
             ReplicationManagerConfiguration.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);

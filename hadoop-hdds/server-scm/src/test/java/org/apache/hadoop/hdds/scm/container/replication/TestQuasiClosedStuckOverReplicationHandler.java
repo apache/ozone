@@ -70,10 +70,8 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         HddsProtos.LifeCycleState.QUASI_CLOSED, RATIS_REPLICATION_CONFIG);
 
     replicationManager = mock(ReplicationManager.class);
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     when(replicationManager.getConfig())
-        .thenReturn(ozoneConfiguration.getObject(
+        .thenReturn(new OzoneConfiguration().getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
     ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);

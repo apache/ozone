@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
@@ -73,18 +72,9 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
       try {
-        if (replicationManager.getConfig().isPush()) {
-          replicationManager.sendThrottledReplicationCommand(containerInfo,
-              Collections.singletonList(source), target,
-              replica.getReplicaIndex());
-        } else {
-          ReplicateContainerCommand cmd = ReplicateContainerCommand
-              .fromSources(containerID, Collections.singletonList(source));
-          // For EC containers, we need to track the replica index which is
-          // to be replicated, so add it to the command.
-          cmd.setReplicaIndex(replica.getReplicaIndex());
-          replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
-        }
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            Collections.singletonList(source), target,
+            replica.getReplicaIndex());
         commandsSent++;
       } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to replicate container {} and index {} from {} to {}"

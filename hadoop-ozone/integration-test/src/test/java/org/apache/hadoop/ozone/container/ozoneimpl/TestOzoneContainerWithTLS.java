@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseCont
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerSecureRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
-import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer.captureLogs;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -44,7 +44,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -91,7 +90,10 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.replication.GrpcContainerUploader;
+import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.PushReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -186,7 +188,7 @@ public class TestOzoneContainerWithTLS {
 
   @ParameterizedTest(name = "Container token enabled: {0}")
   @ValueSource(booleans = {false, true})
-  public void downloadContainer(boolean containerTokenEnabled)
+  public void uploadContainer(boolean containerTokenEnabled)
       throws Exception {
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
         containerTokenEnabled);
@@ -198,26 +200,18 @@ public class TestOzoneContainerWithTLS {
     XceiverClientSpi client = null;
     try {
       client = clientManager.acquireClient(pipeline);
-      // at this point we have an established connection from the client to
-      // the container, and we do not expect a new SSL handshake while we are
-      // running container ops until the renewal, however it may happen, as
-      // the protocol can do a renegotiation at any time, so this dynamic
-      // introduces a very low chance of flakiness.
-      // The downloader client when it connects first, will do a failing
-      // handshake that we are expecting because before downloading, we wait
-      // for the expiration without renewing the certificate.
+      // The push (upload) client exercises the same TLS channel as the old
+      // download client, so cert-expiry/renewal behaviour is equivalent.
       List<Long> containers = new ArrayList<>();
-      List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
-      sourceDatanodes.add(dn);
 
       containers.add(createAndCloseContainer(client, containerTokenEnabled));
       letCertExpire();
       containers.add(createAndCloseContainer(client, containerTokenEnabled));
-      assertDownloadContainerFails(containers.get(0), sourceDatanodes);
+      assertUploadContainerFails(containers.get(0), container);
 
       caClient.renewKey();
       containers.add(createAndCloseContainer(client, containerTokenEnabled));
-      assertDownloadContainerWorks(containers, sourceDatanodes);
+      assertUploadContainerWorks(containers, container);
     } finally {
       if (container != null) {
         container.stop();
@@ -397,28 +391,32 @@ public class TestOzoneContainerWithTLS {
     return container;
   }
 
-  private void assertDownloadContainerFails(long containerId,
-      List<DatanodeDetails> sourceDatanodes) {
-    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
-    SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(conf, caClient);
-    Path file = downloader.getContainerDataFromReplicas(containerId,
-        sourceDatanodes, tempFolder.resolve("tmp"), NO_COMPRESSION);
-    downloader.close();
-    assertNull(file);
+  private void assertUploadContainerFails(long containerId,
+      OzoneContainer container) {
+    LogCapturer logCapture = captureLogs(GrpcContainerUploader.class);
+    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, caClient,
+        container.getController());
+    PushReplicator replicator = new PushReplicator(conf,
+        new OnDemandContainerReplicationSource(container.getController()), uploader);
+    ReplicationTask task = new ReplicationTask(
+        toTarget(
+            containerId, dn), replicator);
+    replicator.replicate(task);
+    assertSame(ReplicationTask.Status.FAILED, task.getStatus());
     assertThat(logCapture.getOutput())
         .contains("java.security.cert.CertificateExpiredException");
   }
 
-  private void assertDownloadContainerWorks(List<Long> containers,
-      List<DatanodeDetails> sourceDatanodes) {
+  private void assertUploadContainerWorks(List<Long> containers,
+      OzoneContainer container) {
     for (Long cId : containers) {
-      SimpleContainerDownloader downloader =
-          new SimpleContainerDownloader(conf, caClient);
-      Path file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
-          tempFolder.resolve("tmp"), NO_COMPRESSION);
-      downloader.close();
-      assertNotNull(file);
+      GrpcContainerUploader uploader = new GrpcContainerUploader(conf, caClient,
+          container.getController());
+      PushReplicator replicator = new PushReplicator(conf,
+          new OnDemandContainerReplicationSource(container.getController()), uploader);
+      ReplicationTask task = new ReplicationTask(toTarget(cId, dn), replicator);
+      replicator.replicate(task);
+      assertSame(ReplicationTask.Status.DONE, task.getStatus());
     }
   }
 
