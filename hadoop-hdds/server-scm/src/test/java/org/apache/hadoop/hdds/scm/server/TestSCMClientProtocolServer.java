@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,17 +70,17 @@ import org.junit.jupiter.api.io.TempDir;
  * servicing commands from the scm client.
  */
 public class TestSCMClientProtocolServer {
-  private SCMClientProtocolServer server;
-  private StorageContainerManager scm;
-  private StorageContainerLocationProtocolServerSideTranslatorPB service;
-  private SCMSafeModeManager mockSafeModeManager;
+  private static SCMClientProtocolServer server;
+  private static StorageContainerManager scm;
+  private static StorageContainerLocationProtocolServerSideTranslatorPB service;
+  private static SCMSafeModeManager mockSafeModeManager;
 
-  @BeforeEach
-  void setUp(@TempDir File testDir) throws Exception {
+
+  @BeforeAll
+  static void setUp(@TempDir File testDir) throws Exception {
     OzoneConfiguration config = SCMTestUtils.getConf(testDir);
 
     mockSafeModeManager = mock(SCMSafeModeManager.class);
-    when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
 
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
@@ -92,6 +93,11 @@ public class TestSCMClientProtocolServer {
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
         scm, mock(ProtocolMessageMetrics.class));
+  }
+
+  @BeforeEach
+  void setUp() {
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
   }
 
   @AfterEach
@@ -208,7 +214,7 @@ public class TestSCMClientProtocolServer {
     SCMClientProtocolServer testServer = serverWithMockFinalization(true, mockFinalizationManager);
     try {
       StatusAndMessages result = testServer.finalizeScmUpgrade("testClientID");
-      assertEquals(STARTING_FINALIZATION, result.status());
+      assertEquals(ALREADY_FINALIZED, result.status());
       assertTrue(result.msgs().isEmpty());
       verify(mockFinalizationManager, never()).finalizeUpgrade();
     } finally {

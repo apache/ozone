@@ -1157,10 +1157,12 @@ public class SCMClientProtocolServer implements
   @Override
   @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) {
-    if (!scm.getVersionManager().needsFinalization()) {
-      return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
-    }
-    return new StatusAndMessages(STARTING_FINALIZATION, Collections.emptyList());
+    // This command is kept only for legacy upgrade scripts which would have first finalized SCM and then
+    // made a call to OM to finalize it. The new flow, is that a single call to OM triggers the finalization process.
+    // The legacy OM command now calls the new one and correctly starts the flow, so this command has become a
+    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow nay scripts to move
+    // on and call OM to start the process.
+    return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
   }
 
   @Override
