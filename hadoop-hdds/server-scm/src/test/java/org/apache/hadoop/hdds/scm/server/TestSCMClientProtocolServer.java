@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -74,8 +73,7 @@ public class TestSCMClientProtocolServer {
   private static StorageContainerManager scm;
   private static StorageContainerLocationProtocolServerSideTranslatorPB service;
   private static SCMSafeModeManager mockSafeModeManager;
-
-
+  
   @BeforeAll
   static void setUp(@TempDir File testDir) throws Exception {
     OzoneConfiguration config = SCMTestUtils.getConf(testDir);
