@@ -42,8 +42,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -586,55 +584,61 @@ public class TestContainerReplicaPendingOps {
   }
 
   /**
-   * scheduleAddReplica must call NodeManager#recordAllocationForDatanode for
-   * the target DN so the PendingContainerTracker slot is reserved.
+   * scheduleAddReplica must notify subscribers via opAdded() so that
+   * a subscribed NodeManager can record the PendingContainerTracker slot.
    */
   @Test
-  public void testScheduleAddReplicaRecordsSlotInNodeManager() {
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo dnInfo = mock(DatanodeInfo.class);
+  public void testScheduleAddReplicaNotifiesSubscriberOpAdded() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
     ContainerID containerID = ContainerID.valueOf(1);
-    when(nodeManager.getDatanodeInfo(dn1)).thenReturn(dnInfo);
 
-    pendingOps.setNodeManager(nodeManager);
+    pendingOps.registerSubscriber(subscriber);
     pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
         FIVE_GB_CONTAINER_SIZE, clock.millis());
 
-    verify(nodeManager, times(1)).recordAllocationForDatanode(dnInfo, containerID);
+    verify(subscriber, times(1)).opAdded(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID));
   }
 
   /**
-   * scheduleDeleteReplica must NOT touch the NodeManager — only ADD ops
-   * consume container slots in the PendingContainerTracker.
+   * scheduleDeleteReplica must NOT invoke opAdded() on subscribers — only ADD ops
+   * reserve container slots in the PendingContainerTracker.
    */
   @Test
-  public void testScheduleDeleteReplicaDoesNotRecordSlot() {
-    NodeManager nodeManager = mock(NodeManager.class);
+  public void testScheduleDeleteReplicaDoesNotNotifyOpAdded() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
     ContainerID containerID = ContainerID.valueOf(1);
 
-    pendingOps.setNodeManager(nodeManager);
+    pendingOps.registerSubscriber(subscriber);
     pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
 
-    verifyNoMoreInteractions(nodeManager);
+    verifyNoMoreInteractions(subscriber);
   }
 
   /**
-   * completeAddReplica (called by ICR handler) must release the slot via
-   * NodeManager#removePendingAllocationForDatanode.
+   * completeAddReplica must notify subscribers via opCompleted(timedOut=false) so that
+   * a subscribed NodeManager can release the PendingContainerTracker slot.
    */
   @Test
-  public void testCompleteAddReplicaReleasesSlotInNodeManager() {
-    NodeManager nodeManager = mock(NodeManager.class);
-    DatanodeInfo dnInfo = mock(DatanodeInfo.class);
+  public void testCompleteAddReplicaNotifiesSubscriberOpCompleted() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
     ContainerID containerID = ContainerID.valueOf(1);
-    when(nodeManager.getDatanodeInfo(dn1)).thenReturn(dnInfo);
 
-    pendingOps.setNodeManager(nodeManager);
+    pendingOps.registerSubscriber(subscriber);
     pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
         FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.completeAddReplica(containerID, dn1, 0);
 
-    verify(nodeManager, times(1)).recordAllocationForDatanode(dnInfo, containerID);
-    verify(nodeManager, times(1)).removePendingAllocationForDatanode(dnInfo, containerID);
+    verify(subscriber, times(1)).opAdded(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID));
+    verify(subscriber, times(1)).opCompleted(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID),
+        org.mockito.ArgumentMatchers.eq(false));
   }
 }
