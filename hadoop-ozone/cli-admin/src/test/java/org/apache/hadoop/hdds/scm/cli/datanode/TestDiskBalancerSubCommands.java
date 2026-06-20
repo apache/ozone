@@ -528,8 +528,8 @@ public class TestDiskBalancerSubCommands {
       String output = outContent.toString(DEFAULT_ENCODING);
       int host2Index = output.indexOf("host-2");
       int host1Index = output.indexOf("host-1");
-      assertTrue(host2Index >= 0);
-      assertTrue(host1Index > host2Index, output);
+      assertThat(host2Index).isGreaterThanOrEqualTo(0);
+      assertThat(host1Index).isGreaterThan(host2Index);
     }
   }
 
@@ -573,8 +573,10 @@ public class TestDiskBalancerSubCommands {
 
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("Status result"));
-      assertTrue(output.contains("host-1"));
-      assertTrue(output.contains("host-2"));
+      int host1Index = output.indexOf("host-1");
+      int host2Index = output.indexOf("host-2");
+      assertThat(host1Index).isGreaterThanOrEqualTo(0);
+      assertThat(host2Index).isGreaterThan(host1Index);
     }
   }
 
@@ -887,4 +889,3 @@ public class TestDiskBalancerSubCommands {
         .build();
   }
 }
-

@@ -25,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -44,7 +43,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   // Store statuses for non-JSON mode consolidation
   private final Map<String, DatanodeDiskBalancerInfoProto> statuses =
-      new ConcurrentHashMap<>();
+      new LinkedHashMap<>();
 
   @Override
   protected Object executeCommand(String hostName) throws IOException {
