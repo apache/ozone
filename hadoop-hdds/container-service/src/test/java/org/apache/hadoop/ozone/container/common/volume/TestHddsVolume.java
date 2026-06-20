@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,7 +38,13 @@ import java.time.Duration;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
@@ -50,19 +57,24 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link HddsVolume}.
@@ -528,6 +540,109 @@ public class TestHddsVolume {
     } finally {
       // Shutdown the volume.
       volume.shutdown();
+    }
+  }
+
+  @Test
+  public void testCommittedBytesIsInitializedForFailedVolume() throws Exception {
+    HddsVolume volume = volumeBuilder.failedVolume(true).build();
+    try {
+      assertEquals(0L, volume.getCommittedBytes(),
+          "committedBytes must be initialized for failed volume instances");
+    } finally {
+      volume.shutdown();
+    }
+  }
+
+  @Test
+  public void testFailVolumeShouldUnregisterVolumeInfoMetricsSource() throws Exception {
+    DefaultMetricsSystem.shutdown();
+    MetricsSystem metricsSystem = DefaultMetricsSystem.instance();
+    metricsSystem.init("test-hdds-volume-metrics");
+    String metricsSourceName = VolumeInfoMetrics.class.getSimpleName() + '-' + folder.toString();
+    HddsVolume volume = null;
+
+    try {
+      volume = volumeBuilder.build();
+      assertNotNull(DefaultMetricsSystem.instance().getSource(metricsSourceName));
+      volume.failVolume();
+      assertNull(DefaultMetricsSystem.instance().getSource(metricsSourceName),
+          "VolumeInfoMetrics source should be unregistered when a volume transitions to FAILED");
+    } finally {
+      if (volume != null) {
+        volume.shutdown();
+      }
+      metricsSystem.stop();
+      metricsSystem.shutdown();
+    }
+  }
+
+  @Test
+  public void testConcurrentMetricsSamplingAfterFailVolumeDoesNotEmitCommittedNpe() throws Exception {
+    DefaultMetricsSystem.shutdown();
+    MetricsSystem metricsSystem = DefaultMetricsSystem.instance();
+    metricsSystem.init("test-hdds-volume-concurrent-metrics");
+    String metricsSourceName = VolumeInfoMetrics.class.getSimpleName() + '-' + folder.toString();
+    HddsVolume volume = null;
+
+    LogCapturer methodMetricLogs = LogCapturer.captureLogs(
+        LoggerFactory.getLogger("org.apache.hadoop.metrics2.lib.MethodMetric"));
+    methodMetricLogs.clearOutput();
+
+    AtomicBoolean running = new AtomicBoolean(true);
+    AtomicLong publishCount = new AtomicLong(0);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<?> publisher = executor.submit(() -> {
+      while (running.get()) {
+        metricsSystem.publishMetricsNow();
+        publishCount.incrementAndGet();
+      }
+    });
+
+    try {
+      volume = volumeBuilder.build();
+
+      // First, prove this test can hit the real MethodMetric -> getCommitted NPE path.
+      // We force committedBytes to null and invoke metrics snapshot directly.
+      Field committedBytes = HddsVolume.class.getDeclaredField("committedBytes");
+      committedBytes.setAccessible(true);
+      committedBytes.set(volume, null);
+      assertNull(committedBytes.get(volume),
+          "Failed to force committedBytes to null; reproducer is invalid");
+      volume.getVolumeInfoStats().getMetrics(new MetricsCollectorImpl(), true);
+      String directSnapshotOutput = methodMetricLogs.getOutput();
+      assertTrue(directSnapshotOutput.contains("Error invoking method getCommitted")
+              || directSnapshotOutput.contains("because \"this.committedBytes\" is null"),
+          "Reproducer sanity check failed: expected MethodMetric/getCommitted null-path log");
+      methodMetricLogs.clearOutput();
+      BooleanSupplier initialPublishReady = () -> publishCount.get() >= 20;
+      GenericTestUtils.waitFor(initialPublishReady, 50, 5000);
+
+      assertTrue(publishCount.get() >= 20);
+      volume.failVolume();
+      assertNull(DefaultMetricsSystem.instance().getSource(metricsSourceName),
+          "VolumeInfoMetrics source should be removed after failVolume()");
+
+      long baseline = publishCount.get();
+      BooleanSupplier steadyStatePublishReady = () -> publishCount.get() >= baseline + 50;
+      GenericTestUtils.waitFor(steadyStatePublishReady, 50, 5000);
+
+      String output = methodMetricLogs.getOutput();
+      assertFalse(output.contains("Error invoking method getCommitted"),
+          "MethodMetric should not invoke getCommitted on failed/unregistered volume source");
+      assertFalse(output.contains("because \"this.committedBytes\" is null"),
+          "MethodMetric should not hit committedBytes null after failed volume is unregistered");
+    } finally {
+      running.set(false);
+      publisher.cancel(true);
+      executor.shutdownNow();
+      executor.awaitTermination(5, TimeUnit.SECONDS);
+      methodMetricLogs.stopCapturing();
+      if (volume != null) {
+        volume.shutdown();
+      }
+      metricsSystem.stop();
+      metricsSystem.shutdown();
     }
   }
 

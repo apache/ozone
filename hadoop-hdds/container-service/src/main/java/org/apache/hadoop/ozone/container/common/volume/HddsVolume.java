@@ -203,6 +203,9 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
+    }
     closeDbStore();
   }
 
