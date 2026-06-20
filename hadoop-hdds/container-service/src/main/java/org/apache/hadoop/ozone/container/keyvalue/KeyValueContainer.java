@@ -299,6 +299,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throws StorageContainerException {
     File tempContainerFile = null;
     try {
+      // The metadata directory may be absent when writing the UNHEALTHY marker after
+      // a MISSING_METADATA_DIR corruption is detected. Recreate it so the state can be persisted.
+      File metadataDir = containerFile.getParentFile();
+      if (!metadataDir.exists() && !metadataDir.mkdirs()) {
+        throw new IOException("Failed to create metadata directory: " + metadataDir);
+      }
       tempContainerFile = createTempFile(containerFile);
       ContainerDataYaml.createContainerFile(containerData, tempContainerFile);
 

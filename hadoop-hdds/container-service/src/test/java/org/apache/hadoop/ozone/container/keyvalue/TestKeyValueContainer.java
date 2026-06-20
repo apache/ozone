@@ -759,6 +759,40 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
+  /**
+   * When a container's metadata directory is missing (MISSING_METADATA_DIR), marking the container
+   * UNHEALTHY must succeed and persist the state to disk. Previously the call failed with
+   * StorageContainerException because writeToContainerFile tried to create a temp file inside
+   * the missing directory.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkUnhealthyWithMissingMetadataDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // Simulate MISSING_METADATA_DIR: delete the entire metadata directory.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertTrue(metadataDir.exists(), "Metadata dir should exist before corruption");
+    FileUtils.deleteDirectory(metadataDir);
+    assertFalse(metadataDir.exists(), "Metadata dir should be gone after deletion");
+
+    // markContainerUnhealthy must not throw even though the metadata dir is absent.
+    keyValueContainer.markContainerUnhealthy();
+
+    // In-memory state must be UNHEALTHY.
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // The metadata directory must have been recreated and the .container file written.
+    assertTrue(metadataDir.exists(), "Metadata dir should be recreated by markContainerUnhealthy");
+    File containerFile = keyValueContainer.getContainerFile();
+    assertTrue(containerFile.exists(), "Container file should exist after markContainerUnhealthy");
+
+    // The persisted state must be UNHEALTHY.
+    KeyValueContainerData reloaded = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY, reloaded.getState());
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
