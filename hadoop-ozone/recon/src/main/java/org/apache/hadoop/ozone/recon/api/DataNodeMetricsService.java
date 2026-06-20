@@ -75,6 +75,7 @@ public class DataNodeMetricsService {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
+  private String failedMessage = "Metrics collection task failed. Please retry after some time.";
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
@@ -118,12 +119,7 @@ public class DataNodeMetricsService {
       return;
     }
     
-    // Check rate limit
-    if (System.currentTimeMillis() - lastCollectionEndTime.get() < minimumApiDelayMs) {
-      LOG.debug("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
-      isRunning.set(false);
-      return;
-    }
+
 
     List<DatanodeInfo> nodes = reconNodeManager.getAllNodes();
     if (nodes.isEmpty()) {
@@ -161,6 +157,7 @@ public class DataNodeMetricsService {
     } catch (Exception e) {
       resetState();
       currentStatus = MetricCollectionStatus.FAILED;
+      failedMessage = e.getLocalizedMessage();
       isRunning.set(false);
     }
   }
@@ -322,15 +319,15 @@ public class DataNodeMetricsService {
 
     return new DataNodeMetricsProgressResponse(
         currentStatus,
-        buildProgressMessage(currentStatus));
+        buildProgressMessage(currentStatus, failedMessage));
   }
 
-  private static String buildProgressMessage(MetricCollectionStatus status) {
+  private static String buildProgressMessage(MetricCollectionStatus status, String failedMessage) {
     switch (status) {
     case IN_PROGRESS:
       return "Metrics collection task is currently running. Please wait for task to finish.";
     case FAILED:
-      return "Metrics collection task failed. Please retry after some time.";
+      return failedMessage;
     case NOT_STARTED:
       return "Metrics collection task has not started yet. Please retry shortly.";
     default:
