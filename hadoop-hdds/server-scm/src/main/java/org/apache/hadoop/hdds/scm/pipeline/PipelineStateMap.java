@@ -405,6 +405,9 @@ class PipelineStateMap {
     NavigableSet<ContainerID> getContainers() {
       return new TreeSet<>(containers);
     }
+    NavigableSet<ContainerID> copyContainers() {
+      return new TreeSet<>(containers);
+    }
 
     void addContainerToOpenPipeline(ContainerID containerID) throws InvalidPipelineStateException {
       Objects.requireNonNull(containerID, "Container Id == null");
