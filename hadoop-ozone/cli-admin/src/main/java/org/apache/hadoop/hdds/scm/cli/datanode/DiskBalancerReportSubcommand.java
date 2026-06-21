@@ -167,7 +167,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         .append(" IdealUsage +/- Threshold are considered balanced.%n")
         .append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n")
         .append("  - Utilization: how much a particular volume is utilized ")
-        .append("effectiveUsedSpace / ozoneCapacity) in %%.%n")
+        .append("(effectiveUsedSpace / ozoneCapacity) in %%.%n")
         .append("  - OzoneCapacity: Ozone data volume capacity.%n")
         .append("  - OzoneAvailable: Ozone data volume available space.%n")
         .append("  - OzoneUsed: Ozone data volume used space.%n")
