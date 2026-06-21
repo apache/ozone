@@ -25,9 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -165,22 +165,6 @@ public class TestDeletedBlockLog {
         });
     when(containerManager.getContainers())
         .thenReturn(new ArrayList<>(containers.values()));
-    doAnswer(invocationOnMock -> {
-      Map<ContainerID, Long> map =
-          (Map<ContainerID, Long>) invocationOnMock.getArguments()[0];
-      for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
-        ContainerInfo info = containers.get(e.getKey());
-        try {
-          assertThat(e.getValue()).isGreaterThan(info.getDeleteTransactionId());
-        } catch (AssertionError err) {
-          throw new Exception("New TxnId " + e.getValue() + " < " + info
-              .getDeleteTransactionId());
-        }
-        info.updateDeleteTransactionId(e.getValue());
-        scmHADBTransactionBuffer.addToBuffer(containerTable, e.getKey(), info);
-      }
-      return null;
-    }).when(containerManager).updateDeleteTransactionId(any());
   }
 
   private void updateContainerMetadata(long cid,
@@ -312,7 +296,8 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testContainerManagerTransactionId() throws Exception {
+  public void testAddTransactionsDoesNotUpdateContainerTransactionId()
+      throws Exception {
     // Initially all containers should have deleteTransactionId as 0
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       assertEquals(0, containerInfo.getDeleteTransactionId());
@@ -329,12 +314,14 @@ public class TestDeletedBlockLog {
 
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
-    // All containers should have positive deleteTransactionId
+    // SCM does not update ContainerInfo deleteTransactionId when adding delete
+    // transactions.
     mockContainerHealthResult(true);
     assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      assertThat(containerInfo.getDeleteTransactionId()).isGreaterThan(0);
+      assertEquals(0, containerInfo.getDeleteTransactionId());
     }
+    verify(containerManager, never()).updateDeleteTransactionId(any());
   }
 
   private void mockContainerHealthResult(Boolean healthy) {
