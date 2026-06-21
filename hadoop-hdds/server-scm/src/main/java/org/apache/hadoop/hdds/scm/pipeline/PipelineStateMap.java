@@ -331,7 +331,11 @@ class PipelineStateMap {
       throw new InvalidPipelineStateException(
           format("Pipeline with %s is not yet closed", pipelineID));
     }
-    pipelineMap.remove(pipelineID);
+    List<Pipeline> pipelineList = query2OpenPipelines.get(pipeline.getReplicationConfig());
+
+    if (pipelineList != null) {
+        pipelineList.remove(pipeline);
+    }
     return pipeline;
   }
 
@@ -368,7 +372,15 @@ class PipelineStateMap {
       return pipeline;
     }
     final Pipeline updated = pipeline.toBuilder().setState(state).build();
-    pipelineMap.put(pipelineID,  new PipelineInfo(updated));
+    PipelineInfo oldInfo = getPipeline(pipelineID);
+
+    PipelineInfo newInfo = new PipelineInfo(updated);
+
+    for (ContainerID cid : oldInfo.copyContainers()) {
+        newInfo.addContainer(cid);
+    }
+
+    pipelineMap.put(pipelineID, newInfo);
 
     List<Pipeline> pipelineList =
         query2OpenPipelines.get(pipeline.getReplicationConfig());
