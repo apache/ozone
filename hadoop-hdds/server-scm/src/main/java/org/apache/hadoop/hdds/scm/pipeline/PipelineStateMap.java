@@ -281,10 +281,10 @@ class PipelineStateMap {
     final Predicate<Pipeline> include = getPredicate(excludeDns, excludePipelines, replicationConfig, state);
     final List<Pipeline> pipelines = new ArrayList<>(pipelineMap.size() / 2 + 1); // only resize once
     for (PipelineInfo info : pipelineMap.values()) {
-      final Pipeline pipeline = info.getPipeline();
-      if (include.test(pipeline)) {
-        pipelines.add(pipeline);
-      }
+        final Pipeline pipeline = info.getPipeline();
+        if (include.test(pipeline)) {
+          pipelines.add(pipeline);
+        }
     }
     return pipelines;
   }
@@ -334,7 +334,7 @@ class PipelineStateMap {
     List<Pipeline> pipelineList = query2OpenPipelines.get(pipeline.getReplicationConfig());
 
     if (pipelineList != null) { 
-        pipelineList.remove(pipeline);
+      pipelineList.remove(pipeline);
     }
     return pipeline;
   }
@@ -417,6 +417,7 @@ class PipelineStateMap {
     NavigableSet<ContainerID> getContainers() {
       return new TreeSet<>(containers);
     }
+    
     NavigableSet<ContainerID> copyContainers() {
       return new TreeSet<>(containers);
     }
