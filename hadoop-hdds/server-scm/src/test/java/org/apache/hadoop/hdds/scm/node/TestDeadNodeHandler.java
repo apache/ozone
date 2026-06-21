@@ -269,6 +269,12 @@ public class TestDeadNodeHandler {
     nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
+    // Changing the operational state of a DEAD node fires a DEAD_NODE event on
+    // SCM's event queue. Let SCM's own DeadNodeHandler process it here, so its
+    // asynchronous topology removal does not race with the handlers driven
+    // below (it could otherwise remove the node right after
+    // HealthyReadOnlyNodeHandler re-adds it).
+    ((EventQueue) scm.getEventQueue()).processAll(60000L);
     setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another
