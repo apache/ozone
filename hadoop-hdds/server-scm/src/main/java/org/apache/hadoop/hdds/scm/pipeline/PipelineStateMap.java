@@ -281,11 +281,11 @@ class PipelineStateMap {
     final Predicate<Pipeline> include = getPredicate(excludeDns, excludePipelines, replicationConfig, state);
     final List<Pipeline> pipelines = new ArrayList<>(pipelineMap.size() / 2 + 1); // only resize once
     for (PipelineInfo info : pipelineMap.values()) {
-        final Pipeline pipeline = info.getPipeline();
-        if (include.test(pipeline)) {
-          pipelines.add(pipeline);
-        }
-    }
+      final Pipeline pipeline = info.getPipeline();
+      if (include.test(pipeline)) {
+        pipelines.add(pipeline);
+      }
+    } 
     return pipelines;
   }
 
@@ -377,7 +377,7 @@ class PipelineStateMap {
     PipelineInfo newInfo = new PipelineInfo(updated);
 
     for (ContainerID cid : oldInfo.copyContainers()) {
-        newInfo.addContainer(cid);
+      newInfo.addContainer(cid);
     }
 
     pipelineMap.put(pipelineID, newInfo);
