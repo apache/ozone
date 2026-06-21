@@ -333,7 +333,7 @@ class PipelineStateMap {
     }
     List<Pipeline> pipelineList = query2OpenPipelines.get(pipeline.getReplicationConfig());
 
-    if (pipelineList != null) {
+    if (pipelineList != null) { 
         pipelineList.remove(pipeline);
     }
     return pipeline;
