@@ -39,6 +39,13 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
+  /**
+   * Number of consecutive heartbeat failures the DN tolerates against the same SCM endpoint before
+   * re-resolving its hostname. Only consulted when ozone.client.failover.resolve-needed is true.
+   */
+  public static final String HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD =
+      "hdds.heartbeat.address.refresh.threshold";
+  public static final int HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD_DEFAULT = 3;
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =

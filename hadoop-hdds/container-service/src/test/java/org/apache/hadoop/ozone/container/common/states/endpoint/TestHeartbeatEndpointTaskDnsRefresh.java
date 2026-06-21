@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
@@ -87,7 +87,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 3);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 3);
 
     Fixture f = newFixture(conf);
     when(f.endpoint.getMissedCount()).thenReturn(3L);
@@ -114,7 +114,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
   public void testRefreshSuppressedWhenFlagDisabled() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, false);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 1);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 1);
 
     Fixture f = newFixture(conf);
     when(f.endpoint.getMissedCount()).thenReturn(99L);
@@ -137,7 +137,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
   public void testRefreshSuppressedBelowThreshold() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 5);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 5);
 
     Fixture f = newFixture(conf);
     when(f.endpoint.getMissedCount()).thenReturn(2L);
@@ -160,7 +160,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 1);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 1);
 
     Fixture f = newFixture(conf);
     when(f.endpoint.getMissedCount()).thenReturn(99L);
@@ -190,7 +190,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 1);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 1);
 
     Fixture f = newFixture(conf);
     f.context.addEndpoint(STALE_ADDR);
@@ -245,7 +245,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY, 1);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 1);
 
     Fixture f = newFixture(conf);
     when(f.endpoint.getMissedCount()).thenReturn(99L);

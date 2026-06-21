@@ -3954,7 +3954,7 @@
   </property>
 
   <property>
-    <name>ozone.datanode.scm.heartbeat.address.refresh.threshold</name>
+    <name>hdds.heartbeat.address.refresh.threshold</name>
     <value>3</value>
     <tag>OZONE, DATANODE, HA</tag>
     <description>Number of consecutive heartbeat failures the

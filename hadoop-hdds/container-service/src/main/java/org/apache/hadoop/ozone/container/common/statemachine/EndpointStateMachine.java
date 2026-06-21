@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
 import java.util.concurrent.ExecutorService;
@@ -116,45 +117,34 @@ public class EndpointStateMachine
   }
 
   /**
-   * Re-resolves the configured hostname and reports whether the resolved
-   * IP differs from the cached {@link #address}. Does not mutate any
-   * state on this endpoint -- the caller is responsible for swapping
-   * this endpoint out (via {@link SCMConnectionManager#refreshSCMServer})
-   * if a refresh is desired.
+   * Re-resolves the configured hostname and reports whether the resolved IP differs from the cached
+   * {@link #address}. Does not mutate any state on this endpoint -- the caller is responsible for
+   * swapping this endpoint out (via {@link SCMConnectionManager#refreshSCMServer}) if a refresh is
+   * desired.
    * <p>
-   * Returns null when:
-   * <ul>
-   *   <li>{@link #hostAndPort} was not preserved at construction</li>
-   *   <li>the resolved IP is unchanged</li>
-   *   <li>the new resolution is unresolved (DNS lookup failed)</li>
-   * </ul>
-   * Returns the freshly-resolved {@link InetSocketAddress} when the IP
-   * has changed under the same hostname.
+   * Returns null when {@link #hostAndPort} was not preserved at construction, when the resolved IP
+   * is unchanged, or when DNS resolution produced no address. Returns the freshly-resolved
+   * {@link InetSocketAddress} when the IP has changed under the same hostname, and throws
+   * {@link IllegalStateException} if {@link #hostAndPort} is malformed.
    */
   public InetSocketAddress resolveLatestAddress() {
     if (hostAndPort == null) {
       return null;
     }
-    InetSocketAddress refreshed;
+    final InetSocketAddress refreshed;
     try {
       refreshed = NetUtils.createSocketAddr(hostAndPort);
     } catch (IllegalArgumentException ex) {
-      LOG.warn("Failed to re-resolve {}: {}", hostAndPort, ex.getMessage());
+      throw new IllegalStateException("Malformed host address: " + hostAndPort, ex);
+    }
+    final InetAddress refreshedIp = refreshed.getAddress();
+    if (refreshedIp == null) {
+      LOG.warn("Failed to resolve {}; reusing previous address {}.", hostAndPort, address);
       return null;
     }
-    if (refreshed.isUnresolved()) {
-      LOG.warn("Re-resolution of {} produced an unresolved address; "
-          + "leaving cached address {} in place.", hostAndPort, address);
-      return null;
-    }
-    // Null-safe comparison: if the cached address itself was unresolved
-    // (initial DNS lookup failed; ctor accepted it with a warning),
-    // address.getAddress() is null and a successful re-resolution
-    // counts as a change. NPE-ing here would wedge the heartbeat
-    // refresh path on exactly the case it most needs to fix.
-    java.net.InetAddress cachedIp = address.getAddress();
-    if (cachedIp != null
-        && refreshed.getAddress().equals(cachedIp)) {
+    // A previously-unresolved cached address (address.getAddress() == null) compares unequal here, so
+    // a now-successful resolution correctly counts as a change.
+    if (refreshedIp.equals(address.getAddress())) {
       return null;
     }
     return refreshed;

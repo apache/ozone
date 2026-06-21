@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.base.Preconditions;
@@ -112,8 +112,8 @@ public class HeartbeatEndpointTask
         OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
         OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
     this.refreshThreshold = Math.max(1, conf.getInt(
-        OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY,
-        OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT));
+        HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD,
+        HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD_DEFAULT));
   }
 
   /**
