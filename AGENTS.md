@@ -198,9 +198,8 @@ Key paths:
 
 ## Security
 
-You are helping a security researcher find and report vulnerabilities in
-Apache Ozone. Before drafting any report or reaching any conclusion, complete
-these steps.
+When assessing a potential security vulnerability in Apache Ozone, complete
+these steps before drafting any report or reaching any security conclusion.
 
 ### Step 1 — Read the threat model
 Read **[THREAT_MODEL.md](THREAT_MODEL.md)**: the multi-service trust boundaries,
@@ -221,8 +220,7 @@ Read **[SECURITY.md](SECURITY.md)** for how to report.
   are the operator's (sections 3/9/10). Route such findings there.
 - Ratis (Raft) safety holds under an honest majority; a Byzantine majority is
   out of scope.
-- `ozone-thirdparty`, integration-test modules, and test utilities are out of
-  scope.
+- integration-test modules, and test utilities are out of scope.
 
 ### Then assess
 Route the finding to exactly one disposition in **THREAT_MODEL.md section 13**,

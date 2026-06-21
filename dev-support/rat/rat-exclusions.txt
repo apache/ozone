@@ -23,6 +23,7 @@ CLAUDE.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
+THREAT_MODEL.md
 
 # hadoop-hdds/interface-client
 src/main/resources/proto.lock

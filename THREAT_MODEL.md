@@ -4,9 +4,8 @@
 
 - **Project:** Apache Ozone (`apache/ozone`) — a distributed, scalable object
   store (S3-compatible + Hadoop-FS) built on Hadoop Distributed Data Store
-  (HDDS). Companion repo `apache/ozone-thirdparty` (shaded dependencies) is
-  build packaging — out of model (§3).
-- **Written against:** `main` @ HEAD (2026-06).
+  (HDDS).
+- **Written against:** `master` @ HEAD (2026-06).
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
 - **Status:** DRAFT — under maintainer review (2026-06-10). Not yet ratified.
@@ -59,7 +58,7 @@ library. There is no single "caller"; the roles split:
 | Recon | read-only HTTP/RPC | operators | **Yes** (read path) |
 | CSI driver | gRPC (kubelet) | in-cluster | partial — Q |
 | `ofs`/`o3fs` client libs | in-process in the caller's app | as the caller | client-side (§10) |
-| `ozone-thirdparty`, test/integration modules | build / test | n/a | No — §3 |
+| test/integration modules | test | n/a | No — §3 |
 
 ## §3 Out of scope (explicit non-goals)
 
@@ -84,14 +83,17 @@ Boundaries, outermost first:
 
 1. **S3 Gateway boundary** — untrusted REST clients; AWS SigV4 over per-user S3
    secrets (derived from the user's Kerberos identity / S3 secret store).
-2. **RPC boundary** — clients to OM/SCM over Hadoop RPC with SASL; in secure
-   mode authenticated via Kerberos / delegation tokens.
+2. **RPC/control-plane boundary** — clients to OM/SCM over Hadoop RPC with SASL;
+   S3 Gateway may reach OM over the OM gRPC transport, and SCM HA uses internal
+   Inter-SCM gRPC for checkpoint transfer. In secure mode, authenticated via
+   Kerberos / delegation tokens and, for gRPC, TLS/mTLS where configured.
 3. **Block-access boundary** — a client obtains a **block token** from OM,
    presents it to a Datanode, which verifies the token's signature before
    serving the block. The Datanode does not re-authenticate the user; the token
    *is* the capability.
-4. **Service-identity boundary** — OM/SCM/DN authenticate to each other with
-   **SCM-issued certificates** (mTLS); SCM is the CA.
+4. **Service-identity boundary** — OM/SCM/DN use **SCM-issued certificates**
+   for service identity; SCM is the CA. Transport encryption is controlled by
+   separate TLS/RPC privacy knobs (§5a).
 5. **Ratis boundary** — Datanode peers replicate via Raft; a peer holds a
    legitimate certificate but may behave arbitrarily if compromised (§7).
 
@@ -99,7 +101,7 @@ Boundaries, outermost first:
 S3 client ──SigV4──► S3 Gateway ──RPC(Kerberos)──► OM ──(block token)──► client
 RPC client ─Kerberos/deleg token─► OM (ACL check) ─► SCM (block alloc) ─► Datanode
                                                   Datanode verifies block token, serves block
-services ⇄ services : SCM-issued certs (mTLS) ; Datanodes ⇄ Datanodes : Ratis(Raft)
+services ⇄ services : SCM-issued certs ; Datanodes ⇄ Datanodes : Ratis(Raft)
 ```
 
 **Reachability precondition (triager's test):** a finding is in-model only if
@@ -126,10 +128,12 @@ Byzantine Datanode peer below the honest-majority threshold (§7).
 ## §5a Build-time and configuration variants — **the central knob**
 
 **`ozone.security.enabled` is load-bearing.** With it **true** (secure mode):
-Kerberos authentication on all RPC, block/container/delegation tokens enforced,
-SCM-issued certs + mTLS between services, ACL/Ranger authorization, and TLS on
-the wire. With it **false** (non-secure mode): **no authentication at all** —
-intended only for dev/sandbox.
+Kerberos authentication on RPC, block/container/delegation tokens enforced,
+SCM-issued certificates for service identity, and ACL/Ranger authorization.
+Transport encryption is configured separately: Hadoop RPC privacy, gRPC TLS
+(`hdds.grpc.tls.enabled`), and HTTP/HTTPS policy (`ozone.http.policy`). With it
+**false** (non-secure mode): **no authentication at all** — intended only for
+dev/sandbox.
 
 **The insecure-default problem (wave-1 question).** If secure mode is the
 **supported production posture** (operators must enable it for any untrusted
@@ -159,8 +163,8 @@ Per-boundary input trust (grouped by family):
 - **Authenticated-but-unauthorized user** — a valid Kerberos principal who
   tries to exceed their ACLs (read another bucket, escalate). In scope —
   authorization is the defence.
-- **On-path network attacker** — passive/active on the wire. In scope; TLS/mTLS
-  is the defence.
+- **On-path network attacker** — passive/active on the wire. In scope where the
+  deployment has enabled transport encryption for the relevant protocol.
 - **Authenticated-but-Byzantine Datanode peer** — a compromised Datanode holding
   a legitimate SCM cert that then behaves arbitrarily in Ratis. In scope **up to
   the Raft honest-majority threshold**: Ratis safety (no committed-log
@@ -183,16 +187,19 @@ Per-boundary input trust (grouped by family):
 3. **Authorization.** Volume/bucket/key operations are checked against native
    ACLs or Ranger. *Violation:* an authenticated user accesses data outside their
    ACLs. *Severity:* critical. *(inferred — Q-authz.)*
-4. **Service identity + mTLS.** Inter-service traffic is authenticated by
-   SCM-issued certificates. *Violation:* a rogue process impersonating a service.
-   *Severity:* critical. *(documented — `CertificateClient`/`CertificateServer`.)*
+4. **Service identity.** Inter-service identity is backed by SCM-issued
+   certificates. *Violation:* a rogue process impersonating a service on a
+   certificate-backed path. *Severity:* critical. *(documented —
+   `CertificateClient`/`CertificateServer`.)*
 5. **Consensus safety (Ratis/Raft).** Committed metadata/data does not diverge or
    silently lose under the honest-majority bound (§7). *Violation:* fork /
    divergent replica state / acknowledged-write loss. *Severity:* critical;
    observable across nodes. *(inferred — Q-ratis.)*
-6. **Confidentiality on the wire / at rest.** TLS in transit; TDE at rest when
-   enabled (keys in KMS). *Violation:* plaintext on the wire / unencrypted blocks
-   when TDE is configured. *Severity:* high. *(inferred — Q-tde.)*
+6. **Confidentiality on configured transports / at rest.** Hadoop RPC privacy,
+   gRPC TLS, or HTTPS protect the wire when configured; TDE protects data at
+   rest when enabled (keys in KMS). *Violation:* plaintext on a transport
+   configured for encryption / unencrypted blocks when TDE is configured.
+   *Severity:* high. *(inferred — Q-tde.)*
 
 ## §9 Security properties the project does *not* provide
 
@@ -220,7 +227,8 @@ Per-boundary input trust (grouped by family):
 - **Secure the dependencies:** harden/operate the KDC, author least-privilege
   Ranger/ACL policies, protect the **SCM CA private key**, manage KMS keys,
   network-isolate datanode/Ratis/admin ports.
-- **Protect tokens and secrets:** keep TLS on so block/delegation tokens and S3
+- **Protect tokens and secrets:** enable the relevant transport encryption
+  (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
   secrets aren't sniffable; rotate S3 secrets; set sensible token lifetimes.
 - **Client side:** treat data read from Ozone per your own trust needs; protect
   delegation tokens your app caches.
@@ -251,8 +259,8 @@ Per-boundary input trust (grouped by family):
 
 ## §12 Conditions that would change this model
 
-- A change to secure-mode defaults, the S3 Gateway auth requirement, or the
-  ACL/Ranger authorizer (§5a).
+- A change to secure-mode defaults, transport-encryption defaults, the S3
+  Gateway auth requirement, or the ACL/Ranger authorizer (§5a).
 - A new network surface, a new token type, or a change to block-token
   verification.
 - A change to the Ratis honest-majority assumptions or block integrity checks.
