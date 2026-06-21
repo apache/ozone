@@ -86,7 +86,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display consolidated report for successful nodes
     if (!successNodes.isEmpty() && !reports.isEmpty()) {
-      List<DatanodeDiskBalancerInfoProto> reportList = new ArrayList<>(reports.values());
+      List<DatanodeDiskBalancerInfoProto> reportList = successNodes.stream()
+          .map(reports::get)
+          .collect(toList());
       System.out.println(generateReport(reportList));
     }
   }
