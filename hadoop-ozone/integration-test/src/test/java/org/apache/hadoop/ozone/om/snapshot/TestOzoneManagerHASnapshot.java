@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
@@ -43,7 +42,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -59,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -200,23 +197,18 @@ public class TestOzoneManagerHASnapshot {
    * passed or empty.
    */
   @Test
-  @Flaky("HDDS-15222")
   public void testSnapshotNameConsistency() throws Exception {
-    store.createSnapshot(volumeName, bucketName, "");
+    String snapshotName = store.createSnapshot(volumeName, bucketName, "");
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
     List<String> snapshotNames = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
       await(120_000, 100, () -> {
-        String snapshotPrefix = OM_KEY_PREFIX + volumeName +
-            OM_KEY_PREFIX + bucketName;
-        SnapshotInfo snapshotInfo = null;
-        try (Table.KeyValueIterator<String, SnapshotInfo>
-                 iterator = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable().iterator(snapshotPrefix)) {
-          while (iterator.hasNext()) {
-            snapshotInfo = iterator.next().getValue();
-          }
+        SnapshotInfo snapshotInfo;
+        try {
+          snapshotInfo = ozoneManager.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
