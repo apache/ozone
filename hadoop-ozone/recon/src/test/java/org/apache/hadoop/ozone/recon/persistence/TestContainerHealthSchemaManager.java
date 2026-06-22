@@ -55,8 +55,8 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
 
   @Test
   public void testDeleteContiguousRangeRemovesExactlyRequestedRows() {
-    // A run long enough to be removed through the range-delete path.
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_DELETE_RUN + 200;
+    // A contiguous run (>= MIN_RANGE_RUN_LENGTH) is removed via the range path.
+    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 50;
     insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
     // Survivors that are not part of the delete list.
     insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 5000L, 5002L, 5004L);
@@ -85,7 +85,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
 
   @Test
   public void testDeleteMixedRunAndScatteredRemovesExactlyRequestedRows() {
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_DELETE_RUN + 100;
+    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 50;
     insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
     insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 9001L, 9003L, 9005L);
     // Survivor not present in the delete list.
@@ -103,7 +103,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
 
   @Test
   public void testDeletePreservesNonScmStateInsideRange() {
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_DELETE_RUN + 100;
+    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 100;
     insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
     // ALL_REPLICAS_BAD is not an SCM-generated state, so it must survive even
     // though container 50 falls inside the deleted [1, runLength] range.
@@ -114,6 +114,49 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
     assertEquals(Collections.singletonList(50L), remainingContainerIds());
     assertEquals(0L, countByState(UnHealthyContainerStates.UNDER_REPLICATED));
     assertEquals(1L, countByState(UnHealthyContainerStates.ALL_REPLICAS_BAD));
+  }
+
+  @Test
+  public void testDeleteShortRunsAndPointsCombinedInOneStatement() {
+    // Short contiguous runs of length >= MIN_RANGE_RUN_LENGTH become BETWEEN
+    // terms; runs of 1-2 ids stay as IN points. All are combined into a single
+    // bounded predicate. Inserted rows cover both deleted and surviving ids.
+    insertRange(1, 5, UnHealthyContainerStates.MISSING);      // range term
+    insertRange(20, 24, UnHealthyContainerStates.MISSING);    // range term
+    insertIds(UnHealthyContainerStates.MISSING, 40L, 41L);    // 2 points (kept short)
+    insertIds(UnHealthyContainerStates.MISSING, 60L);         // single point
+    // Survivors interleaved with the deleted ids.
+    insertIds(UnHealthyContainerStates.MISSING, 10L, 30L, 42L, 61L);
+
+    List<Long> idsToDelete = new ArrayList<>();
+    idsToDelete.addAll(contiguous(1, 5));
+    idsToDelete.addAll(contiguous(20, 24));
+    idsToDelete.addAll(Arrays.asList(40L, 41L, 60L));
+    Collections.shuffle(idsToDelete);
+
+    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
+
+    assertEquals(Arrays.asList(10L, 30L, 42L, 61L), remainingContainerIds());
+  }
+
+  @Test
+  public void testDeleteScatteredIdsSpanningMultipleStatements() {
+    // More scattered ids than fit in a single predicate, forcing the operand
+    // budget to flush across multiple DELETE statements.
+    int count = ContainerHealthSchemaManager.MAX_PREDICATE_OPERANDS + 50;
+    List<Long> idsToDelete = new ArrayList<>(count);
+    for (int k = 0; k < count; k++) {
+      // Even ids only -> every id is isolated (no contiguous runs).
+      long id = 2L * (k + 1);
+      insertIds(UnHealthyContainerStates.UNDER_REPLICATED, id);
+      idsToDelete.add(id);
+    }
+    // A survivor that must remain untouched.
+    insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 1L);
+
+    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
+
+    assertEquals(Collections.singletonList(1L), remainingContainerIds());
   }
 
   private void insertRange(long startInclusive, long endInclusive,

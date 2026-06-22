@@ -70,22 +70,38 @@ public class ContainerHealthSchemaManager {
   static final int MAX_IN_CLAUSE_CHUNK_SIZE = 1_000;
 
   /**
-   * Minimum length of a contiguous container-id run that justifies deleting it
-   * with a single range ({@code BETWEEN}) statement instead of folding the ids
-   * into a chunked {@code IN} delete.
+   * Minimum length of a contiguous container-id run that is deleted with a
+   * range ({@code BETWEEN}) term instead of being expanded into individual
+   * {@code IN} values.
    *
-   * <p>A {@code BETWEEN} predicate is constant size and removes an entire
-   * contiguous range in one statement, whereas an {@code IN} delete is capped
-   * at {@link #MAX_IN_CLAUSE_CHUNK_SIZE} ids per statement to stay under
-   * Derby's 64 KB bytecode limit. Pulling a run out into its own
-   * {@code BETWEEN} only lowers the total statement count once the run is at
-   * least one IN-chunk long, so shorter runs and scattered ids stay in the IN
-   * batches. Real container-id lists are usually dense ranges broken up by gaps
-   * from deleted containers, so this keeps the common case to a handful of
-   * statements while never doing worse than plain IN chunking for sparse
-   * ids.</p>
+   * <p>Derby compiles every statement to JVM bytecode whose size grows with the
+   * number of id literals in the predicate. A contiguous run of {@code L} ids
+   * costs {@code L} operands when listed in an {@code IN} clause, but only
+   * {@link #RANGE_OPERAND_COST} (the two endpoints) when written as
+   * {@code BETWEEN lo AND hi}, independent of {@code L}. The range form is
+   * therefore strictly smaller once {@code L > RANGE_OPERAND_COST}, i.e. for
+   * runs of 3 or more ids; runs of 1–2 ids are left as {@code IN} values since
+   * the range form would save nothing. This lets the optimization benefit
+   * realistic, fragmented unhealthy-container sets rather than only rare
+   * 1,000+ contiguous ranges.</p>
    */
-  static final int MIN_RANGE_DELETE_RUN = MAX_IN_CLAUSE_CHUNK_SIZE;
+  static final int MIN_RANGE_RUN_LENGTH = 3;
+
+  /** Estimated predicate operand cost of a single {@code BETWEEN} range term. */
+  private static final int RANGE_OPERAND_COST = 2;
+
+  /**
+   * Upper bound on the estimated number of id operands packed into one combined
+   * DELETE predicate before it is flushed.
+   *
+   * <p>Range terms count as {@link #RANGE_OPERAND_COST} operands and scattered
+   * ids as one operand each. The cap reuses {@link #MAX_IN_CLAUSE_CHUNK_SIZE} —
+   * the id count already proven to keep a pure {@code IN} delete well under
+   * Derby's 64 KB per-method bytecode limit — so a mixed range/{@code IN}
+   * predicate of the same operand budget stays within the same safe
+   * envelope.</p>
+   */
+  static final int MAX_PREDICATE_OPERANDS = MAX_IN_CLAUSE_CHUNK_SIZE;
 
   private final ContainerSchemaDefinition containerSchemaDefinition;
   private final int unhealthyContainersFetchSize;
@@ -232,7 +248,15 @@ public class ContainerHealthSchemaManager {
         .collect(Collectors.toList());
 
     int totalDeleted = 0;
-    List<Long> inClauseBatch = new ArrayList<>(MAX_IN_CLAUSE_CHUNK_SIZE);
+
+    // Build each DELETE predicate as the combination of compact range terms (one
+    // BETWEEN per contiguous run of at least MIN_RANGE_RUN_LENGTH ids) and a
+    // single IN list for the remaining scattered ids. Terms are accumulated
+    // until the estimated operand count reaches MAX_PREDICATE_OPERANDS, then the
+    // statement is flushed so the generated Derby bytecode stays within budget.
+    List<long[]> ranges = new ArrayList<>();
+    List<Long> points = new ArrayList<>();
+    int operandsUsed = 0;
 
     int i = 0;
     while (i < sortedIds.size()) {
@@ -241,44 +265,61 @@ public class ContainerHealthSchemaManager {
           && sortedIds.get(i + 1) == sortedIds.get(i) + 1) {
         i++;
       }
+      int runLength = i - runStart + 1;
 
-      if (i - runStart + 1 >= MIN_RANGE_DELETE_RUN) {
-        // Long contiguous run: a single constant-size BETWEEN removes the whole
-        // range without straining Derby's per-statement bytecode budget.
-        totalDeleted += deleteScmStatesByRange(dslContext,
-            sortedIds.get(runStart), sortedIds.get(i));
+      // A contiguous run is cheaper as a BETWEEN (RANGE_OPERAND_COST operands,
+      // regardless of length) than as IN values (one operand each) once it spans
+      // at least MIN_RANGE_RUN_LENGTH ids; shorter runs stay as IN points.
+      boolean asRange = runLength >= MIN_RANGE_RUN_LENGTH;
+      int termOperands = asRange ? RANGE_OPERAND_COST : runLength;
+
+      if (operandsUsed > 0
+          && operandsUsed + termOperands > MAX_PREDICATE_OPERANDS) {
+        totalDeleted += executeCombinedDelete(dslContext, ranges, points);
+        ranges.clear();
+        points.clear();
+        operandsUsed = 0;
+      }
+
+      if (asRange) {
+        ranges.add(new long[] {sortedIds.get(runStart), sortedIds.get(i)});
       } else {
-        // Short run or isolated id: fold into IN batches that stay within the
-        // bytecode-safe chunk size.
         for (int j = runStart; j <= i; j++) {
-          inClauseBatch.add(sortedIds.get(j));
-          if (inClauseBatch.size() == MAX_IN_CLAUSE_CHUNK_SIZE) {
-            totalDeleted += deleteScmStatesByIds(dslContext, inClauseBatch);
-            inClauseBatch.clear();
-          }
+          points.add(sortedIds.get(j));
         }
       }
+      operandsUsed += termOperands;
       i++;
     }
 
-    if (!inClauseBatch.isEmpty()) {
-      totalDeleted += deleteScmStatesByIds(dslContext, inClauseBatch);
+    if (operandsUsed > 0) {
+      totalDeleted += executeCombinedDelete(dslContext, ranges, points);
     }
     return totalDeleted;
   }
 
-  private int deleteScmStatesByRange(DSLContext dslContext,
-      long startContainerId, long endContainerId) {
+  /**
+   * Executes a single DELETE whose container-id predicate is the combination of the
+   * given contiguous ranges (as {@code BETWEEN} terms) and scattered ids (as a
+   * single {@code IN} list), restricted to SCM-generated states.
+   */
+  private int executeCombinedDelete(DSLContext dslContext,
+      List<long[]> ranges, List<Long> points) {
+    Condition idCondition = null;
+    if (!points.isEmpty()) {
+      idCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.in(points);
+    }
+    for (long[] range : ranges) {
+      Condition rangeCondition =
+          UNHEALTHY_CONTAINERS.CONTAINER_ID.between(range[0], range[1]);
+      idCondition = (idCondition == null)
+          ? rangeCondition : idCondition.or(rangeCondition);
+    }
+    if (idCondition == null) {
+      return 0;
+    }
     return dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-        .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.between(startContainerId, endContainerId))
-        .and(scmGeneratedStatesCondition())
-        .execute();
-  }
-
-  private int deleteScmStatesByIds(DSLContext dslContext, List<Long> containerIds) {
-    return dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-        .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
-        .and(scmGeneratedStatesCondition())
+        .where(idCondition.and(scmGeneratedStatesCondition()))
         .execute();
   }
 
