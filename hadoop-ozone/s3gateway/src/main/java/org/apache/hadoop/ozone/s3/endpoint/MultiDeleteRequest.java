@@ -69,11 +69,19 @@ public class MultiDeleteRequest {
     @XmlElement(name = "VersionId")
     private String versionId;
 
+    @XmlElement(name = "ETag")
+    private String etag;
+
     public DeleteObject() {
     }
 
     public DeleteObject(String key) {
       this.key = key;
+    }
+
+    public DeleteObject(String key, String etag) {
+      this.key = key;
+      this.etag = etag;
     }
 
     public String getKey() {
@@ -90,6 +98,14 @@ public class MultiDeleteRequest {
 
     public void setVersionId(String versionId) {
       this.versionId = versionId;
+    }
+
+    public String getETag() {
+      return etag;
+    }
+
+    public void setETag(String eTag) {
+      this.etag = eTag;
     }
   }
 }

@@ -66,6 +66,25 @@ public class TestMultiDeleteRequestUnmarshaller {
     assertEquals(3, multiDeleteRequest.getObjects().size());
   }
 
+  @Test
+  public void fromStreamWithETag() throws IOException {
+    ByteArrayInputStream inputBody =
+        new ByteArrayInputStream(
+            ("<Delete xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">"
+                + "<Object><Key>key1</Key><ETag>\"abc\"</ETag></Object>"
+                + "<Object><Key>key2</Key><ETag>*</ETag></Object>"
+                + "</Delete>")
+                .getBytes(UTF_8));
+
+    MultiDeleteRequest multiDeleteRequest = unmarshall(inputBody);
+
+    assertEquals(2, multiDeleteRequest.getObjects().size());
+    assertEquals("key1", multiDeleteRequest.getObjects().get(0).getKey());
+    assertEquals("\"abc\"", multiDeleteRequest.getObjects().get(0).getETag());
+    assertEquals("key2", multiDeleteRequest.getObjects().get(1).getKey());
+    assertEquals("*", multiDeleteRequest.getObjects().get(1).getETag());
+  }
+
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)
       throws IOException {
     return new MultiDeleteRequestUnmarshaller()
