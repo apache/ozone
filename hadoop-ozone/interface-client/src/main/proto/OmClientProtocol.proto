@@ -218,7 +218,7 @@ message OMRequest {
   optional ServiceListRequest               serviceListRequest             = 51;
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54 [deprecated = true];
-  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55 [deprecated = true];
   optional PrepareRequest                   prepareRequest                 = 56;
   optional PrepareStatusRequest             prepareStatusRequest           = 57;
   optional CancelPrepareRequest             cancelPrepareRequest           = 58;
@@ -363,7 +363,7 @@ message OMResponse {
   optional ServiceListResponse               ServiceListResponse           = 51;
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
   optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54 [deprecated = true];
-  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55 [deprecated = true];
   optional PrepareResponse                 prepareResponse                 = 56;
   optional PrepareStatusResponse           prepareStatusResponse           = 57;
   optional CancelPrepareResponse           cancelPrepareResponse           = 58;
@@ -1651,6 +1651,7 @@ message QueryUpgradeStatusResponse {
     required hadoop.hdds.UpgradeStatus hddsStatus = 2;
 }
 
+// deprecated, use QueryUpgradeStatusRequest/Response instead. Retained for wire compatibility.
 message FinalizeUpgradeProgressRequest {
     // Ignored by OM; retained for wire compatibility.
     required string upgradeClientId = 1;
