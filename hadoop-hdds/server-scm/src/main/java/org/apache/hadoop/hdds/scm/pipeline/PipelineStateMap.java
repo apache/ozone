@@ -336,6 +336,7 @@ class PipelineStateMap {
     if (pipelineList != null) { 
       pipelineList.remove(pipeline);
     }
+    pipelineMap.remove(pipelineID);
     return pipeline;
   }
 
