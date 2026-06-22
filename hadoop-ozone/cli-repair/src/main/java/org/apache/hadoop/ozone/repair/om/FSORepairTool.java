@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.repair.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +88,9 @@ public class FSORepairTool extends RepairTool {
   private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
   private static final String PENDING_TO_DELETE_TABLE = "pendingToDelete";
+
+  @VisibleForTesting
+  static int tempDbBatchSize = 10_000;
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -287,29 +291,31 @@ public class FSORepairTool extends RepairTool {
       // Directory keys should have the form /volumeID/bucketID/parentID/name.
       Stack<String> dirKeyStack = new Stack<>();
 
-      // Since the tool uses parent directories to check for reachability, add
-      // a reachable entry for the bucket as well.
-      addReachableEntry(volume, bucket, bucket);
-      // Initialize the stack with all immediate child directories of the
-      // bucket, and mark them all as reachable.
-      Collection<String> childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, bucket);
-      dirKeyStack.addAll(childDirs);
-
-      while (!dirKeyStack.isEmpty()) {
-        // Get one directory and process its immediate children.
-        String currentDirKey = dirKeyStack.pop();
-        OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
-        if (currentDir == null) {
-          if (isVerbose()) {
-            info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
-          }
-          continue;
-        }
-
-        // TODO revisit this for a more memory efficient implementation,
-        //  possibly making better use of RocksDB iterators.
-        childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, currentDir);
+      try (BatchedTempWriter writer = new BatchedTempWriter(reachableTable)) {
+        // Since the tool uses parent directories to check for reachability, add
+        // a reachable entry for the bucket as well.
+        addReachableEntry(volume, bucket, bucket, writer);
+        // Initialize the stack with all immediate child directories of the
+        // bucket, and mark them all as reachable.
+        Collection<String> childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, bucket, writer);
         dirKeyStack.addAll(childDirs);
+
+        while (!dirKeyStack.isEmpty()) {
+          // Get one directory and process its immediate children.
+          String currentDirKey = dirKeyStack.pop();
+          OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
+          if (currentDir == null) {
+            if (isVerbose()) {
+              info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+            }
+            continue;
+          }
+
+          // TODO revisit this for a more memory efficient implementation,
+          //  possibly making better use of RocksDB iterators.
+          childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, currentDir, writer);
+          dirKeyStack.addAll(childDirs);
+        }
       }
     }
 
@@ -321,48 +327,50 @@ public class FSORepairTool extends RepairTool {
       // Find all deleted directories in this bucket and process their children
       String bucketPrefix = OM_KEY_PREFIX + volume.getObjectID() + OM_KEY_PREFIX + bucket.getObjectID();
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> deletedDirIterator =
-               deletedDirectoryTable.iterator()) {
-        deletedDirIterator.seek(bucketPrefix);
-        while (deletedDirIterator.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> deletedDirEntry = deletedDirIterator.next();
-          String deletedDirKey = deletedDirEntry.getKey();
+      try (BatchedTempWriter writer = new BatchedTempWriter(pendingToDeleteTable)) {
+        try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> deletedDirIterator =
+                 deletedDirectoryTable.iterator()) {
+          deletedDirIterator.seek(bucketPrefix);
+          while (deletedDirIterator.hasNext()) {
+            Table.KeyValue<String, OmKeyInfo> deletedDirEntry = deletedDirIterator.next();
+            String deletedDirKey = deletedDirEntry.getKey();
 
-          // Only process deleted directories in this bucket
-          if (!deletedDirKey.startsWith(bucketPrefix)) {
-            break;
+            // Only process deleted directories in this bucket
+            if (!deletedDirKey.startsWith(bucketPrefix)) {
+              break;
+            }
+
+            // Extract the objectID from the deleted directory entry
+            OmKeyInfo deletedDirInfo = deletedDirEntry.getValue();
+            long deletedObjectID = deletedDirInfo.getObjectID();
+
+            // Build the prefix that children would have: /volID/bucketID/deletedObjectID/
+            String childPrefix = OM_KEY_PREFIX + volume.getObjectID() + OM_KEY_PREFIX + bucket.getObjectID() +
+                OM_KEY_PREFIX + deletedObjectID + OM_KEY_PREFIX;
+
+            // Find all children of this deleted directory and mark as pendingToDelete
+            Collection<String> childDirs = getChildDirectoriesAndMarkAsPendingToDelete(childPrefix, writer);
+            dirKeyStack.addAll(childDirs);
+          }
+        }
+
+        while (!dirKeyStack.isEmpty()) {
+          // Get one directory and process its immediate children.
+          String currentDirKey = dirKeyStack.pop();
+          OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
+          if (currentDir == null) {
+            if (isVerbose()) {
+              info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+            }
+            continue;
           }
 
-          // Extract the objectID from the deleted directory entry
-          OmKeyInfo deletedDirInfo = deletedDirEntry.getValue();
-          long deletedObjectID = deletedDirInfo.getObjectID();
-
-          // Build the prefix that children would have: /volID/bucketID/deletedObjectID/
+          // For pendingToDelete directories, we need to build the prefix based on their objectID
           String childPrefix = OM_KEY_PREFIX + volume.getObjectID() + OM_KEY_PREFIX + bucket.getObjectID() +
-              OM_KEY_PREFIX + deletedObjectID + OM_KEY_PREFIX;
-
-          // Find all children of this deleted directory and mark as pendingToDelete
-          Collection<String> childDirs = getChildDirectoriesAndMarkAsPendingToDelete(childPrefix);
+              OM_KEY_PREFIX + currentDir.getObjectID() + OM_KEY_PREFIX;
+          Collection<String> childDirs = getChildDirectoriesAndMarkAsPendingToDelete(childPrefix, writer);
           dirKeyStack.addAll(childDirs);
         }
-      }
-
-      while (!dirKeyStack.isEmpty()) {
-        // Get one directory and process its immediate children.
-        String currentDirKey = dirKeyStack.pop();
-        OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
-        if (currentDir == null) {
-          if (isVerbose()) {
-            info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
-          }
-          continue;
-        }
-
-        // For pendingToDelete directories, we need to build the prefix based on their objectID
-        String childPrefix = OM_KEY_PREFIX + volume.getObjectID() + OM_KEY_PREFIX + bucket.getObjectID() +
-            OM_KEY_PREFIX + currentDir.getObjectID() + OM_KEY_PREFIX;
-        Collection<String> childDirs = getChildDirectoriesAndMarkAsPendingToDelete(childPrefix);
-        dirKeyStack.addAll(childDirs);
       }
     }
 
@@ -467,7 +475,7 @@ public class FSORepairTool extends RepairTool {
     }
 
     private Collection<String> getChildDirectoriesAndMarkAsReachable(OmVolumeArgs volume, OmBucketInfo bucket,
-        WithObjectID currentDir) throws IOException {
+        WithObjectID currentDir, BatchedTempWriter writer) throws IOException {
 
       Collection<String> childDirs = new ArrayList<>();
 
@@ -486,7 +494,7 @@ public class FSORepairTool extends RepairTool {
             break;
           }
           // This directory was reached by search.
-          addReachableEntry(volume, bucket, childDirEntry.getValue());
+          addReachableEntry(volume, bucket, childDirEntry.getValue(), writer);
           childDirs.add(childDirKey);
           reachableStats.addDir();
         }
@@ -495,7 +503,8 @@ public class FSORepairTool extends RepairTool {
       return childDirs;
     }
 
-    private Collection<String> getChildDirectoriesAndMarkAsPendingToDelete(String dirPrefix) throws IOException {
+    private Collection<String> getChildDirectoriesAndMarkAsPendingToDelete(String dirPrefix,
+        BatchedTempWriter writer) throws IOException {
       Collection<String> childDirs = new ArrayList<>();
 
       // Find child directories and mark them as pendingToDelete
@@ -515,7 +524,7 @@ public class FSORepairTool extends RepairTool {
           // Ensure this is an immediate child, not a deeper descendant
           String relativePath = childDirKey.substring(dirPrefix.length());
           if (!relativePath.contains(OM_KEY_PREFIX)) {
-            addPendingToDeleteEntry(childDirKey);
+            addPendingToDeleteEntry(childDirKey, writer);
             childDirs.add(childDirKey);
             pendingToDeleteStats.addDir();
           }
@@ -537,7 +546,7 @@ public class FSORepairTool extends RepairTool {
           // Ensure this is an immediate child, not a deeper descendant
           String relativePath = childFileKey.substring(dirPrefix.length());
           if (!relativePath.contains(OM_KEY_PREFIX)) {
-            addPendingToDeleteEntry(childFileKey);
+            addPendingToDeleteEntry(childFileKey, writer);
             pendingToDeleteStats.addFile(childFileEntry.getValue().getDataSize());
           }
         }
@@ -546,23 +555,55 @@ public class FSORepairTool extends RepairTool {
       return childDirs;
     }
 
+    /** Buffers writes to a temp.db table and flushes them in bounded batches. */
+    private final class BatchedTempWriter implements AutoCloseable {
+      private final Table<String, CodecBuffer> table;
+      private BatchOperation batch;
+      private int pending;
+
+      BatchedTempWriter(Table<String, CodecBuffer> table) {
+        this.table = table;
+        this.batch = tempDB.initBatchOperation();
+      }
+
+      void put(String key) throws IOException {
+        table.putWithBatch(batch, key, CodecBuffer.getEmptyBuffer());
+        if (++pending >= tempDbBatchSize) {
+          flush();
+        }
+      }
+
+      private void flush() throws IOException {
+        tempDB.commitBatchOperation(batch);
+        batch.close();
+        batch = tempDB.initBatchOperation();
+        pending = 0;
+      }
+
+      @Override
+      public void close() throws IOException {
+        if (pending > 0) {
+          tempDB.commitBatchOperation(batch);
+        }
+        batch.close();
+      }
+    }
+
     /**
      * Add the specified object to the reachable table, indicating it is part
      * of the connected FSO tree.
      */
-    private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
-      String reachableKey = buildReachableKey(volume, bucket, object);
-      // No value is needed for this table.
-      reachableTable.put(reachableKey, CodecBuffer.getEmptyBuffer());
+    private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object,
+        BatchedTempWriter writer) throws IOException {
+      writer.put(buildReachableKey(volume, bucket, object));
     }
 
     /**
      * Add the specified object to the pendingToDelete table, indicating it is part
      * of the disconnected FSO tree.
      */
-    private void addPendingToDeleteEntry(String originalKey) throws IOException {
-      // No value is needed for this table.
-      pendingToDeleteTable.put(originalKey, CodecBuffer.getEmptyBuffer());
+    private void addPendingToDeleteEntry(String originalKey, BatchedTempWriter writer) throws IOException {
+      writer.put(originalKey);
     }
 
     /**

@@ -200,6 +200,28 @@ public class TestFSORepairTool {
   }
 
   /**
+   * Flush temp.db writes after every entry so the batch commit/reset path runs for both the
+   * reachable and pendingToDelete tables across all trees, and verify the report is unchanged.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testBatchedTempWrites() {
+    int originalBatchSize = FSORepairTool.tempDbBatchSize;
+    FSORepairTool.tempDbBatchSize = 1;
+    try {
+      String expectedOutput = serializeReport(fullReport);
+
+      int exitCode = dryRun();
+      assertEquals(0, exitCode, err.getOutput());
+
+      String reportOutput = extractRelevantSection(out.getOutput());
+      assertEquals(expectedOutput, reportOutput);
+    } finally {
+      FSORepairTool.tempDbBatchSize = originalBatchSize;
+    }
+  }
+
+  /**
    * Test to verify the file size of the tree.
    */
   @Order(ORDER_DRY_RUN)
