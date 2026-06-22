@@ -27,7 +27,7 @@ source "${DIR}/install/infer.sh"
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/infer"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade --no-transfer-progress'
+MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=true --no-transfer-progress'
 
 # Infer runs by wrapping javac during the Maven build to capture and analyze
 # Java sources. We use 'compile' (not 'clean') to avoid deleting target/,
