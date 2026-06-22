@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.util;
 
 import java.security.SecureRandom;
 import java.util.Random;
+import java.util.function.Consumer;
 
 /**
  * Helper methods to deal with random UUIDs.
@@ -28,19 +29,16 @@ public final class UUIDUtil {
   private static final ThreadLocal<Random> INSECURE_GENERATOR = ThreadLocal.withInitial(Random::new);
 
   public static byte[] randomUUIDBytes() {
-    final byte[] bytes = new byte[16];
-    GENERATOR.get().nextBytes(bytes);
-    // See RFC 4122 section 4.4
-    bytes[6]  &= 0x0f;
-    bytes[6]  |= 0x40;
-    bytes[8]  &= 0x3f;
-    bytes[8]  |= 0x80;
-    return bytes;
+    return getUUIDBytes(GENERATOR.get()::nextBytes);
   }
 
   public static byte[] insecureRandomUUIDBytes() {
+    return getUUIDBytes(INSECURE_GENERATOR.get()::nextBytes);
+  }
+
+  private static byte[] getUUIDBytes(Consumer<byte[]> generator) {
     final byte[] bytes = new byte[16];
-    INSECURE_GENERATOR.get().nextBytes(bytes);
+    generator.accept(bytes);
     // See RFC 4122 section 4.4
     bytes[6]  &= 0x0f;
     bytes[6]  |= 0x40;

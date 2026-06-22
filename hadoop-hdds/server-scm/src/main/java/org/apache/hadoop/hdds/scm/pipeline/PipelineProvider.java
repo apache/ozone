@@ -139,4 +139,11 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     }
     return dns;
   }
+
+  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    return Pipeline.newBuilder()
+        .setNodes(nodes)
+        .setReplicationConfig(replicationConfig)
+        .setState(Pipeline.PipelineState.ALLOCATED);
+  }
 }

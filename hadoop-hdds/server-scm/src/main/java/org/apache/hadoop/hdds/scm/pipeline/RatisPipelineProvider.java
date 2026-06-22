@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -182,13 +181,8 @@ public class RatisPipelineProvider
 
     DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
 
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
-        .setNodes(dns)
-        .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getID() : null)
+    Pipeline pipeline = newPipelineBuilder(RatisReplicationConfig.getInstance(factor), dns)
+        .setSuggestedLeaderId(suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -213,11 +207,8 @@ public class RatisPipelineProvider
   @Override
   public Pipeline create(RatisReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, nodes)
         .setId(PipelineID.randomId())
-        .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(nodes)
         .build();
   }
 
@@ -227,13 +218,8 @@ public class RatisPipelineProvider
       Set<ContainerReplica> replicas) {
     // Use insecureRandomId for throwaway read pipeline IDs to avoid
     // contention on the shared SecureRandom instance.
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, ContainerReplica.toDatanodeDetailsList(replicas))
         .setId(PipelineID.insecureRandomId())
-        .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(replicas.stream()
-            .map(ContainerReplica::getDatanodeDetails)
-            .collect(Collectors.toList()))
         .build();
   }
 
