@@ -17,12 +17,34 @@
 
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolSpec;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_PATH;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_NAMESPACE_USAGE_FILES;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_NAMESPACE_USAGE_REPLICA;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_NAMESPACE_USAGE_SORT_SUB_PATHS;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BUCKET;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER_STATE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CREATION_DATE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILTER;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_KEY_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTAINER_ID;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 
 /**
  * Builds native LLM tool specifications (names, descriptions, parameters).
@@ -31,10 +53,21 @@ import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolSpec;
 @Singleton
 public class LlmToolSpecFactory {
 
+  private final List<ToolSpec> toolSpecs;
+
+  @Inject
+  public LlmToolSpecFactory() {
+    this.toolSpecs = Collections.unmodifiableList(buildToolSpecs());
+  }
+
   public List<ToolSpec> getToolSpecs() {
+    return toolSpecs;
+  }
+
+  private List<ToolSpec> buildToolSpecs() {
     List<ToolSpec> specs = new ArrayList<>();
 
-    Map<String, Object> limitOnly = paramMap("limit", "integer");
+    Map<String, Object> limitOnly = paramMap(RECON_QUERY_LIMIT, "integer");
 
     specs.add(createSpec("api_v1_clusterState",
         "High-level cluster snapshot: storage capacity/usage, pipeline and container counts, "
@@ -76,10 +109,12 @@ public class LlmToolSpecFactory {
             + "'unhealthy', 'bad', or 'replication problems' without naming one state. "
             + "If they name a specific state (UNDER_REPLICATED, MISSING, etc.), prefer "
             + "api_v1_containers_unhealthy_state with the state parameter.",
-        paramMap("limit", "integer", "maxContainerId", "integer", "minContainerId", "integer")));
+        paramMap(RECON_QUERY_LIMIT, "integer", RECON_QUERY_MAX_CONTAINER_ID, "integer",
+            RECON_QUERY_MIN_CONTAINER_ID, "integer")));
 
     Map<String, Object> unhealthyStateParams = paramMap(
-        "state", "string", "limit", "integer", "maxContainerId", "integer", "minContainerId", "integer");
+        RECON_QUERY_CONTAINER_STATE, "string", RECON_QUERY_LIMIT, "integer",
+        RECON_QUERY_MAX_CONTAINER_ID, "integer", RECON_QUERY_MIN_CONTAINER_ID, "integer");
     specs.add(createSpec("api_v1_containers_unhealthy_state",
         "Unhealthy containers filtered to one SCM state. Required: state one of MISSING, "
             + "UNDER_REPLICATED, OVER_REPLICATED, MIS_REPLICATED. Use for targeted questions "
@@ -93,7 +128,7 @@ public class LlmToolSpecFactory {
         limitOnly));
 
     Map<String, Object> mismatchParams = paramMap(
-        "limit", "integer", "missingIn", "string");
+        RECON_QUERY_LIMIT, "integer", RECON_QUERY_FILTER, "string");
     specs.add(createSpec("api_v1_containers_mismatch",
         "OM/SCM container consistency gaps. Use when metadata differs between OM and SCM. "
             + "Set missingIn to OM or SCM to find containers absent from that side. "
@@ -108,7 +143,7 @@ public class LlmToolSpecFactory {
     specs.add(createSpec("api_v1_containers_quasiClosed",
         "Quasi-closed containers (transitional closure state). Use only when the user "
             + "explicitly mentions quasi-closed containers.",
-        paramMap("limit", "integer", "minContainerId", "integer")));
+        paramMap(RECON_QUERY_LIMIT, "integer", RECON_QUERY_MIN_CONTAINER_ID, "integer")));
 
     specs.add(createSpec("api_v1_containers_unhealthy_export",
         "List/export jobs for unhealthy container data exports. Use when the user asks about "
@@ -117,8 +152,8 @@ public class LlmToolSpecFactory {
         null));
 
     Map<String, Object> openKeysParams = paramMap(
-        "limit", "integer", "startPrefix", "string",
-        "includeFso", "boolean", "includeNonFso", "boolean");
+        RECON_QUERY_LIMIT, "integer", RECON_QUERY_START_PREFIX, "string",
+        RECON_OPEN_KEY_INCLUDE_FSO, "boolean", RECON_OPEN_KEY_INCLUDE_NON_FSO, "boolean");
     specs.add(createSpec("api_v1_keys_open",
         "Open (uncommitted/in-progress) keys — active writes not yet finalized. Use when "
             + "the user mentions open, in-progress, uncommitted, or unfinished uploads. "
@@ -145,7 +180,7 @@ public class LlmToolSpecFactory {
         null));
 
     Map<String, Object> deletePendingParams = paramMap(
-        "limit", "integer", "startPrefix", "string");
+        RECON_QUERY_LIMIT, "integer", RECON_QUERY_START_PREFIX, "string");
     specs.add(createSpec("api_v1_keys_deletePending",
         "List keys pending deletion under an optional prefix. Use when the user asks about "
             + "delete-pending or tombstoned keys (files). For directory-level pending deletes "
@@ -155,15 +190,16 @@ public class LlmToolSpecFactory {
     specs.add(createSpec("api_v1_keys_deletePending_dirs",
         "List directories pending deletion. Use when the user asks about pending-delete "
             + "directories or dir-level cleanup — not individual files.",
-        paramMap("limit", "integer")));
+        paramMap(RECON_QUERY_LIMIT, "integer")));
 
     specs.add(createSpec("api_v1_keys_deletePending_dirs_summary",
         "Summary counts for directories pending deletion. Use for overview only.",
         null));
 
     Map<String, Object> listKeysParams = paramMap(
-        "startPrefix", "string", "limit", "integer",
-        "replicationType", "string", "creationDate", "string", "keySize", "integer");
+        RECON_QUERY_START_PREFIX, "string", RECON_QUERY_LIMIT, "integer",
+        RECON_QUERY_REPLICATION_TYPE, "string", RECON_QUERY_CREATION_DATE, "string",
+        RECON_QUERY_KEY_SIZE, "integer");
     specs.add(createSpec("api_v1_keys_listKeys",
         "List committed keys/files under a bucket-scoped prefix with optional filters "
             + "(replicationType RATIS/EC, creationDate, minimum keySize). REQUIRED: startPrefix "
@@ -176,12 +212,12 @@ public class LlmToolSpecFactory {
     specs.add(createSpec("api_v1_volumes",
         "Ozone volume list (max 1000). Use when the user asks to list volumes or how many volumes "
             + "exist. For buckets within a volume use api_v1_buckets with the volume parameter.",
-        paramMap("limit", "integer")));
+        paramMap(RECON_QUERY_LIMIT, "integer")));
 
     specs.add(createSpec("api_v1_buckets",
         "Bucket list (max 1000), optionally filtered by volume. Use when the user asks about "
             + "buckets in a volume or bucket inventory. Set volume when the user names a volume.",
-        paramMap("volume", "string", "limit", "integer")));
+        paramMap(RECON_QUERY_VOLUME, "string", RECON_QUERY_LIMIT, "integer")));
 
     specs.add(createSpec("api_v1_task_status",
         "Recon background sync task status (OM/SCM delta lag, last update timestamps). Use when "
@@ -192,14 +228,15 @@ public class LlmToolSpecFactory {
         "Distribution of file counts by size tier (optionally per volume/bucket). Use for "
             + "histogram-style 'how many small vs large files' questions — not for listing "
             + "individual files (api_v1_keys_listKeys).",
-        paramMap("volume", "string", "bucket", "string", "fileSize", "integer")));
+        paramMap(RECON_QUERY_VOLUME, "string", RECON_QUERY_BUCKET, "string",
+            RECON_QUERY_FILE_SIZE, "integer")));
 
     specs.add(createSpec("api_v1_utilization_containerCount",
         "Distribution of container counts by size tier. Use for container size histogram "
             + "questions at cluster level.",
-        paramMap("containerSize", "integer")));
+        paramMap(RECON_QUERY_CONTAINER_SIZE, "integer")));
 
-    Map<String, Object> nsParams = paramMap("path", "string");
+    Map<String, Object> nsParams = paramMap(RECON_ENTITY_PATH, "string");
     specs.add(createSpec("api_v1_namespace_summary",
         "Namespace metadata summary for a path (counts, quotas overview without full usage math). "
             + "Use for 'what is under this path' summary. For disk usage totals prefer "
@@ -211,7 +248,8 @@ public class LlmToolSpecFactory {
             + "the user asks 'how much space', 'disk usage', 'total size' — NOT for listing "
             + "individual files (api_v1_keys_listKeys). Set path to /volume, /volume/bucket, "
             + "or deeper. Optional files/replica/sortSubPaths flags control breakdown detail.",
-        paramMap("path", "string", "files", "boolean", "replica", "boolean", "sortSubPaths", "boolean")));
+        paramMap(RECON_ENTITY_PATH, "string", RECON_NAMESPACE_USAGE_FILES, "boolean",
+            RECON_NAMESPACE_USAGE_REPLICA, "boolean", RECON_NAMESPACE_USAGE_SORT_SUB_PATHS, "boolean")));
 
     specs.add(createSpec("api_v1_namespace_quota",
         "Quota usage for a namespace path (volume/bucket/key quota consumption). Use when the "

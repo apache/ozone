@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotUtils;
 
 /**
@@ -73,12 +74,13 @@ public class ReconQueryExecutor {
     Map<String, String> params = new HashMap<>(
         parameters == null ? Collections.emptyMap() : parameters);
     // The chatbot never auto-paginates; always strip any cursor the LLM may have included.
-    params.remove("prevKey");
+    params.remove(ReconConstants.RECON_QUERY_PREVKEY);
 
     // Clamp the limit to MAX_RECORDS_PER_CALL. The router receives this pre-validated value.
-    int requested = ChatbotUtils.parsePositiveInt(params.get("limit"), MAX_RECORDS_PER_CALL);
+    int requested = ChatbotUtils.parsePositiveInt(
+        params.get(ReconConstants.RECON_QUERY_LIMIT), MAX_RECORDS_PER_CALL);
     int effective = Math.min(requested, MAX_RECORDS_PER_CALL);
-    params.put("limit", String.valueOf(effective));
+    params.put(ReconConstants.RECON_QUERY_LIMIT, String.valueOf(effective));
 
     Response response = router.route(toolName, params);
     JsonNode jsonNode = ReconResponseUnwrapper.unwrap(response);

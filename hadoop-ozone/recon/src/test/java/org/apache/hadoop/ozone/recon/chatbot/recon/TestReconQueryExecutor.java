@@ -22,22 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Unit tests for {@link ReconQueryExecutor}: limit clamping, prevKey stripping, and truncation
+ * detection driven by {@link org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotUtils#estimateRecordCount}.
+ */
 public class TestReconQueryExecutor {
 
   @Test
@@ -59,24 +60,96 @@ public class TestReconQueryExecutor {
   public void testLimitClampAndPrevKeyStripNonListKeys() throws Exception {
     ReconEndpointRouter router = mock(ReconEndpointRouter.class);
     when(router.hasRoute("api_v1_datanodes")).thenReturn(true);
-    
-    Map<String, Object> entity = new HashMap<>();
-    entity.put("data", Collections.nCopies(1000, Collections.singletonMap("hostname", "host1")));
-    Response mockResponse = Response.ok(entity).build();
-    
-    when(router.route(anyString(), argThat(p -> {
-      return !p.containsKey("prevKey") && "1000".equals(p.get("limit"));
-    }))).thenReturn(mockResponse);
+
+    Response mockResponse = Response.ok(dataObjectArrayBody(1000)).build();
+
+    when(router.route(anyString(), argThat(p ->
+        !p.containsKey("prevKey") && "1000".equals(p.get("limit"))))).thenReturn(mockResponse);
 
     ReconQueryExecutor handler = new ReconQueryExecutor(router);
 
     Map<String, String> params = new HashMap<>();
-    params.put("limit", "5000"); // Should clamp to 1000
-    params.put("prevKey", "someKey"); // Should be stripped
+    params.put("limit", "5000");
+    params.put("prevKey", "someKey");
     ReconQueryResult outcome = handler.execute("api_v1_datanodes", params);
 
     verify(router, times(1)).route(anyString(), any());
     assertEquals(1000, outcome.getRecordsProcessed());
-    assertTrue(outcome.isTruncated()); // 1000 >= effective (1000)
+    assertTrue(outcome.isTruncated());
+  }
+
+  @Test
+  public void testTruncationFalseBelowCap() throws Exception {
+    ReconEndpointRouter router = mock(ReconEndpointRouter.class);
+    when(router.hasRoute("api_v1_datanodes")).thenReturn(true);
+    when(router.route(anyString(), any())).thenReturn(Response.ok(dataObjectArrayBody(999)).build());
+
+    ReconQueryExecutor handler = new ReconQueryExecutor(router);
+    ReconQueryResult outcome = handler.execute("api_v1_datanodes", Collections.emptyMap());
+
+    assertEquals(999, outcome.getRecordsProcessed());
+    assertFalse(outcome.isTruncated());
+  }
+
+  @Test
+  public void testTruncationTrueForNestedContainersAtCap() throws Exception {
+    ReconEndpointRouter router = mock(ReconEndpointRouter.class);
+    when(router.hasRoute("api_v1_containers")).thenReturn(true);
+    when(router.route(anyString(), any())).thenReturn(
+        Response.ok(nestedContainersBody(1000)).build());
+
+    ReconQueryExecutor handler = new ReconQueryExecutor(router);
+    ReconQueryResult outcome = handler.execute("api_v1_containers", Collections.emptyMap());
+
+    assertEquals(1000, outcome.getRecordsProcessed());
+    assertTrue(outcome.isTruncated());
+  }
+
+  @Test
+  public void testTruncationTrueAtRequestedLimit() throws Exception {
+    ReconEndpointRouter router = mock(ReconEndpointRouter.class);
+    when(router.hasRoute("api_v1_datanodes")).thenReturn(true);
+    when(router.route(anyString(), any())).thenReturn(Response.ok(dataObjectArrayBody(10)).build());
+
+    ReconQueryExecutor handler = new ReconQueryExecutor(router);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("limit", "10");
+    ReconQueryResult outcome = handler.execute("api_v1_datanodes", params);
+
+    assertEquals(10, outcome.getRecordsProcessed());
+    assertEquals(10, outcome.getMaxRecords());
+    assertTrue(outcome.isTruncated());
+  }
+
+  @Test
+  public void testTruncationFalseBelowRequestedLimit() throws Exception {
+    ReconEndpointRouter router = mock(ReconEndpointRouter.class);
+    when(router.hasRoute("api_v1_datanodes")).thenReturn(true);
+    when(router.route(anyString(), any())).thenReturn(Response.ok(dataObjectArrayBody(9)).build());
+
+    ReconQueryExecutor handler = new ReconQueryExecutor(router);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("limit", "10");
+    ReconQueryResult outcome = handler.execute("api_v1_datanodes", params);
+
+    assertEquals(9, outcome.getRecordsProcessed());
+    assertEquals(10, outcome.getMaxRecords());
+    assertFalse(outcome.isTruncated());
+  }
+
+  private static Map<String, Object> dataObjectArrayBody(int count) {
+    Map<String, Object> entity = new HashMap<>();
+    entity.put("data", Collections.nCopies(count, Collections.singletonMap("hostname", "host1")));
+    return entity;
+  }
+
+  private static Map<String, Object> nestedContainersBody(int count) {
+    Map<String, Object> data = new HashMap<>();
+    data.put("containers", Collections.nCopies(count, Collections.singletonMap("containerID", 1L)));
+    Map<String, Object> entity = new HashMap<>();
+    entity.put("data", data);
+    return entity;
   }
 }

@@ -22,6 +22,7 @@ import com.google.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.BucketEndpoint;
 import org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
@@ -89,8 +90,10 @@ public class ReconEndpointRouter {
 
   public Response route(String toolName, Map<String, String> params) throws IOException {
     // limit is pre-clamped by ReconQueryExecutor; MAX_RECORDS_PER_CALL is a defensive fallback only.
-    int limit = parseInt(params.get("limit"), ReconQueryExecutor.MAX_RECORDS_PER_CALL);
-    String startPrefix = params.get("startPrefix") == null ? "" : params.get("startPrefix");
+    int limit = parseInt(params.get(ReconConstants.RECON_QUERY_LIMIT),
+        ReconQueryExecutor.MAX_RECORDS_PER_CALL);
+    String startPrefix = params.get(ReconConstants.RECON_QUERY_START_PREFIX) == null
+        ? "" : params.get(ReconConstants.RECON_QUERY_START_PREFIX);
 
     switch (toolName) {
     case "api_v1_clusterState":
@@ -115,7 +118,7 @@ public class ReconEndpointRouter {
       return containerEndpoint.getOmContainersDeletedInSCM(limit, 0L);
     case "api_v1_containers_quasiClosed":
       return containerEndpoint.getQuasiClosedContainers(
-          limit, parseLong(params.get("minContainerId"), 0L));
+          limit, parseLong(params.get(ReconConstants.RECON_QUERY_MIN_CONTAINER_ID), 0L));
     case "api_v1_containers_unhealthy_export":
       return containerEndpoint.listExportJobs();
     case "api_v1_keys_open":
@@ -137,55 +140,60 @@ public class ReconEndpointRouter {
     case "api_v1_volumes":
       return volumeEndpoint.getVolumes(limit, "");
     case "api_v1_buckets":
-      return bucketEndpoint.getBuckets(params.get("volume"), limit, "");
+      return bucketEndpoint.getBuckets(
+          params.get(ReconConstants.RECON_QUERY_VOLUME), limit, "");
     case "api_v1_task_status":
       return taskStatusService.getTaskStats();
     case "api_v1_utilization_fileCount":
       return routeFileCount(params);
     case "api_v1_utilization_containerCount":
-      return utilizationEndpoint.getContainerCounts(parseLong(params.get("containerSize"), 0L));
+      return utilizationEndpoint.getContainerCounts(
+          parseLong(params.get(ReconConstants.RECON_QUERY_CONTAINER_SIZE), 0L));
     case "api_v1_namespace_summary":
-      return nsSummaryEndpoint.getBasicInfo(params.get("path"));
+      return nsSummaryEndpoint.getBasicInfo(params.get(ReconConstants.RECON_ENTITY_PATH));
     case "api_v1_namespace_usage":
       return routeNamespaceUsage(params);
     case "api_v1_namespace_quota":
-      return nsSummaryEndpoint.getQuotaUsage(params.get("path"));
+      return nsSummaryEndpoint.getQuotaUsage(params.get(ReconConstants.RECON_ENTITY_PATH));
     case "api_v1_namespace_dist":
-      return nsSummaryEndpoint.getFileSizeDistribution(params.get("path"));
+      return nsSummaryEndpoint.getFileSizeDistribution(params.get(ReconConstants.RECON_ENTITY_PATH));
     default:
       throw new IllegalArgumentException("No in-process route for " + toolName);
     }
   }
 
   private Response routeUnhealthyContainers(Map<String, String> params, int limit) {
-    long maxContainerId = parseLong(params.get("maxContainerId"), 0L);
-    long minContainerId = parseLong(params.get("minContainerId"), 0L);
+    long maxContainerId = parseLong(params.get(ReconConstants.RECON_QUERY_MAX_CONTAINER_ID), 0L);
+    long minContainerId = parseLong(params.get(ReconConstants.RECON_QUERY_MIN_CONTAINER_ID), 0L);
     return containerEndpoint.getUnhealthyContainers(limit, maxContainerId, minContainerId);
   }
 
   private Response routeUnhealthyContainersByState(Map<String, String> params, int limit) {
-    String state = params.get("state");
-    long maxContainerId = parseLong(params.get("maxContainerId"), 0L);
-    long minContainerId = parseLong(params.get("minContainerId"), 0L);
+    String state = params.get(ReconConstants.RECON_QUERY_CONTAINER_STATE);
+    long maxContainerId = parseLong(params.get(ReconConstants.RECON_QUERY_MAX_CONTAINER_ID), 0L);
+    long minContainerId = parseLong(params.get(ReconConstants.RECON_QUERY_MIN_CONTAINER_ID), 0L);
     return containerEndpoint.getUnhealthyContainers(state, limit, maxContainerId, minContainerId);
   }
 
   private Response routeContainersMismatch(Map<String, String> params, int limit) {
-    String missingIn = params.get("missingIn") == null ? "" : params.get("missingIn");
+    String missingIn = params.get(ReconConstants.RECON_QUERY_FILTER) == null
+        ? "" : params.get(ReconConstants.RECON_QUERY_FILTER);
     return containerEndpoint.getContainerMisMatchInsights(limit, 0L, missingIn);
   }
 
   private Response routeOpenKeys(Map<String, String> params, int limit, String startPrefix) {
-    boolean includeFso = parseBoolean(params.get("includeFso"), false);
-    boolean includeNonFso = parseBoolean(params.get("includeNonFso"), false);
+    boolean includeFso = parseBoolean(
+        params.get(ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO), false);
+    boolean includeNonFso = parseBoolean(
+        params.get(ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO), false);
     return omdbInsightEndpoint.getOpenKeyInfo(limit, "", startPrefix, includeFso, includeNonFso);
   }
 
   private Response routeListKeys(Map<String, String> params, int limit, String startPrefix) {
-    long keySize = parseLong(params.get("keySize"), 0L);
+    long keySize = parseLong(params.get(ReconConstants.RECON_QUERY_KEY_SIZE), 0L);
     return omdbInsightEndpoint.listKeys(
-        params.get("replicationType"),
-        params.get("creationDate"),
+        params.get(ReconConstants.RECON_QUERY_REPLICATION_TYPE),
+        params.get(ReconConstants.RECON_QUERY_CREATION_DATE),
         keySize,
         startPrefix,
         "",
@@ -193,15 +201,20 @@ public class ReconEndpointRouter {
   }
 
   private Response routeNamespaceUsage(Map<String, String> params) throws IOException {
-    boolean files = parseBoolean(params.get("files"), false);
-    boolean replica = parseBoolean(params.get("replica"), false);
-    boolean sortSubPaths = parseBoolean(params.get("sortSubPaths"), false);
-    return nsSummaryEndpoint.getDiskUsage(params.get("path"), files, replica, sortSubPaths);
+    boolean files = parseBoolean(params.get(ReconConstants.RECON_NAMESPACE_USAGE_FILES), false);
+    boolean replica = parseBoolean(params.get(ReconConstants.RECON_NAMESPACE_USAGE_REPLICA), false);
+    boolean sortSubPaths = parseBoolean(
+        params.get(ReconConstants.RECON_NAMESPACE_USAGE_SORT_SUB_PATHS), false);
+    return nsSummaryEndpoint.getDiskUsage(
+        params.get(ReconConstants.RECON_ENTITY_PATH), files, replica, sortSubPaths);
   }
 
   private Response routeFileCount(Map<String, String> params) {
-    long fileSize = parseLong(params.get("fileSize"), 0L);
-    return utilizationEndpoint.getFileCounts(params.get("volume"), params.get("bucket"), fileSize);
+    long fileSize = parseLong(params.get(ReconConstants.RECON_QUERY_FILE_SIZE), 0L);
+    return utilizationEndpoint.getFileCounts(
+        params.get(ReconConstants.RECON_QUERY_VOLUME),
+        params.get(ReconConstants.RECON_QUERY_BUCKET),
+        fileSize);
   }
 
   private int parseInt(String val, int def) {

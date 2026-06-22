@@ -90,18 +90,38 @@ public final class ChatbotUtils {
     if (response == null) {
       return 0;
     }
-    if (response.isArray()) {
-      return response.size();
+    return countRecordArrays(response);
+  }
+
+  /**
+   * Counts how many list-style records appear in a Recon JSON response.
+   *
+   * <p>Walks the whole tree and adds up every array whose items are objects
+   * (e.g. containers, keys, datanodes). Field names do not matter — only
+   * the shape "array of objects". Plain number/string arrays (like size bins)
+   * are skipped.
+   *
+   * <p>Used only to guess whether a response hit the 1000-record cap. The count
+   * does not need to be exact; slightly high is fine and only makes us warn
+   * about a partial sample sooner.
+   */
+  private static int countRecordArrays(JsonNode node) {
+    int count = 0;
+    if (node.isArray()) {
+      boolean holdsObjects = false;
+      for (JsonNode element : node) {
+        holdsObjects |= element.isObject();
+        count += countRecordArrays(element);
+      }
+      if (holdsObjects) {
+        count += node.size();
+      }
+    } else if (node.isObject()) {
+      for (JsonNode child : node) {
+        count += countRecordArrays(child);
+      }
     }
-    JsonNode keys = response.get("keys");
-    if (keys != null && keys.isArray()) {
-      return keys.size();
-    }
-    JsonNode data = response.get("data");
-    if (data != null && data.isArray()) {
-      return data.size();
-    }
-    return 0;
+    return count;
   }
 
   // =========================================================================

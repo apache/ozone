@@ -582,6 +582,10 @@ public class ChatbotAgent {
     metadata.put("recordsProcessed", outcome.getRecordsProcessed());
     metadata.put("truncated", outcome.isTruncated());
     metadata.put("maxRecords", outcome.getMaxRecords());
+    if (outcome.isTruncated()) {
+      metadata.put("truncationNote",
+          "Response is a partial sample capped at maxRecords; do not treat the list as complete.");
+    }
     return metadata;
   }
 

@@ -22,10 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for the pure helpers in {@link ChatbotUtils}: the listKeys safe-scope prefix check,
@@ -36,6 +42,7 @@ public class TestChatbotUtils {
 
   private static final int DEFAULT_LIMIT = 1000;
   private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   // ── isBucketScopedListKeysPrefix ───────────────────────────────────────────
 
@@ -81,27 +88,229 @@ public class TestChatbotUtils {
   // ── estimateRecordCount ────────────────────────────────────────────────────
 
   @Test
-  public void testEstimateRecordCountForNullAndScalar() {
+  public void testEstimateRecordCountForNullScalarAndEmptyObject() {
     assertEquals(0, ChatbotUtils.estimateRecordCount(null), "null node");
     assertEquals(0, ChatbotUtils.estimateRecordCount(NODES.numberNode(5)), "scalar node");
-    assertEquals(0, ChatbotUtils.estimateRecordCount(NODES.objectNode().put("foo", 1)),
-        "object without keys/data array");
+    assertEquals(0, ChatbotUtils.estimateRecordCount(NODES.objectNode()), "empty object");
   }
 
   @Test
-  public void testEstimateRecordCountForArrayNode() {
-    ArrayNode arr = NODES.arrayNode().add("a").add("b").add("c");
-    assertEquals(3, ChatbotUtils.estimateRecordCount(arr));
+  public void testEstimateRecordCountForBareObjectArray() {
+    assertEquals(3, ChatbotUtils.estimateRecordCount(objectArray(3)));
   }
 
   @Test
-  public void testEstimateRecordCountForKeysAndDataArrays() {
-    ObjectNode withKeys = NODES.objectNode();
-    withKeys.set("keys", NODES.arrayNode().add("k1").add("k2"));
-    assertEquals(2, ChatbotUtils.estimateRecordCount(withKeys), "keys[] array");
+  public void testEstimateRecordCountForEmptyArrays() {
+    assertEquals(0, ChatbotUtils.estimateRecordCount(NODES.arrayNode()));
+    ObjectNode emptyContainers = NODES.objectNode();
+    emptyContainers.set("containers", NODES.arrayNode());
+    assertEquals(0, ChatbotUtils.estimateRecordCount(emptyContainers));
+  }
 
-    ObjectNode withData = NODES.objectNode();
-    withData.set("data", NODES.arrayNode().add("d1").add("d2").add("d3").add("d4"));
-    assertEquals(4, ChatbotUtils.estimateRecordCount(withData), "data[] array");
+  @Test
+  public void testEstimateRecordCountFindsNestedRecordArrays() {
+    ObjectNode containersResponse = NODES.objectNode();
+    ObjectNode data = NODES.objectNode();
+    data.set("containers", objectArray(3));
+    containersResponse.set("data", data);
+    assertEquals(3, ChatbotUtils.estimateRecordCount(containersResponse));
+  }
+
+  @Test
+  public void testEstimateRecordCountForLegacyDataObjectArray() throws Exception {
+    JsonNode response = parseJson("{\"data\":[{\"id\":0},{\"id\":1},{\"id\":2}]}");
+    assertEquals(3, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountForMixedObjectAndScalarArray() {
+    ArrayNode mixed = NODES.arrayNode();
+    mixed.add(NODES.objectNode());
+    mixed.add(NODES.numberNode(5));
+    mixed.add(NODES.objectNode());
+    // Any object element means the whole array is treated as a record list.
+    assertEquals(3, ChatbotUtils.estimateRecordCount(mixed));
+  }
+
+  @Test
+  public void testEstimateRecordCountIgnoresScalarFields() {
+    ObjectNode response = NODES.objectNode();
+    response.set("containers", objectArray(5));
+    response.put("missingCount", 5);
+    assertEquals(5, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountSumsMultipleRecordArrays() {
+    ObjectNode response = NODES.objectNode();
+    response.set("fso", objectArray(2));
+    response.set("nonFSO", objectArray(3));
+    response.set("deletedKeyInfo", objectArray(4));
+    assertEquals(9, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountSumsSplitKeyCollections() {
+    ObjectNode keyInsightResponse = NODES.objectNode();
+    keyInsightResponse.set("fso", objectArray(2));
+    keyInsightResponse.set("nonFSO", objectArray(3));
+    assertEquals(5, ChatbotUtils.estimateRecordCount(keyInsightResponse));
+  }
+
+  @Test
+  public void testEstimateRecordCountForDeletedAndMismatchArrays() {
+    ObjectNode deletePendingResponse = NODES.objectNode();
+    deletePendingResponse.set("deletedKeyInfo", objectArray(4));
+    assertEquals(4, ChatbotUtils.estimateRecordCount(deletePendingResponse));
+
+    ObjectNode mismatchResponse = NODES.objectNode();
+    mismatchResponse.set("containerDiscrepancyInfo", objectArray(6));
+    assertEquals(6, ChatbotUtils.estimateRecordCount(mismatchResponse));
+  }
+
+  @Test
+  public void testEstimateRecordCountOverCountsNestedRecordArraysSafely() {
+    // Over-counting only ever over-warns about truncation, never under-reports.
+    ArrayNode containers = NODES.arrayNode();
+    for (int i = 0; i < 2; i++) {
+      ObjectNode container = NODES.objectNode();
+      container.set("replicas", objectArray(2));
+      containers.add(container);
+    }
+    ObjectNode response = NODES.objectNode();
+    response.set("containers", containers);
+    assertEquals(6, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountIgnoresClaimedTotalCount() throws Exception {
+    JsonNode response = parseJson(
+        "{\"data\":{\"totalCount\":1234,\"prevKey\":0,\"containers\":["
+            + "{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},"
+            + "{\"id\":4},{\"id\":5},{\"id\":6}"
+            + "]}}");
+    assertEquals(7, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountForKeyInsightInfoShape() {
+    ObjectNode response = NODES.objectNode();
+    response.put("lastKey", "key-99");
+    response.put("replicatedDataSize", 4096);
+    response.set("status", NODES.objectNode().put("code", "OK"));
+    response.set("fso", objectArray(2));
+    response.set("nonFSO", objectArray(3));
+    assertEquals(5, ChatbotUtils.estimateRecordCount(response));
+  }
+
+  @Test
+  public void testEstimateRecordCountIgnoresScalarArrays() {
+    ObjectNode withBins = NODES.objectNode();
+    withBins.set("bins", scalarArray(1, 2, 3, 4));
+    assertEquals(0, ChatbotUtils.estimateRecordCount(withBins));
+
+    ObjectNode withStringKeys = NODES.objectNode();
+    withStringKeys.set("keys", NODES.arrayNode().add("k1").add("k2"));
+    assertEquals(0, ChatbotUtils.estimateRecordCount(withStringKeys));
+  }
+
+  @Test
+  public void testEstimateRecordCountNullElementsInArray() {
+    ArrayNode withNullAndObject = NODES.arrayNode();
+    withNullAndObject.addNull();
+    withNullAndObject.add(NODES.objectNode());
+    assertEquals(2, ChatbotUtils.estimateRecordCount(withNullAndObject));
+
+    ArrayNode allNulls = NODES.arrayNode();
+    allNulls.addNull();
+    allNulls.addNull();
+    assertEquals(0, ChatbotUtils.estimateRecordCount(allNulls));
+  }
+
+  @Test
+  public void testEstimateRecordCountAtCapBoundary() {
+    assertEquals(1000, ChatbotUtils.estimateRecordCount(objectArray(1000)));
+    assertEquals(1001, ChatbotUtils.estimateRecordCount(objectArray(1001)));
+    assertEquals(5000, ChatbotUtils.estimateRecordCount(objectArray(5000)));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("recordCountShapeSweep")
+  public void testEstimateRecordCountShapeSweep(String label, JsonNode payload, int expected) {
+    assertEquals(expected, ChatbotUtils.estimateRecordCount(payload), label);
+    if (expected > 0) {
+      assertTrue(ChatbotUtils.estimateRecordCount(payload) > 0,
+          "record-bearing shape must not return 0: " + label);
+    }
+  }
+
+  private static Stream<Arguments> recordCountShapeSweep() throws Exception {
+    ObjectNode unhealthy = NODES.objectNode();
+    unhealthy.set("containers", objectArray(5));
+
+    ObjectNode datanodes = NODES.objectNode();
+    datanodes.set("datanodes", objectArray(4));
+
+    ObjectNode volumes = NODES.objectNode();
+    volumes.set("volumes", objectArray(3));
+
+    return Stream.of(
+        Arguments.of("bare object array", objectArray(2), 2),
+        Arguments.of("data.containers", nestedContainers(8), 8),
+        Arguments.of("legacy data[]", parseJson("{\"data\":[{\"id\":1},{\"id\":2}]}"), 2),
+        Arguments.of("fso+nonFSO+deletedKeyInfo", multiKeyInsight(1, 2, 3), 6),
+        Arguments.of("containerDiscrepancyInfo", mismatch(5), 5),
+        Arguments.of("unhealthy containers", unhealthy, 5),
+        Arguments.of("datanodes", datanodes, 4),
+        Arguments.of("volumes", volumes, 3),
+        Arguments.of("scalar bins only", scalarBins(), 0));
+  }
+
+  private static ArrayNode objectArray(int count) {
+    ArrayNode arr = NODES.arrayNode();
+    for (int i = 0; i < count; i++) {
+      arr.add(NODES.objectNode().put("id", i));
+    }
+    return arr;
+  }
+
+  private static ArrayNode scalarArray(int... values) {
+    ArrayNode arr = NODES.arrayNode();
+    for (int value : values) {
+      arr.add(value);
+    }
+    return arr;
+  }
+
+  private static JsonNode parseJson(String json) throws Exception {
+    return MAPPER.readTree(json);
+  }
+
+  private static ObjectNode nestedContainers(int count) {
+    ObjectNode root = NODES.objectNode();
+    ObjectNode data = NODES.objectNode();
+    data.set("containers", objectArray(count));
+    root.set("data", data);
+    return root;
+  }
+
+  private static ObjectNode multiKeyInsight(int fso, int nonFso, int deleted) {
+    ObjectNode root = NODES.objectNode();
+    root.set("fso", objectArray(fso));
+    root.set("nonFSO", objectArray(nonFso));
+    root.set("deletedKeyInfo", objectArray(deleted));
+    return root;
+  }
+
+  private static ObjectNode mismatch(int count) {
+    ObjectNode root = NODES.objectNode();
+    root.set("containerDiscrepancyInfo", objectArray(count));
+    return root;
+  }
+
+  private static ObjectNode scalarBins() {
+    ObjectNode root = NODES.objectNode();
+    root.set("bins", scalarArray(1, 2, 3));
+    return root;
   }
 }
