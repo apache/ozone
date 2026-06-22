@@ -578,19 +578,24 @@ public class FSORepairTool extends RepairTool {
       }
 
       private void flush() throws IOException {
-        tempDB.commitBatchOperation(batch);
-        batch.close();
+        commitPending();
         batch = tempDB.initBatchOperation();
-        pending = 0;
       }
 
       @Override
       public void close() throws IOException {
-        if (pending > 0) {
-          tempDB.commitBatchOperation(batch);
+        commitPending();
+      }
+
+      private void commitPending() throws IOException {
+        try {
+          if (pending > 0) {
+            tempDB.commitBatchOperation(batch);
+          }
+        } finally {
           pending = 0;
+          batch.close();
         }
-        batch.close();
       }
     }
 
