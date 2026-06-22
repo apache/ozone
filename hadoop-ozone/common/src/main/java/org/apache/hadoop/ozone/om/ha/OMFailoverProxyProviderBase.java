@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -533,18 +534,13 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   @VisibleForTesting
   boolean maybeRefreshCurrentOmAddress() {
-    final String nodeId;
-    final OMProxyInfo<T> info;
-    synchronized (this) {
-      nodeId = getCurrentProxyOMNodeId();
-      if (nodeId == null) {
-        return false;
-      }
-      info = omProxies.get(nodeId);
-      if (info == null) {
-        return false;
-      }
-    }
+    // getCurrentProxyOMNodeId() is synchronized and omProxies is an
+    // unmodifiable map populated once at construction, so neither read
+    // needs the provider monitor; both values are always present.
+    final String nodeId = Objects.requireNonNull(getCurrentProxyOMNodeId(),
+        "Current proxy node id is null");
+    final OMProxyInfo<T> info = Objects.requireNonNull(omProxies.get(nodeId),
+        "Current proxy info is null");
     // refreshAddressIfChanged handles its own locking and performs the
     // DNS lookup outside its entry monitor.
     boolean swapped = info.refreshAddressIfChanged();
