@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
  */
 @Path("/blocks")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class BlocksEndPoint {
   private final DBStore scmDBStore;
   private final ReconContainerManager containerManager;

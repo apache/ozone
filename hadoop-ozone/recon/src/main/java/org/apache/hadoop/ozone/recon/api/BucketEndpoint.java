@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
  */
 @Path("/buckets")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class BucketEndpoint {
 
   @Inject

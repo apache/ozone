@@ -95,7 +95,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class OMDBInsightEndpoint {
 
   private final ReconOMMetadataManager omMetadataManager;
