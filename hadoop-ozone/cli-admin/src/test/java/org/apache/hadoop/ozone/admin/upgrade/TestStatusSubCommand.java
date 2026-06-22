@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -91,5 +92,12 @@ public class TestStatusSubCommand {
     assertTrue(output.contains("Total Datanodes: 3"));
     assertTrue(output.contains("Should Finalize: true"));
     verify(omClient).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testStatusCommandPropagatesException() throws Exception {
+    when(omClient.queryUpgradeStatus()).thenThrow(new IOException("OM unavailable"));
+    new CommandLine(cmd).parseArgs();
+    assertThrows(IOException.class, () -> cmd.call());
   }
 }
