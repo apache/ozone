@@ -226,12 +226,6 @@
       <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>com.sun.xml.bind</groupId>
-      <artifactId>jaxb-impl</artifactId>
-      <version>4.0.4</version>
-      <scope>compile</scope>
-    </dependency>
   </dependencies>
   <build>
     <testResources>
