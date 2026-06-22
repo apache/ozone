@@ -73,6 +73,7 @@ public class TestStatusSubCommand {
   @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
+    System.setErr(originalErr);
   }
 
   @Test
