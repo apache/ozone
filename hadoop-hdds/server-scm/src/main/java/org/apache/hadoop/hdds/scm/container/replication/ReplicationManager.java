@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -666,16 +667,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       throws NotLeaderException {
     long datanodeDeadline =
         scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset();
+    if (command.getType() == Type.replicateContainerCommand) {
+      enrichReplicateCommandWithPeerVersion(
+          (ReplicateContainerCommand) command);
+    }
     LOG.info("Sending command [{}] for container {} to {} with datanode "
         + "deadline {} and scm deadline {}",
         command, containerInfo, target, datanodeDeadline,
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadline);
-    if (command.getType() == Type.replicateContainerCommand) {
-      enrichReplicateCommandWithPeerVersion(
-          (ReplicateContainerCommand) command);
-    }
     nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
@@ -697,9 +698,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   private int lookupApparentVersion(DatanodeDetails dn) {
     DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
-    return info != null
-        ? info.getLastKnownApparentVersion().serialize()
-        : HDDSVersion.DEFAULT_VERSION.serialize();
+    if (info == null) {
+      return HDDSVersion.DEFAULT_VERSION.serialize();
+    }
+    ComponentVersion peerVersion = info.getLastKnownApparentVersion();
+    // A peer reporting a version newer than this SCM can recognize
+    // deserializes to UNKNOWN_VERSION (-1). Treat it as the oldest known
+    // version so the client datanode falls back to the most conservative,
+    // backward-compatible behavior rather than propagating the sentinel.
+    if (peerVersion == null || peerVersion == HDDSVersion.UNKNOWN_VERSION) {
+      return HDDSVersion.DEFAULT_VERSION.serialize();
+    }
+    return peerVersion.serialize();
   }
 
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,

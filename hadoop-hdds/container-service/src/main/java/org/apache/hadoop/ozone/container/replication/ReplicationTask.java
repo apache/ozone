@@ -128,6 +128,13 @@ public class ReplicationTask extends AbstractReplicationTask {
     this.transferredBytes = transferredBytes;
   }
 
+  /**
+   * @return the lowest apparent version supported by both this datanode and
+   *     the replication peer, computed as {@code min(localApparentVersion,
+   *     peerApparentVersion)}. Replicators can use this to gate
+   *     version-dependent protocol features so that the newer side downgrades
+   *     to a behavior the older side understands.
+   */
   public int getLowestCommonApparentVersion() {
     return lowestCommonApparentVersion;
   }

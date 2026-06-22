@@ -58,6 +58,7 @@ public class TestReplicateContainerCommandHandler {
   private OzoneContainer ozoneContainer;
   private StateContext stateContext;
   private SCMConnectionManager connectionManager;
+  private DatanodeVersionManager versionManager;
 
   @BeforeEach
   public void setUp() {
@@ -70,12 +71,22 @@ public class TestReplicateContainerCommandHandler {
     stateContext = mock(StateContext.class);
 
     DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
+    versionManager = mock(DatanodeVersionManager.class);
     when(stateContext.getParent()).thenReturn(dsm);
     when(dsm.getVersionManager()).thenReturn(versionManager);
     when(versionManager.getApparentVersion())
         .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+  }
+
+  /**
+   * Stubs {@link ReplicationSupervisor#addTask} and returns a captor for the
+   * {@link ReplicationTask} the handler submits.
+   */
+  private ArgumentCaptor<ReplicationTask> captureSubmittedTask() {
+    ArgumentCaptor<ReplicationTask> captor =
+        ArgumentCaptor.forClass(ReplicationTask.class);
+    doNothing().when(supervisor).addTask(captor.capture());
+    return captor;
   }
 
   @Test
@@ -130,16 +141,8 @@ public class TestReplicateContainerCommandHandler {
   }
 
   @Test
-  public void testEffectiveVersionServerIsOlder() {
-    ArgumentCaptor<ReplicationTask> captor =
-        ArgumentCaptor.forClass(ReplicationTask.class);
-    doNothing().when(supervisor).addTask(captor.capture());
-
-    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(stateContext.getParent()).thenReturn(dsm);
-    when(dsm.getVersionManager()).thenReturn(versionManager);
+  public void testEffectiveVersionPeerIsOlder() {
+    ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
     when(versionManager.getApparentVersion())
         .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
 
@@ -165,15 +168,7 @@ public class TestReplicateContainerCommandHandler {
 
   @Test
   public void testEffectiveVersionLocalIsOlder() {
-    ArgumentCaptor<ReplicationTask> captor =
-        ArgumentCaptor.forClass(ReplicationTask.class);
-    doNothing().when(supervisor).addTask(captor.capture());
-
-    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(stateContext.getParent()).thenReturn(dsm);
-    when(dsm.getVersionManager()).thenReturn(versionManager);
+    ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
     when(versionManager.getApparentVersion())
         .thenReturn(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
 
@@ -195,15 +190,7 @@ public class TestReplicateContainerCommandHandler {
 
   @Test
   public void testEffectiveVersionDefaultWhenNotSet() {
-    ArgumentCaptor<ReplicationTask> captor =
-        ArgumentCaptor.forClass(ReplicationTask.class);
-    doNothing().when(supervisor).addTask(captor.capture());
-
-    DatanodeStateMachine dsm = mock(DatanodeStateMachine.class);
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(stateContext.getParent()).thenReturn(dsm);
-    when(dsm.getVersionManager()).thenReturn(versionManager);
+    ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
     when(versionManager.getApparentVersion())
         .thenReturn(HDDSVersion.STREAM_BLOCK_SUPPORT);
 

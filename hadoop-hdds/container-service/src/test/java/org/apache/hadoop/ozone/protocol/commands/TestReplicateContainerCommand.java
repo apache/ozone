@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 public class TestReplicateContainerCommand {
 
   @Test
-  public void testServerApparentVersionRoundTrip() {
+  public void testPeerApparentVersionRoundTrip() {
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
     List<DatanodeDetails> sources = Collections.singletonList(source);
 
@@ -52,7 +52,7 @@ public class TestReplicateContainerCommand {
   }
 
   @Test
-  public void testServerApparentVersionDefaultWhenAbsent() {
+  public void testPeerApparentVersionDefaultWhenAbsent() {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
@@ -73,7 +73,7 @@ public class TestReplicateContainerCommand {
   }
 
   @Test
-  public void testServerApparentVersionInPushMode() {
+  public void testPeerApparentVersionInPushMode() {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
@@ -91,7 +91,7 @@ public class TestReplicateContainerCommand {
   }
 
   @Test
-  public void testToStringIncludesServerApparentVersion() {
+  public void testToStringIncludesPeerApparentVersion() {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.forTest(1L);
     cmd.setPeerApparentVersion(

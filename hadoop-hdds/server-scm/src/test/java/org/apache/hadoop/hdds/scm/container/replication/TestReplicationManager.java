@@ -1877,4 +1877,30 @@ public class TestReplicationManager {
         command.getPeerApparentVersion());
   }
 
+  @Test
+  public void testPeerApparentVersionDefaultWhenPeerVersionUnknown()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+
+    // A peer reporting a version newer than this SCM can recognize
+    // deserializes to UNKNOWN_VERSION; it must fall back to the oldest
+    // version rather than propagating the sentinel.
+    DatanodeInfo targetInfo = mock(DatanodeInfo.class);
+    when(targetInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.UNKNOWN_VERSION);
+    when(nodeManager.getDatanodeInfo(target)).thenReturn(targetInfo);
+
+    ReplicateContainerCommand command =
+        ReplicateContainerCommand.toTarget(
+            containerInfo.getContainerID(), target);
+    replicationManager.sendDatanodeCommand(command, containerInfo, source);
+
+    assertEquals(HDDSVersion.DEFAULT_VERSION.serialize(),
+        command.getPeerApparentVersion());
+  }
+
 }
