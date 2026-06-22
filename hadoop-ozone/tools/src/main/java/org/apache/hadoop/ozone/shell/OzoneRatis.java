@@ -38,17 +38,12 @@ public class OzoneRatis extends GenericCli {
 
   @Override
   public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = "ozone ratis " + String.join(" ", argv);
-    try {
-      return TracingUtil.executeInNewSpan(spanName, () -> {
-        // TODO: When Ozone has RATIS-2155, update this line to use the RatisShell.Builder
-        //       in order to setup TLS and other confs.
-        final RatisShell shell = new RatisShell(System.out);
-        return shell.run(argv);
-      });
-    } finally {
-      TracingUtil.flushTracing();
-    }
+    return TracingUtil.execute("shell", spanName, getOzoneConf(), () -> {
+      // TODO: When Ozone has RATIS-2155, update this line to use the RatisShell.Builder
+      //       in order to setup TLS and other confs.
+      final RatisShell shell = new RatisShell(System.out);
+      return shell.run(argv);
+    });
   }
 }

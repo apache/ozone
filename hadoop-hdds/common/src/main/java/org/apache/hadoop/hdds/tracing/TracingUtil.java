@@ -112,6 +112,22 @@ public final class TracingUtil {
     }
   }
 
+  /**
+   * This function initializes tracing, runs the command in a span, and exports spans before returning for CLI spans.
+   */
+  public static <R, E extends Exception> R execute(
+      String serviceName,
+      String spanName,
+      ConfigurationSource conf,
+      CheckedSupplier<R, E> supplier) throws E {
+    initTracing(serviceName, conf);
+    try {
+      return executeInNewSpan(spanName, supplier);
+    } finally {
+      flushTracing();
+    }
+  }
+
   private static void shutdownTracing() {
     if (sdkTracerProvider == null) {
       return;
