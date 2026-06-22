@@ -2,7 +2,7 @@
 title: Delta Sharing Protocol Support for Apache Ozone
 summary: Enable Apache Ozone to expose stored data via the Delta Sharing protocol
 date: 2026-06-22
-jira: HDDS-XXXXX
+jira: HDDS-15642
 status: proposed
 author: Abhishek Pal
 ---
