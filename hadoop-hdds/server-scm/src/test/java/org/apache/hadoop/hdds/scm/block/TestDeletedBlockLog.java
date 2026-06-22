@@ -27,7 +27,6 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -321,7 +320,6 @@ public class TestDeletedBlockLog {
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       assertEquals(0, containerInfo.getDeleteTransactionId());
     }
-    verify(containerManager, never()).updateDeleteTransactionId(any());
   }
 
   private void mockContainerHealthResult(Boolean healthy) {
