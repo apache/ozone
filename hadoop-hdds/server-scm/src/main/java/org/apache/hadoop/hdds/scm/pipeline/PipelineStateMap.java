@@ -114,14 +114,12 @@ class PipelineStateMap {
    */
   PipelineInfo getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     Objects.requireNonNull(pipelineID, "pipelineID == null");
-    final PipelineInfo info = pipelineMap.remove(pipelineID);
+    final PipelineInfo info = pipelineMap.get(pipelineID);
 
     if (info == null) {
       throw new PipelineNotFoundException(
           "Pipeline not found: " + pipelineID);
     }
-
-    final Pipeline pipeline = info.getPipeline();
     return info;
   }
 
