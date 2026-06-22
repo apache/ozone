@@ -133,7 +133,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
-        .put(HttpHeaders.CONTENT_TYPE, "response-content-type")
         .put(HttpHeaders.CONTENT_LANGUAGE, "response-content-language")
         .put(HttpHeaders.EXPIRES, "response-expires")
         .put(HttpHeaders.CACHE_CONTROL, "response-cache-control")
@@ -464,15 +463,16 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
 
+      // Content-Type comes from the stored object, not the request header;
+      // response-content-type still overrides it.
+      String contentType = queryParams.getFirst("response-content-type");
+      if (contentType == null) {
+        contentType = contentTypeOf(keyDetails);
+      }
+      responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
+
       for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
         String headerValue = getHeaders().getHeaderString(entry.getKey());
-        // Default the response Content-Type to the object's stored Content-Type
-        // (or the standard default) so it is always returned; a
-        // response-content-type query parameter still overrides it below.
-        if (headerValue == null
-            && HttpHeaders.CONTENT_TYPE.equals(entry.getKey())) {
-          headerValue = contentTypeOf(keyDetails);
-        }
         String queryValue = queryParams.getFirst(entry.getValue());
         if (queryValue != null) {
           headerValue = queryValue;
@@ -508,21 +508,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   /**
-   * Store the request's Content-Type in the key metadata so it can be returned
-   * on GET/HEAD and propagated on copy. The original value is preserved by
-   * {@link HeaderPreprocessor} as {@code X-Ozone-Original-Content-Type}.
+   * Store the request's Content-Type (preserved by {@link HeaderPreprocessor}
+   * as {@code X-Ozone-Original-Content-Type}) in the key metadata.
    */
   private void putContentType(Map<String, String> metadata) {
     String contentType =
         getHeaders().getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE);
     if (contentType != null) {
-      metadata.put(CONTENT_TYPE, contentType);
+      metadata.put(HttpHeaders.CONTENT_TYPE, contentType);
     }
   }
 
   /** Returns the object's stored Content-Type, or the default if absent. */
   private static String contentTypeOf(OzoneKey key) {
-    String contentType = key.getMetadata().get(CONTENT_TYPE);
+    String contentType = key.getMetadata().get(HttpHeaders.CONTENT_TYPE);
     return contentType != null ? contentType : DEFAULT_CONTENT_TYPE;
   }
 
@@ -1119,8 +1118,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
-        // With REPLACE, the Content-Type comes from the copy request (if any),
-        // not from the source object.
+        // REPLACE: Content-Type comes from the request, not the source.
         putContentType(customMetadata);
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);

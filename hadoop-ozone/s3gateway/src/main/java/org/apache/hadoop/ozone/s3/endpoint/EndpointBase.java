@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -118,12 +119,22 @@ import org.slf4j.LoggerFactory;
 public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
-  // Metadata key under which the object's Content-Type is stored in the OM key
-  // metadata (the standard Content-Type header name).
-  protected static final String CONTENT_TYPE = HttpHeaders.CONTENT_TYPE;
-  // Key used to preserve a user-supplied "x-amz-meta-content-type" so it does
-  // not collide with the object's Content-Type stored under CONTENT_TYPE.
   protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+
+  // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
+  // collides with the system ETag / Content-Type stored under the same key, so
+  // it is remapped on write and rebuilt on read; the system value is returned
+  // via its own ETag / Content-Type response header.
+  private static final Map<String, String> RESERVED_METADATA_KEYS =
+      ImmutableMap.of(
+          ETAG, ETAG_CUSTOM,
+          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+
+  // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
+  private static final Map<String, String> REBUILT_RESERVED_KEYS =
+      RESERVED_METADATA_KEYS.entrySet().stream()
+          .collect(ImmutableMap.toImmutableMap(
+              Map.Entry::getValue, e -> e.getKey().toLowerCase()));
 
   private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
@@ -325,22 +336,16 @@ public abstract class EndpointBase {
       }
     }
 
-    // A user-supplied x-amz-meta-{etag,content-type} would collide with the
-    // system ETag / Content-Type stored under the same key in the OM key
-    // metadata. Remap them to dedicated custom keys; they are rebuilt on read
-    // in addCustomMetadataHeaders().
-    remapReservedMetadataKey(customMetadata, HttpHeaders.ETAG, ETAG_CUSTOM);
-    remapReservedMetadataKey(customMetadata, CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+    // Remap user values that collide with a reserved system key.
+    RESERVED_METADATA_KEYS.forEach((headerName, customKey) ->
+        remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
   }
 
   /**
-   * If {@code metadata} contains a user-supplied value under {@code headerName}
-   * (in either the canonical or lower-case form), move it to {@code customKey}
-   * so it does not collide with the system value stored under
-   * {@code headerName}. The original header is rebuilt on read in
-   * {@link #addCustomMetadataHeaders}.
+   * Move a user value under {@code headerName} (canonical or lower-case) to
+   * {@code customKey} so it does not collide with the system value.
    */
   private static void remapReservedMetadataKey(Map<String, String> metadata,
       String headerName, String customKey) {
@@ -359,22 +364,13 @@ public abstract class EndpointBase {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
-      if (entry.getKey().equals(ETAG)) {
-        continue;
-      }
-      // The object's Content-Type is returned as the standard Content-Type
-      // response header, not as a user-metadata header.
-      if (entry.getKey().equals(CONTENT_TYPE)) {
-        continue;
-      }
       String metadataKey = entry.getKey();
-      if (metadataKey.equals(ETAG_CUSTOM)) {
-        // Rebuild the ETag custom metadata header
-        metadataKey = ETAG.toLowerCase();
-      } else if (metadataKey.equals(CONTENT_TYPE_CUSTOM)) {
-        // Rebuild the user-supplied content-type custom metadata header
-        metadataKey = CONTENT_TYPE.toLowerCase();
+      // System ETag / Content-Type are returned via their own response header.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
+        continue;
       }
+      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
