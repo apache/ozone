@@ -182,6 +182,7 @@ public class RatisPipelineProvider
     DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
 
     Pipeline pipeline = newPipelineBuilder(RatisReplicationConfig.getInstance(factor), dns)
+        .setId(PipelineID.randomId())
         .setSuggestedLeaderId(suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
