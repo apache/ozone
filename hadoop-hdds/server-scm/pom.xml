@@ -31,6 +31,13 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.facebook.infer.annotation</groupId>
+      <artifactId>infer-annotation</artifactId>
+      <version>0.18.0</version>
+      <scope>compile</scope>
+    </dependency>
+
+    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
@@ -168,12 +175,6 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.facebook.infer.annotation</groupId>
-      <artifactId>infer-annotation</artifactId>
-      <version>0.18.0</version>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
