@@ -26,6 +26,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/** Tests for {@link LlmRouting}. */
 public class TestLlmRouting {
 
   private static final String DEFAULT_PROVIDER = "gemini";

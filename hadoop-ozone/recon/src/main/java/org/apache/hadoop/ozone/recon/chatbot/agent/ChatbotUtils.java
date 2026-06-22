@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
  * Utility methods for the Chatbot Agent.
  *
  * <p>Contains pure functions for string manipulation, JSON parsing, security validation,
- * and I/O operations used by {@link ChatbotAgent} and {@link org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor}.</p>
+ * and I/O operations used by {@link ChatbotAgent} and
+ * {@link org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor}.</p>
  */
 public final class ChatbotUtils {
 

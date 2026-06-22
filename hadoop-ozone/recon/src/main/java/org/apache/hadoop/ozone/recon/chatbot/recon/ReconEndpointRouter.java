@@ -59,6 +59,7 @@ public class ReconEndpointRouter {
   private final ReconApiAllowlist reconApiAllowlist;
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconEndpointRouter(
       ClusterStateEndpoint clusterStateEndpoint,
       NodeEndpoint nodeEndpoint,

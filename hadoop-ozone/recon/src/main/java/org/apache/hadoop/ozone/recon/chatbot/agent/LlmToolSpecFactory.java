@@ -17,15 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolSpec;
-
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_PATH;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_NAMESPACE_USAGE_FILES;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_NAMESPACE_USAGE_REPLICA;
@@ -45,6 +36,15 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_START_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ToolSpec;
 
 /**
  * Builds native LLM tool specifications (names, descriptions, parameters).
@@ -66,9 +66,14 @@ public class LlmToolSpecFactory {
 
   private List<ToolSpec> buildToolSpecs() {
     List<ToolSpec> specs = new ArrayList<>();
-
     Map<String, Object> limitOnly = paramMap(RECON_QUERY_LIMIT, "integer");
+    addClusterAndContainerToolSpecs(specs, limitOnly);
+    addKeyToolSpecs(specs, limitOnly);
+    addVolumeUtilizationAndNamespaceToolSpecs(specs, limitOnly);
+    return specs;
+  }
 
+  private void addClusterAndContainerToolSpecs(List<ToolSpec> specs, Map<String, Object> limitOnly) {
     specs.add(createSpec("api_v1_clusterState",
         "High-level cluster snapshot: storage capacity/usage, pipeline and container counts, "
             + "and aggregate key statistics. Use for broad health or capacity questions "
@@ -150,7 +155,9 @@ public class LlmToolSpecFactory {
             + "export jobs or downloading unhealthy container reports — not for listing "
             + "unhealthy containers themselves.",
         null));
+  }
 
+  private void addKeyToolSpecs(List<ToolSpec> specs, Map<String, Object> limitOnly) {
     Map<String, Object> openKeysParams = paramMap(
         RECON_QUERY_LIMIT, "integer", RECON_QUERY_START_PREFIX, "string",
         RECON_OPEN_KEY_INCLUDE_FSO, "boolean", RECON_OPEN_KEY_INCLUDE_NON_FSO, "boolean");
@@ -209,6 +216,9 @@ public class LlmToolSpecFactory {
             + "counts without listing keys (api_v1_namespace_summary).",
         listKeysParams));
 
+  }
+
+  private void addVolumeUtilizationAndNamespaceToolSpecs(List<ToolSpec> specs, Map<String, Object> limitOnly) {
     specs.add(createSpec("api_v1_volumes",
         "Ozone volume list (max 1000). Use when the user asks to list volumes or how many volumes "
             + "exist. For buckets within a volume use api_v1_buckets with the volume parameter.",
@@ -262,7 +272,6 @@ public class LlmToolSpecFactory {
             + "questions at a path — not for listing keys.",
         nsParams));
 
-    return specs;
   }
 
   private static Map<String, Object> paramMap(String... nameTypePairs) {

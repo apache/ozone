@@ -157,6 +157,7 @@ public interface LLMClient {
     }
   }
 
+  /** Native tool definition passed to the LLM (name, description, JSON parameter schema). */
   class ToolSpec {
     private final String name;
     private final String description;
@@ -181,6 +182,7 @@ public interface LLMClient {
     }
   }
 
+  /** One tool invocation requested by the LLM (tool name and JSON arguments). */
   class ToolCallRequest {
     private final String toolName;
     private final String argumentsJson;

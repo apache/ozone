@@ -68,11 +68,9 @@ public final class ChatbotConfigKeys {
       + "exec.require.safe.scope";
   public static final boolean OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE_DEFAULT = true;
 
-
   // ── Agent configuration ─────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
-
 
   // ── Async execution thread pool ──────────────────────────────
   /**

@@ -27,6 +27,7 @@ import java.util.Collections;
 import javax.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 
+/** Tests for {@link ReconResponseUnwrapper}. */
 public class TestReconResponseUnwrapper {
 
   @Test

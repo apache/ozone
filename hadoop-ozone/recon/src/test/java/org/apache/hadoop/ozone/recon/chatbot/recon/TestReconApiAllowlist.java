@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/** Tests for {@link ReconApiAllowlist}. */
 public class TestReconApiAllowlist {
 
   private ReconApiAllowlist catalog;
