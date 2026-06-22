@@ -33,8 +33,7 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 /**
  * Service to make containers available for replication.
  */
-public class GrpcReplicationService extends
-    IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceImplBase {
+public class GrpcReplicationService extends IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceImplBase {
 
   static final int BUFFER_SIZE = 1024 * 1024;
 
