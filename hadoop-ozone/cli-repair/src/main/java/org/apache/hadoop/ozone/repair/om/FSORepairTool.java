@@ -89,8 +89,17 @@ public class FSORepairTool extends RepairTool {
   private static final String REACHABLE_TABLE = "reachable";
   private static final String PENDING_TO_DELETE_TABLE = "pendingToDelete";
 
+  private static int tempDbBatchSize = 10_000;
+
   @VisibleForTesting
-  static int tempDbBatchSize = 10_000;
+  static void setTempDbBatchSize(int batchSize) {
+    tempDbBatchSize = batchSize;
+  }
+
+  @VisibleForTesting
+  static int getTempDbBatchSize() {
+    return tempDbBatchSize;
+  }
 
   @CommandLine.Option(names = {"--db"},
       required = true,
