@@ -311,7 +311,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","infer","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -322,7 +322,7 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","infer","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -345,7 +345,7 @@ load bats-assert/load.bash
 @test "CI workflow change (check.yml)" {
   run dev-support/ci/selective_ci_checks.sh 1468af02067ec75b255f605816c32f8bf4dfaabf
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","infer","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -356,7 +356,7 @@ load bats-assert/load.bash
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","infer","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true

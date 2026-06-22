@@ -34,7 +34,7 @@
       <groupId>com.facebook.infer.annotation</groupId>
       <artifactId>infer-annotation</artifactId>
       <version>0.18.0</version>
-      <scope>compile</scope>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>

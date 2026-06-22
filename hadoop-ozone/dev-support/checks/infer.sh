@@ -68,7 +68,7 @@ if [[ -f "${REPORT_DIR}/report.txt" ]]; then
   # Count issue lines (lines containing .java: which indicate findings)
   grep -c '\.java:' "${REPORT_DIR}/report.txt" > "${REPORT_DIR}/failures" 2>/dev/null || echo "0" > "${REPORT_DIR}/failures"
 else
-  echo "Infer completed without generating issues." >> "$REPORT_FILE"
+  : > "$REPORT_FILE"
   echo "0" > "${REPORT_DIR}/failures"
 fi
 
@@ -77,5 +77,4 @@ if [[ -f "${REPORT_DIR}/report.txt" ]]; then
   infer report --issues-json "${REPORT_DIR}/report.json" 2>/dev/null || true
 fi
 
-ERROR_PATTERN="\[ERROR\]"
 source "${DIR}/_post_process.sh"
