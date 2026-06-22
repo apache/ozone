@@ -114,6 +114,9 @@ public class FSORepairTool extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    if (tempDbBatchSize < 1) {
+      throw new IllegalArgumentException("--batch-size must be at least 1, but was " + tempDbBatchSize);
+    }
     try {
       Impl repairTool = new Impl();
       repairTool.run();

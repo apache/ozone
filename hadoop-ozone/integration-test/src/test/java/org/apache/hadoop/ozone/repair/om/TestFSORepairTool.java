@@ -25,6 +25,7 @@ import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -213,6 +214,14 @@ public class TestFSORepairTool {
 
     String reportOutput = extractRelevantSection(out.getOutput());
     assertEquals(expectedOutput, reportOutput);
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testInvalidBatchSize() {
+    int exitCode = dryRun("--batch-size", "0");
+    assertNotEquals(0, exitCode);
+    assertThat(err.getOutput()).contains("--batch-size must be at least 1");
   }
 
   /**
