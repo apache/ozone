@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
@@ -77,8 +78,13 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
@@ -162,6 +168,17 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final Semaphore applyTransactionSemaphore;
   private final boolean waitOnBothFollowers;
   private final HddsDatanodeService datanodeService;
+  private final ConfigurationSource conf;
+
+  /**
+   * Tracks the containerBCSID that existed *before* each pre-quorum PutBlock write (indexed by
+   * logIndex). Used by {@link #truncate} to roll back RocksDB when log entries are retracted.
+   * Entries are removed when the corresponding entry is committed ({@link #notifyTermIndexUpdated})
+   * or rolled back ({@link #truncate}).
+   * Array layout: {@code [containerID, prevBCSID]}.
+   */
+  private final ConcurrentSkipListMap<Long, long[]> putBlockPreWriteBCSIDs =
+      new ConcurrentSkipListMap<>();
   private static Semaphore semaphore = new Semaphore(1);
   private final AtomicBoolean peersValidated;
 
@@ -258,6 +275,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.ratisServer = ratisServer;
+    this.conf = conf;
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentSkipListMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
@@ -455,14 +473,26 @@ public class ContainerStateMachine extends BaseStateMachine {
       return trx;
     }
 
+    final ByteString stateMachineData =
+        stateMachineLogEntry.getStateMachineEntry().getStateMachineData();
     final ContainerCommandRequestProto requestProto;
-    if (logProto.getCmdType() == Type.WriteChunk || logProto.getCmdType() == Type.PutBlock) {
-      // stateMachineData carries a complete ContainerCommandRequestProto;
-      // parse it directly — no manual reconstruction needed.
-      // For WriteChunk it includes chunk data; for PutBlock it is the same as logData.
+    if (logProto.getCmdType() == Type.WriteChunk) {
+      // WriteChunk stateMachineData carries the raw chunk bytes (legacy, wire-compatible
+      // format). Reconstruct the full request by combining the stripped log proto with
+      // the chunk data. This format is identical across versions, so it is safe to
+      // replay entries written by an older datanode and to receive them from an older leader.
+      requestProto = ContainerCommandRequestProto.newBuilder(logProto)
+          .setWriteChunk(WriteChunkRequestProto.newBuilder(logProto.getWriteChunk())
+              .setData(stateMachineData))
+          .build();
+    } else if (logProto.getCmdType() == Type.PutBlock && !stateMachineData.isEmpty()) {
+      // Self-describing discriminator: a PutBlock entry only carries stateMachineData when it
+      // was produced by a leader that had finalized RATIS_PUTBLOCK_PRE_QUORUM_WRITE. In that
+      // case the bytes are a complete ContainerCommandRequestProto that drives the pre-quorum
+      // write() path. Entries written before finalization have no stateMachineData and fall
+      // through to the legacy applyTransaction()-only path below.
       try {
-        requestProto = ContainerCommandRequestProto.parseFrom(
-            stateMachineLogEntry.getStateMachineEntry().getStateMachineData());
+        requestProto = ContainerCommandRequestProto.parseFrom(stateMachineData);
       } catch (InvalidProtocolBufferException e) {
         trx.setException(e);
         return trx;
@@ -506,8 +536,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
         .clearEncodedToken();
     boolean blockAlreadyFinalized = false;
-    // For WriteChunk, holds the full proto (with data) that travels in stateMachineData.
-    ContainerCommandRequestProto fullProtoWithData = null;
     if (proto.getCmdType() == Type.PutBlock) {
       blockAlreadyFinalized = shouldRejectRequest(proto.getPutBlock().getBlockData().getBlockID());
     } else if (proto.getCmdType() == Type.WriteChunk) {
@@ -516,15 +544,15 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (!blockAlreadyFinalized) {
         Preconditions.checkArgument(write.hasData());
         Preconditions.checkArgument(!write.getData().isEmpty());
-        // Set metadata fields while the write chunk still contains data, then snapshot.
-        protoBuilder.setPipelineID(getGroupId().getUuid().toString())
+        // Strip the chunk data from the WAL entry (logProto); the raw chunk bytes travel
+        // separately in stateMachineData. This is the legacy, cross-version wire format,
+        // so an older follower can consume it and an older leader's entries can be replayed.
+        final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
+            .clearData();
+        protoBuilder.setWriteChunk(commitWriteChunkProto)
+            .setPipelineID(getGroupId().getUuid().toString())
             .setTraceID(proto.getTraceID());
-        // fullProtoWithData: token cleared, pipelineID set, chunk data present — travels in AppendEntries.
-        fullProtoWithData = protoBuilder.build();
-        // Strip data for the WAL entry (logProto).
-        protoBuilder.setWriteChunk(WriteChunkRequestProto.newBuilder(write).clearData());
-        // stateMachineData carries the full proto so followers can parse it directly.
-        builder.setStateMachineData(fullProtoWithData.toByteString());
+        builder.setStateMachineData(write.getData());
       }
     } else if (proto.getCmdType() == Type.FinalizeBlock) {
       containerController.addFinalizedBlock(proto.getContainerID(),
@@ -538,17 +566,20 @@ public class ContainerStateMachine extends BaseStateMachine {
       return transactionContext;
     } else {
       final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
-      // For WriteChunk: fullProtoWithData carries chunk data so write() can dispatch WRITE_DATA.
-      // For PutBlock: carry the proto as stateMachineData so Ratis calls write() on all nodes,
-      //   enabling the RocksDB write to happen pre-quorum on every node (no metadata gap on follower crash).
-      // For all other commands: no state machine data.
-      final ContainerCommandRequestProto requestProtoForContext =
-          fullProtoWithData != null ? fullProtoWithData : proto;
-      if (proto.getCmdType() == Type.PutBlock && !blockAlreadyFinalized) {
+      // PutBlock all-commit semantics: only after the cluster has finalized
+      // RATIS_PUTBLOCK_PRE_QUORUM_WRITE do we attach the proto as stateMachineData. Doing so
+      // makes Ratis invoke write() on every node, persisting block metadata to RocksDB before
+      // the quorum ACK (no metadata gap if a follower crashes after commit but before
+      // applyTransaction). Gating on finalization is the cross-version safety barrier: an
+      // older datanode cannot handle a PutBlock in write(), and finalization only flips to
+      // true once every datanode in the cluster runs a version that can. So no old node ever
+      // receives a PutBlock-with-stateMachineData entry during a rolling upgrade.
+      if (proto.getCmdType() == Type.PutBlock && !blockAlreadyFinalized
+          && VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.RATIS_PUTBLOCK_PRE_QUORUM_WRITE)) {
         builder.setStateMachineData(containerCommandRequestProto.toByteString());
       }
       TransactionContext txnContext = builder
-          .setStateMachineContext(new Context(requestProtoForContext, containerCommandRequestProto))
+          .setStateMachineContext(new Context(proto, containerCommandRequestProto))
           .setLogData(containerCommandRequestProto.toByteString())
           .build();
       metrics.recordStartTransactionCompleteNs(Time.monotonicNowNanos() - startTime);
@@ -609,9 +640,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     Preconditions.checkArgument(!write.getData().isEmpty());
     try {
       if (server.getDivision(getGroupId()).getInfo().isLeader()) {
-        // Cache the full proto bytes so read() can return them for slow followers
-        // without having to reconstruct the proto from raw bytes.
-        stateMachineDataCache.put(entryIndex, requestProto.toByteString());
+        // Cache the raw chunk bytes (legacy format). read() returns these directly and the
+        // follower reconstructs the full proto via setData() in startTransaction().
+        stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {
       Thread.currentThread().interrupt();
@@ -738,6 +769,14 @@ public class ContainerStateMachine extends BaseStateMachine {
       return completeExceptionally(ioe);
     }
 
+    // Record the containerBCSID that exists *before* this pre-quorum write so that truncate()
+    // can restore it if this entry is retracted. container2BCSIDMap holds the last committed
+    // BCSID (or 0 if the container has not been created yet), which is exactly the value to
+    // restore to. This must be captured synchronously here, before the async task runs.
+    final long containerID = requestProto.getContainerID();
+    final long prevBCSID = container2BCSIDMap.getOrDefault(containerID, 0L);
+    putBlockPreWriteBCSIDs.put(entryIndex, new long[]{containerID, prevBCSID});
+
     // Snapshot preceding WriteChunk futures so finishWriteChunks() only runs after chunk bytes are on disk.
     final SortedMap<Long, WriteFutures> preceding = writeChunkFutureMap.headMap(entryIndex, false);
     final CompletableFuture<Void> precedingChunksDone = preceding.isEmpty()
@@ -761,6 +800,19 @@ public class ContainerStateMachine extends BaseStateMachine {
           // Single try-finally ensures writeChunkFutureMap is always cleaned up and
           // raftFuture is always completed regardless of which code path exits.
           try {
+            // Abort-signal from truncate(): truncate() clears putBlockPreWriteBCSIDs for all
+            // indices being retracted *before* waiting for their futures. If our entry is gone,
+            // truncation has preempted this task — skip the RocksDB write entirely so that
+            // truncate()'s BCSID restore is not immediately overwritten by us.
+            if (!putBlockPreWriteBCSIDs.containsKey(entryIndex)) {
+              LOG.debug("{}: PutBlock at logIndex={} was truncated before dispatch; skipping write",
+                  getGroupId(), entryIndex);
+              raftFuture.complete(Message.EMPTY);
+              return ContainerCommandResponseProto.newBuilder()
+                  .setCmdType(ContainerProtos.Type.PutBlock)
+                  .setResult(ContainerProtos.Result.SUCCESS)
+                  .build();
+            }
             try {
               precedingChunksDone.get();
             } catch (InterruptedException e) {
@@ -1015,13 +1067,10 @@ public class ContainerStateMachine extends BaseStateMachine {
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);
 
-    // Return the full proto bytes (not raw chunk bytes) so that followers can
-    // parse stateMachineData directly via parseFrom() without reconstruction.
-    final ContainerCommandRequestProto fullProto = ContainerCommandRequestProto.newBuilder(requestProto)
-        .setWriteChunk(WriteChunkRequestProto.newBuilder(requestProto.getWriteChunk())
-            .setData(data))
-        .build();
-    return fullProto.toByteString();
+    // Return the raw chunk bytes (legacy format). The follower combines these with the
+    // stripped log proto in startTransaction(). This keeps the WriteChunk stateMachineData
+    // wire format identical across versions.
+    return data;
   }
 
   /**
@@ -1137,6 +1186,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastApplied();
     removeStateMachineDataIfNeeded(index);
+    // Committed entries no longer need truncation rollback tracking.
+    putBlockPreWriteBCSIDs.headMap(index + 1).clear();
   }
 
   @Override
@@ -1387,7 +1438,65 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Void> truncate(long index) {
     stateMachineDataCache.removeIf(k -> k > index);
-    return CompletableFuture.completedFuture(null);
+
+    // Collect and atomically remove all pending pre-quorum PutBlock writes that are above the
+    // truncation point. Clearing *before* waiting for in-flight tasks is intentional: it acts
+    // as the abort signal — tasks that have not yet called dispatchCommand() will see their
+    // entry is gone and skip the write, so there is nothing to roll back for them.
+    final Map<Long, long[]> toRollback = new HashMap<>(
+        putBlockPreWriteBCSIDs.tailMap(index + 1));
+    putBlockPreWriteBCSIDs.tailMap(index + 1).clear();
+
+    if (toRollback.isEmpty()) {
+      return CompletableFuture.completedFuture(null);
+    }
+
+    // Wait for any tasks that were already past the abort-signal check (i.e. already in
+    // dispatchCommand()) so that the BCSID restore below is not immediately overwritten.
+    final CompletableFuture<?>[] inFlight = writeChunkFutureMap.tailMap(index + 1)
+        .values().stream()
+        .map(wf -> wf.getRaftFuture().exceptionally(e -> null))
+        .toArray(CompletableFuture[]::new);
+
+    return CompletableFuture.allOf(inFlight).thenRun(() -> {
+      for (long[] entry : toRollback.values()) {
+        restoreContainerBCSID(entry[0], entry[1]);
+      }
+    });
+  }
+
+  /**
+   * Restores the container's {@code blockCommitSequenceId} to {@code prevBCSID} in both RocksDB
+   * and the in-memory structures. Called by {@link #truncate} to undo a pre-quorum PutBlock write
+   * whose Raft log entry has been retracted.
+   *
+   * <p>If the container no longer exists (e.g. it was also rolled back), this is a no-op.
+   */
+  private void restoreContainerBCSID(long containerID, long prevBCSID) {
+    final org.apache.hadoop.ozone.container.common.interfaces.Container<?> container =
+        containerController.getContainer(containerID);
+    if (container == null) {
+      return;
+    }
+    try {
+      final KeyValueContainerData kvData =
+          (KeyValueContainerData) container.getContainerData();
+      try (DBHandle db = BlockUtils.getDB(kvData, conf)) {
+        try (org.apache.hadoop.hdds.utils.db.BatchOperation batch =
+                 db.getStore().getBatchHandler().initBatchOperation()) {
+          db.getStore().getMetadataTable()
+              .putWithBatch(batch, kvData.getBcsIdKey(), prevBCSID);
+          db.getStore().getBatchHandler().commitBatchOperation(batch);
+        }
+      }
+      ((KeyValueContainer) container).updateBlockCommitSequenceId(prevBCSID);
+      container2BCSIDMap.put(containerID, prevBCSID);
+      LOG.debug("{}: truncate rolled back containerBCSID for container {} to {}",
+          getGroupId(), containerID, prevBCSID);
+    } catch (IOException e) {
+      LOG.error("{}: failed to restore containerBCSID for container {} to {} during truncate",
+          getGroupId(), containerID, prevBCSID, e);
+    }
   }
 
   @VisibleForTesting

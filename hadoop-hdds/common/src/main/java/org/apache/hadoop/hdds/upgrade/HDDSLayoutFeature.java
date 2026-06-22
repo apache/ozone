@@ -42,7 +42,10 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
           "for the last chunk of blocks to support HBase.)"),
   WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
-  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
+  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature."),
+  RATIS_PUTBLOCK_PRE_QUORUM_WRITE(11, "PutBlock metadata is persisted before the Ratis quorum via the "
+      + "state machine write() path, so every node that ACKs a log entry has already committed the block "
+      + "metadata (all-commit write semantics for replication writes).");
 
   //////////////////////////////  //////////////////////////////
 
