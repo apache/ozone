@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/pendingDeletion")
 @Produces("application/json")
-@AdminOnly
 public class PendingDeletionEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(PendingDeletionEndpoint.class);
   private final ReconGlobalMetricsService reconGlobalMetricsService;
