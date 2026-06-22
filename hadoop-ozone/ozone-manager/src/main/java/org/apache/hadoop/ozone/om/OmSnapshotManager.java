@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_PURGED_JOB_TABLE_NAME;
@@ -842,7 +841,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Check if fromSnapshot and toSnapshot are equal.
     if (Objects.equals(fromSnapshot, toSnapshot)) {
       SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
-          getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          snapshotDiffManager.getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
           fromSnapshot, toSnapshot, Collections.emptyList(), null);
       return new SnapshotDiffResponse(diffReport, DONE, 0L);
     }
@@ -873,7 +872,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Check if fromSnapshot and toSnapshot are equal.
     if (Objects.equals(fromSnapshot, toSnapshot)) {
       SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
-          getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          snapshotDiffManager.getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
           fromSnapshot, toSnapshot, Collections.emptyList(), null);
       return new SnapshotDiffResponse(diffReport, DONE, 0L);
     }
