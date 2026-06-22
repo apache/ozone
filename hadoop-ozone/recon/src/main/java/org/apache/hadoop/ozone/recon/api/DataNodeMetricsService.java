@@ -119,7 +119,12 @@ public class DataNodeMetricsService {
       return;
     }
     
-
+    // Check rate limit
+    if (System.currentTimeMillis() - lastCollectionEndTime.get() < minimumApiDelayMs) {
+      LOG.debug("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
+      isRunning.set(false);
+      return;
+    }
 
     List<DatanodeInfo> nodes = reconNodeManager.getAllNodes();
     if (nodes.isEmpty()) {
