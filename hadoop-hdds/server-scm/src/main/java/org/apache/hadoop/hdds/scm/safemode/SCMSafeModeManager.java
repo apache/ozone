@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,6 +75,7 @@ import org.slf4j.LoggerFactory;
  * @see RatisContainerSafeModeRule
  * @see ECContainerSafeModeRule
  */
+@ThreadSafe
 public class SCMSafeModeManager implements SafeModeManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(SCMSafeModeManager.class);

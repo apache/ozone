@@ -18,6 +18,7 @@
 **/*.json
 .gitattributes
 .github/*
+.inferconfig
 AGENTS.md
 CLAUDE.md
 CONTRIBUTING.md
