@@ -237,7 +237,7 @@
       <groupId>com.facebook.infer.annotation</groupId>
       <artifactId>infer-annotation</artifactId>
       <version>0.18.0</version>
-      <scope>provided</scope>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

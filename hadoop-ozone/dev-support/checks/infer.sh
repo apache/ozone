@@ -25,21 +25,31 @@ source "${DIR}/_lib.sh"
 source "${DIR}/install/infer.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/infer"}
-mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade --no-transfer-progress'
 
 # Infer runs by wrapping javac during the Maven build to capture and analyze
-# Java sources. We use 'clean compile' to ensure all sources are freshly
-# compiled and captured. --keep-going tells Infer to continue past errors.
-infer run --keep-going -- mvn ${MAVEN_OPTIONS} clean compile "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
+# Java sources. We use 'compile' (not 'clean') to avoid deleting target/,
+# which would wipe the REPORT_DIR. --keep-going tells Infer to continue past
+# compilation errors in individual modules.
+mkdir -p "$REPORT_DIR"
+infer run --keep-going -- mvn ${MAVEN_OPTIONS} compile "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 rc=$?
+
+# Recreate REPORT_DIR after infer run, in case it was deleted (e.g., during
+# a 'clean' phase or interleaved Maven runs).
+mkdir -p "$REPORT_DIR"
 
 # Copy infer output to report directory for artifact upload and reporting
 if [[ -d infer-out ]]; then
   cp -r infer-out/* "${REPORT_DIR}/" 2>/dev/null || true
 fi
+
+# Infer's Maven integration may inject profiles into pom.xml files in
+# profile-governed modules (ozonefs-hadoop2, ozonefs-shaded) and fail to
+# restore them, leaving them corrupted. Restore from git checkout.
+git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 touch "$REPORT_FILE"
 
