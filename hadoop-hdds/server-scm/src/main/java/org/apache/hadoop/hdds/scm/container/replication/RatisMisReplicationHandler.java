@@ -62,7 +62,6 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
-    long containerID = containerInfo.getContainerID();
 
     int commandsSent = 0;
     for (DatanodeDetails target : targetDns) {

@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.GrpcContainerUploader;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
@@ -192,11 +191,6 @@ public class DatanodeStateMachine implements Closeable {
     }
     nextHB = new AtomicLong(Time.monotonicNow());
 
-    ContainerImporter importer = new ContainerImporter(conf,
-        container.getContainerSet(),
-        container.getController(),
-        container.getVolumeSet(),
-        volumeChoosingPolicy);
     ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
         new GrpcContainerUploader(conf, certClient, container.getController())

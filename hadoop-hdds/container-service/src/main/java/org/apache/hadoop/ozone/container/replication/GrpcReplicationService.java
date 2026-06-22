@@ -30,17 +30,11 @@ import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Service to make containers available for replication.
  */
 public class GrpcReplicationService extends
     IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceImplBase {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(GrpcReplicationService.class);
 
   static final int BUFFER_SIZE = 1024 * 1024;
 

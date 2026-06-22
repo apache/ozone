@@ -43,9 +43,6 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
-    // Push replication commands are sent to the source datanode to execute.
-    // The source may be out of service, so allow the command to run regardless.
-    setShouldOnlyRunOnInServiceDatanodes(false);
     debugString = cmd.toString();
   }
 

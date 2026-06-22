@@ -399,15 +399,6 @@ public final class ReplicationSupervisor {
         }
 
         if (context != null) {
-          DatanodeDetails dn = context.getParent().getDatanodeDetails();
-          if (dn != null && dn.getPersistedOpState() !=
-              HddsProtos.NodeOperationalState.IN_SERVICE
-              && task.shouldOnlyRunOnInServiceDatanodes()) {
-            LOG.info("Ignoring {} since datanode is not in service ({})",
-                this, dn.getPersistedOpState());
-            return;
-          }
-
           final OptionalLong currentTerm = context.getTermOfLeaderSCM();
           final long taskTerm = task.getTerm();
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {

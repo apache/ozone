@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -45,7 +44,6 @@ import org.junit.jupiter.api.Test;
  * Test cases to verify {@link ReplicateContainerCommandHandler}.
  */
 public class TestReplicateContainerCommandHandler {
-  private OzoneConfiguration conf;
   private ReplicationSupervisor supervisor;
   private ContainerReplicator pushReplicator;
   private OzoneContainer ozoneContainer;
@@ -54,7 +52,6 @@ public class TestReplicateContainerCommandHandler {
 
   @BeforeEach
   public void setUp() {
-    conf = new OzoneConfiguration();
     supervisor = mock(ReplicationSupervisor.class);
     pushReplicator = mock(ContainerReplicator.class);
     ozoneContainer = mock(OzoneContainer.class);
