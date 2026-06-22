@@ -80,7 +80,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
               </tr>
               <tr>
                 <td>Filesystem Reserved</td>
-                <td><strong>{size(fsReserved)}</strong></td>
+                <td><strong>{size(fsReserved as number)}</strong></td>
               </tr>
             </>
           )}

@@ -172,7 +172,7 @@ const Overview: React.FC<{}> = () => {
     openContainers,
     omServiceId,
     scmServiceId
-  } = clusterState.data;
+  } = clusterState.data ?? {};
   const {
     totalReplicatedDataSize: openSummarytotalRepSize,
     totalUnreplicatedDataSize: openSummarytotalUnrepSize,
@@ -232,10 +232,10 @@ const Overview: React.FC<{}> = () => {
                     <WrappedInfoIcon title={totalCapacityDesc} />
                   </span>
                 ),
-                value: storageReport.capacity,
+                value: storageReport?.capacity ?? 'N/A',
               }, {
                 title: 'OZONE USED SPACE',
-                value: storageReport.used,
+                value: storageReport?.used ?? 'N/A',
                 color: '#f4a233'
               }, {
                 title: (
@@ -245,14 +245,15 @@ const Overview: React.FC<{}> = () => {
                   </span>
                 ),
                 value: (
-                  storageReport.capacity
-                  - storageReport.remaining
-                  - storageReport.used
+                  storageReport ? (
+                    storageReport.capacity
+                    - storageReport.remaining
+                    - storageReport.used) : 0
                 ),
                 color: '#11073a'
               }, {
                 title: 'CONTAINER PRE-ALLOCATED',
-                value: storageReport.committed,
+                value: storageReport?.committed ?? 'N/A',
                 color: '#f47b2d'
               }]}
               error={clusterState.error}

@@ -35,6 +35,7 @@ const defaultProps: DatanodeTableProps = {
   selectedColumns: [
     { label: 'Hostname', value: 'hostname' },
     { label: 'State', value: 'state' },
+    { label: 'Storage Used', value: 'storageUsed' }
   ],
   handleSelectionChange: vi.fn(),
 };
@@ -44,16 +45,16 @@ function getDataWith(name: string, state: "HEALTHY" | "STALE" | "DEAD", uuid: nu
     hostname: name,
     uuid: uuid,
     state: state,
-    opState: 'IN_SERVICE',
     lastHeartbeat: 1728280581608,
     storageReport: {
       capacity: 125645656770,
       used: 4096,
       remaining: 114225606656,
+      reserved: 1256456566,
       committed: 0,
       filesystemCapacity: 150000000000,
       filesystemUsed: 30000000000,
-      filesystemAvailable: 120000000000
+      filesystemAvailable: 120000000000,
     },
     storageUsed: 4096,
     storageTotal: 125645656770,
