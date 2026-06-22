@@ -31,12 +31,13 @@ import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -54,6 +55,7 @@ public final class TracingUtil {
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static SdkTracerProvider sdkTracerProvider;
+  private static BatchSpanProcessor batchSpanProcessor;
 
   private TracingUtil() {
   }
@@ -95,13 +97,35 @@ public final class TracingUtil {
     initTracing(serviceName, tracingConfig);
   }
 
-  private static void shutdownTracing() {
-    if (sdkTracerProvider != null) {
-      sdkTracerProvider.shutdown();
-      sdkTracerProvider = null;
+  /**
+   * Drain the BatchSpanProcessor queue without shutting down.
+   * Call from short-lived CLIs before the JVM exits.
+   */
+  public static synchronized void flushTracing() {
+    if (batchSpanProcessor == null) {
+      return;
     }
-    tracer = OpenTelemetry.noop().getTracer("noop");
-    isInit = false;
+    try {
+      batchSpanProcessor.forceFlush().join(10, TimeUnit.SECONDS);
+    } catch (Exception e) {
+      LOG.warn("Tracing flush: forceFlush failed", e);
+    }
+  }
+
+  private static void shutdownTracing() {
+    if (sdkTracerProvider == null) {
+      return;
+    }
+    try {
+      sdkTracerProvider.shutdown();
+    } catch (Exception e) {
+      LOG.warn("Tracing shutdown failed", e);
+    } finally {
+      sdkTracerProvider = null;
+      batchSpanProcessor = null;
+      tracer = OpenTelemetry.noop().getTracer("noop");
+      isInit = false;
+    }
   }
 
   private static void initialize(String serviceName, TracingConfig tracingConfig) {
@@ -119,7 +143,7 @@ public final class TracingUtil {
         .setEndpoint(otelEndPoint)
         .build();
 
-    SimpleSpanProcessor spanProcessor = SimpleSpanProcessor.builder(spanExporter).build();
+    batchSpanProcessor = BatchSpanProcessor.builder(spanExporter).build();
 
     // Choose sampler based on span sampling config. If it is empty use trace based sampling only.
     // else use custom SpanSampler.
@@ -132,7 +156,7 @@ public final class TracingUtil {
     }
 
     SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
-        .addSpanProcessor(spanProcessor)
+        .addSpanProcessor(batchSpanProcessor)
         .setResource(resource)
         .setSampler(sampler)
         .build();
@@ -145,6 +169,7 @@ public final class TracingUtil {
       sdkTracerProvider = tracerProvider;
     } catch (RuntimeException e) {
       tracerProvider.shutdown();
+      batchSpanProcessor = null;
       throw e;
     }
   }
