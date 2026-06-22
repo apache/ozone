@@ -18,7 +18,7 @@
 
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { http, HttpResponse } from "msw";
+import { http, HttpResponse } from 'msw';
 
 import Capacity from '@/v2/pages/capacity/capacity';
 import { capacityServer } from '@tests/mocks/capacityMocks/capacityServer';

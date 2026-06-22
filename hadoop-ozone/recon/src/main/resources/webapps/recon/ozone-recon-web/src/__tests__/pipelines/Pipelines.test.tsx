@@ -43,8 +43,8 @@ vi.mock('@/v2/components/select/multiSelect.tsx', () => ({
   ),
 }));
 
-vi.mock("@/v2/hooks/useAPIData.hook", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/v2/hooks/useAPIData.hook")>();
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
     useApiData: <T,>(url: string, defaultValue: T, options = {}) =>

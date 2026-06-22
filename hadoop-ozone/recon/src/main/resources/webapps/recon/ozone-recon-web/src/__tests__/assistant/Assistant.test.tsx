@@ -36,8 +36,8 @@ import {
   mockChatDelayed
 } from '@tests/mocks/assistantMocks/assistantServer';
 import Assistant from '@/v2/pages/assistant/assistant';
-import { vi } from "vitest";
-import { RECON_LOGS_HINT } from "@/v2/constants/chatbot.constants";
+import { vi } from 'vitest';
+import { RECON_LOGS_HINT } from '@/v2/constants/chatbot.constants';
 
 const WrappedAssistantComponent = () => {
   return (
@@ -47,8 +47,8 @@ const WrappedAssistantComponent = () => {
   )
 }
 
-vi.mock("@/v2/hooks/useAPIData.hook", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/v2/hooks/useAPIData.hook")>();
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
     useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
@@ -237,7 +237,6 @@ describe('Assistant Tests', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome to Recon AI')).toBeVisible();
     });
-
 
     await userEvent.click(screen.getByText('Default Provider'));
     await userEvent.click(screen.getByText('Anthropic Claude'));

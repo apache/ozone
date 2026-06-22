@@ -17,7 +17,7 @@
  */
 
 import { setupServer } from 'msw/node';
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http } from 'msw';
 
 import * as mockResponses from './capacityResponseMocks';
 

@@ -27,12 +27,12 @@ import { BrowserRouter } from 'react-router-dom';
  * and leave it for after all the tests run - saving test time
  */
 import '@testing-library/react/dont-cleanup-after-each';
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from '@testing-library/react';
 
 import { overviewLocators } from '@tests/locators/locators';
 import { faultyOverviewServer, overviewServer } from '@tests/mocks/overviewMocks/overviewServer';
 import Overview from '@/v2/pages/overview/overview';
-import { vi } from "vitest";
+import { vi } from 'vitest';
 
 const WrappedOverviewComponent = () => {
   return (

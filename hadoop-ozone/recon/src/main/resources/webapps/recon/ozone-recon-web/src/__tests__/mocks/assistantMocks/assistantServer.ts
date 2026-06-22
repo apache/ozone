@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { delay, http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
@@ -42,25 +42,25 @@ export const mockHealthNotConfigured = http.get(CHATBOT_ENDPOINTS.HEALTH, () => 
 
 export const mockModels = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
   return HttpResponse.json({
-    models: ["gpt-4.1-nano", "gemini-2.5-flash", "gemini-2.5-pro", "claude-opus-4-6"],
+    models: ['gpt-4.1-nano', 'gemini-2.5-flash', 'gemini-2.5-pro', 'claude-opus-4-6'],
   });
 });
 
 export const mockModelsError = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
   return HttpResponse.json({
-    error: "Failed to fetch models",
+    error: 'Failed to fetch models',
   }, { status: 500 });
 });
 
 export const mockModelsDisabled = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
   return HttpResponse.json({
-    error: "Chatbot service is not enabled",
+    error: 'Chatbot service is not enabled',
   }, { status: 503 });
 });
 
 export const mockChatSuccess = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    response: "This is a **Markdown** response with a table:\n\n| Col 1 | Col 2 |\n|---|---|\n| A | B |",
+    response: 'This is a **Markdown** response with a table:\n\n| Col 1 | Col 2 |\n|---|---|\n| A | B |',
     success: true,
   });
 });
@@ -68,44 +68,44 @@ export const mockChatSuccess = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
 export const mockChatDelayed = http.post(CHATBOT_ENDPOINTS.CHAT, async () => {
   await delay(100);
   return HttpResponse.json({
-    response: "Delayed",
+    response: 'Delayed',
     success: true,
   }, { status: 200 });
 });
 
 export const mockChatBusy = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "The chatbot is currently handling too many requests. Please try again in a moment."
+    error: 'The chatbot is currently handling too many requests. Please try again in a moment.'
   }, { status: 503 });
 });
 
 export const mockChatTimeout = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "The chatbot request timed out. The LLM or Recon API took too long to respond. Please try again or use a different model.",
+    error: 'The chatbot request timed out. The LLM or Recon API took too long to respond. Please try again or use a different model.',
   }, { status: 504 });
 });
 
 export const mockChatError = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "An error occurred processing your request.",
+    error: 'An error occurred processing your request.',
   }, { status: 500 });
 });
 
 export const mockChatDisabled = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "Chatbot service is not enabled",
+    error: 'Chatbot service is not enabled',
   }, { status: 503 });
 });
 
 export const mockChatInterrupted = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "Request was interrupted. Please try again.",
+    error: 'Request was interrupted. Please try again.',
   }, { status: 503 });
 });
 
 export const mockChatEmpty = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
   return HttpResponse.json({
-    error: "Query cannot be empty",
+    error: 'Query cannot be empty',
   }, { status: 400 });
 });
 
