@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,9 +49,6 @@ public class TestStatusSubCommand {
   @BeforeEach
   public void setup() throws IOException {
     omClient = mock(OzoneManagerProtocol.class);
-
-    // Mock close() to do nothing - needed for try-with-resources
-    doNothing().when(omClient).close();
 
     cmd = new StatusSubCommand() {
       @Override
