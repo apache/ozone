@@ -124,6 +124,12 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       }
       bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes());
       bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace());
+      if (bucketCountInfo.hasDiffSnapshotUsedBytes()) {
+        bucketInfo.incrSnapshotUsedBytes(bucketCountInfo.getDiffSnapshotUsedBytes());
+      }
+      if (bucketCountInfo.hasDiffSnapshotUsedNamespace()) {
+        bucketInfo.incrSnapshotUsedNamespace(bucketCountInfo.getDiffSnapshotUsedNamespace());
+      }
       if (bucketCountInfo.getSupportOldQuota()) {
         OmBucketInfo.Builder builder = bucketInfo.toBuilder();
         if (bucketInfo.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
