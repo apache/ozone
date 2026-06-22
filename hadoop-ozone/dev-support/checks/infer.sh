@@ -34,7 +34,7 @@ MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=tru
 # which would wipe the REPORT_DIR. --keep-going tells Infer to continue past
 # compilation errors in individual modules.
 mkdir -p "$REPORT_DIR"
-infer run --keep-going -- mvn ${MAVEN_OPTIONS} compile "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
+infer run --keep-going -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 rc=$?
 
 # Recreate REPORT_DIR after infer run, in case it was deleted (e.g., during
