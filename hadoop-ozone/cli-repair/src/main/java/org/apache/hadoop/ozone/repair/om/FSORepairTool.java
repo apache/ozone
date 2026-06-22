@@ -585,6 +585,7 @@ public class FSORepairTool extends RepairTool {
       public void close() throws IOException {
         if (pending > 0) {
           tempDB.commitBatchOperation(batch);
+          pending = 0;
         }
         batch.close();
       }
