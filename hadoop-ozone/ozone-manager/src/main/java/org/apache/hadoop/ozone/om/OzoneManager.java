@@ -309,6 +309,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QueryUpgradeStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
@@ -3646,6 +3647,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Server-side stub; the real implementation is handled via the Ratis request path through
     // OMStartFinalizeUpgradeRequest
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
+    HddsProtos.UpgradeStatus scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+
+    return QueryUpgradeStatusResponse.newBuilder()
+        .setOmFinalized(!versionManager.needsFinalization())
+        .setHddsStatus(scmStatus)
+        .build();
   }
 
   @Override

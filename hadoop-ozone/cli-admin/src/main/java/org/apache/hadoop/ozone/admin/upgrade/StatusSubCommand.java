@@ -17,32 +17,46 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
-import java.io.IOException;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import picocli.CommandLine;
 
 /**
  * Sub command to query the overall upgrade status of the cluster, returning information about the finalization
- * status of SCM, the datanodes and OM.
+ * status of SCM, the datanodes and OM. The command makes a single call to OM which returns the status of the other
+ * components as well as itself.
  */
 @CommandLine.Command(
     name = "status",
     description = "Show status of the cluster upgrade",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class StatusSubCommand extends ScmSubcommand {
+public class StatusSubCommand extends AbstractSubcommand implements Callable<Integer> {
+
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @Override
-  public void execute(ScmClient client) throws IOException {
-    HddsProtos.UpgradeStatus status = client.queryUpgradeStatus();
+  public Integer call() throws Exception {
+    try (OzoneManagerProtocol client = getClient()) {
+      OzoneManagerProtocolProtos.QueryUpgradeStatusResponse status = client.queryUpgradeStatus();
 
-    out().println("Upgrade status:");
-    out().println("    SCM Finalized: " + status.getScmFinalized());
-    out().println("    Datanodes finalized: " + status.getNumDatanodesFinalized());
-    out().println("    Total Datanodes: " + status.getNumDatanodesTotal());
-    out().println("    Should Finalize: " + status.getShouldFinalize());
+      out().println("Upgrade status:");
+      out().println("    OM Finalized: " + status.getOmFinalized());
+      out().println("    SCM Finalized: " + status.getHddsStatus().getScmFinalized());
+      out().println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized());
+      out().println("    Total Datanodes: " + status.getHddsStatus().getNumDatanodesTotal());
+      out().println("    Should Finalize: " + status.getHddsStatus().getShouldFinalize());
+    }
+    return 0;
   }
+
+  protected OzoneManagerProtocol getClient() throws Exception {
+    return omAddressOptions.newClient();
+  }
+
 }

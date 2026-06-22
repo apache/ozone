@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.admin.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,10 +26,10 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,11 +44,22 @@ public class TestStatusSubCommand {
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
+  private OzoneManagerProtocol omClient;
   private StatusSubCommand cmd;
 
   @BeforeEach
-  public void setup() throws UnsupportedEncodingException {
-    cmd = new StatusSubCommand();
+  public void setup() throws IOException {
+    omClient = mock(OzoneManagerProtocol.class);
+
+    // Mock close() to do nothing - needed for try-with-resources
+    doNothing().when(omClient).close();
+
+    cmd = new StatusSubCommand() {
+      @Override
+      protected OzoneManagerProtocol getClient() throws Exception {
+        return omClient;
+      }
+    };
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
   }
 
@@ -57,25 +69,31 @@ public class TestStatusSubCommand {
   }
 
   @Test
-  public void testStatusCommandPrintsUpgradeStatus() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-    HddsProtos.UpgradeStatus status = HddsProtos.UpgradeStatus.newBuilder()
+  public void testStatusCommandPrintsUpgradeStatus() throws Exception {
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(false)
         .setNumDatanodesFinalized(1)
         .setNumDatanodesTotal(3)
         .setShouldFinalize(true)
         .build();
-    when(scmClient.queryUpgradeStatus()).thenReturn(status);
 
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalized(false)
+            .setHddsStatus(hddsStatus)
+            .build();
+
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
     new CommandLine(cmd).parseArgs();
-    cmd.execute(scmClient);
+    cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Upgrade status:"));
+    assertTrue(output.contains("OM Finalized: false"));
     assertTrue(output.contains("SCM Finalized: false"));
     assertTrue(output.contains("Datanodes finalized: 1"));
     assertTrue(output.contains("Total Datanodes: 3"));
     assertTrue(output.contains("Should Finalize: true"));
-    verify(scmClient).queryUpgradeStatus();
+    verify(omClient).queryUpgradeStatus();
   }
 }

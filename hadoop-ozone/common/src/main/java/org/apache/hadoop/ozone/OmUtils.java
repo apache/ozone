@@ -261,6 +261,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case QueryUpgradeStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -455,6 +456,7 @@ public final class OmUtils {
       // Quota repair lifecycle request should be initiated by the leader
     case DBUpdates: // We are currently only interested on the leader DB info
     case UnknownCommand:
+    case QueryUpgradeStatus:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();

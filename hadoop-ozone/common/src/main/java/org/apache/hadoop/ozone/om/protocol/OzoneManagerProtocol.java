@@ -508,6 +508,14 @@ public interface OzoneManagerProtocol
   void finalizeUpgrade() throws IOException;
 
   /**
+   * Returns the upgrade status of the cluster. This call is received by OM which will in turn query SCM to get the
+   * status of it and the datanodes, and return the combined status to the caller.
+   * @return QueryUpgradeStatusResponse containing details of the overall cluster state
+   * @throws IOException If any error occurs.
+   */
+  OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException;
+
+  /**
    * Queries the current status of finalization.
    * This method when called, returns the status messages from the finalization
    * progress, if any. The status returned is
