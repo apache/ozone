@@ -329,15 +329,15 @@ public class DataNodeMetricsService {
 
   private static String buildProgressMessage(MetricCollectionStatus status, String failedMessage) {
     switch (status) {
-    case IN_PROGRESS:
-      return "Metrics collection task is currently running. Please wait for task to finish.";
-    case FAILED:
-      return failedMessage;
-    case NOT_STARTED:
-      return "Metrics collection task has not started yet. Please retry shortly.";
-    default:
-      return "Metrics collection task is not complete yet. Please retry shortly.";
-    }
+      case IN_PROGRESS:
+        return "Metrics collection task is currently running. Please wait for task to finish.";
+      case FAILED:
+        return failedMessage;
+      case NOT_STARTED:
+        return "Metrics collection task has not started yet. Please retry shortly.";
+      default:
+        return "Metrics collection task is not complete yet. Please retry shortly.";
+      }
   }
 
   @PreDestroy

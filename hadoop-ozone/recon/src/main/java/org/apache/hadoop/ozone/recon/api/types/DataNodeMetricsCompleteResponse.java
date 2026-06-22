@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
@@ -27,7 +26,6 @@ import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
  * Response returned when metrics collection is complete.
  * Includes the metric payload fields.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DataNodeMetricsCompleteResponse {
 
   @JsonProperty("status")
