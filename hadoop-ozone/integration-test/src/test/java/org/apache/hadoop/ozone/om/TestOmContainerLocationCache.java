@@ -835,35 +835,49 @@ public class TestOmContainerLocationCache {
                              byte[] data,
                              Exception exception,
                              Result errorCode) throws Exception {
-    final CompletableFuture<ContainerCommandResponseProto> response;
-    if (exception != null) {
-      response = new CompletableFuture<>();
-      response.completeExceptionally(exception);
-    } else if (errorCode != null) {
-      ContainerCommandResponseProto readChunkResp =
-          ContainerCommandResponseProto.newBuilder()
-              .setResult(errorCode)
-              .setCmdType(Type.ReadChunk)
-              .build();
-      response = completedFuture(readChunkResp);
+    final ContainerCommandResponseProto response;
+    if (errorCode != null) {
+      response = ContainerCommandResponseProto.newBuilder()
+          .setResult(errorCode)
+          .setCmdType(Type.ReadChunk)
+          .build();
+    } else if (data != null) {
+      response = ContainerCommandResponseProto.newBuilder()
+          .setReadChunk(ReadChunkResponseProto.newBuilder()
+              .setBlockID(createBlockId(containerId, localId))
+              .setChunkData(createChunkInfo(data))
+              .setData(ByteString.copyFrom(data))
+              .build()
+          )
+          .setResult(Result.SUCCESS)
+          .setCmdType(Type.ReadChunk)
+          .build();
     } else {
-      ContainerCommandResponseProto readChunkResp =
-          ContainerCommandResponseProto.newBuilder()
-              .setReadChunk(ReadChunkResponseProto.newBuilder()
-                  .setBlockID(createBlockId(containerId, localId))
-                  .setChunkData(createChunkInfo(data))
-                  .setData(ByteString.copyFrom(data))
-                  .build()
-              )
-              .setResult(Result.SUCCESS)
-              .setCmdType(Type.ReadChunk)
-              .build();
-      response = completedFuture(readChunkResp);
+      response = null;
     }
 
-    doAnswer(invocation -> new XceiverClientReply(response))
-        .when(mockDnProtocol)
-        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any());
+    doAnswer(invocation -> {
+      if (exception != null) {
+        ExecutionException executionException = new ExecutionException(
+            exception);
+        if (Status.fromThrowable(exception).getCode()
+            == Status.UNAUTHENTICATED.getCode()) {
+          throw new SCMSecurityException("Failed to authenticate with "
+              + "GRPC XceiverServer with Ozone block token.");
+        }
+        throw new IOException(executionException);
+      }
+
+      ContainerCommandRequestProto request = invocation.getArgument(0);
+      List<XceiverClientSpi.Validator> validators = invocation.getArgument(1);
+      if (validators != null) {
+        for (XceiverClientSpi.Validator validator : validators) {
+          validator.accept(request, response);
+        }
+      }
+      return response;
+    }).when(mockDnProtocol)
+        .sendCommandWithZeroCopy(argThat(matchCmd(Type.ReadChunk)), any());
 
   }
 

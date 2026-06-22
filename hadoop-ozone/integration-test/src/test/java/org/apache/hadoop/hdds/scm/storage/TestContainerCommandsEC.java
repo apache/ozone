@@ -165,6 +165,11 @@ public class TestContainerCommandsEC {
   private static OzoneBucket classBucket;
   private static ReplicationConfig repConfig;
 
+  private enum ReadChunkPath {
+    LEGACY,
+    ZERO_COPY
+  }
+
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
@@ -243,6 +248,10 @@ public class TestContainerCommandsEC {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  private static Stream<ReadChunkPath> readChunkPaths() {
+    return Stream.of(ReadChunkPath.values());
   }
 
   @Test
@@ -443,8 +452,10 @@ public class TestContainerCommandsEC {
     }
   }
 
-  @Test
-  public void testCreateRecoveryContainer() throws Exception {
+  @ParameterizedTest(name = "readChunkPath={0}")
+  @MethodSource("readChunkPaths")
+  public void testCreateRecoveryContainer(ReadChunkPath readChunkPath)
+      throws Exception {
     try (XceiverClientManager xceiverClientManager =
         new XceiverClientManager(config)) {
       ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
@@ -514,20 +525,46 @@ public class TestContainerCommandsEC {
                 container.containerID().getProtobuf().getId(), encodedToken);
         assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
             readContainerResponseProto.getContainerData().getState());
-        ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
-            ContainerProtocolCalls.readChunk(dnClient,
-                writeChunkRequest.getWriteChunk().getChunkData(),
-                blockID.getDatanodeBlockIDProtobufBuilder().setReplicaIndex(replicaIndex).build(), null,
-                blockToken);
-        ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
-            .getReadOnlyByteBuffersArray(
-                readChunkResponseProto.getDataBuffers().getBuffersList());
-        assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
-        byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
-        readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
-        assertArrayEquals(data, readBuff);
+        ContainerProtos.DatanodeBlockID readBlockID =
+            blockID.getDatanodeBlockIDProtobufBuilder()
+                .setReplicaIndex(replicaIndex)
+                .build();
+        assertReadChunkData(readChunkPath, dnClient,
+            writeChunkRequest.getWriteChunk().getChunkData(),
+            readBlockID, blockToken, data);
       } finally {
         xceiverClientManager.releaseClient(dnClient, false);
+      }
+    }
+  }
+
+  private void assertReadChunkData(ReadChunkPath readChunkPath,
+      XceiverClientSpi dnClient, ContainerProtos.ChunkInfo chunkInfo,
+      ContainerProtos.DatanodeBlockID blockID,
+      Token<? extends TokenIdentifier> blockToken, byte[] expectedData)
+      throws IOException {
+    ContainerProtos.ContainerCommandResponseProto readChunkReply = null;
+    ContainerProtos.ReadChunkResponseProto readChunkResponseProto;
+    if (readChunkPath == ReadChunkPath.ZERO_COPY) {
+      readChunkReply = ContainerProtocolCalls.readChunkForZeroCopy(dnClient,
+          chunkInfo, blockID, null, blockToken);
+      readChunkResponseProto = readChunkReply.getReadChunk();
+    } else {
+      readChunkResponseProto = ContainerProtocolCalls.readChunk(dnClient,
+          chunkInfo, blockID, null, blockToken);
+    }
+
+    try {
+      ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
+          .getReadOnlyByteBuffersArray(
+              readChunkResponseProto.getDataBuffers().getBuffersList());
+      assertEquals(readOnlyByteBuffersArray[0].limit(), expectedData.length);
+      byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
+      readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
+      assertArrayEquals(expectedData, readBuff);
+    } finally {
+      if (readChunkReply != null) {
+        dnClient.releaseReceivedResponse(readChunkReply);
       }
     }
   }
