@@ -21,6 +21,7 @@ import static java.util.UUID.randomUUID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -59,6 +60,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -566,6 +569,42 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
 
       objectStore.listVolumes("");
       long currentLocalLeaseSuccess = ozoneManager.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+      assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess);
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
+  }
+
+  @Test
+  void testGrpcClientFollowerReadTargetsFollower() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "LOCAL_LEASE");
+    clientConf.set(OZONE_OM_TRANSPORT_CLASS, GrpcOmTransportFactory.class.getName());
+
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      GrpcOmTransport grpcOmTransport = OmTestUtil.getGrpcOmTransport(objectStore);
+
+      String leaderOMNodeId = getCluster().getOMLeader().getOMNodeId();
+      OzoneManager followerOM = null;
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        if (!om.getOMNodeId().equals(leaderOMNodeId)) {
+          followerOM = om;
+          break;
+        }
+      }
+      assertNotNull(followerOM);
+
+      grpcOmTransport.changeLeaderProxyForTest(leaderOMNodeId);
+      grpcOmTransport.changeFollowerReadInitialProxy(followerOM.getOMNodeId());
+      long previousLocalLeaseSuccess = followerOM.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+
+      objectStore.listVolumes("");
+
+      long currentLocalLeaseSuccess = followerOM.getMetrics().getNumFollowerReadLocalLeaseSuccess();
       assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess);
     } finally {
       IOUtils.closeQuietly(ozoneClient);
