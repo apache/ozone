@@ -41,11 +41,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.UnsafeByteOperations;
 import jakarta.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -55,6 +53,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -63,10 +62,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -79,9 +74,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -250,7 +242,7 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void stalledDownload() {
+  public void stalledReplication() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> noopReplicator,
         new DiscardingExecutorService());
@@ -280,7 +272,7 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void slowDownload() {
+  public void slowReplication() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> slowReplicator,
         new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
@@ -305,6 +297,44 @@ public class TestReplicationSupervisor {
     } finally {
       supervisor.stop();
     }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testPushReplicatorTargetReturnsError(ContainerLayoutVersion layout) throws IOException {
+    this.layoutVersion = layout;
+    // GIVEN a real PushReplicator wired to an uploader whose remote side rejects the push
+    // (e.g. the target datanode reports it has no space to import the container).
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    ContainerReplicationSource source = mock(ContainerReplicationSource.class);
+    ContainerUploader uploader = mock(ContainerUploader.class);
+    // Have the uploader's startUpload immediately complete the future exceptionally,
+    // simulating the target returning an error before any data is transferred.
+    when(uploader.startUpload(anyLong(), any(), any(), any()))
+        .thenAnswer(invocation -> {
+          CompletableFuture<Void> fut = invocation.getArgument(2);
+          fut.completeExceptionally(
+              new IOException("No space left on target datanode"));
+          return new ByteArrayOutputStream();
+        });
+
+    replicatorRef.set(new PushReplicator(conf, source, uploader));
+
+    // WHEN
+    ReplicationTask task = createTask(1L);
+    supervisor.addTask(task);
+
+    // THEN the supervisor records a clean failure.
+    assertEquals(1, supervisor.getReplicationRequestCount());
+    assertEquals(0, supervisor.getReplicationSuccessCount());
+    assertEquals(1, supervisor.getReplicationFailureCount());
+    assertEquals(0, supervisor.getTotalInFlightReplications());
+    assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
   }
 
   @ContainerLayoutTestInfo.ContainerTest
