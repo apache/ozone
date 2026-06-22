@@ -375,11 +375,6 @@ public class TestOzoneContainerWithTLS {
     return id;
   }
 
-  private void letCertExpire() throws Exception {
-    Date expiry = caClient.getCertificate().getNotAfter();
-    waitFor(() -> expiry.before(new Date()), 100, CERT_LIFETIME * 1000);
-  }
-
   private void letCACertExpire() throws Exception {
     Date expiry = caClient.getCACertificate().getNotAfter();
     waitFor(() -> expiry.before(new Date()), 100, ROOT_CERT_LIFE_TIME * 1000);
