@@ -75,7 +75,7 @@ public class DataNodeMetricsService {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
-  private String failedMessage = "Metrics collection task failed. Please retry after some time.";
+  private volatile String failedMessage = "Metrics collection task failed. Please retry after some time.";
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
@@ -337,7 +337,7 @@ public class DataNodeMetricsService {
         return "Metrics collection task has not started yet. Please retry shortly.";
       default:
         return "Metrics collection task is not complete yet. Please retry shortly.";
-      }
+    }
   }
 
   @PreDestroy
