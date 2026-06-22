@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.admin.upgrade;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import picocli.CommandLine;
@@ -43,6 +45,12 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
   @Override
   public Integer call() throws Exception {
     try (OzoneManagerProtocol client = getClient()) {
+      OzoneManagerVersion omVersion = RpcClient.getOmVersion(client.getServiceInfo());
+      if (!OzoneManagerVersion.ZDU.isSupportedBy(omVersion)) {
+        err().println("OM does not support ZDU. The cluster upgrade status should be queried with the pre ZDU " +
+            "commands, eg `ozone admin scm finalizationstatus` and `ozone admin om finalizationstatus`");
+        return 1;
+      }
       OzoneManagerProtocolProtos.QueryUpgradeStatusResponse status = client.queryUpgradeStatus();
 
       out().println("Upgrade status:");
