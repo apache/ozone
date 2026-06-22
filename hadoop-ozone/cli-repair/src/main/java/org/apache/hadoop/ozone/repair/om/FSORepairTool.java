@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.repair.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
-import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -89,18 +88,6 @@ public class FSORepairTool extends RepairTool {
   private static final String REACHABLE_TABLE = "reachable";
   private static final String PENDING_TO_DELETE_TABLE = "pendingToDelete";
 
-  private static int tempDbBatchSize = 10_000;
-
-  @VisibleForTesting
-  static void setTempDbBatchSize(int batchSize) {
-    tempDbBatchSize = batchSize;
-  }
-
-  @VisibleForTesting
-  static int getTempDbBatchSize() {
-    return tempDbBatchSize;
-  }
-
   @CommandLine.Option(names = {"--db"},
       required = true,
       description = "Path to OM RocksDB")
@@ -113,6 +100,11 @@ public class FSORepairTool extends RepairTool {
   @CommandLine.Option(names = {"-b", "--bucket"},
       description = "Filter by bucket name")
   private String bucketFilter;
+
+  @CommandLine.Option(names = {"--batch-size"},
+      defaultValue = "10000",
+      description = "Number of entries to buffer before flushing a batch of writes to temp.db.")
+  private int tempDbBatchSize;
 
   @Nonnull
   @Override

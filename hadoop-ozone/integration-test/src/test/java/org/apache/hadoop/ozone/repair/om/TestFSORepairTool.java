@@ -206,19 +206,13 @@ public class TestFSORepairTool {
   @Order(ORDER_DRY_RUN)
   @Test
   public void testBatchedTempWrites() {
-    int originalBatchSize = FSORepairTool.getTempDbBatchSize();
-    FSORepairTool.setTempDbBatchSize(1);
-    try {
-      String expectedOutput = serializeReport(fullReport);
+    String expectedOutput = serializeReport(fullReport);
 
-      int exitCode = dryRun();
-      assertEquals(0, exitCode, err.getOutput());
+    int exitCode = dryRun("--batch-size", "1");
+    assertEquals(0, exitCode, err.getOutput());
 
-      String reportOutput = extractRelevantSection(out.getOutput());
-      assertEquals(expectedOutput, reportOutput);
-    } finally {
-      FSORepairTool.setTempDbBatchSize(originalBatchSize);
-    }
+    String reportOutput = extractRelevantSection(out.getOutput());
+    assertEquals(expectedOutput, reportOutput);
   }
 
   /**
