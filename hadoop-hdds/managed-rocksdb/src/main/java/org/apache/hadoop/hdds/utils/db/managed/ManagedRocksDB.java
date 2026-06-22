@@ -31,6 +31,7 @@ import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +74,83 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     return new ManagedRocksDB(
         RocksDB.openReadOnly(path, columnFamilyDescriptors, columnFamilyHandles)
     );
+  }
+
+  /**
+   * Opens a RocksDB at {@code dbPath} as a <b>secondary</b> instance.
+   * It is safe to use a secondary instance while a primary writer
+   * is active on the same DB.
+   *
+   * <p>Secondary mode is RocksDB's supported way to attach an extra reader
+   * to a DB that has a live primary writer. If a DB is simultaneously opened
+   * by with the primary writer and as a read-only instance,
+   * it has <i>undefined</i> behavior. It often succeeds if the read-only instance
+   * closes quickly, but the contract is unsafe.
+   *
+   * <p><b>Catch-up semantics.</b> A secondary's view does not auto-refresh; it
+   * stays at the snapshot captured at open time. The only way to advance it
+   * is to call {@code tryCatchUpWithPrimary()}, a user-triggered operation
+   * that rebuilds the in-memory memtable from new MANIFEST / WAL entries and
+   * never writes anything to disk.
+   *
+   * <p><b>The secondary log directory.</b> Secondary mode requires its own
+   * directory at {@code secondaryDbLogFilePath} for the RocksDB info
+   * {@code LOG} file. That directory is used <i>only</i> for log files. No
+   * important data lives there. The previous {@code LOG} file is rotated to
+   * {@code LOG.old.<ts>} on each subsequent open, so callers that reopen the
+   * secondary repeatedly should periodically clean these up. Note that the
+   * open will <b>fail</b> if the {@code LOG} cannot be created or written
+   * (directory missing, not writable, or out of space).
+   *
+   * @param options                DB options for the secondary instance.
+   * @param dbPath                 path to the primary DB.
+   * @param secondaryDbLogFilePath directory for the secondary's info log
+   *                               files; must be writable and on a
+   *                               filesystem with at least a small amount
+   *                               of free space.
+   * @return an open secondary {@link ManagedRocksDB}.
+   * @throws RocksDBException if the underlying native open fails for any
+   *                          reason, including an unwritable / full
+   *                          {@code secondaryDbLogFilePath}.
+   */
+  public static ManagedRocksDB openAsSecondary(
+      final ManagedOptions options,
+      final String dbPath,
+      final String secondaryDbLogFilePath)
+      throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.openAsSecondary(options, dbPath, secondaryDbLogFilePath));
+  }
+
+  /**
+   * True iff the throwable (or any cause in its chain) is a
+   * {@link RocksDBException} whose status is {@code IOError(NoSpace)}.
+   * RocksDB sets that subcode specifically when the underlying syscall
+   * returns {@code ENOSPC}, so this is a precise signal that the failed
+   * operation hit a full disk — distinct from {@code IOError} causes such
+   * as permission denied, missing path, or DB corruption.
+   *
+   * <p>Callers wanting to consult the {@link Status} on a
+   * {@link RocksDBException} from outside this module would otherwise have
+   * to import {@code org.rocksdb.Status} directly, which is restricted by
+   * the project's {@code banned-rocksdb-imports} enforcer rule. Use this
+   * helper instead.
+   *
+   * @param t the throwable to inspect; the entire cause chain is walked.
+   * @return {@code true} iff a {@code RocksDBException} with status
+   * {@code IOError(NoSpace)} is found.
+   */
+  public static boolean isNoSpaceFailure(Throwable t) {
+    for (Throwable cur = t; cur != null; cur = cur.getCause()) {
+      if (cur instanceof RocksDBException) {
+        Status status = ((RocksDBException) cur).getStatus();
+        if (status != null
+            && status.getCode() == Status.Code.IOError
+            && status.getSubCode() == Status.SubCode.NoSpace) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   public static ManagedRocksDB open(

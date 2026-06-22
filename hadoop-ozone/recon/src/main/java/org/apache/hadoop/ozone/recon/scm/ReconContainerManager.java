@@ -201,6 +201,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   void transitionOpenToClosing(ContainerID containerID, ContainerInfo containerInfo)
       throws IOException, InvalidStateTransitionException {
     PipelineID pipelineID = containerInfo.getPipelineID();
+    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
     if (pipelineID != null) {
       int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
       if (curCnt == 1) {
@@ -209,12 +210,20 @@ public class ReconContainerManager extends ContainerManagerImpl {
         pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
     }
-    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
   }
 
   /**
-   * Check if an OPEN container should move to CLOSING based on a healthy
-   * non-OPEN DN replica report.
+   * Check if Recon's container lifecycle state needs the Recon-specific
+   * pre-processing required before SCM's shared report handler processes the
+   * replica.
+   *
+   * <p>Recon only handles OPEN to CLOSING here to keep the per-pipeline open
+   * container count accurate. All other known-container lifecycle transitions
+   * are left to SCM's common ICR/FCR state machine, which is invoked after this
+   * method by Recon's report handlers.
+   *
+   * @param containerID containerID to check
+   * @param replicaState replica state reported by a DataNode
    */
   private void checkContainerStateAndUpdate(ContainerID containerID,
                                             ContainerReplicaProto.State replicaState)
@@ -222,15 +231,12 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = getContainer(containerID);
     HddsProtos.LifeCycleState reconState = containerInfo.getState();
 
-    if (reconState != HddsProtos.LifeCycleState.OPEN
-        || replicaState == ContainerReplicaProto.State.OPEN
-        || !isHealthy(replicaState)) {
-      return;
+    if (reconState == HddsProtos.LifeCycleState.OPEN
+        && replicaState != ContainerReplicaProto.State.OPEN && isHealthy(replicaState)) {
+      LOG.info("Container {} has state OPEN, but given state is {}.",
+          containerID, replicaState);
+      transitionOpenToClosing(containerID, containerInfo);
     }
-
-    LOG.info("Container {} is OPEN in Recon but DN reports replica state {}. "
-        + "Moving to CLOSING.", containerID, replicaState);
-    transitionOpenToClosing(containerID, containerInfo);
   }
 
   private boolean isHealthy(ContainerReplicaProto.State replicaState) {

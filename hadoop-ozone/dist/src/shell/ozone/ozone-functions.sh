@@ -48,14 +48,14 @@ function ozone_debug
 ## @replaceable yes
 function ozone_validate_classpath_usage
 {
-  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
+  description=$'The --validate flag checks that all jars required for the command are present on the classpath\n\n'
   usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
   options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
   ozone_error "${description}${usage_text}${options}"
   exit 1
 }
 
-## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
+## @description Validates that all jars required for the command are present on the classpath
 ## @audience private
 ## @stability evolving
 ## @replaceable yes
@@ -890,6 +890,8 @@ function ozone_basic_init
   OZONE_PID_DIR=${OZONE_PID_DIR:-/tmp}
   OZONE_ROOT_LOGGER=${OZONE_ROOT_LOGGER:-${OZONE_LOGLEVEL},console}
   OZONE_DAEMON_ROOT_LOGGER=${OZONE_DAEMON_ROOT_LOGGER:-${OZONE_LOGLEVEL},RFA}
+  OZONE_HTTP_REQUEST_LOGGER=${OZONE_HTTP_REQUEST_LOGGER:-INFO,console}
+  OZONE_DAEMON_HTTP_REQUEST_LOGGER=${OZONE_DAEMON_HTTP_REQUEST_LOGGER:-INFO,HttpAccess}
   OZONE_SECURITY_LOGGER=${OZONE_SECURITY_LOGGER:-INFO,NullAppender}
   OZONE_SSH_OPTS=${OZONE_SSH_OPTS-"-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10s"}
   OZONE_SECURE_LOG_DIR=${OZONE_SECURE_LOG_DIR:-${OZONE_LOG_DIR}}
@@ -1599,6 +1601,7 @@ function ozone_finalize_opts
   ozone_add_param OZONE_OPTS hadoop.home.dir "-Dhadoop.home.dir=${OZONE_HOME}"
   ozone_add_param OZONE_OPTS hadoop.id.str "-Dhadoop.id.str=${OZONE_IDENT_STRING}"
   ozone_add_param OZONE_OPTS hadoop.root.logger "-Dhadoop.root.logger=${OZONE_ROOT_LOGGER}"
+  ozone_add_param OZONE_OPTS ozone.http.request.logger "-Dozone.http.request.logger=${OZONE_HTTP_REQUEST_LOGGER}"
   ozone_add_param OZONE_OPTS hadoop.policy.file "-Dhadoop.policy.file=${OZONE_POLICYFILE}"
   ozone_add_param OZONE_OPTS hadoop.security.logger "-Dhadoop.security.logger=${OZONE_SECURITY_LOGGER}"
 }
@@ -2730,6 +2733,7 @@ function ozone_generic_java_subcmd_handler
   # if yes, use the daemon logger and the appropriate log file.
   if [[ "${OZONE_DAEMON_MODE}" != "default" ]]; then
     OZONE_ROOT_LOGGER="${OZONE_DAEMON_ROOT_LOGGER}"
+    OZONE_HTTP_REQUEST_LOGGER="${OZONE_DAEMON_HTTP_REQUEST_LOGGER}"
     if [[ "${OZONE_SUBCMD_SECURESERVICE}" = true ]]; then
       OZONE_LOGFILE="ozone-${OZONE_SECURE_USER}-${OZONE_IDENT_STRING}-${OZONE_SUBCMD}-${HOSTNAME}.log"
     else

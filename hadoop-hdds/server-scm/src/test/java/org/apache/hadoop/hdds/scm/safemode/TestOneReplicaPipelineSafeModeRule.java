@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -217,7 +216,7 @@ public class TestOneReplicaPipelineSafeModeRule {
                 java.util.Collections.singletonList(mock(DatanodeDetails.class))));
 
     when(mockedPipelineManager.getPipelines(
-        Mockito.any(ReplicationConfig.class),
+        Mockito.any(),
         Mockito.eq(Pipeline.PipelineState.OPEN)))
         .thenReturn(java.util.Collections.singletonList(mockedPipeline));
 

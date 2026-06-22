@@ -46,6 +46,10 @@ public abstract class GenericCli implements GenericParentCommand {
 
   private UserGroupInformation user;
 
+  private String configurationPath;
+  private String deprecatedConfigurationPath;
+  private boolean isConfigurationPathAdded = false;
+
   @Option(names = {"--verbose"},
       scope = CommandLine.ScopeType.INHERIT,
       description = "More verbose output. Show the stack trace of the errors.")
@@ -56,9 +60,25 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"-conf"})
+  @Option(names = {"--conf"},
+      description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
-    config.addResource(new Path(configPath));
+    configurationPath = configPath;
+  }
+
+  /** For backward compatibility. */
+  @Option(names = {"-conf"}, hidden = true)
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  public void setDeprecatedConfigurationPath(String configPath) {
+    deprecatedConfigurationPath = configPath;
+  }
+
+  private String getConfigurationPath() {
+    if (configurationPath != null) {
+      return configurationPath;
+    }
+    return deprecatedConfigurationPath;
   }
 
   public GenericCli() {
@@ -70,6 +90,10 @@ public abstract class GenericCli implements GenericParentCommand {
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
+    });
+    cmd.setExecutionStrategy(parseResult -> {
+      DeprecatedCliOption.warnIfMatched(parseResult);
+      return new CommandLine.RunLast().execute(parseResult);
     });
 
     ExtensibleParentCommand.addSubcommands(cmd);
@@ -111,6 +135,11 @@ public abstract class GenericCli implements GenericParentCommand {
 
   @Override
   public OzoneConfiguration getOzoneConf() {
+    String path = getConfigurationPath();
+    if (path != null && !isConfigurationPathAdded) {
+      config.addResource(new Path(path));
+      isConfigurationPathAdded = true;
+    }
     return config;
   }
 

@@ -109,7 +109,6 @@ public class TestOzoneClientRetriesOnExceptions {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);

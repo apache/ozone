@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -43,6 +45,7 @@ import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 
@@ -86,6 +89,14 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   private String updatedLeaderNodeID = null;
 
   /**
+   * When true, on each connection-class failure the provider re-resolves
+   * the cached SCM hostname and rebuilds the proxy if the IP has changed
+   * (Kubernetes pod-IP-change recovery). Off by default. Mirrors the
+   * intent of HADOOP-17068 / HDFS-14118.
+   */
+  private final boolean resolveOnFailureEnabled;
+
+  /**
    * Construct SCMFailoverProxyProviderBase.
    * If userGroupInformation is not null, use the passed ugi, else obtain
    * from {@link UserGroupInformation#getCurrentUser()}
@@ -117,6 +128,9 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     scmClientConfig = conf.getObject(SCMClientConfig.class);
     this.maxRetryCount = scmClientConfig.getRetryCount();
     this.retryInterval = scmClientConfig.getRetryInterval();
+    this.resolveOnFailureEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
 
     getLogger().info("Created fail-over proxy for protocol {} with {} nodes: {}", protocol.getSimpleName(),
         scmNodeIds.size(), scmProxyInfoMap.values());
@@ -144,6 +158,17 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     return currentProxySCMNodeId;
   }
 
+  /**
+   * Test-only: substitute the cached SCMProxyInfo for {@code nodeId}
+   * with a hand-built one whose IP can be deliberately stale. Used to
+   * drive the DNS-refresh code path without standing up a real SCM.
+   */
+  @VisibleForTesting
+  synchronized void replaceProxyInfoForTest(String nodeId, SCMProxyInfo info) {
+    scmProxyInfoMap.put(nodeId, info);
+    scmProxies.remove(nodeId);
+  }
+
   @VisibleForTesting
   protected synchronized void loadConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
@@ -161,7 +186,12 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         String scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
         scmNodeIds.add(scmNodeId);
-        SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId, protocolAddr);
+        // Preserve the original config string so DNS can be re-resolved
+        // on connection failure when the SCM peer is rescheduled to a
+        // new IP (Kubernetes pod-IP-change recovery). See
+        // refreshProxyAddressIfChanged(String).
+        SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
+            protocolAddr, protocolAddress);
         scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
     }
@@ -260,6 +290,85 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     }
   }
 
+  /**
+   * Re-resolve the configured hostname for the given SCM nodeId. If DNS
+   * now returns a different IP, swap in a fresh {@link SCMProxyInfo}
+   * (with the new resolved address) and discard any cached proxy so the
+   * next {@link #getProxy()} call dials the new IP.
+   *
+   * @return true when a swap occurred; false when the hostname was not
+   *         preserved, the IP is unchanged, the lookup failed, or the
+   *         nodeId is unknown.
+   */
+  boolean refreshProxyAddressIfChanged(String nodeId) {
+    // Read the cached info first so we can do the DNS lookup outside
+    // any monitor. A slow / dead resolver while holding the provider
+    // monitor would freeze every concurrent getProxy() / shouldRetry()
+    // caller.
+    SCMProxyInfo cached;
+    synchronized (this) {
+      cached = scmProxyInfoMap.get(nodeId);
+    }
+    // SCMProxyInfo is immutable, so its fields can be read outside the
+    // monitor once the reference has been fetched safely from the map.
+    if (cached == null) {
+      return false;
+    }
+    String hostAndPort = cached.getHostAndPort();
+    if (hostAndPort == null) {
+      return false;
+    }
+    InetSocketAddress cachedAddress = cached.getAddress();
+    String serviceId = cached.getServiceId();
+    InetSocketAddress refreshed;
+    try {
+      refreshed = NetUtils.createSocketAddr(hostAndPort);
+    } catch (IllegalArgumentException ex) {
+      getLogger().warn("Failed to re-resolve SCM address {}",
+          hostAndPort, ex);
+      return false;
+    }
+    if (refreshed.isUnresolved()) {
+      getLogger().warn("SCM hostname {} re-resolved to an unresolved "
+          + "address; leaving cached entry in place.", hostAndPort);
+      return false;
+    }
+    // Null-safe IP comparison. SCMProxyInfo's constructor allows
+    // an unresolved cached address (warns but stores). In that case
+    // cachedAddress.getAddress() is null and a successful
+    // re-resolution is genuinely a change -- proceed to swap rather
+    // than NPE on .equals().
+    InetAddress cachedIp = cachedAddress.getAddress();
+    if (cachedIp != null
+        && refreshed.getAddress().equals(cachedIp)) {
+      return false;
+    }
+    SCMProxyInfo updated = new SCMProxyInfo(serviceId, nodeId,
+        refreshed, hostAndPort);
+    ProxyInfo<T> staleProxy;
+    synchronized (this) {
+      // Re-check under the lock to avoid a lost update if another
+      // refresher beat us to the swap.
+      SCMProxyInfo current = scmProxyInfoMap.get(nodeId);
+      if (current == null || !cachedAddress.equals(current.getAddress())) {
+        return false;
+      }
+      scmProxyInfoMap.put(nodeId, updated);
+      staleProxy = scmProxies.remove(nodeId);
+    }
+    if (staleProxy != null && staleProxy.proxy != null) {
+      try {
+        RPC.stopProxy(staleProxy.proxy);
+      } catch (RuntimeException stopEx) {
+        getLogger().warn("Failed to stop stale proxy for SCM nodeId {}",
+            nodeId, stopEx);
+      }
+    }
+    getLogger().info("DNS re-resolution: SCM nodeId {} address {} -> {} "
+        + "(hostname {}).", nodeId, cachedAddress, refreshed, hostAndPort);
+    return true;
+  }
+
   private long getRetryInterval() {
     // TODO add exponential backup
     return retryInterval;
@@ -342,7 +451,23 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           printRetryMessage(e, failover, retryAction.delayMillis);
         }
 
-        if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+        // Before advancing the failover index, give the cached SCM
+        // address a chance to be re-resolved -- the same nodeId may
+        // have moved to a new IP under a stable hostname (Kubernetes
+        // pod restart). Limited to connection-class exceptions to
+        // avoid extra DNS load on application-level errors.
+        boolean refreshed = false;
+        if (resolveOnFailureEnabled
+            && ConnectionFailureUtils.isConnectionFailure(e)) {
+          refreshed = refreshProxyAddressIfChanged(getCurrentProxySCMNodeId());
+        }
+
+        if (refreshed) {
+          // Stay on this nodeId so the next attempt dials the newly
+          // resolved IP; advancing the failover ring here would bypass
+          // the freshly-fixed peer for N-1 attempts.
+          setUpdatedLeaderNodeID();
+        } else if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           setUpdatedLeaderNodeID();
         } else {
           performFailoverToAssignedLeader(null, e);

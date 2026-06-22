@@ -220,12 +220,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         snapshotInfo.toAuditMap(), exception, userInfo));
 
     if (exception == null) {
-      LOG.info("Created snapshot: '{}' with snapshotId: '{}' under path '{}'",
+      LOG.info("Created snapshot '{}' (snapshotId='{}') under path '{}'",
           snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
       omMetrics.incNumSnapshotActive();
     } else {
       omMetrics.incNumSnapshotCreateFails();
-      LOG.error("Failed to create snapshot '{}' with snapshotId: '{}' under " +
+      LOG.error("Failed to create snapshot '{}' (snapshotId='{}') under " +
               "path '{}'",
           snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     }

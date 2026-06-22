@@ -63,7 +63,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -541,9 +540,9 @@ final class TestSecureOzoneCluster {
       conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
       IllegalArgumentException exception = assertThrows(
           IllegalArgumentException.class, () -> setupOm(conf));
-      assertTrue(exception.getMessage().contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
+      assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
           "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
-          "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration"));
+          "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
     } finally {
       if (scm != null) {
         scm.stop();
@@ -650,9 +649,9 @@ final class TestSecureOzoneCluster {
       // Start SCM
       scm.start();
 
-      // Setup secure OM for start.
-      int tokenMaxLifetime = 1000;
-      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
+      // Setup secure OM for start.  Generous token lifetime so the renewer and
+      // tampered-token cases below do not race token expiry.
+      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
       setupOm(conf);
       OzoneManager.setTestSecureOmFlag(true);
       om.setCertClient(new CertificateClientTestImpl(conf));
@@ -683,10 +682,15 @@ final class TestSecureOzoneCluster {
       omLogs.clearOutput();
 
       // Test failure of delegation renewal
-      // 1. When token maxExpiryTime exceeds
-      Thread.sleep(tokenMaxLifetime);
+      // 1. When token maxExpiryTime exceeds (maxDate in the past)
+      OzoneTokenIdentifier expiredId = OzoneTokenIdentifier.readProtoBuf(
+          token.getIdentifier());
+      expiredId.setMaxDate(System.currentTimeMillis() - 1000);
+      Token<OzoneTokenIdentifier> expiredToken = new Token<>(
+          expiredId.getBytes(), token.getPassword(), token.getKind(),
+          token.getService());
       OMException ex = assertThrows(OMException.class,
-          () -> omClient.renewDelegationToken(token));
+          () -> omClient.renewDelegationToken(expiredToken));
       assertEquals(TOKEN_EXPIRED, ex.getResult());
       omLogs.clearOutput();
 
@@ -1347,22 +1351,16 @@ final class TestSecureOzoneCluster {
     if (m.matches()) {
       cn = m.group(1);
     }
-    String hostName = InetAddress.getLocalHost().getHostName();
-
     // Subject name should be om login user in real world but in this test
     // UGI has scm user context.
-    assertThat(cn).contains(SCM_SUB_CA);
-    assertThat(cn).contains(hostName);
+    assertThat(cn).isEqualTo(SCM_SUB_CA + "@localhost");
 
     LocalDate today = ZonedDateTime.now().toLocalDate();
-    Date invalidDate;
 
     // Make sure the end date is honored.
-    invalidDate = java.sql.Date.valueOf(today.plus(1, ChronoUnit.DAYS));
-    assertTrue(cert.getNotAfter().after(invalidDate));
-
-    invalidDate = java.sql.Date.valueOf(today.plus(400, ChronoUnit.DAYS));
-    assertTrue(cert.getNotAfter().before(invalidDate));
+    assertThat(cert.getNotAfter())
+        .isAfter(java.sql.Date.valueOf(today.plus(1, ChronoUnit.DAYS)))
+        .isBefore(java.sql.Date.valueOf(today.plus(400, ChronoUnit.DAYS)));
 
     assertThat(cert.getSubjectDN().toString()).contains(scmId);
     assertThat(cert.getSubjectDN().toString()).contains(clusterId);
