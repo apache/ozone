@@ -28,6 +28,8 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -51,8 +53,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.Time;
@@ -70,6 +78,9 @@ public final class ReplicationSupervisor {
   private static final Comparator<TaskRunner> TASK_RUNNER_COMPARATOR =
       Comparator.comparing(TaskRunner::getTaskPriority)
           .thenComparing(TaskRunner::getTaskQueueTime);
+
+  private final Map<HddsVolume, ThreadPoolExecutor> volumeExecutors = new ConcurrentHashMap<>();
+  private volatile int currentThreadCount;
 
   private final ExecutorService executor;
   private final ScheduledExecutorService scheduler;
@@ -218,11 +229,14 @@ public final class ReplicationSupervisor {
             .setDaemon(true)
             .setNameFormat("ReplicationSupervisor-Scheduler")
             .build());
+    this.scheduler.scheduleWithFixedDelay(
+        this::cleanupFailedVolumeExecutors, 1, 1, TimeUnit.MINUTES);
     this.replicationConfig = replicationConfig;
     this.datanodeConfig = datanodeConfig;
     maxQueueSize = datanodeConfig.getCommandQueueLimit();
     this.clock = clock;
     this.executorThreadUpdater = executorThreadUpdater;
+    this.currentThreadCount = replicationConfig.getReplicationMaxStreams();
 
     // set initial state
     if (context != null) {
@@ -283,7 +297,74 @@ public final class ReplicationSupervisor {
             k -> new AtomicInteger()).incrementAndGet();
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
-      executor.execute(new TaskRunner(task));
+      getExecutorForTask(task).execute(new TaskRunner(task));
+    }
+  }
+
+  private ExecutorService getExecutorForTask(AbstractReplicationTask task) {
+    HddsVolume volume = null;
+    if (context != null && task instanceof ReplicationTask) {
+      ReplicationTask repTask = (ReplicationTask) task;
+      if (repTask.getTarget() != null) { // push replication
+        OzoneContainer container = context.getParent().getContainer();
+        ContainerSet containerSet = container.getContainerSet();
+        Container<?> localContainer = containerSet.getContainer(task.getContainerId());
+        if (localContainer != null) {
+          volume = localContainer.getContainerData().getVolume();
+        }
+      }
+    }
+    if (volume != null) {
+      return getOrCreateVolumeExecutor(volume);
+    }
+    // fall back to global executor
+    return executor;
+  }
+
+  private synchronized ThreadPoolExecutor getOrCreateVolumeExecutor(HddsVolume volume) {
+    return volumeExecutors.computeIfAbsent(volume, v -> {
+      String threadNamePrefix = context != null ? context.getThreadNamePrefix() : "";
+      ThreadFactory threadFactory = new ThreadFactoryBuilder()
+          .setDaemon(true)
+          .setNameFormat(threadNamePrefix + "ContainerReplicationThread-" + v.getStorageID() + "-%d")
+          .build();
+      ThreadPoolExecutor tpe = new ThreadPoolExecutor(
+          currentThreadCount,
+          currentThreadCount,
+          60, TimeUnit.SECONDS,
+          new PriorityBlockingQueue<>(),
+          threadFactory);
+      LOG.info("Created replication executor for volume {} with size {}", v.getStorageID(), currentThreadCount);
+      return tpe;
+    });
+  }
+
+  @VisibleForTesting
+  synchronized void cleanupFailedVolumeExecutors() {
+    if (context == null || context.getParent() == null) {
+      return;
+    }
+    OzoneContainer container = context.getParent().getContainer();
+    if (container == null) {
+      return;
+    }
+    MutableVolumeSet volumeSet = container.getVolumeSet();
+    if (volumeSet == null) {
+      return;
+    }
+
+    List<StorageVolume> healthyVolumes = volumeSet.getVolumesList();
+    Iterator<Map.Entry<HddsVolume, ThreadPoolExecutor>> it = volumeExecutors.entrySet().iterator();
+    while (it.hasNext()) {
+      Map.Entry<HddsVolume, ThreadPoolExecutor> entry = it.next();
+      HddsVolume volume = entry.getKey();
+      if (!healthyVolumes.contains(volume)) {
+        LOG.info("Volume {} is no longer healthy/present. Shutting down its replication thread pool.",
+            volume.getStorageID());
+        ThreadPoolExecutor executorToShutdown = entry.getValue();
+        executorToShutdown.shutdownNow();
+        it.remove();
+      }
     }
   }
 
@@ -303,8 +384,16 @@ public final class ReplicationSupervisor {
   public void shutdownAfterFinish() throws InterruptedException {
     scheduler.shutdown();
     scheduler.awaitTermination(1L, TimeUnit.DAYS);
+    for (ThreadPoolExecutor tpe : volumeExecutors.values()) {
+      tpe.shutdown();
+    }
+    for (ThreadPoolExecutor tpe : volumeExecutors.values()) {
+      tpe.awaitTermination(1L, TimeUnit.DAYS);
+    }
+    volumeExecutors.clear();
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.DAYS);
+    inFlight.clear();
   }
 
   public void stop() {
@@ -313,10 +402,25 @@ public final class ReplicationSupervisor {
       if (!scheduler.awaitTermination(3, TimeUnit.SECONDS)) {
         scheduler.shutdownNow();
       }
+      for (ThreadPoolExecutor tpe : volumeExecutors.values()) {
+        tpe.shutdown();
+      }
+      for (ThreadPoolExecutor tpe : volumeExecutors.values()) {
+        try {
+          if (!tpe.awaitTermination(3, TimeUnit.SECONDS)) {
+            tpe.shutdownNow();
+          }
+        } catch (InterruptedException e) {
+          tpe.shutdownNow();
+          Thread.currentThread().interrupt();
+        }
+      }
+      volumeExecutors.clear();
       executor.shutdown();
       if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
         executor.shutdownNow();
       }
+      inFlight.clear();
     } catch (InterruptedException ie) {
       // Ignore, we don't really care about the failure.
       Thread.currentThread().interrupt();
@@ -384,7 +488,19 @@ public final class ReplicationSupervisor {
         newMaxQueueSize);
 
     maxQueueSize = newMaxQueueSize;
+    currentThreadCount = threadCount;
     executorThreadUpdater.accept(threadCount);
+    for (Map.Entry<HddsVolume, ThreadPoolExecutor> entry : volumeExecutors.entrySet()) {
+      ThreadPoolExecutor tpe = entry.getValue();
+      if (threadCount < tpe.getCorePoolSize()) {
+        tpe.setCorePoolSize(threadCount);
+        tpe.setMaximumPoolSize(threadCount);
+      } else {
+        tpe.setMaximumPoolSize(threadCount);
+        tpe.setCorePoolSize(threadCount);
+      }
+      LOG.info("Scaled replication executor for volume {} to size {}", entry.getKey().getStorageID(), threadCount);
+    }
   }
 
   /**
@@ -505,11 +621,14 @@ public final class ReplicationSupervisor {
   }
 
   public long getQueueSize() {
+    long size = 0;
     if (executor instanceof ThreadPoolExecutor) {
-      return ((ThreadPoolExecutor)executor).getQueue().size();
-    } else {
-      return 0;
+      size += ((ThreadPoolExecutor) executor).getQueue().size();
     }
+    for (ThreadPoolExecutor tpe : volumeExecutors.values()) {
+      size += tpe.getQueue().size();
+    }
+    return size;
   }
 
   public long getMaxReplicationStreams() {

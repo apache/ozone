@@ -32,11 +32,13 @@ import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerComman
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,6 +58,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
@@ -93,6 +96,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -109,6 +113,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -952,6 +957,12 @@ public class TestReplicationSupervisor {
     return new ReplicationTask(cmd, replicatorRef.get());
   }
 
+  private ReplicationTask createTaskWithTarget(long containerId, DatanodeDetails target) {
+    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(containerId, target);
+    cmd.setTerm(CURRENT_TERM);
+    return new ReplicationTask(cmd, replicatorRef.get());
+  }
+
   private ReconcileContainerTask createReconciliationTask(long containerId) {
     ReconcileContainerCommand reconcileContainerCommand =
         new ReconcileContainerCommand(containerId, Collections.singleton(datanode));
@@ -1224,6 +1235,91 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> sources =
           singletonList(datanodes.get(i % datanodes.size()));
       rs.addTask(new ReplicationTask(fromSources(i, sources), noopReplicator));
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testVolumeSpecificThreadPoolAndCleanup(ContainerLayoutVersion layout) throws Exception {
+    this.layoutVersion = layout;
+    replicatorRef.set(slowReplicator);
+    DatanodeStateMachine stateMachine = context.getParent();
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(stateMachine.getContainer()).thenReturn(ozoneContainer);
+    when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
+
+    HddsVolume vol1 = mock(HddsVolume.class);
+    when(vol1.getStorageID()).thenReturn("vol-1");
+    HddsVolume vol2 = mock(HddsVolume.class);
+    when(vol2.getStorageID()).thenReturn("vol-2");
+
+    List<StorageVolume> healthyVolumes = new ArrayList<>();
+    healthyVolumes.add(vol1);
+    healthyVolumes.add(vol2);
+    when(volumeSet.getVolumesList()).thenReturn(healthyVolumes);
+
+    // Build supervisor
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .clock(clock)
+        .build();
+
+    supervisor.setReplicationMaxStreams(1);
+
+    ContainerSet containerSet = mock(ContainerSet.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+
+    DatanodeDetails target = mock(DatanodeDetails.class);
+
+    try {
+      AbstractReplicationTask task1 = createTaskWithTarget(1L, target);
+      Container<?> container1 = mock(Container.class);
+      ContainerData containerData1 = mock(ContainerData.class);
+      when(containerData1.getVolume()).thenReturn(vol1);
+      when(container1.getContainerData()).thenReturn(containerData1);
+      doReturn(container1).when(containerSet).getContainer(1L);
+
+      AbstractReplicationTask task2 = createTaskWithTarget(2L, target);
+      Container<?> container2 = mock(Container.class);
+      ContainerData containerData2 = mock(ContainerData.class);
+      when(containerData2.getVolume()).thenReturn(vol2);
+      when(container2.getContainerData()).thenReturn(containerData2);
+      doReturn(container2).when(containerSet).getContainer(2L);
+
+      AbstractReplicationTask task3 = createTask(3L); // No volume, no target
+
+      supervisor.addTask(task1);
+      supervisor.addTask(task2);
+      supervisor.addTask(task3);
+
+      // Now, simulate vol2 failure (remove it from healthyVolumes)
+      healthyVolumes.remove(vol2);
+
+      // Run cleanup and queue task4 on vol1 (which already has task1 running, so task4 will queue)
+      AbstractReplicationTask task4 = createTaskWithTarget(4L, target);
+      Container<?> container4 = mock(Container.class);
+      ContainerData containerData4 = mock(ContainerData.class);
+      when(containerData4.getVolume()).thenReturn(vol1);
+      when(container4.getContainerData()).thenReturn(containerData4);
+      doReturn(container4).when(containerSet).getContainer(4L);
+      supervisor.addTask(task4);
+
+      supervisor.cleanupFailedVolumeExecutors();
+
+      // Thread pool for vol2 should be shut down, while vol1 remains active
+      java.lang.reflect.Field field = ReplicationSupervisor.class.getDeclaredField("volumeExecutors");
+      field.setAccessible(true);
+      Map<?, ?> volumeExecutors = (Map<?, ?>) field.get(supervisor);
+
+      // Since max streams is 1, task1 is executing and task4 is in vol1's executor queue.
+      // We should see a queue size of at least 1 (potentially more depending on fallback executor state).
+      assertTrue(supervisor.getQueueSize() >= 1);
+
+      assertTrue(volumeExecutors.containsKey(vol1));
+      assertFalse(volumeExecutors.containsKey(vol2));
+      assertEquals(1, volumeExecutors.size());
+    } finally {
+      supervisor.stop();
     }
   }
 }
