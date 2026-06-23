@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -66,7 +67,8 @@ public class ExportSubcommand implements Callable<Void> {
     parent.loadContainersFromVolumes();
 
     final ContainerReplicationSource replicationSource =
-        new OnDemandContainerReplicationSource(parent.getController());
+        new OnDemandContainerReplicationSource(parent.getController(),
+            new ReplicationServer.ReplicationConfig());
 
     for (int i = 0; i < containerCount; i++) {
       replicationSource.prepare(containerId);

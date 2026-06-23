@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.REPLICATION_LIMIT_REACHED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.getDownloadMethod;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.getUploadMethod;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.fromProto;
@@ -30,12 +31,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -132,6 +135,15 @@ public class GrpcReplicationService extends
           (CallStreamObserver<CopyContainerResponseProto>) responseObserver,
           containerID, BUFFER_SIZE);
       source.copyData(containerID, outputStream, compression);
+    } catch (StorageContainerException e) {
+      if (e.getResult() == REPLICATION_LIMIT_REACHED) {
+        responseObserver.onError(Status.RESOURCE_EXHAUSTED
+            .withDescription(e.getMessage())
+            .asRuntimeException());
+      } else {
+        LOG.warn("Error streaming container {}", containerID, e);
+        responseObserver.onError(e);
+      }
     } catch (IOException e) {
       LOG.warn("Error streaming container {}", containerID, e);
       responseObserver.onError(e);
