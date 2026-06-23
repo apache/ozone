@@ -38,29 +38,14 @@ public class SetS3SecretHandler extends S3Handler {
           + "(Admins only)'")
   private String username;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private SecretKeyOption secretKeyOption;
+  @CommandLine.Option(names = {"-s", "--secret"},
+      description = "Secret key", required = true)
+  private String secretKey;
 
   @Option(names = "-e",
       description = "Print out variables together with 'export' prefix, to "
           + "use it from 'eval $(ozone s3 setsecret)'")
   private boolean export;
-
-  static class SecretKeyOption {
-    @CommandLine.Option(names = {"-s", "--secret"},
-        description = "Secret key")
-    private String secretKey;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--secretKey", hidden = true)
-    private String deprecatedSecretKey;
-
-    String getSecretKey() {
-      return secretKey != null ? secretKey : deprecatedSecretKey;
-    }
-  }
 
   @Override
   protected boolean isApplicable() {
@@ -70,8 +55,6 @@ public class SetS3SecretHandler extends S3Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    String secretKey = secretKeyOption.getSecretKey();
-
     if (username == null || username.isEmpty()) {
       username = UserGroupInformation.getCurrentUser().getUserName();
     }

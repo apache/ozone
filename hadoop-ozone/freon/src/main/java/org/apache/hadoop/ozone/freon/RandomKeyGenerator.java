@@ -104,15 +104,6 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private static final int CHECK_INTERVAL_MILLIS = 100;
 
-  private static final int DEFAULT_NUM_OF_THREADS = 10;
-  private static final int DEFAULT_NUM_OF_VOLUMES = 10;
-  private static final int DEFAULT_NUM_OF_BUCKETS = 1000;
-  private static final int DEFAULT_NUM_OF_KEYS = 500000;
-  private static final StorageSize DEFAULT_KEY_SIZE =
-      StorageSize.parse("10KB", org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
-  private static final int DEFAULT_NUM_OF_VALIDATE_THREADS = 1;
-  private static final int DEFAULT_BUFFER_SIZE = 4096;
-
   private byte[] keyValueBuffer = null;
 
   private static final String DIGEST_ALGORITHM = "MD5";
@@ -126,110 +117,53 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private volatile Throwable exception;
 
   @Option(names = {"--num-of-threads"},
-      description = "number of threads to be launched for the run.")
-  private Integer numOfThreadsArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--numOfThreads", hidden = true)
-  private Integer deprecatedNumOfThreads;
-
-  private int numOfThreads;
+      description = "number of threads to be launched for the run.",
+      defaultValue = "10")
+  private int numOfThreads = 10;
 
   @Option(names = {"--num-of-volumes"},
-      description = "specifies number of Volumes to be created in offline mode.")
-  private Integer numOfVolumesArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--numOfVolumes", hidden = true)
-  private Integer deprecatedNumOfVolumes;
-
-  private int numOfVolumes;
+      description = "specifies number of Volumes to be created in offline mode.",
+      defaultValue = "10")
+  private int numOfVolumes = 10;
 
   @Option(names = {"--num-of-buckets"},
-      description = "specifies number of Buckets to be created per Volume.")
-  private Integer numOfBucketsArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--numOfBuckets", hidden = true)
-  private Integer deprecatedNumOfBuckets;
-
-  private int numOfBuckets;
+      description = "specifies number of Buckets to be created per Volume.",
+      defaultValue = "1000")
+  private int numOfBuckets = 1000;
 
   @Option(
       names = {"--num-of-keys"},
-      description = "specifies number of Keys to be created per Bucket."
+      description = "specifies number of Keys to be created per Bucket.",
+      defaultValue = "500000"
   )
-  private Integer numOfKeysArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--numOfKeys", hidden = true)
-  private Integer deprecatedNumOfKeys;
-
-  private int numOfKeys;
+  private int numOfKeys = 500000;
 
   @Option(
       names = {"--key-size"},
-      description = "Specifies the size of Key in bytes to be created. "
-          + StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      description = "Specifies the size of Key in bytes to be created." +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "10KB",
       converter = StorageSizeConverter.class
   )
-  private StorageSize keySizeArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--keySize", hidden = true, converter = StorageSizeConverter.class)
-  private StorageSize deprecatedKeySize;
-
   private StorageSize keySize;
 
   @Option(
       names = {"--validate-writes"},
-      description = "Specifies whether to validate keys after writing."
+      description = "Specifies whether to validate keys after writing"
   )
-  private Boolean validateWritesArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--validateWrites", hidden = true)
-  private Boolean deprecatedValidateWrites;
-
-  private boolean validateWrites;
+  private boolean validateWrites = false;
 
   @Option(names = {"--num-of-validate-threads"},
-      description = "number of threads to be launched for validating keys.")
-  private Integer numOfValidateThreadsArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--numOfValidateThreads", hidden = true)
-  private Integer deprecatedNumOfValidateThreads;
-
-  private int numOfValidateThreads;
+      description = "number of threads to be launched for validating keys.",
+      defaultValue = "1")
+  private int numOfValidateThreads = 1;
 
   @Option(
       names = {"--buffer-size"},
-      description = "Specifies the buffer size while writing."
+      description = "Specifies the buffer size while writing.",
+      defaultValue = "4096"
   )
-  private Integer bufferSizeArg;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--bufferSize", hidden = true)
-  private Integer deprecatedBufferSize;
-
-  private int bufferSize;
+  private int bufferSize = 4096;
 
   @Option(
       names = "--json",
@@ -348,100 +282,8 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
   }
 
-  private void resolveOptions() {
-    numOfThreads = getNumOfThreads();
-    numOfVolumes = getNumOfVolumes();
-    numOfBuckets = getNumOfBuckets();
-    numOfKeys = getNumOfKeys();
-    keySize = getKeySize();
-    validateWrites = getValidateWritesOption();
-    numOfValidateThreads = getNumOfValidateThreads();
-    bufferSize = getBufferSize();
-  }
-
-  private int getNumOfThreads() {
-    if (numOfThreadsArg != null) {
-      return numOfThreadsArg;
-    }
-    if (deprecatedNumOfThreads != null) {
-      return deprecatedNumOfThreads;
-    }
-    return DEFAULT_NUM_OF_THREADS;
-  }
-
-  private int getNumOfVolumes() {
-    if (numOfVolumesArg != null) {
-      return numOfVolumesArg;
-    }
-    if (deprecatedNumOfVolumes != null) {
-      return deprecatedNumOfVolumes;
-    }
-    return DEFAULT_NUM_OF_VOLUMES;
-  }
-
-  private int getNumOfBuckets() {
-    if (numOfBucketsArg != null) {
-      return numOfBucketsArg;
-    }
-    if (deprecatedNumOfBuckets != null) {
-      return deprecatedNumOfBuckets;
-    }
-    return DEFAULT_NUM_OF_BUCKETS;
-  }
-
-  private int getNumOfKeys() {
-    if (numOfKeysArg != null) {
-      return numOfKeysArg;
-    }
-    if (deprecatedNumOfKeys != null) {
-      return deprecatedNumOfKeys;
-    }
-    return DEFAULT_NUM_OF_KEYS;
-  }
-
-  private StorageSize getKeySize() {
-    if (keySizeArg != null) {
-      return keySizeArg;
-    }
-    if (deprecatedKeySize != null) {
-      return deprecatedKeySize;
-    }
-    return DEFAULT_KEY_SIZE;
-  }
-
-  private boolean getValidateWritesOption() {
-    if (validateWritesArg != null) {
-      return validateWritesArg;
-    }
-    if (deprecatedValidateWrites != null) {
-      return deprecatedValidateWrites;
-    }
-    return false;
-  }
-
-  private int getNumOfValidateThreads() {
-    if (numOfValidateThreadsArg != null) {
-      return numOfValidateThreadsArg;
-    }
-    if (deprecatedNumOfValidateThreads != null) {
-      return deprecatedNumOfValidateThreads;
-    }
-    return DEFAULT_NUM_OF_VALIDATE_THREADS;
-  }
-
-  private int getBufferSize() {
-    if (bufferSizeArg != null) {
-      return bufferSizeArg;
-    }
-    if (deprecatedBufferSize != null) {
-      return deprecatedBufferSize;
-    }
-    return DEFAULT_BUFFER_SIZE;
-  }
-
   @Override
   public Void call() throws Exception {
-    resolveOptions();
     if (ozoneConfiguration == null) {
       ozoneConfiguration = freon.getOzoneConf();
     }

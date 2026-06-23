@@ -52,19 +52,9 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     )
     private String scmId;
 
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--newLeaderId", hidden = true)
-    private String deprecatedScmId;
-
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
     private boolean isRandom;
-
-    String getScmId() {
-      return scmId != null ? scmId : deprecatedScmId;
-    }
   }
 
   @Override
@@ -73,8 +63,6 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
         parent.getParent().getOzoneConf());
     if (configGroup.isRandom) {
       configGroup.scmId = "";
-    } else {
-      configGroup.scmId = configGroup.getScmId();
     }
     client.transferLeadership(configGroup.scmId);
     System.out.println("Transfer leadership successfully to " +

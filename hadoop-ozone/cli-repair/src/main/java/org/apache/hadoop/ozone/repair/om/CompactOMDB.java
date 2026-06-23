@@ -41,8 +41,10 @@ import picocli.CommandLine;
 )
 public class CompactOMDB extends RepairTool {
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private ColumnFamilyOption columnFamilyOption;
+  @CommandLine.Option(names = {"--column-family", "--cf"},
+      required = true,
+      description = "Column family name")
+  private String columnFamilyName;
 
   @CommandLine.Option(
       names = {"--service-id", "--om-service-id"},
@@ -58,34 +60,15 @@ public class CompactOMDB extends RepairTool {
   )
   private String nodeId;
 
-<<<<<<< HEAD
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
       description = "BottommostLevelCompaction option for RocksDB compaction." +
           " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
       defaultValue = "0",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int bottommostLevelCompaction;
-=======
-  static class ColumnFamilyOption {
-    @CommandLine.Option(names = {"--column-family", "--cf"},
-        description = "Column family name")
-    private String columnFamilyName;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--column_family", hidden = true)
-    private String deprecatedColumnFamilyName;
-
-    String getColumnFamilyName() {
-      return columnFamilyName != null ? columnFamilyName : deprecatedColumnFamilyName;
-    }
-  }
->>>>>>> a71ff80348 (Remove conflicts and refactor the code to use DeprecatedCliOption class)
 
   @Override
   public void execute() throws Exception {
-    String columnFamilyName = columnFamilyOption.getColumnFamilyName();
 
     OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(

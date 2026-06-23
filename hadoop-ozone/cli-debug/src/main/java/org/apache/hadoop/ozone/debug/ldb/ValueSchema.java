@@ -51,58 +51,31 @@ import picocli.CommandLine;
 )
 public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
 
-  private static final String DEFAULT_DN_DB_SCHEMA_VERSION = "V3";
-
   @CommandLine.ParentCommand
   private RDBParser parent;
 
   private static final Logger LOG = LoggerFactory.getLogger(ValueSchema.class);
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private ColumnFamilyOption columnFamilyOption;
-
+  @CommandLine.Option(names = {"--column-family", "--cf"},
+      required = true,
+      description = "Table name")
   private String tableName;
 
   @CommandLine.Option(names = {"--dn-schema", "-d"},
-      description = "Datanode DB Schema Version: V1/V2/V3")
+      description = "Datanode DB Schema Version: V1/V2/V3",
+      defaultValue = "V3")
   private String dnDBSchemaVersion;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--dnSchema", hidden = true)
-  private String deprecatedDnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--depth"},
       description = "The level till which the value-schema should be shown. Values in the range [0-10] are allowed)",
       defaultValue = "10")
   private int depth;
 
-  static class ColumnFamilyOption {
-    @CommandLine.Option(names = {"--column-family", "--cf"},
-        description = "Table name",
-        required = true)
-    private String tableName;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--column_family", hidden = true, required = true)
-    private String deprecatedTableName;
-
-    String getTableName() {
-      return tableName != null ? tableName : deprecatedTableName;
-    }
-  }
-
   @Override
   public Void call() throws Exception {
     if (depth < 0 || depth > 10) {
       throw new IOException("depth should be specified in the range [0, 10]");
     }
-
-    tableName = columnFamilyOption.getTableName();
-    dnDBSchemaVersion = getDnDBSchemaVersion();
 
     boolean success = true;
 
@@ -119,16 +92,6 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
           "Exit code is non-zero. Check the error message above");
     }
     return null;
-  }
-
-  private String getDnDBSchemaVersion() {
-    if (dnDBSchemaVersion != null) {
-      return dnDBSchemaVersion;
-    }
-    if (deprecatedDnDBSchemaVersion != null) {
-      return deprecatedDnDBSchemaVersion;
-    }
-    return DEFAULT_DN_DB_SCHEMA_VERSION;
   }
 
   public boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {

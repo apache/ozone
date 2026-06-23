@@ -28,34 +28,16 @@ import picocli.CommandLine;
  * Base Ratis Log Parser used by generic, datanode etc.
  */
 public abstract class BaseLogParser {
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private SegmentFileOption segmentFileOption;
-
-  static class SegmentFileOption {
-    @CommandLine.Option(names = {"-s", "--segment-path"},
-        description = "Path of the segment file")
-    private File segmentFile;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--segmentPath", hidden = true)
-    private File deprecatedSegmentFile;
-
-    File getSegmentFile() {
-      return segmentFile != null ? segmentFile : deprecatedSegmentFile;
-    }
-
-    void setSegmentFile(File file) {
-      segmentFile = file;
-    }
-  }
+  @CommandLine.Option(names = {"-s", "--segment-path"},
+      required = true,
+      description = "Path of the segment file")
+  private File segmentFile;
 
   public void parseRatisLogs(
       Function<RaftProtos.StateMachineLogEntryProto, String> smLogToStr) {
     try {
       ParseRatisLog.Builder builder = new ParseRatisLog.Builder();
-      builder.setSegmentFile(segmentFileOption.getSegmentFile());
+      builder.setSegmentFile(segmentFile);
       builder.setSMLogToString(smLogToStr);
 
       ParseRatisLog prl = builder.build();
@@ -68,7 +50,6 @@ public abstract class BaseLogParser {
 
   @VisibleForTesting
   public void setSegmentFile(File segmentFile) {
-    segmentFileOption = new SegmentFileOption();
-    segmentFileOption.setSegmentFile(segmentFile);
+    this.segmentFile = segmentFile;
   }
 }

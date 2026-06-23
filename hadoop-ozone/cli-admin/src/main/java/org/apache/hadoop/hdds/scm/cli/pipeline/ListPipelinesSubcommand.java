@@ -63,12 +63,7 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     if (replicationFilter.isPresent()) {
       stream = stream.filter(replicationFilter.get());
     }
-<<<<<<< HEAD
     if (!Strings.isNullOrEmpty(state)) {
-=======
-    String effectiveState = getState();
-    if (!Strings.isNullOrEmpty(effectiveState)) {
->>>>>>> a71ff80348 (Remove conflicts and refactor the code to use DeprecatedCliOption class)
       stream = stream.filter(p -> p.getPipelineState().toString()
           .compareToIgnoreCase(state) == 0);
     }

@@ -46,27 +46,15 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
     )
     private String omNodeId;
 
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--newLeaderId", hidden = true)
-    private String deprecatedOmNodeId;
-
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
     private boolean isRandom;
-
-    String getOmNodeId() {
-      return omNodeId != null ? omNodeId : deprecatedOmNodeId;
-    }
   }
 
   @Override
   public Void call() throws Exception {
     if (configGroup.isRandom) {
       configGroup.omNodeId = "";
-    } else {
-      configGroup.omNodeId = configGroup.getOmNodeId();
     }
     try (OzoneManagerProtocol client = omServiceOption.newClient()) {
       client.transferLeadership(configGroup.omNodeId);

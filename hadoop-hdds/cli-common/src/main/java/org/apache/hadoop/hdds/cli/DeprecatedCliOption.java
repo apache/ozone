@@ -23,7 +23,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Emits warnings when deprecated CLI option aliases are used.
+ * Emits warnings when deprecated CLI option aliases are used
+ * and return the recommended replacement option.
  */
 public final class DeprecatedCliOption {
 

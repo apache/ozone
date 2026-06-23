@@ -50,38 +50,23 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopDirTreeGenerator.class);
 
-  private static final int DEFAULT_FILE_COUNT = 2;
-  private static final int DEFAULT_NAME_LEN = 10;
-  private static final StorageSize DEFAULT_FILE_SIZE =
-      StorageSize.parse("4KB", org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
-
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
       defaultValue = "5")
   private int depth;
 
   @Option(names = {"-c", "--file-count"},
-      description = "Number of files to be written in each directory.")
-  private Integer fileCount;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--fileCount", hidden = true)
-  private Integer deprecatedFileCount;
+      description = "Number of files to be written in each directory.",
+      defaultValue = "2")
+  private int fileCount;
 
   @Option(names = {"-g", "--file-size"},
       description = "Generated data size of each file to be " +
           "written in each directory. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "4KB",
       converter = StorageSizeConverter.class)
   private StorageSize fileSize;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--fileSize", hidden = true, converter = StorageSizeConverter.class)
-  private StorageSize deprecatedFileSize;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",
@@ -96,14 +81,9 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create.")
-  private Integer length;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--nameLen", hidden = true)
-  private Integer deprecatedLength;
+          "Length of the random name of directory you want to create",
+      defaultValue = "10")
+  private int length;
 
   private AtomicLong totalDirsCnt = new AtomicLong();
 
@@ -122,42 +102,12 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       print(s);
     } else {
       super.init();
-      contentGenerator = new ContentGenerator(getFileSize().toBytes(), bufferSize);
+      contentGenerator = new ContentGenerator(fileSize.toBytes(), bufferSize);
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);
     }
     return null;
-  }
-
-  private int getFileCount() {
-    if (fileCount != null) {
-      return fileCount;
-    }
-    if (deprecatedFileCount != null) {
-      return deprecatedFileCount;
-    }
-    return DEFAULT_FILE_COUNT;
-  }
-
-  private StorageSize getFileSize() {
-    if (fileSize != null) {
-      return fileSize;
-    }
-    if (deprecatedFileSize != null) {
-      return deprecatedFileSize;
-    }
-    return DEFAULT_FILE_SIZE;
-  }
-
-  private int getLength() {
-    if (length != null) {
-      return length;
-    }
-    if (deprecatedLength != null) {
-      return deprecatedLength;
-    }
-    return DEFAULT_NAME_LEN;
   }
 
   /*
@@ -232,7 +182,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private String makeDirWithGivenNumberOfFiles(String parent)
           throws Exception {
-    String dir = RandomStringUtils.secure().nextAlphanumeric(getLength());
+    String dir = RandomStringUtils.secure().nextAlphanumeric(length);
     dir = parent.concat("/").concat(dir);
     getFileSystem().mkdirs(new Path(dir));
     totalDirsCnt.incrementAndGet();
@@ -243,7 +193,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   private void createFile(String dir, long counter) throws Exception {
     String fileName = dir.concat("/").concat(RandomStringUtils.
-            secure().nextAlphanumeric(getLength()));
+            secure().nextAlphanumeric(length));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);
@@ -257,7 +207,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
   }
 
   private void createFiles(String dir) throws Exception {
-    for (int i = 0; i < getFileCount(); i++) {
+    for (int i = 0; i < fileCount; i++) {
       createFile(dir, i);
     }
   }

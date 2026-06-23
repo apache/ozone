@@ -69,16 +69,6 @@ public class PutKeyHandler extends KeyHandler {
       description = "Store key only if it already exists and its generation matches the value provided")
   private Long expectedGeneration;
 
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--expectedGeneration", hidden = true)
-  private Long deprecatedExpectedGeneration;
-
-  private Long getExpectedGeneration() {
-    return expectedGeneration != null ? expectedGeneration : deprecatedExpectedGeneration;
-  }
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -137,9 +127,8 @@ public class PutKeyHandler extends KeyHandler {
   private OzoneOutputStream createOrReplaceKey(OzoneBucket bucket, String keyName,
       long size, Map<String, String> keyMetadata, ReplicationConfig replicationConfig
   ) throws IOException {
-    Long generation = getExpectedGeneration();
-    if (generation != null) {
-      final long existingGeneration = generation;
+    if (expectedGeneration != null) {
+      final long existingGeneration = expectedGeneration;
       Preconditions.checkArgument(existingGeneration > 0,
           "expectedGeneration must be positive, but was %s", existingGeneration);
       return bucket.rewriteKey(keyName, size, existingGeneration, replicationConfig, keyMetadata);

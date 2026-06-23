@@ -58,33 +58,17 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private ColumnFamilyOption columnFamilyOption;
+  @CommandLine.Option(names = {"--column-family", "--cf"},
+      required = true,
+      description = "Column family name")
+  private String columnFamilyName;
 
-<<<<<<< HEAD
   @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
       description = "BottommostLevelCompaction option for RocksDB compaction." +
           " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).",
       defaultValue = "0",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int bottommostLevelCompaction;
-=======
-  static class ColumnFamilyOption {
-    @CommandLine.Option(names = {"--column-family", "--cf"},
-        description = "Column family name")
-    private String columnFamilyName;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--column_family", hidden = true)
-    private String deprecatedColumnFamilyName;
-
-    String getColumnFamilyName() {
-      return columnFamilyName != null ? columnFamilyName : deprecatedColumnFamilyName;
-    }
-  }
->>>>>>> a71ff80348 (Remove conflicts and refactor the code to use DeprecatedCliOption class)
 
   private String getConsoleReadLineWithFormat() {
     err().printf(WARNING_TO_STOP_SERVICE);
@@ -99,8 +83,6 @@ public class RocksDBManualCompaction extends RepairTool {
    */
   @Override
   public void execute() throws Exception {
-    String columnFamilyName = columnFamilyOption.getColumnFamilyName();
-
     if (!isDryRun()) {
       confirmUser();
       final boolean confirmed = "y".equalsIgnoreCase(getConsoleReadLineWithFormat());

@@ -45,8 +45,6 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
 
-  private static final int DEFAULT_NAME_LEN = 10;
-
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
       defaultValue = "5")
@@ -60,14 +58,9 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
 
   @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create.")
-  private Integer length;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @Option(names = "--nameLen", hidden = true)
-  private Integer deprecatedLength;
+          "Length of the random name of directory you want to create.",
+      defaultValue = "10")
+  private int length;
 
   @Override
   public Void call() throws Exception {
@@ -85,16 +78,6 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
     return null;
   }
 
-  private int getLength() {
-    if (length != null) {
-      return length;
-    }
-    if (deprecatedLength != null) {
-      return deprecatedLength;
-    }
-    return DEFAULT_NAME_LEN;
-  }
-
   /*
       Nested directories will be created like this,
       suppose you pass depth=3, span=3 and number of tests=2
@@ -109,15 +92,14 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
-    int nameLen = getLength();
-    String dirString = RandomStringUtils.secure().nextAlphanumeric(nameLen);
+    String dirString = RandomStringUtils.secure().nextAlphanumeric(length);
     for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
-          secure().nextAlphanumeric(nameLen));
+          secure().nextAlphanumeric(length));
     }
     Path file = new Path(getRootPath().concat("/").concat(dirString));
     getFileSystem().mkdirs(file.getParent());
-    String leafDir = dirString.substring(0, dirString.length() - nameLen);
+    String leafDir = dirString.substring(0, dirString.length() - length);
     String tmp = "/0";
     for (int i = 1; i <= span; i++) {
       String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);

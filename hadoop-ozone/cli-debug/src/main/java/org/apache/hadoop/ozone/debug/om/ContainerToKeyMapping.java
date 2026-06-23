@@ -86,12 +86,6 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       description = "Only display file names without full path")
   private boolean onlyFileNames;
 
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = {"--onlyFileNames"}, hidden = true)
-  private boolean deprecatedOnlyFileNames;
-
   @CommandLine.Option(names = {"--in-progress"},
       defaultValue = "false",
       description = "Includes in-progress open files/keys and multipart uploads")
@@ -112,13 +106,8 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private final Map<String, Long> volumeCache = new HashMap<>();
   private ConfigurationSource conf;
 
-  private boolean getOnlyFileNames() {
-    return onlyFileNames || deprecatedOnlyFileNames;
-  }
-
   @Override
   public Void call() throws Exception {
-    onlyFileNames = getOnlyFileNames();
     String dbPath = parent.getDbPath();
     // Parse container IDs
     Set<Long> containerIDs = Arrays.stream(containers.split(","))

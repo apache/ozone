@@ -50,16 +50,6 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   //  unintentionally leak secret if an admin isn't careful.
   private String accessId;
 
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--accessId", hidden = true)
-  private String deprecatedAccessId;
-
-  private String getAccessId() {
-    return accessId != null ? accessId : deprecatedAccessId;
-  }
-
   private String getDefaultAccessId(String userPrinc) {
     return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrinc;
   }
@@ -67,8 +57,6 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
-    accessId = getAccessId();
 
     if (StringUtils.isEmpty(accessId)) {
       accessId = getDefaultAccessId(userPrincipal);

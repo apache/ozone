@@ -90,14 +90,13 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
-  private static final String DEFAULT_DN_DB_SCHEMA_VERSION = "V3";
 
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private ColumnFamilyOption columnFamilyOption;
-
+  @CommandLine.Option(names = {"--column-family", "--cf"},
+      required = true,
+      description = "Table name")
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
@@ -139,14 +138,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private String filter;
 
   @CommandLine.Option(names = {"--dn-schema", "-d"},
-      description = "Datanode DB Schema Version: V1/V2/V3")
+      description = "Datanode DB Schema Version: V1/V2/V3",
+      defaultValue = "V3")
   private String dnDBSchemaVersion;
-
-  /** For backward compatibility. */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  @CommandLine.Option(names = "--dnSchema", hidden = true)
-  private String deprecatedDnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "--cid"},
       description = "Container ID. Applicable if datanode DB Schema is V3",
@@ -188,37 +182,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private static volatile boolean exception;
   private static final long FIRST_SEQUENCE_ID = 0L;
 
-  static class ColumnFamilyOption {
-    @CommandLine.Option(names = {"--column-family", "--cf"},
-        description = "Table name",
-        required = true)
-    private String tableName;
-
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--column_family", hidden = true, required = true)
-    private String deprecatedTableName;
-
-    String getTableName() {
-      return tableName != null ? tableName : deprecatedTableName;
-    }
-  }
-
-  private String getDnDBSchemaVersion() {
-    if (dnDBSchemaVersion != null) {
-      return dnDBSchemaVersion;
-    }
-    if (deprecatedDnDBSchemaVersion != null) {
-      return deprecatedDnDBSchemaVersion;
-    }
-    return DEFAULT_DN_DB_SCHEMA_VERSION;
-  }
-
   @Override
   public Void call() throws Exception {
-    tableName = columnFamilyOption.getTableName();
-    dnDBSchemaVersion = getDnDBSchemaVersion();
     fileSuffix = 0;
     globalCount = 0;
     List<ColumnFamilyDescriptor> cfDescList =

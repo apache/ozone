@@ -116,20 +116,6 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
 
-  static final int CHECK_INTERVAL_MILLIS = 5000;
-
-  private static final Random RANDOM = new Random();
-
-  private OzoneConfiguration conf;
-
-  private List<FakeDatanode> datanodes;
-
-  private StorageContainerDatanodeProtocol datanodeScmClient;
-
-  private StorageContainerLocationProtocol scmContainerClient;
-
-  private ScmBlockLocationProtocol scmBlockClient;
-
   @CommandLine.ParentCommand
   private Freon freon;
 
@@ -170,33 +156,30 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private ScmHostOption scmHostOption;
-
+  @CommandLine.Option(names = {"--scm-host"},
+      required = true,
+      description = "The leader scm host x.x.x.x.")
   private String scm;
 
   @CommandLine.Mixin
   private FreonReplicationOptions replication;
 
-  static class ScmHostOption {
-    @CommandLine.Option(names = {"--scm-host"},
-        description = "The leader scm host x.x.x.x.")
-    private String scm;
+  static final int CHECK_INTERVAL_MILLIS = 5000;
 
-    /** For backward compatibility. */
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @CommandLine.Option(names = "--scmHost", hidden = true)
-    private String deprecatedScm;
+  private static final Random RANDOM = new Random();
 
-    String getScmHost() {
-      return scm != null ? scm : deprecatedScm;
-    }
-  }
+  private OzoneConfiguration conf;
+
+  private List<FakeDatanode> datanodes;
+
+  private StorageContainerDatanodeProtocol datanodeScmClient;
+
+  private StorageContainerLocationProtocol scmContainerClient;
+
+  private ScmBlockLocationProtocol scmBlockClient;
 
   @Override
   public Void call() throws Exception {
-    scm = scmHostOption.getScmHost();
     conf = freon.getOzoneConf();
 
     ThroughputBenchmark benchmark = createBenchmark();
