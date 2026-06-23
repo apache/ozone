@@ -65,4 +65,4 @@ execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" debug/bloc
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" -v "FAULT_INJ_DATANODE:${dn_with_num}" debug/container-state-verifier.robot
 
 execute_robot_test ${OM} kinit.robot
-execute_robot_test ${OM} -v "PREFIX:${prefix}" debug/ozone-debug-tests- ec3-2.robot
+execute_robot_test ${OM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot

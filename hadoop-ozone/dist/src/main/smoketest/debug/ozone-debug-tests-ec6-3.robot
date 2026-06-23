@@ -17,10 +17,12 @@
 Documentation       Test ozone Debug CLI for EC(6,3) replicated keys
 Library             OperatingSystem
 Library             Process
+Resource            ../ec/lib.resource
 Resource            ../lib/os.robot
 Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
-Suite Setup         Create Volume Bucket
+Suite Setup         Run Keywords    Wait Until Keyword Succeeds    2min    10sec    Has Enough Datanodes    9
+...                     AND    Create Volume Bucket
 
 *** Variables ***
 ${PREFIX}           ${EMPTY}
