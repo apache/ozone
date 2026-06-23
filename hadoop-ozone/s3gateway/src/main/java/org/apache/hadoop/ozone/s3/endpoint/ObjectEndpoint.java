@@ -80,6 +80,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -984,7 +985,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else {
         getMetrics().updateCreateMultipartKeyFailureStats(startNanos);
       }
-      final OMException omEx = findOMException(ex);
+      final OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
       if (omEx != null) {
         if (omEx.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
           throw newError(NO_SUCH_UPLOAD, uploadID, omEx);
@@ -1000,17 +1001,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         multiDigestInputStream.resetDigests();
       }
     }
-  }
-
-  private static OMException findOMException(Throwable t) {
-    Throwable currentException = t;
-    while (currentException != null) {
-      if (currentException instanceof OMException) {
-        return (OMException) currentException;
-      }
-      currentException = currentException.getCause();
-    }
-    return null;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
