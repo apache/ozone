@@ -453,7 +453,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "isFinalized per selected non-S3G host. true when software_version == apparent_version.",
+      "description": "Per non-S3G host: software_version, apparent_version, and isFinalized (true when software_version == apparent_version).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -469,23 +469,7 @@
             },
             "inspect": false
           },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "color": "red",
-                  "index": 0,
-                  "text": "false"
-                },
-                "1": {
-                  "color": "green",
-                  "index": 1,
-                  "text": "true"
-                }
-              },
-              "type": "value"
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -508,6 +492,26 @@
                 "value": {
                   "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "false"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 1,
+                        "text": "true"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
               }
             ]
           }
@@ -546,30 +550,89 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left(component) ozone_build_info",
+          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left(component) ozone_build_info",
           "format": "table",
           "instant": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "component_version_manager_metrics_apparent_version{instance=~\"$instance\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
         }
       ],
       "title": "Finalization Status",
       "transformations": [
         {
+          "id": "joinByField",
+          "options": {
+            "byField": "instance",
+            "mode": "outer"
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
               "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "__name__ 3": true,
               "context": true,
-              "job": true
+              "context 1": true,
+              "context 2": true,
+              "context 3": true,
+              "exported_component": true,
+              "exported_component 1": true,
+              "exported_component 2": true,
+              "exported_component 3": true,
+              "hostname": true,
+              "hostname 1": true,
+              "hostname 2": true,
+              "hostname 3": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "revision": true,
+              "revision 1": true,
+              "revision 2": true,
+              "revision 3": true,
+              "version": true,
+              "version 1": true,
+              "version 2": true,
+              "version 3": true
             },
             "indexByName": {
-              "Value": 2,
+              "apparent_version": 3,
               "component": 1,
-              "instance": 0
+              "instance": 0,
+              "isFinalized": 4,
+              "software_version": 2
             },
             "renameByName": {
-              "Value": "isFinalized"
+              "Value #A": "software_version",
+              "Value #B": "apparent_version",
+              "Value #C": "isFinalized"
             }
           }
         }
@@ -797,5 +860,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade 2",
   "uid": "ozone-rolling-upgrade-2",
-  "version": 4
+  "version": 6
 }
