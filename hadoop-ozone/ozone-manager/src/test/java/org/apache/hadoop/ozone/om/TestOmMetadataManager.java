@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
@@ -140,7 +141,8 @@ public class TestOmMetadataManager {
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
       COMPACTION_LOG_TABLE,
-      LIFECYCLE_CONFIGURATION_TABLE
+      LIFECYCLE_CONFIGURATION_TABLE,
+      LIFECYCLE_SCAN_STATE_TABLE
   };
 
   private OMMetadataManager omMetadataManager;

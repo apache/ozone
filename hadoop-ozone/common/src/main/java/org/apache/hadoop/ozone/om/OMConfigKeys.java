@@ -199,6 +199,13 @@ public final class OMConfigKeys {
       "ozone.lifecycle.service.delete.cached.directory.max-count";
   public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;
 
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS =
+      "ozone.lifecycle.service.state.save.interval.ms";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED =
+      "ozone.lifecycle.service.state.save.keys.processed";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT = 100000;
+
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED =
       "ozone.lifecycle.service.move.to.trash.enabled";
   public static final boolean

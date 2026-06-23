@@ -162,6 +162,7 @@ enum Type {
   DeleteLifecycleConfiguration = 146;
   GetLifecycleServiceStatus    = 147;
   SetLifecycleServiceStatus     = 148;
+  SaveLifecycleScanState        = 149;
 }
 
 enum SafeMode {
@@ -319,6 +320,7 @@ message OMRequest {
   optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 147;
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 148;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 149;
+  optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 150;
 }
 
 message OMResponse {
@@ -459,6 +461,7 @@ message OMResponse {
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 146;
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 147;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 148;
+  optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 149;
 }
 
 enum Status {
@@ -1414,6 +1417,7 @@ message DeleteKeyRequest {
 message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
     optional RequestSource sourceType = 2 [default = USER];
+    optional LifecycleScanState scanState = 3;
 }
 
 enum RequestSource {
@@ -2624,3 +2628,22 @@ message SetLifecycleServiceStatusRequest {
 message SetLifecycleServiceStatusResponse {
 }
 
+
+message LifecycleScanState {
+  optional string bucketKey = 1;  // volume/bucket
+  optional uint64 bucketObjID = 2;
+  optional uint64 lifecycleConfigurationUpdateID = 3;
+  optional uint64 scanStartTime = 4;
+  optional uint64 scanEndTime = 5;
+  optional string lastScannedKey = 6;
+  optional string lastScannedDir = 7;
+  optional string lastScannedDirKey = 8;
+  optional string lastScannedMpuKey = 9;
+}
+
+message SaveLifecycleScanStateRequest {
+  optional LifecycleScanState state = 1;
+}
+
+message SaveLifecycleScanStateResponse {
+}
