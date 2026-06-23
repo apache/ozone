@@ -31,6 +31,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.ozone.test.InputSubstream;
 
 /**
@@ -40,7 +44,36 @@ public final class S3SDKTestUtils {
 
   public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
 
+  private static final int DEFAULT_LIST_PARTS_MAX = 100;
+
   private S3SDKTestUtils() {
+  }
+
+  /**
+   * Returns the modification time of a key stored in OM, in epoch milliseconds.
+   */
+  public static long getOmKeyModificationTime(MiniOzoneCluster cluster, String bucketName, String keyName)
+      throws IOException {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      final OzoneBucket bucket = ozoneClient.getObjectStore().getS3Volume().getBucket(bucketName);
+      return bucket.getKey(keyName).getModificationTime().toEpochMilli();
+    }
+  }
+
+  /**
+   * Returns the modification time of a multipart upload part stored in OM, in epoch milliseconds.
+   */
+  public static long getOmPartModificationTime(MiniOzoneCluster cluster, String bucketName, String keyName,
+      String uploadId, int partNumber) throws IOException {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      final OzoneBucket bucket = ozoneClient.getObjectStore().getS3Volume().getBucket(bucketName);
+      final OzoneMultipartUploadPartListParts parts = bucket.listParts(keyName, uploadId, 0, DEFAULT_LIST_PARTS_MAX);
+      return parts.getPartInfoList().stream()
+          .filter(part -> part.getPartNumber() == partNumber)
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Part " + partNumber + " not found for upload " + uploadId))
+          .getModificationTime();
+    }
   }
 
   /**
