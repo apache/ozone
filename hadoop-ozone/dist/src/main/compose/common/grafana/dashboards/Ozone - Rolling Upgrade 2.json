@@ -239,7 +239,7 @@
       },
       "id": 4,
       "panels": [],
-      "title": "Build Versions",
+      "title": "Build Versions — by host and component",
       "type": "row"
     },
     {
@@ -446,7 +446,7 @@
       },
       "id": 9,
       "panels": [],
-      "title": "Finalization Status",
+      "title": "Finalization — by host and component",
       "type": "row"
     },
     {
@@ -749,14 +749,37 @@
         "datasource": {
           "type": "prometheus"
         },
-        "definition": "label_values(ozone_build_info, instance)",
+        "definition": "label_values(ozone_build_info, component)",
+        "includeAll": true,
+        "label": "component",
+        "multi": true,
+        "name": "component",
+        "options": [],
+        "query": {
+          "query": "label_values(ozone_build_info, component)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus"
+        },
+        "definition": "label_values(ozone_build_info{component=~\"$component\"}, instance)",
         "includeAll": true,
         "label": "instance",
         "multi": true,
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(ozone_build_info, instance)",
+          "query": "label_values(ozone_build_info{component=~\"$component\"}, instance)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -774,5 +797,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade 2",
   "uid": "ozone-rolling-upgrade-2",
-  "version": 3
+  "version": 4
 }
