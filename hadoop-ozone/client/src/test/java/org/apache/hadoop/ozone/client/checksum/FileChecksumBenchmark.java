@@ -317,7 +317,7 @@ public class FileChecksumBenchmark {
     when(mockBucket.getName()).thenReturn("bucket");
 
     OzoneClientConfig.ChecksumCombineMode combineMode =
-        OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
+        OzoneClientConfig.ChecksumCombineMode.COMPOSITE_CRC;
 
     Runnable task = () -> {
       try {
