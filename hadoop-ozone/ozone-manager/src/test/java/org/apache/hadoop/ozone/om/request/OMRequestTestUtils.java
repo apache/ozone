@@ -1030,6 +1030,13 @@ public final class OMRequestTestUtils {
         omDirectoryInfo.getName());
     omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
     omMetadataManager.getDirectoryTable().delete(ozoneKey);
+
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo != null) {
+      omBucketInfo.decrUsedNamespace(1L, true);
+      omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+    }
     return ozoneKey;
   }
 
