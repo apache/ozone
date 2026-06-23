@@ -177,7 +177,7 @@ public class ChatbotAgent {
       }
 
       // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
-      if (selection.kind() == ToolSelection.Kind.DIRECT_ANSWER) {
+      if (selection.kind() == ToolSelectionKind.DIRECT_ANSWER) {
         LOG.info("Tool selection result: DOCUMENTATION_QUERY (no Recon API call)");
         return selection.answer();
       }
@@ -186,7 +186,7 @@ public class ChatbotAgent {
       Map<String, EndpointResult> apiResults;
 
       // Scenario A: LLM says we need to call MULTIPLE APIs to get the answer
-      if (selection.kind() == ToolSelection.Kind.MULTI) {
+      if (selection.kind() == ToolSelectionKind.MULTI) {
 
         if (selection.calls() == null || selection.calls().isEmpty()) {
           LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
@@ -598,17 +598,19 @@ public class ChatbotAgent {
    * </ul>
    * A {@code null} {@code ToolSelection} signals "no suitable endpoint" and routes to the fallback.
    */
+  private enum ToolSelectionKind {
+    SINGLE, MULTI, DIRECT_ANSWER
+  }
+
   private static final class ToolSelection {
 
-    private enum Kind { SINGLE, MULTI, DIRECT_ANSWER }
-
-    private final Kind kind;
+    private final ToolSelectionKind kind;
     private final String toolName;
     private final Map<String, String> parameters;
     private final List<ToolSelection> calls;
     private final String answer;
 
-    private ToolSelection(Kind kind, String toolName, Map<String, String> parameters,
+    private ToolSelection(ToolSelectionKind kind, String toolName, Map<String, String> parameters,
                           List<ToolSelection> calls, String answer) {
       this.kind = kind;
       this.toolName = toolName;
@@ -618,18 +620,18 @@ public class ChatbotAgent {
     }
 
     static ToolSelection single(String toolName, Map<String, String> parameters) {
-      return new ToolSelection(Kind.SINGLE, toolName, parameters, null, null);
+      return new ToolSelection(ToolSelectionKind.SINGLE, toolName, parameters, null, null);
     }
 
     static ToolSelection multi(List<ToolSelection> calls) {
-      return new ToolSelection(Kind.MULTI, null, null, calls, null);
+      return new ToolSelection(ToolSelectionKind.MULTI, null, null, calls, null);
     }
 
     static ToolSelection directAnswer(String answer) {
-      return new ToolSelection(Kind.DIRECT_ANSWER, null, null, null, answer);
+      return new ToolSelection(ToolSelectionKind.DIRECT_ANSWER, null, null, null, answer);
     }
 
-    Kind kind() {
+    ToolSelectionKind kind() {
       return kind;
     }
 

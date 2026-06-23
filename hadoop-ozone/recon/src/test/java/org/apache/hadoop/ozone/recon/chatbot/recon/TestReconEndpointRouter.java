@@ -48,13 +48,9 @@ public class TestReconEndpointRouter {
 
   private ReconEndpointRouter router;
   private ClusterStateEndpoint clusterStateEndpoint;
-  private NodeEndpoint nodeEndpoint;
-  private PipelineEndpoint pipelineEndpoint;
   private ContainerEndpoint containerEndpoint;
   private OMDBInsightEndpoint omdbInsightEndpoint;
-  private VolumeEndpoint volumeEndpoint;
   private BucketEndpoint bucketEndpoint;
-  private TaskStatusService taskStatusService;
   private UtilizationEndpoint utilizationEndpoint;
   private NSSummaryEndpoint nsSummaryEndpoint;
   private ReconApiAllowlist reconApiAllowlist;
@@ -62,13 +58,13 @@ public class TestReconEndpointRouter {
   @BeforeEach
   public void setUp() {
     clusterStateEndpoint = mock(ClusterStateEndpoint.class);
-    nodeEndpoint = mock(NodeEndpoint.class);
-    pipelineEndpoint = mock(PipelineEndpoint.class);
+    NodeEndpoint nodeEndpoint = mock(NodeEndpoint.class);
+    PipelineEndpoint pipelineEndpoint = mock(PipelineEndpoint.class);
     containerEndpoint = mock(ContainerEndpoint.class);
     omdbInsightEndpoint = mock(OMDBInsightEndpoint.class);
-    volumeEndpoint = mock(VolumeEndpoint.class);
+    VolumeEndpoint volumeEndpoint = mock(VolumeEndpoint.class);
     bucketEndpoint = mock(BucketEndpoint.class);
-    taskStatusService = mock(TaskStatusService.class);
+    TaskStatusService taskStatusService = mock(TaskStatusService.class);
     utilizationEndpoint = mock(UtilizationEndpoint.class);
     nsSummaryEndpoint = mock(NSSummaryEndpoint.class);
     reconApiAllowlist = mock(ReconApiAllowlist.class);
