@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Reco
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -80,6 +82,7 @@ import org.apache.hadoop.ozone.container.replication.PushReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -221,6 +224,23 @@ public class DatanodeStateMachine implements Closeable {
         .datanodeConfig(dnConf)
         .replicationConfig(replicationConfig)
         .clock(clock)
+        .volumeChooser(task -> {
+          if (task instanceof ReplicationTask) {
+            ReplicationTask repTask = (ReplicationTask) task;
+            if (repTask.getTarget() == null) {
+              try {
+                return importer.chooseNextVolume(importer.getDefaultReplicationSpace());
+              } catch (IOException e) {
+                LOG.error("Failed to choose volume for replication task " + task, e);
+                return null;
+              }
+            } else {
+              Container localContainer = getContainer().getContainerSet().getContainer(task.getContainerId());
+              return localContainer != null ? (HddsVolume) localContainer.getContainerData().getVolume() : null;
+            }
+          }
+          return null;
+        })
         .build();
 
     replicationSupervisorMetrics =

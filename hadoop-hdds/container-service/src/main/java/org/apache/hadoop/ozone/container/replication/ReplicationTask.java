@@ -125,7 +125,7 @@ public class ReplicationTask extends AbstractReplicationTask {
     this.transferredBytes = transferredBytes;
   }
 
-  DatanodeDetails getTarget() {
+  public DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
   }
 

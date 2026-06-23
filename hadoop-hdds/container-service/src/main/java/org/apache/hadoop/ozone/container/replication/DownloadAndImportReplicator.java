@@ -72,11 +72,13 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     LOG.info("Starting replication of container {} from {} using {}",
         containerID, sourceDatanodes, compression);
-    HddsVolume targetVolume = null;
-
+    HddsVolume targetVolume = task.getVolume();
     try {
-      targetVolume = containerImporter.chooseNextVolume(
-          containerImporter.getDefaultReplicationSpace());
+      if (targetVolume == null) {
+        targetVolume = containerImporter.chooseNextVolume(
+            containerImporter.getDefaultReplicationSpace());
+        task.setVolume(targetVolume);
+      }
 
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.

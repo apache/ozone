@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
 /**
  * Abstract class to capture common variables and methods for different types
@@ -43,6 +44,8 @@ public abstract class AbstractReplicationTask {
   private ReplicationCommandPriority priority = NORMAL;
 
   private boolean shouldOnlyRunOnInServiceDatanodes = true;
+
+  private HddsVolume volume;
 
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
@@ -154,6 +157,14 @@ public abstract class AbstractReplicationTask {
       sb.append(", queued at ").append(getQueued());
     }
     return sb.toString();
+  }
+
+  public HddsVolume getVolume() {
+    return volume;
+  }
+
+  public void setVolume(HddsVolume volume) {
+    this.volume = volume;
   }
 
   /**
