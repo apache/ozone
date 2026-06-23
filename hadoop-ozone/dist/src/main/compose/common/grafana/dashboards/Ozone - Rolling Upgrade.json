@@ -38,49 +38,43 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "One bar per build version present in the cluster. Bar max is the total number of scrape targets, so the bar for the new version fills completely when the upgrade is done.",
+      "description": "Distribution of cluster instances by build version. Each slice represents the share of instances on that build; the chart fills with a single slice when the upgrade completes.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "decimals": 0,
           "displayName": "${__field.labels.version}",
           "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": 0
-              }
-            ]
-          },
           "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 24,
         "x": 0,
         "y": 1
       },
       "id": 2,
       "options": {
-        "displayMode": "gradient",
+        "displayLabels": [
+          "name",
+          "value",
+          "percent"
+        ],
         "legend": {
           "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
         },
-        "maxVizHeight": 300,
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
+        "pieType": "pie",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -88,9 +82,10 @@
           "fields": "",
           "values": false
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -104,35 +99,10 @@
           "legendFormat": "{{version}}",
           "range": false,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "count(ozone_build_info)",
-          "instant": true,
-          "legendFormat": "__total__",
-          "range": false,
-          "refId": "B"
         }
       ],
-      "title": "Hosts per Build Version",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "__total__",
-                "handlerKey": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "bargauge"
+      "title": "Instances per Build Version",
+      "type": "piechart"
     },
     {
       "collapsed": false,
