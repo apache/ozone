@@ -45,6 +45,7 @@
             "mode": "thresholds"
           },
           "decimals": 0,
+          "displayName": "${__field.labels.version}",
           "mappings": [],
           "min": 0,
           "thresholds": {
@@ -194,7 +195,16 @@
             "desc": false,
             "displayName": "instance"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -379,7 +389,16 @@
             "desc": false,
             "displayName": "instance"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -564,7 +583,16 @@
             "desc": false,
             "displayName": "instance"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -750,7 +778,16 @@
             "desc": false,
             "displayName": "instance"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -937,7 +974,16 @@
             "desc": false,
             "displayName": "instance"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -1369,7 +1415,16 @@
             "desc": false,
             "displayName": "host"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -1643,7 +1698,16 @@
             "desc": false,
             "displayName": "host"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -1917,7 +1981,16 @@
             "desc": false,
             "displayName": "host"
           }
-        ]
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false,
+          "enablePagination": true
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
