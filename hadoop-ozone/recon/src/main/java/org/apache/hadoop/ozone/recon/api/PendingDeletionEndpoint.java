@@ -26,7 +26,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,12 +86,12 @@ public class PendingDeletionEndpoint {
           .entity("Limit query parameter must be at-least 1").build();
     }
 
-    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics(limit);
-    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
-      return Response.ok(response).build();
-    } else {
-      return Response.accepted(response).build();
+    Object response = dataNodeMetricsService.getCollectedMetrics(limit);
+    if (response instanceof DataNodeMetricsCompleteResponse) {
+      DataNodeMetricsCompleteResponse completeResponse = (DataNodeMetricsCompleteResponse) response;
+      return Response.ok(completeResponse).build();
     }
+    return Response.accepted(response).build();
   }
 
   private Response handleScmPendingDeletion() {
