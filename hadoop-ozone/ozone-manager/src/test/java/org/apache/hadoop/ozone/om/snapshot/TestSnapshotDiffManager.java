@@ -1166,12 +1166,12 @@ public class TestSnapshotDiffManager {
   }
 
   private static Stream<Arguments> threadPoolFullScenarios() {
+    int fullThreadPoolSize = 2 * OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
     return Stream.of(
         Arguments.of("When the pool drains between job batches",
             true, 45, 0),
-        // 10 running + 10 queued = 20 accepted, remaining 25 rejected
         Arguments.of("When the pool does not drain between job batches",
-            false, 20, 25)
+            false, fullThreadPoolSize, 45 - fullThreadPoolSize)
     );
   }
 
