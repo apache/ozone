@@ -103,6 +103,7 @@ public class FSORepairTool extends RepairTool {
 
   @CommandLine.Option(names = {"--batch-size"},
       defaultValue = "10000",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS,
       description = "Number of entries to buffer before flushing a batch of writes to temp.db.")
   private int tempDbBatchSize;
 
