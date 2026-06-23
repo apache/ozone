@@ -585,6 +585,12 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
+  public void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap) {
+    // Legacy SCM HA method retained as a no-op. SCM no longer maintains the
+    // ContainerInfo deleteTransactionId; DN-side container data tracks it.
+  }
+
   private AutoCloseableLock readLock() {
     return AutoCloseableLock.acquire(lock.readLock());
   }

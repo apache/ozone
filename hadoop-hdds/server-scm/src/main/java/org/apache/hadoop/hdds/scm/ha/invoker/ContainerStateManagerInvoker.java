@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -184,6 +185,11 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
         final Object[] args = {arg0, arg1, arg2};
         invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
       }
+
+      @Override
+      public void updateDeleteTransactionId(Map arg0) throws IOException {
+        invoker.getImpl().updateDeleteTransactionId(arg0);
+      }
     };
   }
 
@@ -309,8 +315,8 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       return Message.EMPTY;
 
     case "updateDeleteTransactionId":
-      // Legacy HA compatibility: old SCMs may replicate this operation during
-      // rolling upgrade or log replay. SCM no longer maintains this field.
+      final Map arg29 = p.length > 0 ? (Map) p[0] : null;
+      getImpl().updateDeleteTransactionId(arg29);
       return Message.EMPTY;
 
     default:

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -227,6 +228,16 @@ public interface ContainerStateManager extends SCMHandler {
    */
   @Replicate
   void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
+
+  /**
+   * Legacy no-op retained for SCM HA compatibility with old method names.
+   * SCM no longer maintains ContainerInfo deleteTransactionId.
+   *
+   * @deprecated SCM no longer updates ContainerInfo deleteTransactionId.
+   */
+  @Deprecated
+  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
       throws IOException;
 
 }
