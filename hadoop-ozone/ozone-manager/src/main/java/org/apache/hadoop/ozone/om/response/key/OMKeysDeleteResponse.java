@@ -129,4 +129,8 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   protected Map<String, OmKeyInfo> getOpenKeyInfoMap() {
     return openKeyInfoMap;
   }
+
+  public OmLifecycleScanState getScanState() {
+    return scanState;
+  }
 }

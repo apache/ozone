@@ -48,7 +48,6 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
   private List<OmKeyInfo> dirsList;
   private long volumeId;
-  private OmLifecycleScanState scanState;
 
   public OMKeysDeleteResponseWithFSO(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
@@ -60,7 +59,6 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
     super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap, scanState);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
-    this.scanState = scanState;
   }
 
   @Override
@@ -107,6 +105,7 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       }
     }
 
+    OmLifecycleScanState scanState = getScanState();
     if (scanState != null) {
       omMetadataManager.getLifecycleScanStateTable().putWithBatch(
           batchOperation, scanState.getBucketKey(), scanState);

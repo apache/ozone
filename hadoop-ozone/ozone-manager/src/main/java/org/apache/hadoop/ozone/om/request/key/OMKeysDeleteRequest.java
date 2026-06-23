@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -91,6 +92,25 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   public OMKeysDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    DeleteKeysRequest deleteKeysRequest = super.preExecute(ozoneManager).getDeleteKeysRequest();
+    Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
+
+    if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
+      if (ozoneManager.getAclsEnabled()) {
+        UserGroupInformation ugi = createUGIForApi();
+        if (!ozoneManager.isAdmin(ugi)) {
+          throw new OMException("Access denied for user " + ugi + ". "
+              + "Superuser privilege is required to save Lifecycle Service task state.",
+              OMException.ResultCodes.ACCESS_DENIED);
+        }
+      }
+    }
+
+    return getOmRequest();
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -163,17 +183,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
-
-      if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
-        if (ozoneManager.getAclsEnabled()) {
-          UserGroupInformation ugi = createUGIForApi();
-          if (!ozoneManager.isAdmin(ugi)) {
-            throw new OMException("Access denied for user " + ugi + ". "
-                + "Superuser privilege is required to save Lifecycle Service task state.",
-                OMException.ResultCodes.ACCESS_DENIED);
-          }
-        }
-      }
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);

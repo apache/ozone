@@ -199,7 +199,6 @@ public final class OMConfigKeys {
       "ozone.lifecycle.service.delete.cached.directory.max-count";
   public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;
 
-  // Save task state for every 5m, or evaluated keys reaches 100k
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS =
       "ozone.lifecycle.service.state.save.interval.ms";
   public static final long OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;

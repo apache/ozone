@@ -171,7 +171,7 @@ public class KeyLifecycleService extends BackgroundService {
       LOG.warn("Illegal value {} for Property {}. Set {} to {}", stateSaveIntervalMs,
           OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS, OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS,
           OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT);
-      maxKeysProcessedPerState = OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
+      stateSaveIntervalMs = OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
     }
     this.maxKeysProcessedPerState = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED,
         OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT);
@@ -181,6 +181,7 @@ public class KeyLifecycleService extends BackgroundService {
           OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT);
       maxKeysProcessedPerState = OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
     }
+    LOG.info("stateSaveIntervalMs = {}, maxKeysProcessedPerState = {}", stateSaveIntervalMs, maxKeysProcessedPerState);
     this.inFlight = new ConcurrentHashMap();
     this.omMetadataManager = ozoneManager.getMetadataManager();
     int limit = (int) conf.getStorageSize(
@@ -629,40 +630,21 @@ public class KeyLifecycleService extends BackgroundService {
       return sortedConsolidatedRules;
     }
 
-    private boolean canSkipDir(OmDirectoryInfo currentDir, String currentDirTableKey, DirectoryList dirList) {
-      // currentDir null is bucket root
-      if (currentDir == null) {
+    private boolean canSkipDir(String currentDirPath, String lastScannedDirInState) {
+      if (lastScannedDirInState == null || currentDirPath.isEmpty()) {
         return false;
       }
-
-      int count = dirList.getSubDirCount();
-      // if currentDir is equal to lastScannedDir
-      if (currentDir.getObjectID() == dirList.getSubDirList().get(count - 1).getObjectID()) {
-        return false;
-      }
-
-      // if currentDir is parent of lastScannedDir
-      long currentObjID = currentDir.getObjectID();
-      for (int i = 0; i < count; i++) {
-        OmDirectoryInfo dir = dirList.getSubDirList().get(i);
-        if (dir.getObjectID() == currentObjID) {
-          return false;
+      String[] cur = currentDirPath.split(OM_KEY_PREFIX);
+      String[] last = lastScannedDirInState.split(OM_KEY_PREFIX);
+      int n = Math.min(cur.length, last.length);
+      for (int i = 0; i < n; i++) {
+        int cmp = cur[i].compareTo(last[i]);
+        if (cmp != 0) {
+          // current name > last name -> skip
+          return cmp > 0;
         }
       }
-
-      // if currentDir and lastScannedDir has same parent
-      do {
-        long parentID = currentDir.getParentObjectID();
-        for (int i = 0; i < count; i++) {
-          OmDirectoryInfo dir = dirList.getSubDirList().get(i);
-          if (dir.getParentObjectID() == parentID) {
-            if (dirList.getSubDirKeyList().get(i).compareTo(currentDirTableKey) < 0) {
-              return true;
-            }
-          }
-        }
-        return false;
-      } while (true);
+      return false;
     }
 
     @SuppressWarnings({"checkstyle:parameternumber", "checkstyle:MethodLength"})
@@ -676,19 +658,6 @@ public class KeyLifecycleService extends BackgroundService {
       String lastScannedDirInState = scanStateBuilder == null ? null : scanStateBuilder.getLastScannedDir();
       String lastScannedDirKeyInState = scanStateBuilder == null ? null : scanStateBuilder.getLastScannedDirKey();
       String lastScannedKeyInState = scanStateBuilder == null ? null : scanStateBuilder.getLastScannedKey();
-      DirectoryList lastScannedDirList = null;
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      if (lastScannedDirInState != null && lastScannedDirKeyInState != null) {
-        // find all parents of lastScannedSubDir
-        try {
-          lastScannedDirList = getDirList(volumeObjId, bucket, lastScannedDirInState, bucketKey);
-        } catch (IOException e) {
-          // Saved lastScannedDir in state could be deleted or renamed after it's saved.
-          // Fallback to no state saved status.
-          LOG.info("Failed to get DirList for lastScannedDirInState {}", lastScannedDirInState, e);
-          lastScannedDirInState = null;
-        }
-      }
       try {
         if (dir != null) {
           stack.push(new PendingEvaluateDirectory(dir, dirKey, directoryPath, null));
@@ -748,8 +717,7 @@ public class KeyLifecycleService extends BackgroundService {
          *   - dir3/dir8, lastScannedDir, partially scanned,
          *   - dir3/dir9, same the same parentID as lastScannedDir, and name order > lastScannedDir, scanned, skip
          */
-        if (lastScannedDirList != null &&
-            canSkipDir(currentDir, currentDirTableKey, lastScannedDirList)) {
+        if (canSkipDir(currentDirPath, lastScannedDirInState)) {
           LOG.info("Skip {} in LifecycleActionTask for bucket {}. ", currentDirPath, bucketName);
           continue;
         }
@@ -885,33 +853,12 @@ public class KeyLifecycleService extends BackgroundService {
 
         try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                  keyTable.iterator(prefix)) {
+          boolean seekPerformed = false;
           if (lastScannedDirKeyInState != null && lastScannedDirKeyInState.compareTo(currentDirTableKey) == 0 &&
               lastScannedKeyInState != null && lastScannedKeyInState.startsWith(prefix)) {
             LOG.info("Seek to key {} under directory {}", scanStateBuilder.getLastScannedKey(), lastScannedDirInState);
             keyTblItr.seek(scanStateBuilder.getLastScannedKey());
-            if (keyTblItr.hasNext()) {
-              Table.KeyValue<String, OmKeyInfo> first = keyTblItr.next();
-              if (!first.getKey().equals(scanStateBuilder.getLastScannedKey())) {
-                OmKeyInfo key = first.getValue();
-                String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
-                    currentDirPath + OM_KEY_PREFIX + key.getKeyName();
-                if (!deletedKeySetInCache.remove(first.getKey()) && !keySetInCache.remove(first.getKey())) {
-                  numKeyIterated++;
-                  numKeysUnderDir++;
-                  for (OmLCRule rule : ruleList) {
-                    if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
-                      if (keyList.isFull()) {
-                        handleAndClearFullList(bucket, keyList, false, scanStateBuilder, false);
-                      }
-                      keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
-                      numKeysExpired++;
-                      break;
-                    }
-                  }
-                  lastScannedKey = first.getKey();
-                }
-              }
-            }
+            seekPerformed = true;
           }
 
           while (keyTblItr.hasNext()) {
@@ -923,6 +870,9 @@ public class KeyLifecycleService extends BackgroundService {
             OmKeyInfo key = keyValue.getValue();
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
+            if (seekPerformed && keyValue.getKey().equals(scanStateBuilder.getLastScannedKey())) {
+              continue;
+            }
             if (deletedKeySetInCache.remove(keyValue.getKey()) || keySetInCache.remove(keyValue.getKey())) {
               continue;
             }
@@ -1066,19 +1016,10 @@ public class KeyLifecycleService extends BackgroundService {
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                keyTable.iterator(bucketPrefix)) {
+        boolean seekPerformed = false;
         if (scanStateBuilder != null && scanStateBuilder.getLastScannedKey() != null) {
           keyTblItr.seek(scanStateBuilder.getLastScannedKey());
-          // Skip the exact match since it was already processed
-          if (keyTblItr.hasNext()) {
-            Table.KeyValue<String, OmKeyInfo> first = keyTblItr.next();
-            if (!first.getKey().equals(scanStateBuilder.getLastScannedKey())) {
-              // We seeked past it, so we need to process this one.
-              // We can't easily "push back" in TableIterator, so we handle it here.
-              processKey(bucketInfo, first.getValue(), ruleList, expiredKeyList, scanStateBuilder);
-              numKeyIterated++;
-              lastScannedKey = first.getKey();
-            }
-          }
+          seekPerformed = true;
         }
 
         while (keyTblItr.hasNext()) {
@@ -1091,6 +1032,9 @@ public class KeyLifecycleService extends BackgroundService {
             flushAndSaveState(bucketInfo, expiredKeyList, null, scanStateBuilder);
           }
           Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
+          if (seekPerformed && keyValue.getKey().equals(scanStateBuilder.getLastScannedKey())) {
+            continue;
+          }
           processKey(bucketInfo, keyValue.getValue(), ruleList, expiredKeyList, scanStateBuilder);
           numKeyIterated++;
           lastScannedKey = keyValue.getKey();

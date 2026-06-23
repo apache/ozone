@@ -13,7 +13,7 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-  */
+*/
 
 # Design for Resumable Lifecycle Scans(HDDS-8342)
 
@@ -46,21 +46,21 @@ message LifecycleScanState {
 ```
 
 ### OM DB Schema Updates
-Add a new table `lifecycleStateTable` to `OMMetadataManager` to store the scan states:
-- **Table Name:** `lifecycleStateTable`
+Add a new table `lifecycleScanStateTable` to `OMMetadataManager` to store the scan states:
+- **Table Name:** `lifecycleScanStateTable`
 - **Key:** `bucketKey` (String, e.g., `/volumeName/bucketName`)
 - **Value:** `LifecycleScanState`
 
 ### When to Persist the Pointer
 Persisting the pointer for every key would overwhelm Ratis and RocksDB. We should checkpoint periodically:
 
-1. **Piggybacking on Deletes:** Add an optional `LifecycleScanState` field to `DeleteKeysRequest`. When the OM state machine applies the deletion, it atomically updates the `lifecycleStateTable` with the new pointer. This guarantees exactly-once semantics for the scan pointer relative to deletions.
+1. **Piggybacking on Deletes:** Add an optional `LifecycleScanState` field to `DeleteKeysRequest`. When the OM state machine applies the deletion, it atomically updates the `lifecycleScanStateTable` with the new pointer. This guarantees exactly-once semantics for the scan pointer relative to deletions.
 2. **Move to trash**: Since there is no `RenameKeysRequest`, rename has be called multiple times for a batch of keys. We introduce a new OM request `SaveLifecycleScanStateRequest`. After a batch of keys are moved to trash, call `SaveLifecycleScanStateRequest` explicitly to persist the state.
 3. **Periodic Standalone Checkpoints:** If no keys are expired (e.g., scanning millions of valid keys), we still need to save progress. The `LifecycleActionTask` will send this request periodically (e.g., every 100,000 keys iterated, or every 1 minute of execution time).
 3. **End of Scan:** When the scan for a bucket finishes, a `SaveLifecycleScanStateRequest` is sent to mark state as completed by recording the completion time.
 
 ### How to Resume the Scan
-When `KeyLifecycleService` schedules a `LifecycleActionTask` for a bucket, it first reads the `LifecycleScanState` from the `lifecycleStateTable`.
+When `KeyLifecycleService` schedules a `LifecycleActionTask` for a bucket, it first reads the `LifecycleScanState` from the `lifecycleScanStateTable`.
 
 - **OBS/Legacy Resumption:** 
   The iterator for `keyTable` is initialized to seek to `lastScannedKey` instead of the bucket prefix.

@@ -219,6 +219,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS, stateSaveInternal);
     conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
     OmLCExpiration.setTest(true);
+    KeyLifecycleService.setTest(true);
   }
 
   private void createSubject() throws Exception {
@@ -1083,7 +1084,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // So key1 and key2 are skipped, key3 is deleted.
       int expectedDeleted = 1;
       GenericTestUtils.waitFor(() ->
-          (getDeletedKeyCount() - initialDeletedKeyCount) >= expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
       
       assertEquals(2, getKeyCount(layout) - initialKeyCount);
       GenericTestUtils.waitFor(() ->
