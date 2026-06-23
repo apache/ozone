@@ -43,7 +43,7 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
   )
   private HddsProtos.ReplicationType type;
 
-   @CommandLine.Option(
+  @CommandLine.Option(
       names = {"-f", "--replication-factor"},
       description = "Replication factor for RATIS (ONE, THREE).",
       defaultValue = "ONE"
