@@ -299,12 +299,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throws StorageContainerException {
     File tempContainerFile = null;
     try {
-      // The metadata directory may be absent when writing the UNHEALTHY marker after
-      // a MISSING_METADATA_DIR corruption is detected. Recreate it so the state can be persisted.
-      File metadataDir = containerFile.getParentFile();
-      if (!metadataDir.exists() && !metadataDir.mkdirs()) {
-        throw new IOException("Failed to create metadata directory: " + metadataDir);
-      }
       tempContainerFile = createTempFile(containerFile);
       ContainerDataYaml.createContainerFile(containerData, tempContainerFile);
 
@@ -397,7 +391,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     final State prevState = containerData.getState();
     try {
-      updateContainerState(UNHEALTHY);
+      if (!getContainerFile().getParentFile().exists()) {
+        // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
+        // Attempting to write the .container file would fail, and writing a partial file
+        // with only the state field is more harmful than not writing one at all.
+        // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
+        // and schedule deletion without requiring a persisted .container file.
+        containerData.setState(UNHEALTHY);
+        LOG.debug("Skipping .container file update for container {} with missing metadata directory",
+            containerData.getContainerID());
+      } else {
+        updateContainerState(UNHEALTHY);
+      }
       clearPendingPutBlockCache();
     } finally {
       writeUnlock();
