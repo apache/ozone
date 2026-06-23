@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.cli;
 import java.io.PrintWriter;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import picocli.CommandLine;
+import java.util.Objects;
 
 /**
  * Emits warnings when deprecated multi-character short CLI options are used.
@@ -51,24 +51,27 @@ public final class DeprecatedCliOption {
   }
 
   /**
-   * Print a warning to stderr for each deprecated option present on the command line.
+   * If {@code arg} is a deprecated option (with or without {@code =value} part),
+   * print a warning to stderr and return with the recommended replacement option.
    */
-  public static void warnIfMatched(CommandLine.ParseResult parseResult) {
-    if (parseResult == null) {
-      return;
+  public static String toNonDeprecated(String arg, PrintWriter err) {
+    if (arg == null || arg.isEmpty()) {
+      return arg;
     }
 
-    for (CommandLine cli : parseResult.asCommandLineList()) {
-      CommandLine.ParseResult subcommandResult = cli.getParseResult();
-      if (subcommandResult.matchedOptions().isEmpty()) {
-        continue;
-      }
-      for (Map.Entry<String, String> entry : DEPRECATED_OPTIONS.entrySet()) {
-        if (subcommandResult.hasMatchedOption(entry.getKey())) {
-          warn(cli.getErr(), entry.getKey(), entry.getValue());
-        }
-      }
+    String result = arg;
+    String[] parts = arg.split("=", 2);
+    String opt = parts[0];
+    String optToUse = DEPRECATED_OPTIONS.getOrDefault(opt, opt);
+
+    if (!Objects.equals(opt, optToUse)) {
+      warn(err, opt, optToUse);
+      result = parts.length == 2
+          ? optToUse + '=' + parts[1]
+          : optToUse;
     }
+
+    return result;
   }
 
   private static void warn(PrintWriter err, String deprecated, String replacement) {

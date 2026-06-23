@@ -67,11 +67,15 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private NodeIdOptions nodeIdOptions;
+  @CommandLine.Option(names = {"--nodeid"},
+      description = "NodeID of the OM to be decommissioned.",
+      required = true)
+  private String decommNodeId;
 
-  @CommandLine.ArgGroup(multiplicity = "1")
-  private HostnameOptions hostnameOptions;
+  @CommandLine.Option(names = {"--node-host-address"},
+      description = "Host name/address of the OM to be decommissioned.",
+      required = true)
+  private String hostname;
 
   private InetAddress hostInetAddress;
 
@@ -102,14 +106,14 @@ public class DecommissionOMSubcommand implements Callable<Void> {
              OMAdminProtocolClientSideImpl.createProxyForOMHA(ozoneConf, user,
                  omServiceOption.getServiceID())) {
       OMNodeDetails decommNodeDetails = new OMNodeDetails.Builder()
-          .setOMNodeId(nodeIdOptions.getNodeId())
+          .setOMNodeId(decommNodeId)
           .setHostAddress(hostInetAddress.getHostAddress())
           .build();
       omAdminProtocolClient.decommission(decommNodeDetails);
 
-      System.out.println("Successfully decommissioned OM " + nodeIdOptions.getNodeId());
+      System.out.println("Successfully decommissioned OM " + decommNodeId);
     } catch (IOException e) {
-      System.out.println("Failed to decommission OM " + nodeIdOptions.getNodeId());
+      System.out.println("Failed to decommission OM " + decommNodeId);
       throw e;
     }
     return null;
@@ -121,19 +125,19 @@ public class DecommissionOMSubcommand implements Callable<Void> {
    */
   private void verifyNodeIdAndHostAddress() throws IOException {
     String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-        omServiceOption.getServiceID(), nodeIdOptions.getNodeId());
+        omServiceOption.getServiceID(), decommNodeId);
     String rpcAddrStr = OmUtils.getOmRpcAddress(ozoneConf, rpcAddrKey);
     if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-      throw new IOException("There is no OM corresponding to " + nodeIdOptions.getNodeId()
+      throw new IOException("There is no OM corresponding to " + decommNodeId
           + "in the configuration.");
     }
 
-    hostInetAddress = InetAddress.getByName(hostnameOptions.getHostname());
+    hostInetAddress = InetAddress.getByName(hostname);
     InetAddress rpcAddressFromConfig = InetAddress.getByName(
         rpcAddrStr.split(":")[0]);
 
     if (!hostInetAddress.equals(rpcAddressFromConfig)) {
-      throw new IOException("OM " + nodeIdOptions.getNodeId() + "'s host address in " +
+      throw new IOException("OM " + decommNodeId + "'s host address in " +
           "config - " + rpcAddressFromConfig.getHostAddress() + " does not " +
           "match the provided host address " + hostInetAddress);
     }
@@ -149,9 +153,9 @@ public class DecommissionOMSubcommand implements Callable<Void> {
         OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceOption.getServiceID());
     Collection<String> decommNodes =
         OmUtils.getDecommissionedNodeIds(ozoneConf, decommNodesKey);
-    if (!decommNodes.contains(nodeIdOptions.getNodeId())) {
+    if (!decommNodes.contains(decommNodeId)) {
       throw new IOException("Please add the to be decommissioned OM "
-          + nodeIdOptions.getNodeId() + " to the " + decommNodesKey + " config in " +
+          + decommNodeId + " to the " + decommNodesKey + " config in " +
           "ozone-site.xml of all nodes.");
     }
 
@@ -161,7 +165,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
     List<OMNodeDetails> activeOMNodeDetails = OmUtils.getAllOMHAAddresses(
         ozoneConf, omServiceOption.getServiceID(), false);
     if (activeOMNodeDetails.isEmpty()) {
-      throw new IOException("Cannot decommission OM " + nodeIdOptions.getNodeId() + " as " +
+      throw new IOException("Cannot decommission OM " + decommNodeId + " as " +
           "it is the only node in the ring.");
     }
 
@@ -190,7 +194,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
                  user, omNodeDetails)) {
       OMConfiguration omConfig = omAdminProtocolClient.getOMConfiguration();
       OMNodeDetails decommNodeDetails = omConfig
-          .getDecommissionedNodesInNewConf().get(nodeIdOptions.getNodeId());
+          .getDecommissionedNodesInNewConf().get(decommNodeId);
       if (decommNodeDetails == null) {
         return false;
       }
@@ -200,45 +204,5 @@ public class DecommissionOMSubcommand implements Callable<Void> {
       }
     }
     return true;
-  }
-
-  /** Options for OM node ID. */
-  static class NodeIdOptions {
-    @CommandLine.Option(names = {"--nodeid"},
-        description = "NodeID of the OM to be decommissioned.",
-        required = true)
-    private String nodeId;
-
-    /** For backward compatibility. */
-    @CommandLine.Option(names = {"-nodeid"},
-        hidden = true,
-        required = true)
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    private String deprecatedNodeId;
-
-    String getNodeId() {
-      return nodeId != null ? nodeId : deprecatedNodeId;
-    }
-  }
-
-  /** Options for OM host name/address. */
-  static class HostnameOptions {
-    @CommandLine.Option(names = {"--node-host-address"},
-        description = "Host name/address of the OM to be decommissioned.",
-        required = true)
-    private String hostname;
-
-    /** For backward compatibility. */
-    @CommandLine.Option(names = {"-hostname"},
-        hidden = true,
-        required = true)
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    private String deprecatedHostname;
-
-    String getHostname() {
-      return hostname != null ? hostname : deprecatedHostname;
-    }
   }
 }

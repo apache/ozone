@@ -18,49 +18,44 @@
 package org.apache.hadoop.hdds.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
 /**
  * Tests for {@link GenericCli} configuration option handling.
  */
 public class TestGenericCliConfiguration {
 
+  private static Path deprecatedConf;
+  private static Path preferredConf;
+
   private static final class TestGenericCli extends GenericCli {
   }
 
-  @Test
-  public void nonDeprecatedConfWinsWhenBothAreProvided() throws IOException {
-    Path deprecatedConf = writeConf("deprecated");
-    Path preferredConf = writeConf("preferred");
-
-    TestGenericCli cli = new TestGenericCli();
-    cli.getCmd().parseArgs("-conf", deprecatedConf.toString(), "--conf",
-        preferredConf.toString());
-
-    assertThat(cli.getOzoneConf().get("test.key")).isEqualTo("preferred");
+  @BeforeAll
+  static void setup() throws IOException {
+    deprecatedConf = writeConf("deprecated");
+    preferredConf = writeConf("preferred");
   }
 
   @Test
-  public void nonDeprecatedConfWinsRegardlessOfOrder() throws IOException {
-    Path deprecatedConf = writeConf("deprecated");
-    Path preferredConf = writeConf("preferred");
-
-    TestGenericCli cli = new TestGenericCli();
-    cli.getCmd().parseArgs("--conf", preferredConf.toString(), "-conf",
-        deprecatedConf.toString());
-
-    assertThat(cli.getOzoneConf().get("test.key")).isEqualTo("preferred");
+  void confOptionsAreExclusive() {
+    CommandLine cmd = new TestGenericCli().getCmd();
+    assertThrows(CommandLine.OverwrittenOptionException.class,
+        () -> cmd.parseArgs("-conf", deprecatedConf.toString(), "--conf", preferredConf.toString()));
+    assertThrows(CommandLine.OverwrittenOptionException.class,
+        () -> cmd.parseArgs("--conf", deprecatedConf.toString(), "-conf", preferredConf.toString()));
   }
 
   @Test
-  public void deprecatedConfIsUsedWhenNonDeprecatedIsAbsent() throws IOException {
-    Path deprecatedConf = writeConf("deprecated");
-
+  void deprecatedConfIsUsedWhenNonDeprecatedIsAbsent() {
     TestGenericCli cli = new TestGenericCli();
     cli.getCmd().parseArgs("-conf", deprecatedConf.toString());
 

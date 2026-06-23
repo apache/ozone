@@ -49,16 +49,6 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String state;
 
-  /** For backward compatibility. */
-  @CommandLine.Option(
-      names = {"-fst"},
-      hidden = true,
-      defaultValue = ""
-  )
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private String deprecatedState;
-
   @CommandLine.Option(
       names = {"--json"},
       defaultValue = "false",
@@ -73,10 +63,9 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     if (replicationFilter.isPresent()) {
       stream = stream.filter(replicationFilter.get());
     }
-    String effectiveState = getState();
-    if (!Strings.isNullOrEmpty(effectiveState)) {
+    if (!Strings.isNullOrEmpty(state)) {
       stream = stream.filter(p -> p.getPipelineState().toString()
-          .compareToIgnoreCase(effectiveState) == 0);
+          .compareToIgnoreCase(state) == 0);
     }
 
     if (json) {
@@ -86,12 +75,5 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     } else {
       stream.forEach(System.out::println);
     }
-  }
-
-  private String getState() {
-    if (!Strings.isNullOrEmpty(state)) {
-      return state;
-    }
-    return deprecatedState;
   }
 }
