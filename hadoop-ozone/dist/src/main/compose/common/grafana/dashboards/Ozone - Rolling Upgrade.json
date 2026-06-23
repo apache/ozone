@@ -31,7 +31,7 @@
       },
       "id": 1,
       "panels": [],
-      "title": "Section 1 — Build Information",
+      "title": "Section 1 \u2014 Build Information",
       "type": "row"
     },
     {
@@ -143,196 +143,8 @@
       },
       "id": 3,
       "panels": [],
-      "title": "Build Version — per component",
+      "title": "Build Version \u2014 per component",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "description": "Build version of each Ozone Manager. Use this to see which instances still need to be upgraded.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "cellHeight": "sm",
-        "frameIndex": 0,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "host"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "ozone_build_info{component=\"om\"}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Ozone Manager Versions",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "__name__": true,
-              "component": true,
-              "context": true,
-              "job": true,
-              "revision": true
-            },
-            "indexByName": {
-              "instance": 0,
-              "version": 1
-            },
-            "renameByName": {
-              "instance": "host"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "description": "Total number of OM instances running each build version over time.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "Instances",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "count by (version) (ozone_build_info{component=\"om\"})",
-          "legendFormat": "{{version}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Ozone Manager Instances Per Version",
-      "type": "timeseries"
     },
     {
       "datasource": {
@@ -371,7 +183,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 8
       },
       "id": 6,
       "options": {
@@ -380,7 +192,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "host"
+            "displayName": "instance"
           }
         ]
       },
@@ -408,6 +220,8 @@
               "__name__": true,
               "component": true,
               "context": true,
+              "exported_component": true,
+              "hostname": true,
               "job": true,
               "revision": true
             },
@@ -415,9 +229,7 @@
               "instance": 0,
               "version": 1
             },
-            "renameByName": {
-              "instance": "host"
-            }
+            "renameByName": {}
           }
         }
       ],
@@ -487,7 +299,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 8
       },
       "id": 7,
       "options": {
@@ -517,6 +329,191 @@
         }
       ],
       "title": "SCM Instances Per Version",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Build version of each Recon. Use this to see which instances still need to be upgraded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "instance"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ozone_build_info{component=\"recon\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Recon Versions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "component": true,
+              "context": true,
+              "exported_component": true,
+              "hostname": true,
+              "job": true,
+              "revision": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "version": 1
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Total number of Recon instances running each build version over time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Instances",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count by (version) (ozone_build_info{component=\"recon\"})",
+          "legendFormat": "{{version}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Recon Instances Per Version",
       "type": "timeseries"
     },
     {
@@ -565,7 +562,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "host"
+            "displayName": "instance"
           }
         ]
       },
@@ -593,6 +590,8 @@
               "__name__": true,
               "component": true,
               "context": true,
+              "exported_component": true,
+              "hostname": true,
               "job": true,
               "revision": true
             },
@@ -600,9 +599,7 @@
               "instance": 0,
               "version": 1
             },
-            "renameByName": {
-              "instance": "host"
-            }
+            "renameByName": {}
           }
         }
       ],
@@ -708,7 +705,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Build version of each S3 Gateway. Use this to see which instances still need to be upgraded.",
+      "description": "Build version of each Ozone Manager. Use this to see which instances still need to be upgraded.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -743,6 +740,194 @@
         "x": 0,
         "y": 35
       },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "frameIndex": 0,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "instance"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ozone_build_info{component=\"om\"}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Ozone Manager Versions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "component": true,
+              "context": true,
+              "exported_component": true,
+              "hostname": true,
+              "job": true,
+              "revision": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "version": 1
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Total number of OM instances running each build version over time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Instances",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count by (version) (ozone_build_info{component=\"om\"})",
+          "legendFormat": "{{version}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Ozone Manager Instances Per Version",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Build version of each S3 Gateway. Use this to see which instances still need to be upgraded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
       "id": 10,
       "options": {
         "cellHeight": "sm",
@@ -750,7 +935,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "host"
+            "displayName": "instance"
           }
         ]
       },
@@ -778,6 +963,8 @@
               "__name__": true,
               "component": true,
               "context": true,
+              "exported_component": true,
+              "hostname": true,
               "job": true,
               "revision": true
             },
@@ -785,9 +972,7 @@
               "instance": 0,
               "version": 1
             },
-            "renameByName": {
-              "instance": "host"
-            }
+            "renameByName": {}
           }
         }
       ],
@@ -857,7 +1042,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 44
       },
       "id": 11,
       "options": {
@@ -890,191 +1075,6 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "description": "Build version of each Recon. Use this to see which instances still need to be upgraded.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 44
-      },
-      "id": 12,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "host"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "ozone_build_info{component=\"recon\"}",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Recon Versions",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "__name__": true,
-              "component": true,
-              "context": true,
-              "job": true,
-              "revision": true
-            },
-            "indexByName": {
-              "instance": 0,
-              "version": 1
-            },
-            "renameByName": {
-              "instance": "host"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "description": "Total number of Recon instances running each build version over time.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "Instances",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 44
-      },
-      "id": 13,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "count by (version) (ozone_build_info{component=\"recon\"})",
-          "legendFormat": "{{version}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Recon Instances Per Version",
-      "type": "timeseries"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1084,7 +1084,7 @@
       },
       "id": 14,
       "panels": [],
-      "title": "Build Version — per host over time",
+      "title": "Build Version \u2014 per host over time",
       "type": "row"
     },
     {
@@ -1171,7 +1171,7 @@
       },
       "id": 16,
       "panels": [],
-      "title": "Section 2 — Finalization Status (S3 Gateway excluded)",
+      "title": "Section 2 \u2014 Finalization Status (S3 Gateway excluded)",
       "type": "row"
     },
     {
@@ -1287,7 +1287,7 @@
       },
       "id": 18,
       "panels": [],
-      "title": "Finalization — per component",
+      "title": "Finalization \u2014 per component",
       "type": "row"
     },
     {
@@ -1384,7 +1384,7 @@
           "refId": "A"
         }
       ],
-      "title": "OzoneManager — finalization status",
+      "title": "OzoneManager \u2014 finalization status",
       "transformations": [
         {
           "id": "organize",
@@ -1561,7 +1561,7 @@
           "refId": "B"
         }
       ],
-      "title": "OzoneManager — finalized vs total",
+      "title": "OzoneManager \u2014 finalized vs total",
       "type": "timeseries"
     },
     {
@@ -1658,7 +1658,7 @@
           "refId": "A"
         }
       ],
-      "title": "SCM — finalization status",
+      "title": "SCM \u2014 finalization status",
       "transformations": [
         {
           "id": "organize",
@@ -1835,7 +1835,7 @@
           "refId": "B"
         }
       ],
-      "title": "SCM — finalized vs total",
+      "title": "SCM \u2014 finalized vs total",
       "type": "timeseries"
     },
     {
@@ -1932,7 +1932,7 @@
           "refId": "A"
         }
       ],
-      "title": "Datanode — finalization status",
+      "title": "Datanode \u2014 finalization status",
       "transformations": [
         {
           "id": "organize",
@@ -2109,7 +2109,7 @@
           "refId": "B"
         }
       ],
-      "title": "Datanode — finalized vs total",
+      "title": "Datanode \u2014 finalized vs total",
       "type": "timeseries"
     },
     {
@@ -2122,7 +2122,7 @@
       },
       "id": 25,
       "panels": [],
-      "title": "Finalization — per host detail (use $finalization_host selector)",
+      "title": "Finalization \u2014 per host detail (use $finalization_host selector)",
       "type": "row"
     },
     {
