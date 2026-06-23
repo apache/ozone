@@ -218,11 +218,9 @@
   </property>
   <property>
     <name>hdds.datanode.disk.balancer.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, DATANODE, DISKBALANCER</tag>
-    <description>If this property is set to true, then the Disk Balancer
-      feature is enabled on Datanodes, and users can use
-      this service. By default, this is disabled.
+    <description>By default Disk Balancer feature is enabled on Datanodes.
     </description>
   </property>
   <property>
@@ -1038,6 +1036,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pending.container.roll.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The interval at which the two-window tumbling bucket for pending
+      container allocations rolls over per DataNode. Pending containers
+      that have not been confirmed within two intervals are automatically
+      aged out. Default is 5 minutes.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.lock.stripes</name>
     <value>512</value>
     <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
@@ -1701,11 +1710,29 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.creation.ratis.three</name>
+    <value>true</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      When true, SCM creates RATIS/THREE pipelines in the background and
+      requires them during safemode. Applies only when the cluster default
+      replication type is EC. For RATIS-default clusters this flag has no
+      effect.
+    </description>
+  </property>
+  <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description> % of containers which should have at least one
       reported replica before SCM comes out of safe mode.
+    </description>
+  </property>
+  <property>
+    <name>hdds.scm.safemode.rule.refresh.interval</name>
+    <value>5s</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description> Refresh interval in SCM Safemode.
     </description>
   </property>
 
@@ -3660,6 +3687,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.thread.count</name>
+    <value>0</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Size of the thread pool Recon uses to collect JMX metrics from DataNodes.
+      A value of 0 (or any non-positive value) means "auto" and selects
+      2 x Runtime.availableProcessors() at startup.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -3891,6 +3928,39 @@
     <description>Disable the jvm network address cache. In environment such as
       kubernetes, IPs of instances of scm, om and datanodes can be changed.
       Disabling this cache helps to quickly resolve the fqdn's to the new IPs.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.failover.resolve-needed</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT, OM, SCM, HA</tag>
+    <description>When true, RPC clients (DN heartbeat, OM client, SCM
+      client) re-resolve cached hostnames on connection-class failures
+      (ConnectException, SocketTimeoutException, NoRouteToHostException,
+      UnknownHostException, EOFException, SocketException) and rebuild
+      the proxy if the resolved IP has changed. Set to true in
+      environments where server pod IPs may change while DNS names
+      remain stable, such as Kubernetes. Default false preserves
+      pre-fix behaviour. Mirrors the design intent of HADOOP-17068 /
+      HDFS-14118.
+
+      Required co-config for SECURE clusters: when this flag is true,
+      operators must ALSO set hadoop.security.token.service.use_ip=false
+      (in core-site.xml). Reason: the Hadoop delegation-token service
+      identifier defaults to an IP:port string. After a refresh, the
+      per-OM service identifier built from the new IP no longer matches
+      the IP-based service captured on long-lived tokens, and token
+      selection (OzoneDelegationTokenSelector) silently fails for the
+      refreshed peer. With use_ip=false the service identifier is the
+      stable hostname:port, which survives any IP change. Insecure
+      clusters do not need the co-config.
+
+      Note: ozone.network.jvm.address.cache.enabled controls a related
+      but distinct concern -- the JVM-level positive DNS cache TTL.
+      That setting only affects future name lookups; this setting
+      additionally rebuilds long-lived RPC proxies whose
+      InetSocketAddress was frozen at process start.
     </description>
   </property>
 
@@ -4200,12 +4270,6 @@
     <description>The duration at which we periodically fetch the updated network
       topology cluster tree from SCM.
     </description>
-  </property>
-  <property>
-    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
-    <value>1024</value>
-    <tag>SCM, OZONE</tag>
-    <description>Raft snapshot gap index after which snapshot can be taken.</description>
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
@@ -4726,7 +4790,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.max.page.size</name>
-    <value>1000</value>
+    <value>5000</value>
     <tag>OZONE, OM</tag>
     <description>
        Maximum number of entries to be returned in a single page of snap diff report.
@@ -4812,7 +4876,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.max.allowed.keys.changed.per.job</name>
-    <value>10000000</value>
+    <value>1000000000</value>
     <tag>OZONE, OM</tag>
     <description>
       Max numbers of keys changed allowed for a snapshot diff job.

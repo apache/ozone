@@ -237,16 +237,17 @@ public class ContainerManagerImpl implements ContainerManager {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    if (!pipelineManager.hasEnoughSpace(pipeline)) {
-      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
-      return null;
-    }
-
     final long uniqueId = sequenceIdGen.getNextId(SequenceIdType.containerId);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
+
+    if (!pipelineManager.checkSpaceAndRecordAllocation(pipeline, containerID)) {
+      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
+      return null;
+    }
+
     final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
         .newBuilder()
         .setState(LifeCycleState.OPEN)

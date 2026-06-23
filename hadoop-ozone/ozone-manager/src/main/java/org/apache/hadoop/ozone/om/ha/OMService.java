@@ -15,16 +15,47 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+package org.apache.hadoop.ozone.om.ha;
 
 /**
- * Test OmSnapshot for Object Store bucket type.
+ * Interface for stateful background service in OM.
+ *
+ * Provide a fine-grained method to manipulate the status of these background
+ * services.
  */
-public class TestOmSnapshotObjectStoreWithLinkedBuckets extends TestOmSnapshot {
+public interface OMService {
+  /**
+   * Notify raft or safe mode related status changed.
+   */
+  void notifyStatusChanged();
 
-  public TestOmSnapshotObjectStoreWithLinkedBuckets() throws Exception {
-    super(OBJECT_STORE, false, false, false, true);
+  /**
+   * @return true, if next iteration of Service should take effect,
+   *         false, if next iteration of Service should be skipped.
+   */
+  boolean shouldRun();
+
+  /**
+   * @return name of the Service.
+   */
+  String getServiceName();
+
+  /**
+   * Status of Service.
+   */
+  enum ServiceStatus {
+    RUNNING,
+    PAUSING
   }
+
+  /**
+   * starts the OM service.
+   */
+  void start() throws OMServiceException;
+
+  /**
+   * stops the OM service.
+   */
+  void stop();
+
 }

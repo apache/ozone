@@ -19,7 +19,10 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -75,10 +78,13 @@ public final class SafeModeRuleFactory {
         config, containerManager, safeModeManager);
     SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
         config, nodeManager, safeModeManager);
+    SafeModeExitRule<?> ecMinDnRule = new ECMinDataNodeSafeModeRule(eventQueue,
+        config, nodeManager, safeModeManager);
 
     safeModeRules.add(ratisContainerRule);
     safeModeRules.add(ecContainerRule);
     safeModeRules.add(datanodeRule);
+    safeModeRules.add(ecMinDnRule);
 
     preCheckRules.add(datanodeRule);
 
@@ -93,12 +99,48 @@ public final class SafeModeRuleFactory {
     }
 
     if (pipelineManager != null) {
-      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config, scmContext, nodeManager));
-      safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
-          safeModeManager, config));
+      if (shouldEnableRatisThreePipelineRules()) {
+        safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
+            pipelineManager, safeModeManager, config, scmContext, nodeManager));
+        safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
+            safeModeManager, config));
+      } else {
+        SCMSafeModeManager.getLogger().info(
+            "RATIS/THREE pipeline safemode rules are disabled because "
+                + "{} is false for an EC-default cluster or the default "
+                + "replication config is invalid.",
+            ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE);
+      }
     }
 
+  }
+
+  /**
+   * Returns true when RATIS/THREE pipeline safemode rules should be active.
+   * For EC-default clusters, these rules are only meaningful when RATIS/THREE
+   * background pipeline creation is also enabled (same flag); if no
+   * RATIS/THREE pipelines are created, requiring them in safemode would block
+   * safemode exit.
+   */
+  private boolean shouldEnableRatisThreePipelineRules() {
+    ReplicationConfig defaultReplicationConfig;
+    try {
+      defaultReplicationConfig = ReplicationConfig.getDefault(config);
+    } catch (IllegalArgumentException e) {
+      SCMSafeModeManager.getLogger().warn(
+          "Disabling RATIS/THREE pipeline safemode rules because default "
+              + "replication config could not be parsed.",
+          e);
+      return false;
+    }
+
+    if (defaultReplicationConfig.getReplicationType()
+        != HddsProtos.ReplicationType.EC) {
+      return true;
+    }
+
+    return config.getBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
   }
 
   public static synchronized SafeModeRuleFactory getInstance() {

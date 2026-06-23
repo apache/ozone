@@ -145,7 +145,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   public static final String GRPC_SO_BACKLOG_KEY = "hdds.datanode.grpc.so.backlog";
-  public static final int GRPC_SO_BACKLOG_DEFAULT = 4096;
+  public static final int GRPC_SO_BACKLOG_DEFAULT = 256;
 
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
@@ -167,7 +167,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    */
   @Config(key = "hdds.datanode.grpc.so.backlog",
       type = ConfigType.INT,
-      defaultValue = "4096",
+      defaultValue = "256",
       tags = {DATANODE},
       description = "The SO_BACKLOG value for the Datanode gRPC server socket. " +
           "This limits the number of pending connections in the kernel's " +

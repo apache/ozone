@@ -23,6 +23,16 @@ MYNAME="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
 
+## @description  true when the ozone-iceberg artifact is present in this distribution
+## @audience     private
+function ozone_iceberg_available
+{
+  local lib_dir="${HDDS_LIB_JARS_DIR:-${OZONE_HOME}/share/ozone/lib}"
+
+  [[ -f "${OZONE_HOME}/share/ozone/classpath/ozone-iceberg.classpath" ]] \
+    && compgen -G "${lib_dir}/ozone-iceberg-*.jar" > /dev/null
+}
+
 ## @description  build up the ozone command's usage text.
 ## @audience     public
 ## @stability    stable
@@ -35,13 +45,13 @@ function ozone_usage
   ozone_add_option "--hosts filename" "list of hosts to use in worker mode"
   ozone_add_option "--loglevel level" "set the log4j level for this command"
   ozone_add_option "--workers" "turn on worker mode"
-  ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
-  ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
+  ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be appended after these jvmargs"
+  ozone_add_option "--validate [continue]" "validate that all required jars are present on the classpath; with 'continue', keep running even if validation fails"
 
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "completion" client "generate autocompletion script for bash/zsh"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
-  ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
+  ozone_add_subcommand "envvars" client "display computed Ozone environment variables"
   ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
@@ -53,7 +63,7 @@ function ozone_usage
   ozone_add_subcommand "httpfs" daemon "run the HTTPFS compatible REST gateway"
   ozone_add_subcommand "csi" daemon "run the standalone CSI daemon"
   ozone_add_subcommand "recon" daemon "run the Recon service"
-  ozone_add_subcommand "sh" client "command line interface for object store operations"
+  ozone_add_subcommand "sh" client "command line interface for object store operations (alias: shell)"
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
   ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
@@ -65,7 +75,9 @@ function ozone_usage
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
   ozone_add_subcommand "vapor" client "Ozone server simulator"
-
+  if ozone_iceberg_available; then
+    ozone_add_subcommand "iceberg" client "commands for Iceberg tables on Ozone (see ozone iceberg --help for subcommands)"
+  fi
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
 
@@ -252,6 +264,15 @@ function ozonecmd_case
       OZONE_VAPOR_OPTS="${OZONE_VAPOR_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
     ;;
+    iceberg)
+      if ! ozone_iceberg_available; then
+        ozone_error "ERROR: ozone iceberg is not available in this distribution (requires JDK 11+ build)."
+        exit 1
+      fi
+      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.IcebergCommand"
+      OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+    ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
       if ! ozone_validate_classname "${OZONE_CLASSNAME}"; then
@@ -288,7 +309,8 @@ function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
-      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-iceberg" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF

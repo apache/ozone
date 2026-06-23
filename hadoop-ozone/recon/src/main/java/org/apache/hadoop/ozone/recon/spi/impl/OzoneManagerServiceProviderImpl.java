@@ -229,7 +229,7 @@ public class OzoneManagerServiceProviderImpl
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
     // Number of parallel workers
-    int omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
+    int omDBTarProcessorThreadCount = Math.min(64, Runtime.getRuntime().availableProcessors());
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
     this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,

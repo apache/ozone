@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,6 +48,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -58,6 +63,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -677,6 +684,81 @@ public class TestDiskBalancerTask {
 
     // Verify delta sizes are restored
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPendingDeletionDoesNotDropReplicasOnSameMillisecondKey(
+      ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+
+    long delayMs = 2_000L;
+    diskBalancerService.setReplicaDeletionDelay(delayMs);
+
+    long id1 = CONTAINER_ID;
+    long id2 = CONTAINER_ID + 1;
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+
+    Container c1 = createContainer(id1, sourceVolume, State.CLOSED);
+    Container c2 = createContainer(id2, sourceVolume, State.CLOSED);
+
+    File oldDir1 = new File(c1.getContainerData().getContainerPath());
+    File oldDir2 = new File(c2.getContainerData().getContainerPath());
+    assertTrue(oldDir1.exists());
+    assertTrue(oldDir2.exists());
+
+    // Reserve dest space like the choosing policy would.
+    destVolume.incCommittedBytes(c1.getContainerData().getBytesUsed());
+    destVolume.incCommittedBytes(c2.getContainerData().getBytesUsed());
+
+    // Schedule two moves (parallelThread default is 5 in config).
+    BackgroundTaskQueue queue = diskBalancerService.getTasks();
+    assertEquals(2, queue.size());
+    DiskBalancerService.DiskBalancerTask task1 =
+        (DiskBalancerService.DiskBalancerTask) queue.poll();
+    DiskBalancerService.DiskBalancerTask task2 =
+        (DiskBalancerService.DiskBalancerTask) queue.poll();
+    assertNotNull(task1);
+    assertNotNull(task2);
+
+    // Run both moves concurrently; fixed TestClock => same deadline key.
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<BackgroundTaskResult>> futures = pool.invokeAll(Arrays.asList(
+          task1::call,
+          task2::call));
+      for (Future<BackgroundTaskResult> future : futures) {
+        future.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+
+    assertEquals(2, diskBalancerService.getMetrics().getSuccessCount());
+
+    assertEquals(1, diskBalancerService.getPendingDeletionDeadlineCount(),
+        "both moves should share one deadline key");
+    assertEquals(2, diskBalancerService.getPendingDeletionQueueSize(),
+        "both container replicas should be queued for deletion");
+
+    // Not deleted yet — delay has not elapsed.
+    assertTrue(oldDir1.exists());
+    assertTrue(oldDir2.exists());
+
+    clock.fastForward(delayMs);
+    diskBalancerService.cleanupPendingDeletionContainers();
+
+    assertEquals(0, diskBalancerService.getPendingDeletionQueueSize());
+    assertFalse(oldDir1.exists());
+    assertFalse(oldDir2.exists());
+    assertFalse(sourceVolume.getContainerIterator().hasNext(),
+        "source volume should have no containers after delayed deletion");
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace(),
+        "source volume used space should return to pre-move level after old replicas are deleted");
+
+    // New replicas live on dest volume.
+    assertTrue(new File(containerSet.getContainer(id1).getContainerData().getContainerPath()).exists());
+    assertTrue(new File(containerSet.getContainer(id2).getContainerData().getContainerPath()).exists());
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -79,6 +80,29 @@ public final class ContainerClientMetrics {
   private final Map<DatanodeID, MutableCounterLong> writeChunksCallsByLeaders;
   private final MetricsRegistry registry;
 
+  /**
+   * Handle for one ContainerClientMetrics acquisition.
+   */
+  public static final class Handle implements AutoCloseable {
+    private final ContainerClientMetrics metrics;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private Handle(ContainerClientMetrics metrics) {
+      this.metrics = metrics;
+    }
+
+    public ContainerClientMetrics metrics() {
+      return metrics;
+    }
+
+    @Override
+    public void close() {
+      if (closed.compareAndSet(false, true)) {
+        release();
+      }
+    }
+  }
+
   public static synchronized ContainerClientMetrics acquire() {
     if (instance == null) {
       instanceCount++;
@@ -88,6 +112,10 @@ public final class ContainerClientMetrics {
     }
     referenceCount++;
     return instance;
+  }
+
+  public static Handle acquireHandle() {
+    return new Handle(acquire());
   }
 
   public static synchronized void release() {

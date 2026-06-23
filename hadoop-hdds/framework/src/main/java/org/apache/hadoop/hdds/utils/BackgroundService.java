@@ -190,7 +190,11 @@ public abstract class BackgroundService {
     }
   }
 
-  // shutdown and make sure all threads are properly released.
+  /**
+   * Shuts down the scheduled executor and waits for pool threads to finish.
+   * DO NOT call while holding the monitor on this instance. {@link PeriodicalTask}
+   * uses the same lock and can deadlock during {@code awaitTermination}.
+   */
   public void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
     final ScheduledThreadPoolExecutor current;

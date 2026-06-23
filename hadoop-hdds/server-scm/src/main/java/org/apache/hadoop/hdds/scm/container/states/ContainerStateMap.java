@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -98,7 +98,7 @@ public class ContainerStateMap {
    * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
    */
   private static class ContainerMap {
-    private final NavigableMap<ContainerID, ContainerEntry> map = new TreeMap<>();
+    private final NavigableMap<ContainerID, ContainerEntry> map = new ConcurrentSkipListMap<>();
 
     boolean contains(ContainerID id) {
       return map.containsKey(id);

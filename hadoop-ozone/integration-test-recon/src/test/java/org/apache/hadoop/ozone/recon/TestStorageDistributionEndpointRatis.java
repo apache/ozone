@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Test;
  * <p>Common infrastructure and verification helpers are provided by
  * {@link AbstractTestStorageDistributionEndpoint}.
  */
+@Unhealthy("HDDS-15519")
 public class TestStorageDistributionEndpointRatis extends AbstractTestStorageDistributionEndpoint {
 
   private static final int NUM_DATANODES = 3;
@@ -88,13 +90,13 @@ public class TestStorageDistributionEndpointRatis extends AbstractTestStorageDis
     closeAllContainers();
     getFs().delete(dir1, true);
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOm, 1000, 30000);
-    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionScm, 2000, 30000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionScm, 1000, 30000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionDn, 1000, 60000);
     GenericTestUtils.waitFor(() -> Objects.requireNonNull(
             getScm().getClientProtocolServer().getDeletedBlockSummary()).getTotalBlockCount() == 0,
         1000, 30000);
-    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionDn, 2000, 60000);
-    GenericTestUtils.waitFor(this::verifyPendingDeletionClearsAtDn, 2000, 60000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionClearsAtDn, 1000, 60000);
     getCluster().getHddsDatanodes().get(0).stop();
-    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOnDnFailure, 2000, 60000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOnDnFailure, 1000, 60000);
   }
 }

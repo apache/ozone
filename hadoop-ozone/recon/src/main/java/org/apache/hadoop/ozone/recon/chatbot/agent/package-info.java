@@ -15,20 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.api;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import javax.ws.rs.Path;
-
 /**
- * Annotation to apply to endpoint classes that also have a {@link Path}
- * annotation that will cause their access to be restricted to ozone and
- * recon administrators only.
+ * Agent and tool execution for the Recon Chatbot.
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AdminOnly {
-}
+package org.apache.hadoop.ozone.recon.chatbot.agent;

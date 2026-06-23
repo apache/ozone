@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
 
@@ -31,7 +31,7 @@ public final class ContainerReplicaInfo {
   private long containerID;
   private String state;
   private DatanodeDetails datanodeDetails;
-  private UUID placeOfBirth;
+  private DatanodeID placeOfBirth;
   private long sequenceId;
   private long keyCount;
   private long bytesUsed;
@@ -46,7 +46,7 @@ public final class ContainerReplicaInfo {
         .setState(proto.getState())
         .setDatanodeDetails(DatanodeDetails
             .getFromProtoBuf(proto.getDatanodeDetails()))
-        .setPlaceOfBirth(UUID.fromString(proto.getPlaceOfBirth()))
+        .setPlaceOfBirth(DatanodeID.fromUuidString(proto.getPlaceOfBirth()))
         .setSequenceId(proto.getSequenceID())
         .setKeyCount(proto.getKeyCount())
         .setBytesUsed(proto.getBytesUsed())
@@ -71,7 +71,7 @@ public final class ContainerReplicaInfo {
     return datanodeDetails;
   }
 
-  public UUID getPlaceOfBirth() {
+  public DatanodeID getPlaceOfBirth() {
     return placeOfBirth;
   }
 
@@ -117,7 +117,7 @@ public final class ContainerReplicaInfo {
       return this;
     }
 
-    public Builder setPlaceOfBirth(UUID placeOfBirth) {
+    public Builder setPlaceOfBirth(DatanodeID placeOfBirth) {
       subject.placeOfBirth = placeOfBirth;
       return this;
     }

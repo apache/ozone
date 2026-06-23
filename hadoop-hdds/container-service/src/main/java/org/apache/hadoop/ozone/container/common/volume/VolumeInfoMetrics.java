@@ -51,14 +51,20 @@ public class VolumeInfoMetrics implements MetricsSource {
       Interns.info("OzoneUsed", "Ozone used space");
   private static final MetricsInfo RESERVED =
       Interns.info("Reserved", "Reserved Space");
-  private static final MetricsInfo TOTAL_CAPACITY =
-      Interns.info("TotalCapacity", "Ozone capacity + reserved space");
   private static final MetricsInfo FS_CAPACITY =
       Interns.info("FilesystemCapacity", "Filesystem capacity as reported by the local filesystem");
   private static final MetricsInfo FS_AVAILABLE =
       Interns.info("FilesystemAvailable", "Filesystem available space as reported by the local filesystem");
   private static final MetricsInfo FS_USED =
       Interns.info("FilesystemUsed", "Filesystem used space (FilesystemCapacity - FilesystemAvailable)");
+  private static final MetricsInfo MIN_FREE_SPACE =
+      Interns.info("MinFreeSpace",
+          "Minimum free space threshold (soft limit) reported to SCM, " +
+          "derived from hdds.datanode.volume.min.free.space.percent / hdds.datanode.volume.min.free.space");
+  private static final MetricsInfo NON_OZONE_USED =
+      Interns.info("NonOzoneUsed",
+          "Space on the filesystem consumed by non-Ozone workloads " +
+          "(FilesystemUsed - OzoneUsed)");
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
@@ -238,15 +244,17 @@ public class VolumeInfoMetrics implements MetricsSource {
       SpaceUsageSource.Fixed fsUsage = volumeUsage.realUsage();
       SpaceUsageSource usage = volumeUsage.getCurrentUsage(fsUsage);
       long reserved = volumeUsage.getReservedInBytes();
+      long ozoneCapacity = usage.getCapacity();
       builder
-          .addGauge(CAPACITY, usage.getCapacity())
+          .addGauge(CAPACITY, ozoneCapacity)
           .addGauge(AVAILABLE, usage.getAvailable())
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
-          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved)
           .addGauge(FS_CAPACITY, fsUsage.getCapacity())
           .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
-          .addGauge(FS_USED, fsUsage.getUsedSpace());
+          .addGauge(FS_USED, fsUsage.getCapacity() - fsUsage.getAvailable())
+          .addGauge(MIN_FREE_SPACE, volume.getReportedFreeSpaceToSpare(ozoneCapacity))
+          .addGauge(NON_OZONE_USED, VolumeUsage.getOtherUsed(fsUsage));
     }
   }
 }

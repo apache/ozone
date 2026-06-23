@@ -44,7 +44,7 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   private final FilterPipelineOptions filterOptions = new FilterPipelineOptions();
 
   @CommandLine.Option(
-      names = {"-s", "--state", "-fst", "--filterByState", "--filter-by-state"},
+      names = {"-s", "--state", "--filterByState", "--filter-by-state"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;

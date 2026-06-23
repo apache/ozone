@@ -999,11 +999,15 @@ public class ContainerBalancerTask implements Runnable {
             result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION ||
-            result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE) {
+            result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE ||
+            result == MoveManager.MoveResult.FAIL_CONTAINER_ALREADY_BEING_MOVED) {
           // add source back to queue as a different container can be selected in next run.
           // the container which caused failure of move is not excluded
           // as it is an intermittent failure or a replica related failure
           findSourceStrategy.addBackSourceDataNode(source);
+        } else if (result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE) {
+          findSourceStrategy.addBackSourceDataNode(source);
+          selectionCriteria.addToExcludeDueToFailContainers(containerID);
         }
         return result == MoveManager.MoveResult.COMPLETED;
       }
@@ -1191,6 +1195,10 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   public List<DatanodeUsageInfo> getUnderUtilizedNodes() {
     return underUtilizedNodes;
+  }
+
+  ContainerBalancerSelectionCriteria getSelectionCriteria() {
+    return selectionCriteria;
   }
 
   /**

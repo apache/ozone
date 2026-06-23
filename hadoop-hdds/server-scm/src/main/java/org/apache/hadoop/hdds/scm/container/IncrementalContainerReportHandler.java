@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -83,6 +84,7 @@ public class IncrementalContainerReportHandler
     // issue between the container list in NodeManager and the replicas in
     // ContainerManager.
     synchronized (dd) {
+      DatanodeInfo datanodeInfo = dd instanceof DatanodeInfo ? (DatanodeInfo) dd : null;
       for (ContainerReplicaProto replicaProto :
           report.getReport().getReportList()) {
         Object detailsForLogging = getDetailsForLogging(null, replicaProto, dd);
@@ -103,6 +105,9 @@ public class IncrementalContainerReportHandler
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
+            if (datanodeInfo != null) {
+              getNodeManager().removePendingAllocationForDatanode(datanodeInfo, id);
+            }
           }
           success = true;
         } catch (ContainerNotFoundException e) {

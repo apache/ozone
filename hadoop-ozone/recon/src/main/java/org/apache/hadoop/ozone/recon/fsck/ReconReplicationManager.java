@@ -322,7 +322,7 @@ public class ReconReplicationManager extends ReplicationManager {
         processedCount++;
 
         if (processedCount % logEvery == 0 || processedCount == containers.size()) {
-          LOG.info("Processed {}/{} containers", processedCount, containers.size());
+          LOG.debug("Processed {}/{} containers", processedCount, containers.size());
         }
       } catch (ContainerNotFoundException e) {
         LOG.error("Container {} not found", container.getContainerID(), e);

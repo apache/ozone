@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -63,7 +65,6 @@ public class TestReconContainerEndpoint {
   private OzoneClient client;
   private ObjectStore store;
   private ReconService recon;
-  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void init() throws Exception {
@@ -121,7 +122,7 @@ public class TestReconContainerEndpoint {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
     waitUntilReconIndexesKeysForPaths(volName, bucketName,
@@ -192,7 +193,7 @@ public class TestReconContainerEndpoint {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
     waitUntilReconIndexesKeysForPaths(volumeName, obsBucketName, obsSingleFileKey);
@@ -252,7 +253,7 @@ public class TestReconContainerEndpoint {
     }
     ReconContainerMetadataManager mgr =
         recon.getReconServer().getReconContainerMetadataManager();
-    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(mgr, requiredCountByContainer);
+    waitUntilReconKeyCounts(mgr, requiredCountByContainer);
   }
 
   private long getContainerIdForKey(String volumeName, String bucketName,

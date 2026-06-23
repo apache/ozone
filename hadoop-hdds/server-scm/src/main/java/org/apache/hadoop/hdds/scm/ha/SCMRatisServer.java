@@ -18,11 +18,9 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
@@ -38,7 +36,7 @@ public interface SCMRatisServer {
 
   void start() throws IOException;
 
-  void registerStateMachineHandler(RequestType handlerType, Object handler);
+  void registerStateMachineHandler(ScmInvoker<?> handler);
 
   SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException,
@@ -73,15 +71,8 @@ public interface SCMRatisServer {
   RaftPeerId getLeaderId();
 
   default <T extends SCMHandler> T getProxyHandler(ScmInvoker<T> invoker) {
-    registerStateMachineHandler(invoker.getType(), invoker);
+    registerStateMachineHandler(invoker);
     return invoker.getProxy();
-  }
-
-  default <T extends SCMHandler> T getProxyHandler(Class<T> intf, T impl) {
-    final SCMHAInvocationHandler invocationHandler =
-        new SCMHAInvocationHandler(impl.getType(), impl, this);
-    return intf.cast(Proxy.newProxyInstance(getClass().getClassLoader(),
-        new Class<?>[] {intf}, invocationHandler));
   }
 
 }

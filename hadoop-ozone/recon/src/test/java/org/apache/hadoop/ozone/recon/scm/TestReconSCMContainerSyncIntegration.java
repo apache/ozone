@@ -51,7 +51,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -59,7 +61,7 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration tests for {@link ReconStorageContainerSyncHelper} and
- * {@link ReconStorageContainerManagerFacade#triggerTargetedSCMContainerSync()}.
+ * {@link ReconStorageContainerManagerFacade#triggerSCMContainerSync()}.
  *
  * <p>Uses a <em>real</em> {@link ReconContainerManager} backed by RocksDB
  * (from {@link AbstractReconContainerManagerTest}) and a mocked
@@ -86,13 +88,20 @@ public class TestReconSCMContainerSyncIntegration
     extends AbstractReconContainerManagerTest {
 
   private StorageContainerServiceProvider mockScm;
+  private ReconScmContainerSyncMetrics metrics;
   private ReconStorageContainerSyncHelper syncHelper;
 
   @BeforeEach
   void setupSyncHelper() {
     mockScm = mock(StorageContainerServiceProvider.class);
+    metrics = ReconScmContainerSyncMetrics.create();
     syncHelper = new ReconStorageContainerSyncHelper(
-        mockScm, getConf(), getContainerManager());
+        mockScm, getConf(), getContainerManager(), metrics);
+  }
+
+  @AfterEach
+  void tearDownSyncMetrics() {
+    metrics.unRegister();
   }
 
   // ---------------------------------------------------------------------------
@@ -278,7 +287,7 @@ public class TestReconSCMContainerSyncIntegration
       getConf().setLong(
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE, 3L);
       ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
-          mockScm, getConf(), getContainerManager());
+          mockScm, getConf(), getContainerManager(), metrics);
 
       when(mockScm.getContainerCount(CLOSED)).thenReturn(7L);
       // Page 1: IDs 1-3
@@ -411,7 +420,7 @@ public class TestReconSCMContainerSyncIntegration
       getConf().setLong(
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE, 2L);
       ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
-          mockScm, getConf(), getContainerManager());
+          mockScm, getConf(), getContainerManager(), metrics);
 
       when(mockScm.getContainerCount(OPEN)).thenReturn(2L, 1L, 0L);
       when(mockScm.getListOfContainerIDs(
@@ -681,7 +690,7 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(400, 10, CLOSED);
       getConf().setInt(OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE, 3);
       ReconStorageContainerSyncHelper batchHelper = new ReconStorageContainerSyncHelper(
-          mockScm, getConf(), getContainerManager());
+          mockScm, getConf(), getContainerManager(), metrics);
 
       // SCM's DELETED list page 1 (IDs 400-402), then empty.
       List<ContainerID> firstPage = idRange(400, 403);

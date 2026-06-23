@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
@@ -111,6 +112,7 @@ public class TestOzoneManagerStateMachine {
   private RequestHandler handler;
   private ExecutorService executor;
   private OzoneManagerStateMachine sm;
+  private OMServiceManager serviceManager;
 
   @BeforeEach
   public void setup() {
@@ -119,6 +121,8 @@ public class TestOzoneManagerStateMachine {
     doubleBuffer = mock(OzoneManagerDoubleBuffer.class);
     handler = mock(RequestHandler.class);
     executor = Executors.newSingleThreadExecutor();
+    serviceManager = mock(OMServiceManager.class);
+    when(om.getOMServiceManager()).thenReturn(serviceManager);
     sm = new OzoneManagerStateMachine(om, doubleBuffer, handler, executor, null);
   }
 
@@ -878,6 +882,7 @@ public class TestOzoneManagerStateMachine {
     sm.notifyLeaderReady();
 
     verify(snapshotManager).resetInFlightSnapshotCount();
+    verify(serviceManager).notifyStatusChanged();
   }
 
   // --- getLatestSnapshot tests ---
