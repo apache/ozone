@@ -29,8 +29,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
-import org.apache.hadoop.hdds.utils.db.VersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.ExpectedLatestVersionMergeOutput.SourceRecord;
+import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
@@ -47,9 +47,9 @@ import org.slf4j.LoggerFactory;
  * applying {@link ExpectedLatestVersionMergeOutput}.
  */
 @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-class TestVersionedKWayMergeIteratorOverSst {
+class TestLatestVersionedKWayMergeIteratorOverSst {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestVersionedKWayMergeIteratorOverSst.class);
+      LoggerFactory.getLogger(TestLatestVersionedKWayMergeIteratorOverSst.class);
 
   @TempDir
   private Path tempDir;
@@ -106,8 +106,8 @@ class TestVersionedKWayMergeIteratorOverSst {
 
   private List<MergedKeyValue> mergeSstFiles(Path... sstFiles) throws Exception {
     List<MergedKeyValue> results = new ArrayList<>();
-    try (VersionedKWayMergeIterator iterator =
-             VersionedKWayMergeIterator.overRawSstFiles(Arrays.asList(sstFiles))) {
+    try (LatestVersionedKWayMergeIterator iterator =
+             LatestVersionedKWayMergeIterator.overRawSstFiles(Arrays.asList(sstFiles))) {
       while (iterator.hasNext()) {
         results.add(iterator.next());
       }

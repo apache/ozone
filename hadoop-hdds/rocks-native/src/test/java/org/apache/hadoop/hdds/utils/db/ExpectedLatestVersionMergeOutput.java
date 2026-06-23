@@ -24,8 +24,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Computes the expected output of {@link VersionedKWayMergeIterator} when configured
- * with {@link LatestVersionMergeComparators} and {@link LatestVersionMergeEmitter}.
+ * Computes the expected output of {@link LatestVersionedKWayMergeIterator}.
  * <p>
  * Test-only reference implementation: groups all source records by user key, picks the
  * highest-sequence value and tombstone per key, then applies snapshot-diff emit rules.
@@ -36,8 +35,7 @@ final class ExpectedLatestVersionMergeOutput {
   }
 
   static List<SourceRecord> fromSourceRecords(List<List<SourceRecord>> perSourceRecords) {
-    Map<byte[], List<SourceRecord>> grouped = new TreeMap<>(
-        LatestVersionMergeComparators.INSTANCE::compareUserKeys);
+    Map<byte[], List<SourceRecord>> grouped = new TreeMap<>(ExpectedLatestVersionMergeOutput::compareUserKeys);
     for (List<SourceRecord> source : perSourceRecords) {
       for (SourceRecord record : source) {
         grouped.computeIfAbsent(record.userKey, key -> new ArrayList<>()).add(record);
@@ -79,6 +77,27 @@ final class ExpectedLatestVersionMergeOutput {
     return expected;
   }
 
+  private static int compareUserKeys(byte[] left, byte[] right) {
+    if (left == right) {
+      return 0;
+    }
+    if (left == null) {
+      return -1;
+    }
+    if (right == null) {
+      return 1;
+    }
+    int minLength = Math.min(left.length, right.length);
+    for (int i = 0; i < minLength; i++) {
+      int l = left[i] & 0xff;
+      int r = right[i] & 0xff;
+      if (l != r) {
+        return Integer.compare(l, r);
+      }
+    }
+    return Integer.compare(left.length, right.length);
+  }
+
   static final class SourceRecord {
     private final byte[] userKey;
     private final long sequence;
@@ -93,7 +112,7 @@ final class ExpectedLatestVersionMergeOutput {
     }
 
     boolean isTombstone() {
-      return type != VersionedMergeEntry.ROCKS_TYPE_VALUE;
+      return type != LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE;
     }
 
     byte[] getUserKey() {

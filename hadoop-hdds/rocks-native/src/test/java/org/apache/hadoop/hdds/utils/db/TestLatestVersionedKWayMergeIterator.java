@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -29,8 +28,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.utils.db.VersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.ExpectedLatestVersionMergeOutput.SourceRecord;
+import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,9 +38,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class TestVersionedKWayMergeIterator {
+class TestLatestVersionedKWayMergeIterator {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestVersionedKWayMergeIterator.class);
+      LoggerFactory.getLogger(TestLatestVersionedKWayMergeIterator.class);
 
   private static Stream<Arguments> mergeScenarios() {
     return Stream.of(
@@ -115,7 +114,7 @@ class TestVersionedKWayMergeIterator {
         .collect(Collectors.toList());
 
     List<MergedKeyValue> results = new ArrayList<>();
-    try (VersionedKWayMergeIterator iterator = VersionedKWayMergeIterator.forTest(iterators)) {
+    try (LatestVersionedKWayMergeIterator iterator = LatestVersionedKWayMergeIterator.forTest(iterators)) {
       while (iterator.hasNext()) {
         results.add(iterator.next());
       }
@@ -162,7 +161,7 @@ class TestVersionedKWayMergeIterator {
     for (Source source : sources) {
       sourceKvs.add(source.entries);
       sourceRecords.add(source.entries.stream()
-          .map(TestVersionedKWayMergeIterator::toSourceRecord)
+          .map(TestLatestVersionedKWayMergeIterator::toSourceRecord)
           .collect(Collectors.toList()));
     }
     return new MergeScenario(name, sourceKvs, sourceRecords);

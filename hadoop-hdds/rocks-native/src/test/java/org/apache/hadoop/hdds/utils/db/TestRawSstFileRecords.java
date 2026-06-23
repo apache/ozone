@@ -49,7 +49,7 @@ final class TestRawSstFileRecords {
       while (iterator.hasNext()) {
         ManagedRawSSTFileIterator.KeyValue kv = iterator.next();
         byte[] key = copyBuffer(kv.getKey());
-        byte[] value = kv.getType() == VersionedMergeEntry.ROCKS_TYPE_VALUE
+        byte[] value = kv.getType() == LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE
             ? copyBuffer(kv.getValue()) : null;
         records.add(new SourceRecord(key, kv.getSequence().longValue(), kv.getType(), value));
       }

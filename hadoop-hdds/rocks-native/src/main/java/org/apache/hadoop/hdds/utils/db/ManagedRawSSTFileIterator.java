@@ -81,6 +81,24 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
     return this.transformer.apply(keyValue);
   }
 
+  /**
+   * Reads the key at the current native iterator position without advancing.
+   * After {@link #next()}, this is the key of the next record to be returned.
+   */
+  byte[] peekKeyBytes() {
+    if (!hasNext() || !type.readKey()) {
+      return null;
+    }
+    CodecBuffer key = keyBuffer.getFromDb();
+    if (key == null) {
+      return null;
+    }
+    ByteBuffer byteBuffer = key.asReadOnlyByteBuffer();
+    byte[] bytes = new byte[byteBuffer.remaining()];
+    byteBuffer.get(bytes);
+    return bytes;
+  }
+
   private native void closeInternal(long handle);
 
   @Override
