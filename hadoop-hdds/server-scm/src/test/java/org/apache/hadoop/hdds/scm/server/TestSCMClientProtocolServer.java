@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,8 +98,8 @@ public class TestSCMClientProtocolServer {
     when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
   }
 
-  @AfterEach
-  public void tearDown() throws Exception {
+  @AfterAll
+  public static void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
       scm.join();

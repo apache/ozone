@@ -1159,7 +1159,7 @@ public class SCMClientProtocolServer implements
     // This command is kept only for legacy upgrade scripts which would have first finalized SCM and then
     // made a call to OM to finalize it. The new flow, is that a single call to OM triggers the finalization process.
     // The legacy OM command now calls the new one and correctly starts the flow, so this command has become a
-    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow nay scripts to move
+    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow any scripts to move
     // on and call OM to start the process.
     return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
   }
