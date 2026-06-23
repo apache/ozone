@@ -35,7 +35,6 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.VolumeUtilizationMetrics.VolumeMetricsInfo;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.jupiter.api.Test;
 
@@ -52,8 +51,6 @@ public class TestVolumeUtilizationMetrics {
   private static final long QUOTA_IN_NAMESPACE_2 = -1;
   private static final long USED_NAMESPACE_1 = 4;
   private static final long USED_NAMESPACE_2 = 0;
-  private static final long BUCKET_USED_BYTES_1 = 100;
-  private static final long BUCKET_USED_BYTES_2 = 200;
 
   @Test
   void testVolumeUtilizationMetrics() {
@@ -76,22 +73,6 @@ public class TestVolumeUtilizationMetrics {
 
     when(omMetadataManager.getVolumeIterator()).thenReturn(volumeIterator);
 
-    Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> bucketEntry1 =
-        createMockBucketEntry(VOLUME_NAME_1, BUCKET_USED_BYTES_1);
-    Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> bucketEntry2 =
-        createMockBucketEntry(VOLUME_NAME_2, BUCKET_USED_BYTES_2);
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> bucketIterator = mock(Iterator.class);
-    when(bucketIterator.hasNext())
-        .thenReturn(true)
-        .thenReturn(true)
-        .thenReturn(false);
-    when(bucketIterator.next())
-        .thenReturn(bucketEntry1)
-        .thenReturn(bucketEntry2);
-
-    when(omMetadataManager.getBucketIterator()).thenReturn(bucketIterator);
-
     MetricsRecordBuilder mb = mock(MetricsRecordBuilder.class);
     when(mb.setContext(anyString())).thenReturn(mb);
     when(mb.tag(any(MetricsInfo.class), anyString())).thenReturn(mb);
@@ -106,32 +87,13 @@ public class TestVolumeUtilizationMetrics {
 
     verify(mb, times(1)).tag(VolumeMetricsInfo.VolumeName, VOLUME_NAME_1);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaBytes, QUOTA_IN_BYTES_1);
-    verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedBytes, BUCKET_USED_BYTES_1);
-    verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeAvailableBytes, QUOTA_IN_BYTES_1 - BUCKET_USED_BYTES_1);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaNamespace, QUOTA_IN_NAMESPACE_1);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedNamespace, USED_NAMESPACE_1);
 
     verify(mb, times(1)).tag(VolumeMetricsInfo.VolumeName, VOLUME_NAME_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaBytes, QUOTA_IN_BYTES_2);
-    verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedBytes, BUCKET_USED_BYTES_2);
-    verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeAvailableBytes, QUOTA_IN_BYTES_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaNamespace, QUOTA_IN_NAMESPACE_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedNamespace, USED_NAMESPACE_2);
-  }
-
-  private static Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> createMockBucketEntry(
-      String volumeName, long usedBytes) {
-    Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = mock(Map.Entry.class);
-    CacheValue<OmBucketInfo> cacheValue = mock(CacheValue.class);
-    OmBucketInfo bucketInfo = mock(OmBucketInfo.class);
-
-    when(bucketInfo.getVolumeName()).thenReturn(volumeName);
-    when(bucketInfo.getUsedBytes()).thenReturn(usedBytes);
-
-    when(cacheValue.getCacheValue()).thenReturn(bucketInfo);
-    when(entry.getValue()).thenReturn(cacheValue);
-
-    return entry;
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> createMockEntry(

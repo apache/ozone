@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -31,7 +29,6 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 
 /**
@@ -40,9 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
  * Available metrics:
  * <ul>
  *   <li>Volume quota in bytes.
- *   <li>Volume used bytes (aggregated from all buckets in the volume).
- *   <li>Volume available bytes. Calculated from difference between volume quota and used bytes.
- *   If volume quota is not set then this metric shows -1 as value.
  *   <li>Volume quota in namespace (maximum number of buckets).
  *   <li>Volume used namespace (current number of buckets).
  * </ul>
@@ -66,43 +60,19 @@ public class VolumeUtilizationMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    Map<String, OmVolumeArgs> volumes = new HashMap<>();
     Iterator<Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>> volumeIterator = metadataManager.getVolumeIterator();
+
     while (volumeIterator.hasNext()) {
       Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry = volumeIterator.next();
       OmVolumeArgs volumeArgs = entry.getValue().getCacheValue();
-      if (volumeArgs != null) {
-        volumes.put(volumeArgs.getVolume(), volumeArgs);
-      }
-    }
-
-    Map<String, Long> usedBytesPerVolume = new HashMap<>();
-    Iterator<Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> bucketIterator = metadataManager.getBucketIterator();
-    while (bucketIterator.hasNext()) {
-      Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = bucketIterator.next();
-      OmBucketInfo bucketInfo = entry.getValue().getCacheValue();
-      if (bucketInfo == null) {
+      if (volumeArgs == null) {
         continue;
-      }
-      usedBytesPerVolume.merge(bucketInfo.getVolumeName(), bucketInfo.getUsedBytes(), Long::sum);
-    }
-
-    for (OmVolumeArgs volumeArgs : volumes.values()) {
-      long quotaInBytes = volumeArgs.getQuotaInBytes();
-      long usedBytes = usedBytesPerVolume.getOrDefault(volumeArgs.getVolume(), 0L);
-      long availableBytes;
-      if (quotaInBytes == -1) {
-        availableBytes = -1;
-      } else {
-        availableBytes = Math.max(quotaInBytes - usedBytes, 0);
       }
 
       collector.addRecord(SOURCE)
           .setContext("Volume metrics")
           .tag(VolumeMetricsInfo.VolumeName, volumeArgs.getVolume())
-          .addGauge(VolumeMetricsInfo.VolumeQuotaBytes, quotaInBytes)
-          .addGauge(VolumeMetricsInfo.VolumeUsedBytes, usedBytes)
-          .addGauge(VolumeMetricsInfo.VolumeAvailableBytes, availableBytes)
+          .addGauge(VolumeMetricsInfo.VolumeQuotaBytes, volumeArgs.getQuotaInBytes())
           .addGauge(VolumeMetricsInfo.VolumeQuotaNamespace, volumeArgs.getQuotaInNamespace())
           .addGauge(VolumeMetricsInfo.VolumeUsedNamespace, volumeArgs.getUsedNamespace());
     }
@@ -116,8 +86,6 @@ public class VolumeUtilizationMetrics implements MetricsSource {
   enum VolumeMetricsInfo implements MetricsInfo {
     VolumeName("Volume name."),
     VolumeQuotaBytes("Volume quota in bytes."),
-    VolumeUsedBytes("Bytes used across all buckets in the volume."),
-    VolumeAvailableBytes("Volume available space."),
     VolumeQuotaNamespace("Volume quota in namespace."),
     VolumeUsedNamespace("Volume used namespace.");
 
