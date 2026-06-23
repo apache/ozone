@@ -352,7 +352,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
       boolean hasConditionalDeletes = request.getObjects().stream()
-          .anyMatch(d -> StringUtils.isNotBlank(d.getETag()));
+          .anyMatch(d -> StringUtils.isNotBlank(d.getIfMatch()));
       long startNanos = Time.monotonicNowNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
@@ -409,11 +409,11 @@ public class BucketEndpoint extends BucketOperationHandler {
       MultiDeleteResponse result, boolean quiet, List<String> failedDeletes)
       throws IOException {
     String key = deleteObject.getKey();
-    if (StringUtils.isNotBlank(deleteObject.getETag())) {
+    if (StringUtils.isNotBlank(deleteObject.getIfMatch())) {
       try {
         OzoneKeyDetails keyDetails = bucket.getKey(key);
         String currentETag = keyDetails.getMetadata().get(ETAG);
-        if (!S3ConditionalRequest.matchesETag(deleteObject.getETag(), currentETag)) {
+        if (!S3ConditionalRequest.matchesETag(deleteObject.getIfMatch(), currentETag)) {
           addPreconditionFailedError(result, key);
           return;
         }

@@ -69,8 +69,8 @@ public class MultiDeleteRequest {
     @XmlElement(name = "VersionId")
     private String versionId;
 
-    @XmlElement(name = "ETag")
-    private String etag;
+    @XmlElement(name = S3Consts.IF_MATCH_HEADER)
+    private String ifMatch;
 
     public DeleteObject() {
     }
@@ -79,9 +79,9 @@ public class MultiDeleteRequest {
       this.key = key;
     }
 
-    public DeleteObject(String key, String etag) {
+    public DeleteObject(String key, String ifMatch) {
       this.key = key;
-      this.etag = etag;
+      this.ifMatch = ifMatch;
     }
 
     public String getKey() {
@@ -100,12 +100,12 @@ public class MultiDeleteRequest {
       this.versionId = versionId;
     }
 
-    public String getETag() {
-      return etag;
+    public String getIfMatch() {
+      return ifMatch;
     }
 
-    public void setETag(String eTag) {
-      this.etag = eTag;
+    public void setIfMatch(String ifMatch) {
+      this.ifMatch = ifMatch;
     }
   }
 }

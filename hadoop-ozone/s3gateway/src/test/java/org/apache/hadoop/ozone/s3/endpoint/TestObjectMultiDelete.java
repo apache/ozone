@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -148,17 +149,17 @@ public class TestObjectMultiDelete {
   }
 
   @Test
-  public void conditionalDeleteMatchingETag() throws Exception {
+  public void conditionalDeleteMatchingIfMatch() throws Exception {
     OzoneClient client = new OzoneClientStub();
-    OzoneBucket bucket = initTestDataWithEtags(client);
+    OzoneBucket bucket = initConditionalDeleteTestData(client);
 
     BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
-    mdr.getObjects().add(new DeleteObject("key1", "\"etag-1\""));
-    mdr.getObjects().add(new DeleteObject("key2", "etag-2"));
+    mdr.getObjects().add(new DeleteObject("key1", "\"match-1\""));
+    mdr.getObjects().add(new DeleteObject("key2", "match-2"));
 
     MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
@@ -168,16 +169,16 @@ public class TestObjectMultiDelete {
   }
 
   @Test
-  public void conditionalDeleteMismatchedETag() throws Exception {
+  public void conditionalDeleteMismatchedIfMatch() throws Exception {
     OzoneClient client = new OzoneClientStub();
-    initTestDataWithEtags(client);
+    initConditionalDeleteTestData(client);
 
     BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
-    mdr.getObjects().add(new DeleteObject("key1", "\"wrong-etag\""));
+    mdr.getObjects().add(new DeleteObject("key1", "\"wrong-match\""));
 
     MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
@@ -190,14 +191,14 @@ public class TestObjectMultiDelete {
   @Test
   public void conditionalDeleteMissingKeyFails() throws Exception {
     OzoneClient client = new OzoneClientStub();
-    initTestDataWithEtags(client);
+    initConditionalDeleteTestData(client);
 
     BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
-    mdr.getObjects().add(new DeleteObject("missing-key", "\"etag-1\""));
+    mdr.getObjects().add(new DeleteObject("missing-key", "\"match-1\""));
 
     MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
 
@@ -207,9 +208,9 @@ public class TestObjectMultiDelete {
   }
 
   @Test
-  public void conditionalDeleteWildcardETag() throws Exception {
+  public void conditionalDeleteWildcardIfMatch() throws Exception {
     OzoneClient client = new OzoneClientStub();
-    OzoneBucket bucket = initTestDataWithEtags(client);
+    OzoneBucket bucket = initConditionalDeleteTestData(client);
 
     BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -233,14 +234,14 @@ public class TestObjectMultiDelete {
   @Test
   public void conditionalDeleteMixedWithUnconditional() throws Exception {
     OzoneClient client = new OzoneClientStub();
-    OzoneBucket bucket = initTestDataWithEtags(client);
+    OzoneBucket bucket = initConditionalDeleteTestData(client);
 
     BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
-    mdr.getObjects().add(new DeleteObject("key1", "\"etag-1\""));
+    mdr.getObjects().add(new DeleteObject("key1", "\"match-1\""));
     mdr.getObjects().add(new DeleteObject("key2"));
     mdr.getObjects().add(new DeleteObject("missing-unconditional"));
 
@@ -263,20 +264,20 @@ public class TestObjectMultiDelete {
     return bucket;
   }
 
-  private OzoneBucket initTestDataWithEtags(OzoneClient client) throws IOException {
+  private OzoneBucket initConditionalDeleteTestData(OzoneClient client) throws IOException {
     client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
-    createKeyWithEtag(bucket, "key1", "etag-1");
-    createKeyWithEtag(bucket, "key2", "etag-2");
-    createKeyWithEtag(bucket, "key3", "etag-3");
+    createKeyWithIfMatchTarget(bucket, "key1", "\"match-1\"");
+    createKeyWithIfMatchTarget(bucket, "key2", "match-2");
+    createKeyWithIfMatchTarget(bucket, "key3", "match-3");
     return bucket;
   }
 
-  private static void createKeyWithEtag(OzoneBucket bucket, String keyName,
-      String etag) throws IOException {
+  private static void createKeyWithIfMatchTarget(OzoneBucket bucket, String keyName,
+      String ifMatch) throws IOException {
     Map<String, String> metadata = new HashMap<>();
-    metadata.put(ETAG, etag);
+    metadata.put(ETAG, parseETag(ifMatch));
     try (OzoneOutputStream out = bucket.createKey(keyName, 1,
         bucket.getReplicationConfig(), metadata, emptyMap())) {
       out.write('x');
