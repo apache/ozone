@@ -43,8 +43,8 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "decommission",
     customSynopsis = "ozone admin om decommission --service-id=<om-service-id> " +
-        "-nodeid=<decommission-om-node-id> " +
-        "-hostname=<decommission-om-node-address> [options]",
+        "--nodeid=<decommission-om-node-id> " +
+        "--node-host-address=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
         "decommissioned is shutdown first." +
         "%nNote - Add the node to be decommissioned to " +
