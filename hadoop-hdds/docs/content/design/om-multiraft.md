@@ -369,6 +369,108 @@ public class BucketRaftGroupsReconciler {
 }
 ```
 
+## Snapshot & Install-Snapshot
+
+### Problem
+
+Ratis snapshot and install-snapshot assume a **1:1 relationship between a Raft log
+and the persisted state** it protects. The multi-raft design breaks that assumption:
+there are `N` bucket RAFT groups plus the main RAFT group, but they all apply into a
+**single shared OM RocksDB**. This means a snapshot taken for one group, and an
+install-snapshot triggered by one group, unavoidably touch state owned by the other
+groups.
+
+Two distinct mechanisms must be considered separately:
+
+- **`takeSnapshot()` (log purging)** — works per group. Each `BucketStateMachine`
+  persists its own last-applied position under a group-scoped key
+  `#TRANSACTIONINFO<raftGroupId>` in the `transactionInfo` table, and returns its own
+  applied index to Ratis so that group's log can be purged. Because a RocksDB flush is
+  global, flushing one group's double buffer also durably persists the others' pending
+  writes — so per-group log purging is safe.
+
+- **`notifyInstallSnapshot()` (follower bootstrap)** — does **not** work per group with
+  a shared DB, and is the focus of this section.
+
+### Why per-group install-snapshot is unsafe with a shared DB
+
+When the leader of bucket group *g* triggers `notifyInstallSnapshot` to a lagging
+follower, the follower today (`OzoneManager#installSnapshotFromLeader` →
+`installCheckpoint`):
+
+1. Downloads the **entire** OM DB checkpoint from the leader — the checkpoint contains
+   `keyTable`/`fileTable`/`bucketTable`/`volumeTable` and the `#TRANSACTIONINFO<*>`
+   markers for **every** group, not just group *g*.
+2. Pauses **only one** state machine and replaces the **whole** DB directory
+   (`replaceOMDBWithCheckpoint`), then reloads and unpauses.
+
+With a single shared DB this produces three correctness problems:
+
+1. **Concurrent appliers over a DB being swapped.** Only the triggering group is paused;
+   the other groups' `BucketStateMachine`s keep applying into a DB that is being stopped
+   and replaced underneath them → lost writes, RocksDB errors, or a crash.
+2. **Cross-group rollback.** The checkpoint reflects the *source node's* view of the
+   other groups, where that node is typically a **follower** (leadership is spread across
+   OM nodes by the balancer). Installing it rewinds groups whose state on the receiver
+   was independently ahead — silently rolling their data back.
+3. **Log/DB divergence.** After the swap, each non-triggering group's in-memory
+   `lastAppliedTermIndex` no longer matches its `#TRANSACTIONINFO<group>` value in the
+   freshly installed DB, so its Raft log position and persisted state disagree.
+
+There is no globally consistent cut in an arbitrary whole-DB checkpoint: it is an
+interleaving of `N+1` independent logs at `N+1` unrelated indices.
+
+### Design: node-level coordinated install-snapshot
+
+Because the DB is shared, **snapshot and install-snapshot are treated as a node-level
+operation coordinated across all groups**, not as an independent per-group action. The
+main RAFT group leader is the coordinator (it already drives cross-group concerns such
+as group reconciliation).
+
+**Producing a consistent checkpoint (source):**
+1. Quiesce all state machines — pause and flush the double buffers of the main SM and
+   every `BucketStateMachine`.
+2. Record the **vector** of `(raftGroupId → appliedIndex)`. This is already materialized
+   as the per-group `#TRANSACTIONINFO<raftGroupId>` keys.
+3. Take the RocksDB checkpoint, then resume all state machines.
+
+**Installing a checkpoint (receiver):** when **any** group requires install-snapshot,
+1. Pause **all** `N+1` state machines (not just the triggering group) and clear their
+   double buffers.
+2. Replace the OM DB directory **once**.
+3. Re-seed **each** group's `lastAppliedTermIndex` from its own `#TRANSACTIONINFO<group>`
+   marker in the installed DB.
+4. Unpause all groups; each then replays its own log tail from its restored index.
+
+> **Implementation note:** the current `installCheckpoint` pauses/unpauses only
+> `omRatisServer.getOmStateMachine()` (the main SM). It must be extended to pause/unpause
+> the full set of state machines and to reload every group's transaction-info marker.
+> The global pause must be ordered against `waitForMainStateMachineCatchUp()` to avoid a
+> deadlock between the install barrier and a bucket group waiting on the main SM.
+
+### Mitigation: keep install-snapshot rare
+
+Install-snapshot is the expensive, disruptive path. Followers should catch up via
+`AppendEntries` whenever possible, so per-group log retention is sized so that purging
+rarely outruns a temporarily lagging follower. Because there are now `N+1` logs, this
+increases aggregate log disk usage proportionally; size retention and disk accordingly.
+
+This mitigation reduces frequency but cannot eliminate install-snapshot: a **newly
+bootstrapped or re-added OM** has no state for any group and must obtain an initial
+checkpoint for all groups. That case is handled by the node-level install above.
+
+### Future direction: per-group state isolation (Phase 2)
+
+The clean long-term fix is to remove the shared-DB constraint by partitioning OM state
+per group — e.g. group-scoped RocksDB column families (or separate RocksDB instances) —
+so a group's checkpoint and install touch only that group's data and the native Ratis
+1:1 log↔state model is restored. This is a larger change: `keyTable`/`fileTable`/
+`openKeyTable`/`deletedTable` are global today, buckets are assigned to groups
+dynamically (so a bucket's keys would migrate partitions on reassignment), and shared
+metadata (volumes, the bucket table, snapshots, S3 secrets) still needs an owning group.
+It is therefore deferred to a follow-up phase; the node-level coordinated install above
+is the correct near-term behavior.
+
 ## Upgrade Path
 
 ### From Single-Raft to Multi-Raft
