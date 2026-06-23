@@ -33,7 +33,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for application-aware and incoming-only tracing init modes.
+ * Tests for application-aware and ozone tracing init modes.
  */
 public class TestTracingInitModes {
 
@@ -132,7 +132,7 @@ public class TestTracingInitModes {
   }
 
   @Test
-  public void testServiceIncomingOnlyVsOzoneRoots() throws Exception {
+  public void testServiceApplicationAwarePassThroughVsOzoneRoots() throws Exception {
     TracingUtil.initServiceTracing("parent-export", tracingConfig(true, false));
     String parentCarrier;
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("parent")) {
@@ -145,16 +145,16 @@ public class TestTracingInitModes {
 
     TracingUtil.initServiceTracing("scm", tracingConfig(false, true));
     assertThat(TracingUtil.shouldInstallTraceProxy(conf(false, true)))
-        .as("server incoming-only alone must not wrap client RPC proxies")
+        .as("server APPLICATION pass-through alone must not wrap client RPC proxies")
         .isFalse();
 
     assertThat(TracingUtil.importAndCreateSpan("server-op", "").getSpanContext().isValid())
-        .as("incoming-only must not start root spans without client trace context")
+        .as("APPLICATION mode must not start root spans without client trace context")
         .isFalse();
 
     Span child = TracingUtil.importAndCreateSpan("server-op", parentCarrier);
     assertThat(child.getSpanContext().isValid())
-        .as("incoming-only should create a child span from W3C carrier")
+        .as("APPLICATION mode should create a child span from W3C carrier")
         .isTrue();
     try (Scope ignored = child.makeCurrent()) {
       assertThat(Span.current().getSpanContext().isValid())
@@ -179,7 +179,7 @@ public class TestTracingInitModes {
   }
 
   @Test
-  public void testReconfigureSwitchesToIncomingOnly() throws Exception {
+  public void testReconfigureSwitchesToApplicationPassThrough() throws Exception {
     TracingUtil.initServiceTracing("om", tracingConfig(true, true));
     Span root = TracingUtil.importAndCreateSpan("before", null);
     assertThat(root.getSpanContext().isValid())
@@ -191,7 +191,7 @@ public class TestTracingInitModes {
 
     Span after = TracingUtil.importAndCreateSpan("after", "");
     assertThat(after.getSpanContext().isValid())
-        .as("reconfigure should use initServiceTracing → incoming-only, not root traces")
+        .as("reconfigure should use initServiceTracing → APPLICATION pass-through, not root traces")
         .isFalse();
   }
 

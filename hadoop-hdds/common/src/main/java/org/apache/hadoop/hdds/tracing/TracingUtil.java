@@ -58,12 +58,13 @@ public final class TracingUtil {
   private static SdkTracerProvider sdkTracerProvider;
   private static volatile Mode mode = Mode.NOOP;
 
-  /* MODES of tracing are as follows:
-  NOOP = off, OZONE = Ozone owns tracing, APPLICATION = join the app's trace,
-  INCOMING_ONLY = server exports spans only when a client sends trace context.
-  */
+  /**
+   * NOOP — tracing off.
+   * OZONE — Ozone-owned tracing ({@code ozone.tracing.enabled=true}).
+   * APPLICATION — continue an existing trace only; never start roots.
+   */
 
-  private enum Mode { NOOP, OZONE, APPLICATION, INCOMING_ONLY }
+  private enum Mode { NOOP, OZONE, APPLICATION }
 
   private TracingUtil() {
   }
@@ -109,9 +110,7 @@ public final class TracingUtil {
       tracer = GlobalOpenTelemetry.get().getTracer(serviceName);
       mode = Mode.APPLICATION;
       isInit = true;
-      LOG.info("Ozone client tracing is application-aware: continuing the "
-          + "application's traces using the globally-registered OpenTelemetry "
-          + "tracer (service={}).", serviceName);
+      LOG.info("Application-aware client tracing enabled (service={}).", serviceName);
       return;
     }
 
@@ -124,8 +123,7 @@ public final class TracingUtil {
       return;
     }
 
-    LOG.debug("Ozone client tracing disabled: no application tracer registered "
-        + "and ozone.tracing.enabled=false.");
+    LOG.debug("Client tracing disabled (service={}).", serviceName);
   }
 
   /**
@@ -143,8 +141,7 @@ public final class TracingUtil {
       tracer = GlobalOpenTelemetry.get().getTracer(serviceName);
       mode = Mode.APPLICATION;
       isInit = true;
-      LOG.info("Service tracing is application-aware via global OpenTelemetry "
-          + "(service={}).", serviceName);
+      LOG.info("Application-aware service tracing enabled (service={}).", serviceName);
       return;
     }
 
@@ -156,17 +153,16 @@ public final class TracingUtil {
     if (tracingConfig.isClientApplicationAware()) {
       try {
         initialize(serviceName, tracingConfig);
-        mode = Mode.INCOMING_ONLY;
+        mode = Mode.APPLICATION;
         isInit = true;
-        LOG.info("Service tracing is incoming-only: continuing client traces "
-            + "from RPC/gRPC context (service={}).", serviceName);
+        LOG.info("Application-aware service tracing enabled (service={}).", serviceName);
       } catch (Exception e) {
-        LOG.error("Failed to initialize incoming-only tracing", e);
+        LOG.error("Failed to initialize application-aware service tracing", e);
       }
       return;
     }
 
-    LOG.debug("Service tracing disabled.");
+    LOG.debug("Service tracing disabled (service={}).", serviceName);
   }
 
   /**
@@ -281,7 +277,7 @@ public final class TracingUtil {
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
     if (encodedParent == null || encodedParent.isEmpty()) {
-      if (mode == Mode.APPLICATION || mode == Mode.INCOMING_ONLY) {
+      if (mode == Mode.APPLICATION) {
         return Span.getInvalid();
       }
       return tracer.spanBuilder(name).setNoParent().startSpan();
@@ -289,6 +285,9 @@ public final class TracingUtil {
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
+    if (mode == Mode.APPLICATION && !Span.fromContext(extract).getSpanContext().isValid()) {
+      return Span.getInvalid();
+    }
     return tracer.spanBuilder(name)
         .setParent(extract)
         .startSpan();
@@ -363,7 +362,7 @@ public final class TracingUtil {
    * If a parent span exists in the current context, this becomes a child span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
-                                                            CheckedRunnable<E> runnable) throws E {
+      CheckedRunnable<E> runnable) throws E {
     Span span = buildSpan(spanName);
     executeInSpan(span, runnable);
   }
@@ -372,7 +371,7 @@ public final class TracingUtil {
    * Execute {@code supplier} inside an activated new span.
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
-                                                            CheckedSupplier<R, E> supplier) throws E {
+      CheckedSupplier<R, E> supplier) throws E {
     Span span = buildSpan(spanName);
     return executeInSpan(span, supplier);
   }
@@ -383,7 +382,7 @@ public final class TracingUtil {
    * @return the value returned by {@code supplier}
    */
   private static <R, E extends Exception> R executeInSpan(Span span,
-                                                          CheckedSupplier<R, E> supplier) throws E {
+      CheckedSupplier<R, E> supplier) throws E {
     if (!span.getSpanContext().isValid()) {
       return supplier.get();
     }
@@ -402,7 +401,7 @@ public final class TracingUtil {
    * Execute {@code runnable} in the given {@code span}.
    */
   private static <E extends Exception> void executeInSpan(Span span,
-                                                          CheckedRunnable<E> runnable) throws E {
+      CheckedRunnable<E> runnable) throws E {
     if (!span.getSpanContext().isValid()) {
       runnable.run();
       return;
@@ -422,7 +421,7 @@ public final class TracingUtil {
    * Execute a new function as a child span of the parent.
    */
   public static <E extends Exception> void executeAsChildSpan(String spanName,
-                                                              String parentName, CheckedRunnable<E> runnable) throws E {
+      String parentName, CheckedRunnable<E> runnable) throws E {
     Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
     executeInSpan(span, runnable);
   }
@@ -504,7 +503,7 @@ public final class TracingUtil {
 
     // Application-aware client and incoming-only server: only continue an
     // already-active trace; never start a brand-new root trace.
-    if ((mode == Mode.APPLICATION || mode == Mode.INCOMING_ONLY) && !validParent) {
+    if (mode == Mode.APPLICATION  && !validParent) {
       return Span.getInvalid();
     }
 
@@ -533,7 +532,7 @@ public final class TracingUtil {
 
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
-    if (conf == null || !(isTracingActive() || shouldInstallTraceProxy(conf))) {
+    if (conf == null || (!isTracingActive() && !shouldInstallTraceProxy(conf))) {
       return () -> { };
     }
 
