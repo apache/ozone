@@ -234,7 +234,8 @@ public class TestAnalyzeSubcommand {
 
     String output = outWriter.toString();
     assertThat(output).contains("Number of orphan containers(wrt SCM) on this DataNode: 0");
-    assertThat(output).contains("Number of deleted but present containers on this DataNode: 0");
+    assertThat(output).contains(
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode: 0");
   }
 
   @Test
@@ -256,7 +257,8 @@ public class TestAnalyzeSubcommand {
 
     String output = outWriter.toString();
     assertThat(output).contains("Number of orphan containers(wrt SCM) on this DataNode: 1");
-    assertThat(output).contains("Number of deleted but present containers on this DataNode: 1");
+    assertThat(output).contains(
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode: 1");
     assertThat(output).contains("Container " + orphanId + " (1 occurrence):");
     assertOccurrenceStatus(output, volumeRoot, orphanId, "VALID");
     assertThat(output).contains("Container " + deletedId + " (1 occurrence):");
@@ -288,7 +290,8 @@ public class TestAnalyzeSubcommand {
     assertThat(output).contains("Number of orphan containers(wrt SCM) on this DataNode: 1");
     assertThat(output).contains("Container " + orphanId + " (1 occurrence):");
     assertOccurrenceStatus(output, volumeRoot1, orphanId, "VALID");
-    assertThat(output).contains("Number of deleted but present containers on this DataNode: 1");
+    assertThat(output).contains(
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode: 1");
     assertThat(output).contains("Container " + deletedId + " (1 occurrence):");
     assertOccurrenceStatus(output, volumeRoot1, deletedId, "VALID");
     assertThat(output).contains("Number of containers with duplicate container directories on this DataNode: 1");
@@ -308,7 +311,8 @@ public class TestAnalyzeSubcommand {
     String output = outWriter.toString();
     assertThat(output).contains("provide the SCM database path using the --scm-db option");
     assertThat(output).doesNotContain("Number of orphan containers(wrt SCM) on this DataNode:");
-    assertThat(output).doesNotContain("Number of deleted but present containers on this DataNode:");
+    assertThat(output).doesNotContain(
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode:");
     assertThat(output).contains("Number of containers with duplicate container directories on this DataNode: 0");
   }
 
@@ -328,7 +332,7 @@ public class TestAnalyzeSubcommand {
     assertThat(output).contains(
         "Number of orphan containers(wrt SCM) on this DataNode: " + expectedOrphans);
     assertThat(output).contains(
-        "Number of deleted but present containers on this DataNode: " + expectedDeleted);
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode: " + expectedDeleted);
   }
 
   private void assertDuplicateReport(File volumeRoot1, File volumeRoot2, long containerId,

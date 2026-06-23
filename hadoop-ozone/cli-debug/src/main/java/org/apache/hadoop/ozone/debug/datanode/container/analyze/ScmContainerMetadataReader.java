@@ -46,9 +46,13 @@ public final class ScmContainerMetadataReader implements AutoCloseable {
   public ScmContainerMetadataReader(ConfigurationSource conf, File scmDbPath)
       throws IOException {
     File scmDbDir = resolveScmDbDirectory(scmDbPath);
+    File parentDir = scmDbDir.getParentFile();
+    if (parentDir == null) {
+      throw new IOException("SCM database directory has no parent path: " + scmDbDir);
+    }
     try {
       this.dbStore = DBStoreBuilder.newBuilder(conf, SCMDBDefinition.get(), scmDbDir.getName(),
-          scmDbDir.getParentFile().toPath())
+          parentDir.toPath())
           .setOpenReadOnly(true)
           .build();
     } catch (RocksDatabaseException e) {
@@ -85,9 +89,10 @@ public final class ScmContainerMetadataReader implements AutoCloseable {
 
   static File resolveScmDbDirectory(File path) throws IOException {
     Objects.requireNonNull(path, "scmDbPath");
-    File scmDbDir = path;
-    if (!OzoneConsts.SCM_DB_NAME.equals(path.getName())) {
-      File child = new File(path, OzoneConsts.SCM_DB_NAME);
+    File absolutePath = path.getAbsoluteFile();
+    File scmDbDir = absolutePath;
+    if (!OzoneConsts.SCM_DB_NAME.equals(absolutePath.getName())) {
+      File child = new File(absolutePath, OzoneConsts.SCM_DB_NAME);
       if (child.isDirectory()) {
         scmDbDir = child;
       }

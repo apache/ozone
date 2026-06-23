@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.debug.datanode.container.analyze;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -68,7 +69,7 @@ public class TestScmContainerMetadataReader {
     containers.put(1002L, HddsProtos.LifeCycleState.DELETED);
     File scmDb = testHelper.createScmDb(containers);
 
-    try (ScmContainerMetadataReader reader = new ScmContainerMetadataReader(conf, scmDb)) {
+    try (ScmContainerMetadataReader reader = new ScmContainerMetadataReader(conf, scmDb.getParentFile())) {
       Optional<ScmContainerMetadataReader.ScmContainerClassification> result = reader.classify(1002L);
       assertTrue(result.isPresent());
       assertEquals(ScmContainerMetadataReader.ScmContainerClassification.DELETED, result.get());
@@ -86,5 +87,14 @@ public class TestScmContainerMetadataReader {
       assertFalse(reader.classify(1003L).isPresent());
       assertFalse(reader.classify(1004L).isPresent());
     }
+  }
+
+  @Test
+  public void testResolveScmDbDirectoryReturnsAbsolutePathWithParent() throws Exception {
+    File scmDb = testHelper.createScmDb(Collections.emptyMap());
+    File resolved = ScmContainerMetadataReader.resolveScmDbDirectory(scmDb);
+    assertTrue(resolved.isAbsolute());
+    assertNotNull(resolved.getParentFile());
+    assertEquals(scmDb.getAbsolutePath(), resolved.getAbsolutePath());
   }
 }

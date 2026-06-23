@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.shell.ListLimitOptions;
@@ -45,11 +46,16 @@ import picocli.CommandLine.Command;
         "Analyze container consistency between on-disk container directories on this DataNode and SCM metadata.",
         "Must be run locally on a DataNode.",
         "",
-        "Each reported container occurrence includes a status:",
+        "Reports:",
+        "  Duplicate container directories: same containerID found on more than one volume.",
+        "  Orphan containers (requires --scm-db): present on disk but not present in SCM metadata.",
+        "  Containers marked DELETED in SCM but present on disk (requires --scm-db).",
+        "",
+        "Each reported occurrence includes container directory path(s), size and an on-disk metadata status:",
         "  MISSING_METADATA: metadata/{containerId}.container does not exist.",
-        "  INVALID_METADATA: metadata file exists but cannot be parsed, or the container ID in the metadata",
-        "      does not match the directory name.",
-        "  VALID: metadata file is present and consistent with the directory."
+        "  INVALID_METADATA: metadata file exists but cannot be parsed, or the containerID in the",
+        "      file does not match the directory name.",
+        "  VALID: metadata file is present, parses correctly, and its containerID matches the directory name."
     })
 public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Void> {
   @CommandLine.Mixin
@@ -61,7 +67,7 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
 
   @Override
   public Void call() throws Exception {
-    listOptions.getLimit(); //This triggers ListLimitOptions validation
+    validateOptions();
     OzoneConfiguration conf = getOzoneConf();
     ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
     Map<Long, List<ContainerDiskOccurrence>> enrichedDuplicates =
@@ -78,6 +84,16 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
     printDuplicates(enrichedDuplicates);
     printVolumeScanErrors(scanResult.getVolumeScanErrors());
     return null;
+  }
+
+  /**
+   * Validate CLI options before starting the on-disk DN scan.
+   * {@link ListLimitOptions#getLimit()} is also called from
+   * {@link #printContainerOccurrenceReport(String, Map)}, but validating here fails fast
+   * before the DN volume scan and SCM DB lookup.
+   */
+  private void validateOptions() {
+    listOptions.getLimit();
   }
 
   private void findOrphanAndDeletedButPresentContainers(OzoneConfiguration conf, ContainerScanResult scanResult,
@@ -109,7 +125,8 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
 
     printContainerOccurrenceReport("Number of orphan containers(wrt SCM) on this DataNode: %d%n",
         enrichedOrphanContainers);
-    printContainerOccurrenceReport("Number of deleted but present containers on this DataNode: %d%n",
+    printContainerOccurrenceReport(
+        "Number of containers marked DELETED in SCM but present on disk on this DataNode: %d%n",
         enrichedDeletedButPresent);
   }
 
@@ -121,21 +138,16 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
       return;
     }
 
+    Stream<Map.Entry<Long, List<ContainerDiskOccurrence>>> stream =
+        containersById.entrySet().stream().sorted(Map.Entry.comparingByKey());
     if (!listOptions.isAll()) {
       int limit = listOptions.getLimit();
       if (total > limit) {
         out().printf("Showing first %d:%n", limit);
       }
-
-      containersById.entrySet().stream()
-          .sorted(Map.Entry.comparingByKey())
-          .limit(limit)
-          .forEach(entry -> printContainerEntry(entry.getKey(), entry.getValue()));
-    } else {
-      containersById.entrySet().stream()
-          .sorted(Map.Entry.comparingByKey())
-          .forEach(entry -> printContainerEntry(entry.getKey(), entry.getValue()));
+      stream = stream.limit(limit);
     }
+    stream.forEach(entry -> printContainerEntry(entry.getKey(), entry.getValue()));
   }
 
   private void printContainerEntry(long containerId, List<ContainerDiskOccurrence> occurrences) {
