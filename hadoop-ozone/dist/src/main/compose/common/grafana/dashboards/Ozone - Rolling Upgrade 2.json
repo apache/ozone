@@ -453,7 +453,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Per non-S3G host: software_version, apparent_version, and isFinalized (true when software_version == apparent_version).",
+      "description": "Per non-S3G host: Software Version, Apparent Version, and Finalized? (true when software_version == apparent_version).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -484,7 +484,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "isFinalized"
+              "options": "Finalized?"
             },
             "properties": [
               {
@@ -539,7 +539,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "instance"
+            "displayName": "Instance"
           }
         ]
       },
@@ -597,6 +597,10 @@
               "__name__ 1": true,
               "__name__ 2": true,
               "__name__ 3": true,
+              "component": true,
+              "component 1": true,
+              "component 2": true,
+              "component 3": true,
               "context": true,
               "context 1": true,
               "context 2": true,
@@ -623,16 +627,16 @@
               "version 3": true
             },
             "indexByName": {
-              "apparent_version": 3,
-              "component": 1,
-              "instance": 0,
-              "isFinalized": 4,
-              "software_version": 2
+              "Instance": 0,
+              "Software Version": 1,
+              "Apparent Version": 2,
+              "Finalized?": 3
             },
             "renameByName": {
-              "Value #A": "software_version",
-              "Value #B": "apparent_version",
-              "Value #C": "isFinalized"
+              "instance": "Instance",
+              "Value #A": "Software Version",
+              "Value #B": "Apparent Version",
+              "Value #C": "Finalized?"
             }
           }
         }
