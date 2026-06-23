@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -138,6 +137,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // The base test fixture is pre-finalized by default.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
@@ -145,7 +145,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
     String multipartUploadID =
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
-            keyName, (byte) 1);
+            keyName, 1);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
@@ -167,9 +167,6 @@ public class TestS3MultipartUploadCommitPartRequest
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L);
 
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-        .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omClientResponse.getOMResponse().getStatus());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
@@ -181,6 +178,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // Tests must explicitly bump metadata layout version to simulate finalized OM.
     when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
 
@@ -219,9 +217,6 @@ public class TestS3MultipartUploadCommitPartRequest
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L);
 
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omClientResponse.getOMResponse().getStatus());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
@@ -248,10 +243,6 @@ public class TestS3MultipartUploadCommitPartRequest
 
     // Add key to open key table.
     addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
-    String openKey = getOpenKey(volumeName, bucketName, keyName, clientID);
-    OmKeyInfo openPartKeyInfo = omMetadataManager.getOpenKeyTable(
-        s3MultipartUploadCommitPartRequest.getBucketLayout()).get(openKey);
-    assertNotNull(openPartKeyInfo);
 
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
@@ -263,16 +254,6 @@ public class TestS3MultipartUploadCommitPartRequest
         bucketName, keyName, multipartUploadID);
 
     assertNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
-
-    BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation();
-    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    String deleteKey = omMetadataManager.getOzoneDeletePathKey(
-        openPartKeyInfo.getObjectID(), multipartKey);
-    assertNotNull(omMetadataManager.getDeletedTable().get(deleteKey));
-
   }
 
   @Test

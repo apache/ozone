@@ -87,8 +87,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   // This stores the schema version of the multipart key.
   // 0 - Legacy Schema -> Uses the same table to store the multipart part info
   // 1 - New Schema -> Uses a separate table to store the multipart part info
-  private static final int LEGACY_SCHEMA_VERSION = 0;
-  private static final int SPLIT_PARTS_SCHEMA_VERSION = 1;
+  public static final int LEGACY_SCHEMA_VERSION = 0;
+  public static final int SPLIT_PARTS_SCHEMA_VERSION = 1;
   private final int schemaVersion;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {

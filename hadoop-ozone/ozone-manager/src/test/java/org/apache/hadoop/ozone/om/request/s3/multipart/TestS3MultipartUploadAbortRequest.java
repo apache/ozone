@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
@@ -106,6 +105,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // The base test fixture is pre-finalized by default.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
@@ -113,7 +113,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
     String multipartUploadID =
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
-            keyName, (byte) 1);
+            keyName, 1);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
@@ -132,9 +132,6 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     OMClientResponse omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-        .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omClientResponse.getOMResponse().getStatus());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
@@ -146,6 +143,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // Tests must explicitly bump metadata layout version to simulate finalized OM.
     when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
 
@@ -182,9 +180,6 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omClientResponse.getOMResponse().getStatus());
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omClientResponse.getOMResponse().getStatus());
   }
 

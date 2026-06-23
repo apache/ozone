@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -217,12 +216,13 @@ public class TestS3MultipartUploadCompleteRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // The base test fixture is pre-finalized by default.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
     String multipartUploadID =
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
-            keyName, (byte) 1);
+            keyName, 1);
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, new ArrayList<>());
@@ -234,9 +234,6 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L);
 
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-        .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omClientResponse.getOMResponse().getStatus());
     assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omClientResponse.getOMResponse().getStatus());
   }
@@ -248,6 +245,7 @@ public class TestS3MultipartUploadCompleteRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    // Tests must explicitly bump metadata layout version to simulate finalized OM.
     when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
 
@@ -281,9 +279,6 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L);
 
-    assertNotEquals(OzoneManagerProtocolProtos.Status
-            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-        omClientResponse.getOMResponse().getStatus());
     assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omClientResponse.getOMResponse().getStatus());
   }

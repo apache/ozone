@@ -72,7 +72,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
-  private static final int LEGACY_MPU_SCHEMA_VERSION = 0;
 
   public S3InitiateMultipartUploadRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -294,16 +293,13 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   protected int resolveMultipartSchemaVersion(
       MultipartInfoInitiateRequest multipartInfoInitiateRequest) {
     if (!multipartInfoInitiateRequest.hasSchemaVersion()) {
-      return LEGACY_MPU_SCHEMA_VERSION;
+      return OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION;
     }
     return (int) multipartInfoInitiateRequest.getSchemaVersion();
   }
 
   @RequestFeatureValidator(
-      conditions = {
-          ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
-          ValidationCondition.CLUSTER_HAS_MPU_PARTS_TABLE_SPLIT
-      },
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.InitiateMultiPartUpload
   )
@@ -316,7 +312,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     // write/read paths are fully implemented.
     return req.toBuilder()
         .setInitiateMultiPartUploadRequest(initiateRequest.toBuilder()
-            .setSchemaVersion(LEGACY_MPU_SCHEMA_VERSION))
+            .setSchemaVersion(OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION))
         .build();
   }
 

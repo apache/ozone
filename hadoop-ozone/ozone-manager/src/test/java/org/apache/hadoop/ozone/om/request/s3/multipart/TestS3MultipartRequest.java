@@ -315,7 +315,7 @@ public class TestS3MultipartRequest {
    */
   protected String initiateMultipartUploadWithSchemaVersion(
       String volumeName, String bucketName, String keyName,
-      byte schemaVersion) throws Exception {
+      int schemaVersion) throws Exception {
     OMRequest initiateMPURequest =
         doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
 

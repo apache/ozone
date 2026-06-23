@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 /**
@@ -31,18 +30,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
  * the client.
  */
 public enum ValidationCondition {
-  /**
-   * Classifies validations that apply once the MPU split-parts-table feature
-   * layout version has been finalized in the cluster.
-   */
-  CLUSTER_HAS_MPU_PARTS_TABLE_SPLIT {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return ctx.versionManager().getMetadataLayoutVersion()
-          >= OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion();
-    }
-  },
-
   /**
    * Classifies validations that has to run after an upgrade until the cluster
    * is in a pre-finalized state.
