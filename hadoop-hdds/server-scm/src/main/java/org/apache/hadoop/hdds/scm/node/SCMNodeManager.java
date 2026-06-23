@@ -27,7 +27,6 @@ import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -268,11 +267,9 @@ public class SCMNodeManager implements NodeManager {
    * @return List of Datanodes that are known to SCM in the requested states.
    */
   @Override
-  public List<DatanodeDetails> getNodes(
+  public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
-    return nodeStateManager.getNodes(opState, health)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(opState, health);
   }
 
   @Override
@@ -1013,8 +1010,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
-    List<DatanodeDetails> healthyNodes =
-        getNodes(IN_SERVICE, NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyNodes = getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -1059,24 +1055,6 @@ public class SCMNodeManager implements NodeManager {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
     return usageInfo;
-  }
-
-  /**
-   * Get the usage info of a specified datanode.
-   *
-   * @param dn the usage of which we want to get
-   * @return DatanodeUsageInfo of the specified datanode
-   */
-  @Override
-  @Nullable
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
-    try {
-      return nodeStateManager.getNode(dn);
-    } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getID());
-      return null;
-    }
   }
 
   @Override
