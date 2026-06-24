@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,18 +109,70 @@ class TestLatestVersionedKWayMergeIterator {
     assertResultsEqual(expected, actual);
   }
 
+  @Test
+  void testSkipsEntriesAtOrBelowExclusiveMinSequenceNumber() {
+    List<List<MergedKeyValue>> sources = Arrays.asList(
+        Arrays.asList(
+            kv("k1", 1, 1, "v1"),
+            kv("k1", 4, 1, "v4"),
+            kv("k2", 10, 1, "v10")),
+        Arrays.asList(
+            kv("k1", 2, 0, null),
+            kv("k1", 5, 1, "v5")));
+    List<List<SourceRecord>> filtered = filterSourceRecordsAboveSequence(sources, 3L);
+    List<SourceRecord> expected =
+        ExpectedLatestVersionMergeOutput.fromSourceRecords(filtered);
+    List<MergedKeyValue> actual = merge(sources, 3L);
+
+    assertResultsEqual(expected, actual);
+  }
+
+  @Test
+  void testExclusiveMinSequenceNumberRemovesKeyWhenAllVersionsSkipped() {
+    List<List<MergedKeyValue>> sources = Arrays.asList(
+        Arrays.asList(kv("k1", 1, 1, "v1"), kv("k1", 2, 0, null)),
+        Arrays.asList(kv("k2", 10, 1, "v10")));
+    List<List<SourceRecord>> filtered = filterSourceRecordsAboveSequence(sources, 5L);
+    List<SourceRecord> expected =
+        ExpectedLatestVersionMergeOutput.fromSourceRecords(filtered);
+    List<MergedKeyValue> actual = merge(sources, 5L);
+
+    assertResultsEqual(expected, actual);
+  }
+
   private static List<MergedKeyValue> merge(List<List<MergedKeyValue>> sources) {
+    return merge(sources, null);
+  }
+
+  private static List<MergedKeyValue> merge(List<List<MergedKeyValue>> sources,
+      Long exclusiveMinSequenceNumber) {
     List<ClosableIterator<MergedKeyValue>> iterators = sources.stream()
         .map(ListIterator::new)
         .collect(Collectors.toList());
 
     List<MergedKeyValue> results = new ArrayList<>();
-    try (LatestVersionedKWayMergeIterator iterator = LatestVersionedKWayMergeIterator.forTest(iterators)) {
+    try (LatestVersionedKWayMergeIterator iterator =
+             LatestVersionedKWayMergeIterator.forTest(iterators, exclusiveMinSequenceNumber)) {
       while (iterator.hasNext()) {
         results.add(iterator.next());
       }
     }
     return results;
+  }
+
+  private static List<List<SourceRecord>> filterSourceRecordsAboveSequence(
+      List<List<MergedKeyValue>> sources, long exclusiveMinSequenceNumber) {
+    List<List<SourceRecord>> filtered = new ArrayList<>(sources.size());
+    for (List<MergedKeyValue> source : sources) {
+      List<SourceRecord> records = new ArrayList<>();
+      for (MergedKeyValue entry : source) {
+        if (entry.getSequence() > exclusiveMinSequenceNumber) {
+          records.add(toSourceRecord(entry));
+        }
+      }
+      filtered.add(records);
+    }
+    return filtered;
   }
 
   private static void assertResultsEqual(List<SourceRecord> expected, List<MergedKeyValue> actual) {

@@ -40,6 +40,9 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
  * all versions are drained from both heaps, then snapshot-diff emit rules apply:
  * emit the latest tombstone and/or latest value, including both when a delete is
  * followed by a newer recreate.
+ * <p>
+ * When constructed with an exclusive minimum sequence number {@code S}, each SST
+ * source skips entries whose sequence is {@code <= S} while advancing.
  */
 public final class LatestVersionedKWayMergeIterator implements
     ClosableIterator<LatestVersionedKWayMergeIterator.MergedKeyValue> {
@@ -50,6 +53,7 @@ public final class LatestVersionedKWayMergeIterator implements
 
   private final ManagedOptions options;
   private final List<ClosableIterator<? extends MergeHead>> iterators;
+  private final Long exclusiveMinSequenceNumber;
 
   private final PriorityQueue<HeapEntry> valueHeap;
   private final PriorityQueue<HeapEntry> tombstoneHeap;
@@ -59,33 +63,57 @@ public final class LatestVersionedKWayMergeIterator implements
 
   public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles)
       throws IOException {
-    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE);
+    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE, null);
   }
 
   public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
       int readAheadSizePerFile) throws IOException {
+    return overRawSstFiles(sstFiles, readAheadSizePerFile, null);
+  }
+
+  /**
+   * Opens one iterator per SST file and merges them.
+   *
+   * @param exclusiveMinSequenceNumber when non-null, each source skips entries with
+   *        sequence {@code <=} this value while advancing; when null, no entries are skipped
+   */
+  public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
+      int readAheadSizePerFile, Long exclusiveMinSequenceNumber) throws IOException {
     Objects.requireNonNull(sstFiles, "sstFiles cannot be null");
     ManagedOptions options = new ManagedOptions();
     List<ClosableIterator<? extends MergeHead>> sources = new ArrayList<>(sstFiles.size());
     for (Path file : sstFiles) {
       sources.add(new RawSstIterator(options, file, readAheadSizePerFile));
     }
-    return new LatestVersionedKWayMergeIterator(options, sources);
+    return new LatestVersionedKWayMergeIterator(options, sources, exclusiveMinSequenceNumber);
+  }
+
+  public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
+      long exclusiveMinSequenceNumber) throws IOException {
+    return overRawSstFiles(sstFiles, DEFAULT_READ_AHEAD_SIZE, exclusiveMinSequenceNumber);
   }
 
   @VisibleForTesting
   public static LatestVersionedKWayMergeIterator forTest(
       List<ClosableIterator<MergedKeyValue>> iterators) {
+    return forTest(iterators, null);
+  }
+
+  @VisibleForTesting
+  public static LatestVersionedKWayMergeIterator forTest(
+      List<ClosableIterator<MergedKeyValue>> iterators, Long exclusiveMinSequenceNumber) {
     List<ClosableIterator<? extends MergeHead>> sources = new ArrayList<>(iterators.size());
     sources.addAll(iterators);
-    return new LatestVersionedKWayMergeIterator(null, sources);
+    return new LatestVersionedKWayMergeIterator(null, sources, exclusiveMinSequenceNumber);
   }
 
   private LatestVersionedKWayMergeIterator(
       ManagedOptions options,
-      List<ClosableIterator<? extends MergeHead>> iterators) {
+      List<ClosableIterator<? extends MergeHead>> iterators,
+      Long exclusiveMinSequenceNumber) {
     this.options = options;
     this.iterators = new ArrayList<>(Objects.requireNonNull(iterators, "iterators cannot be null"));
+    this.exclusiveMinSequenceNumber = exclusiveMinSequenceNumber;
     this.valueHeap = new PriorityQueue<>(Math.max(this.iterators.size(), 1));
     this.tombstoneHeap = new PriorityQueue<>(Math.max(this.iterators.size(), 1));
     this.emitQueue = new ArrayList<>();
@@ -361,11 +389,18 @@ public final class LatestVersionedKWayMergeIterator implements
     }
 
     private void advance() throws IOException {
-      if (iterator.hasNext()) {
-        current = iterator.next();
-      } else {
-        current = null;
-        iterator.close();
+      while (true) {
+        if (!iterator.hasNext()) {
+          current = null;
+          iterator.close();
+          return;
+        }
+        MergeHead next = iterator.next();
+        if (exclusiveMinSequenceNumber == null
+            || next.getSequence() > exclusiveMinSequenceNumber) {
+          current = next;
+          return;
+        }
       }
     }
 
