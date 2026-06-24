@@ -772,7 +772,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         // Bypass InetAddress.getName() resolution for custom hostnames by starting DN via YAML.
         confDatanodeViaYaml(dnConf);
-        HddsDatanodeService datanode =   new HddsDatanodeService(NO_ARGS);
+        HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
         dnConf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, conf.getStrings(ScmConfigKeys.OZONE_SCM_NAMES));
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
