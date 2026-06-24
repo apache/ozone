@@ -298,7 +298,7 @@ Test Delete key with Trash
                    ...                   bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
                    ...                   key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
                    ...                   key delete ${protocol}${server}/${volume}/bfso/key3
-    ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
+    ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso 2>/dev/null
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
                    Should Contain Any    ${result}    .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}    key3
