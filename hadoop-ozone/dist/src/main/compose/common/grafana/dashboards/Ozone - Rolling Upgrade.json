@@ -112,7 +112,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Indicates whether all instances in the cluster have been finalized.",
+      "description": "Cluster finalization status. Unfinalized: no instances are finalized. Finalizing: some instances are finalized. Finalized: all instances are finalized. Recon and S3 Gateway are excluded.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -127,8 +127,13 @@
                   "text": "Unfinalized"
                 },
                 "1": {
-                  "color": "green",
+                  "color": "orange",
                   "index": 1,
+                  "text": "Finalizing"
+                },
+                "2": {
+                  "color": "green",
+                  "index": 2,
                   "text": "Finalized"
                 }
               },
@@ -139,12 +144,16 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "yellow",
                 "value": 0
               },
               {
-                "color": "green",
+                "color": "orange",
                 "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
               }
             ]
           }
@@ -182,7 +191,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(count(component_version_manager_metrics_software_version * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))) == bool 0",
+          "expr": "(sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) > bool 0) + (sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == bool count(component_version_manager_metrics_software_version * on(instance) group_left() (ozone_build_info{component!~\"recon\"})))",
           "instant": true,
           "legendFormat": "",
           "range": false,
