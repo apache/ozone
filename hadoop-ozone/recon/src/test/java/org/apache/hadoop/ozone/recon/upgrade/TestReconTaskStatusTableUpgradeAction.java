@@ -17,26 +17,35 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.SqlDbUtils.columnExists;
 import static org.apache.ozone.recon.schema.SqlDbUtils.isColumnNullable;
+import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for ReconTaskStatusTableUpgradeAction.
+ * Tests UNHEALTHY_CONTAINERS constraint upgrade within {@link ReconTaskStatusTableUpgradeAction}.
  */
 public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTest {
 
@@ -48,10 +57,23 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
   private ReconTaskStatusTableUpgradeAction upgradeAction;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws SQLException {
     dslContext = getDslContext();
     dataSource = getInjector().getInstance(DataSource.class);
     upgradeAction = new ReconTaskStatusTableUpgradeAction();
+
+    try (Connection conn = dataSource.getConnection()) {
+      DatabaseMetaData dbMetaData = conn.getMetaData();
+      ResultSet tables = dbMetaData.getTables(null, null, UNHEALTHY_CONTAINERS_TABLE_NAME, null);
+      if (!tables.next()) {
+        dslContext.createTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+            .column("container_id", SQLDataType.BIGINT.nullable(false))
+            .column("container_state", SQLDataType.VARCHAR(16).nullable(false))
+            .constraint(DSL.constraint("pk_container_id")
+                .primaryKey("container_id", "container_state"))
+            .execute();
+      }
+    }
   }
 
   @Test
@@ -96,6 +118,98 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
   public void testNoOpWhenTableMissing() throws SQLException {
     dropTaskStatusTableIfPresent();
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testUpgradeAppliesConstraintModificationForAllStates() {
+    upgradeAction.upgradeUnhealthyContainersConstraintForTesting(dslContext);
+
+    for (ContainerSchemaDefinition.UnHealthyContainerStates state :
+        ContainerSchemaDefinition.UnHealthyContainerStates.values()) {
+      dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+          .columns(
+              field(name("container_id")),
+              field(name("container_state")),
+              field(name("in_state_since")),
+              field(name("expected_replica_count")),
+              field(name("actual_replica_count")),
+              field(name("replica_delta")),
+              field(name("reason"))
+          )
+          .values(
+              System.currentTimeMillis(),
+              state.name(), System.currentTimeMillis(), 3, 2, 1, "Replica count mismatch"
+          )
+          .execute();
+    }
+
+    int count = dslContext.fetchCount(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME));
+    assertEquals(ContainerSchemaDefinition.UnHealthyContainerStates.values().length,
+        count, "Expected one record for each valid state");
+
+    assertThrows(DataAccessException.class, () ->
+            dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+                .columns(
+                    field(name("container_id")),
+                    field(name("container_state")),
+                    field(name("in_state_since")),
+                    field(name("expected_replica_count")),
+                    field(name("actual_replica_count")),
+                    field(name("replica_delta")),
+                    field(name("reason"))
+                )
+                .values(999L, "INVALID_STATE", System.currentTimeMillis(), 3, 2, 1,
+                    "Invalid state test").execute(),
+        "Inserting an invalid container_state should fail due to the constraint");
+  }
+
+  @Test
+  public void testInsertionWithNullContainerState() {
+    assertThrows(org.jooq.exception.DataAccessException.class, () -> {
+      dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+          .columns(
+              field(name("container_id")),
+              field(name("container_state")),
+              field(name("in_state_since")),
+              field(name("expected_replica_count")),
+              field(name("actual_replica_count")),
+              field(name("replica_delta")),
+              field(name("reason"))
+          )
+          .values(100L, null, System.currentTimeMillis(), 3, 2, 1, "Testing NULL state")
+          .execute();
+    }, "Inserting a NULL container_state should fail due to the NOT NULL constraint");
+  }
+
+  @Test
+  public void testDuplicatePrimaryKeyInsertion() {
+    dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+        .columns(
+            field(name("container_id")),
+            field(name("container_state")),
+            field(name("in_state_since")),
+            field(name("expected_replica_count")),
+            field(name("actual_replica_count")),
+            field(name("replica_delta")),
+            field(name("reason"))
+        )
+        .values(200L, "MISSING", System.currentTimeMillis(), 3, 2, 1, "First insertion")
+        .execute();
+
+    assertThrows(org.jooq.exception.DataAccessException.class, () -> {
+      dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+          .columns(
+              field(name("container_id")),
+              field(name("container_state")),
+              field(name("in_state_since")),
+              field(name("expected_replica_count")),
+              field(name("actual_replica_count")),
+              field(name("replica_delta")),
+              field(name("reason"))
+          )
+          .values(200L, "MISSING", System.currentTimeMillis(), 3, 2, 1, "Duplicate insertion")
+          .execute();
+    }, "Inserting a duplicate primary key should fail due to the primary key constraint");
   }
 
   private void createLegacyTaskStatusTable() throws SQLException {
