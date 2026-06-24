@@ -72,4 +72,3 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 # to demonstrate divergence rendering. Revert before running acceptance tests.
 OZONE-SITE.XML_testing.ozone.om.init.apparent.version=7
 OZONE-SITE.XML_testing.hdds.scm.init.apparent.version=8
-OZONE-SITE.XML_testing.hdds.datanode.init.apparent.version=8
