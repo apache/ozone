@@ -290,11 +290,27 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
   }
 
+  private void validateCounts() {
+    if (numOfVolumes <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, numOfVolumes must be a positive integer");
+    }
+    if (numOfBuckets <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, numOfBuckets must be a positive integer");
+    }
+    if (numOfKeys <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, numOfKeys must be a positive integer");
+    }
+  }
+
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
       ozoneConfiguration = freon.getOzoneConf();
     }
+    validateCounts();
     if (!ozoneConfiguration.getBoolean(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA_DEFAULT)) {
