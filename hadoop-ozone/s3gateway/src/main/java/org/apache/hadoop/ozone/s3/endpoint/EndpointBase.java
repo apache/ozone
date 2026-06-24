@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -118,6 +119,22 @@ import org.slf4j.LoggerFactory;
 public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
+  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+
+  // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
+  // collides with the system ETag / Content-Type stored under the same key, so
+  // it is remapped on write and rebuilt on read; the system value is returned
+  // via its own ETag / Content-Type response header.
+  private static final Map<String, String> RESERVED_METADATA_KEYS =
+      ImmutableMap.of(
+          ETAG, ETAG_CUSTOM,
+          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+
+  // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
+  private static final Map<String, String> REBUILT_RESERVED_KEYS =
+      RESERVED_METADATA_KEYS.entrySet().stream()
+          .collect(ImmutableMap.toImmutableMap(
+              Map.Entry::getValue, e -> e.getKey().toLowerCase()));
 
   private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
@@ -319,20 +336,27 @@ public abstract class EndpointBase {
       }
     }
 
-    // If the request contains a custom metadata header "x-amz-meta-ETag",
-    // replace the metadata key to "etag-custom" to prevent key metadata collision with
-    // the ETag calculated by hashing the object when storing the key in OM table.
-    // The custom ETag metadata header will be rebuilt during the headObject operation.
-    if (customMetadata.containsKey(HttpHeaders.ETAG)
-        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
-      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
-          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.remove(HttpHeaders.ETAG);
-      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.put(ETAG_CUSTOM, customETag);
-    }
+    // Remap user values that collide with a reserved system key.
+    RESERVED_METADATA_KEYS.forEach((headerName, customKey) ->
+        remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
+  }
+
+  /**
+   * Move a user value under {@code headerName} (canonical or lower-case) to
+   * {@code customKey} so it does not collide with the system value.
+   */
+  private static void remapReservedMetadataKey(Map<String, String> metadata,
+      String headerName, String customKey) {
+    String lowerName = headerName.toLowerCase();
+    if (metadata.containsKey(headerName) || metadata.containsKey(lowerName)) {
+      String value = metadata.get(headerName) != null
+          ? metadata.get(headerName) : metadata.get(lowerName);
+      metadata.remove(headerName);
+      metadata.remove(lowerName);
+      metadata.put(customKey, value);
+    }
   }
 
   protected void addCustomMetadataHeaders(
@@ -340,14 +364,13 @@ public abstract class EndpointBase {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
-      if (entry.getKey().equals(ETAG)) {
+      String metadataKey = entry.getKey();
+      // System ETag / Content-Type are returned via their own response header.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      String metadataKey = entry.getKey();
-      if (metadataKey.equals(ETAG_CUSTOM)) {
-        // Rebuild the ETag custom metadata header
-        metadataKey = ETAG.toLowerCase();
-      }
+      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
