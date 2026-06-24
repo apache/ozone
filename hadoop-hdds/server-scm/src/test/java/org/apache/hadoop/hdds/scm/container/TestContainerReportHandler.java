@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
@@ -102,7 +101,7 @@ public class TestContainerReportHandler {
   @BeforeEach
   void setup() throws IOException, InvalidStateTransitionException {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 20);
     containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -635,12 +634,11 @@ public class TestContainerReportHandler {
         container.getReplicationType());
     final int numDatanodes =
         container.getReplicationConfig().getRequiredNodes();
-    // Register required number of datanodes with NodeManager
-    List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
-    for (int i = 0; i < numDatanodes; i++) {
-      dns.add(randomDatanodeDetails());
-      nodeManager.register(dns.get(i), null, null);
-    }
+    // Get the required number of pre-registered, healthy datanodes from NodeManager
+    List<DatanodeDetails> dns = nodeManager.getNodes(NodeStatus.inServiceHealthy())
+        .stream()
+        .limit(numDatanodes)
+        .collect(Collectors.toList());
 
     // Add this container to ContainerStateManager
     containerStateManager.addContainer(container.getProtobuf());
