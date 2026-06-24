@@ -74,18 +74,9 @@ public final class BuildInfoMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(RECORD_NAME)
         .add(new MetricsTag(
-            Interns.info("component", "Ozone component name"), component))
-        .add(new MetricsTag(
-            Interns.info("revision", "Source control revision"), revision))
+            Interns.info("component", "Ozone component name"), component)).add(new MetricsTag(Interns.info("revision", "Source control revision"), revision))
+        .add(new MetricsTag(Interns.info("version", "Ozone build version"), version))
         .addGauge(Interns.info("BuildInfo", "Always 1; identifying info is in labels"), 1L);
-
-    if (component.equals("hddsDatanode")) {
-      builder.add(new MetricsTag(Interns.info("version", "Ozone build version"), "2.1.0-TEST"));
-    } else {
-      builder.add(new MetricsTag(Interns.info("version", "Ozone build version"), version));
-    }
-
-
     builder.endRecord();
   }
 }

@@ -67,8 +67,3 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
-
-# Testing overrides for ZDU dashboard verification: start with apparent < software
-# to demonstrate divergence rendering. Revert before running acceptance tests.
-OZONE-SITE.XML_testing.ozone.om.init.apparent.version=7
-OZONE-SITE.XML_testing.hdds.scm.init.apparent.version=8
