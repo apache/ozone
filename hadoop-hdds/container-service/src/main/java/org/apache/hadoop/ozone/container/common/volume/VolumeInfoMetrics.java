@@ -64,7 +64,8 @@ public class VolumeInfoMetrics implements MetricsSource {
   private static final MetricsInfo HARD_MIN_FREE_SPACE =
       Interns.info("HardMinFreeSpace",
           "Minimum free space threshold (hard limit) enforced locally for writes, " +
-          "derived from hdds.datanode.volume.min.free.space.hard.limit.percent");
+          "derived from hdds.datanode.volume.min.free.space.hard.limit.percent " +
+          "/ hdds.datanode.volume.min.free.space");
   private static final MetricsInfo NON_OZONE_USED =
       Interns.info("NonOzoneUsed",
           "Space on the filesystem consumed by non-Ozone workloads " +
