@@ -128,12 +128,9 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     // BoundedByteString with a backing array, so gRPC serializes via a single
     // System.arraycopy into the Netty wire buffer instead of the slow NioByteString
     // direct-buffer path (temp-array allocation + byte-by-byte copy).
-    // ChunkBuffer.ALLOCATE_DIRECT is flipped only by BlockOutputStreamWriteBenchmark.
     ByteBuffer b = null;
     for (; i <= index; i++) {
-      final CodecBuffer c = ChunkBuffer.ALLOCATE_DIRECT.get()
-          ? CodecBuffer.allocateDirect(getBufferCapacityAtIndex(i))
-          : CodecBuffer.allocateHeap(getBufferCapacityAtIndex(i));
+      final CodecBuffer c = CodecBuffer.allocateHeap(getBufferCapacityAtIndex(i));
       underlying.add(c);
       b = c.asWritableByteBuffer();
       buffers.add(b);

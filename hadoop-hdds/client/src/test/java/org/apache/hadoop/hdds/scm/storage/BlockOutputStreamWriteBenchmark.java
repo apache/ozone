@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.event.Level;
 
@@ -53,17 +52,9 @@ import org.slf4j.event.Level;
  * sequential writes and closes the stream, driving the chunk serialisation and
  * gRPC framing code at full speed without real network or disk I/O.
  *
- * <p>The benchmark compares two buffer-allocation strategies:
- * <ul>
- *   <li><b>heap</b> — {@code ByteBuffer.allocate()} backed chunks.
- *       {@code UnsafeByteOperations.unsafeWrap()} returns a
- *       {@code BoundedByteString} with a backing array, so gRPC serialises via
- *       a single {@code System.arraycopy} into the Netty wire buffer.</li>
- *   <li><b>direct</b> — {@code ByteBuffer.allocateDirect()} backed chunks
- *       (the behaviour before this patch). {@code UnsafeByteOperations.unsafeWrap()}
- *       returns a {@code NioByteString}, forcing gRPC to allocate a temp byte[]
- *       and copy byte-by-byte.</li>
- * </ul>
+ * <p>Uses heap {@code ByteBuffer} backed chunks. {@code UnsafeByteOperations.unsafeWrap()}
+ * returns a {@code BoundedByteString} with a backing array, so gRPC serialises via
+ * a single {@code System.arraycopy} into the Netty wire buffer.
  *
  * <p>On-demand benchmark (not part of {@code mvn test}). Run from the repo root:
  * <pre>
@@ -76,18 +67,16 @@ import org.slf4j.event.Level;
  * <ul>
  *   <li>{@code benchmark.label} – profile label (default {@code workspace})</li>
  *   <li>{@code benchmark.writeSize} – single write size in bytes (default: run
- *       1 MB, 2 MB, 3 MB and 4 MB)</li>
- *   <li>{@code benchmark.heapBuffer} – {@code true} or {@code false}
- *       (default: run both)</li>
+ *       256 KB, 512 KB, 1 MB, 2 MB and 4 MB)</li>
  *   <li>{@code benchmark.checksumType} – {@code NONE} or {@code CRC32}
  *       (default {@code CRC32})</li>
  *   <li>{@code benchmark.threads} – worker count (default {@code CPUs * 2})</li>
- *   <li>{@code benchmark.scaling=true} – run multiple thread counts for both
- *       allocation modes and print a scaling summary</li>
+ *   <li>{@code benchmark.scaling=true} – run multiple thread counts and print
+ *       a scaling summary</li>
  *   <li>{@code benchmark.scaling.threads} – comma-separated thread counts for
- *       scaling (default {@code 1,2,7,14,28,42,56})</li>
+ *       scaling (default {@code 1,2,4,7,14,28,42})</li>
  *   <li>{@code benchmark.scaling.writeSizes} – comma-separated write sizes in
- *       bytes (overrides default 1/2/3/4 MB list when set)</li>
+ *       bytes (overrides default list when set)</li>
  * </ul>
  *
  * <p>Or use
@@ -102,9 +91,10 @@ public final class BlockOutputStreamWriteBenchmark {
   private static final int POOL_CAPACITY = 8;
 
   private static final int[] DEFAULT_WRITE_SIZES = {
+      256 * 1024,
+      512 * 1024,
       1024 * 1024,
       2 * 1024 * 1024,
-      3 * 1024 * 1024,
       4 * 1024 * 1024
   };
 
@@ -126,7 +116,6 @@ public final class BlockOutputStreamWriteBenchmark {
 
     System.out.println("BlockOutputStream client write benchmark (mocked container RPCs)");
     System.out.println("Profile: " + label);
-    System.out.println("Comparing: heap ByteBuffer (this patch) vs direct ByteBuffer (pre-patch)");
     System.out.println("JVM: " + System.getProperty("java.version")
         + " on " + System.getProperty("os.arch"));
     System.out.printf("CPUs=%d sourceBuffer=%dMB streamBuffer=%dMB poolCapacity=%d checksum=%s%n",
@@ -146,10 +135,8 @@ public final class BlockOutputStreamWriteBenchmark {
       final BenchmarkMockXceiverClient client = new BenchmarkMockXceiverClient(pipeline);
       try {
         for (int writeSize : resolveWriteSizes()) {
-          for (boolean heapBuffer : resolveHeapBufferModes()) {
-            runProfile(sourceBuffer, writeSize, heapBuffer, checksumType, threadCount, client);
-            System.out.println();
-          }
+          runProfile(sourceBuffer, writeSize, checksumType, threadCount, client);
+          System.out.println();
         }
       } finally {
         client.close();
@@ -175,12 +162,10 @@ public final class BlockOutputStreamWriteBenchmark {
       for (int writeSize : resolveWriteSizes()) {
         System.out.printf("===== writeSize=%dKB scaling study =====%n%n", writeSize / 1024);
         for (int threadCount : threadCounts) {
-          for (boolean heapBuffer : new boolean[] {false, true}) {
-            final Result result = runProfile(sourceBuffer, writeSize, heapBuffer, checksumType,
-                threadCount, sharedClient);
-            rows.add(new ScalingRow(writeSize, threadCount, heapBuffer, result.mbPerSec));
-            System.out.println();
-          }
+          final Result result = runProfile(sourceBuffer, writeSize, checksumType,
+              threadCount, sharedClient);
+          rows.add(new ScalingRow(writeSize, threadCount, result.mbPerSec));
+          System.out.println();
         }
         printScalingSummary(writeSize, threadCounts, rows);
         System.out.println();
@@ -199,32 +184,24 @@ public final class BlockOutputStreamWriteBenchmark {
       }
     }
 
-    final double directBaseline = findMbPerSec(rows, 1, false);
-    final double heapBaseline = findMbPerSec(rows, 1, true);
+    final double baseline = findMbPerSec(rows, 1);
 
     System.out.printf("--- scaling summary writeSize=%dKB ---%n", writeSize / 1024);
-    System.out.printf("%8s | %12s | %12s | %10s | %10s | %10s%n",
-        "threads", "direct MB/s", "heap MB/s", "heap/direct", "direct eff.", "heap eff.");
-    System.out.println("---------|--------------|--------------|------------|------------|------------");
+    System.out.printf("%8s | %12s | %10s%n", "threads", "MB/s", "efficiency");
+    System.out.println("---------|--------------|------------");
 
     for (int threadCount : threadCounts) {
-      final double direct = findMbPerSec(rows, threadCount, false);
-      final double heap = findMbPerSec(rows, threadCount, true);
-      final double heapVsDirect = direct == 0 ? 0 : heap / direct;
-      final double directEff = directBaseline == 0 ? 0 : direct / directBaseline / threadCount;
-      final double heapEff = heapBaseline == 0 ? 0 : heap / heapBaseline / threadCount;
-      System.out.printf("%8d | %12s | %12s | %10.2fx | %10.2f | %10.2f%n",
-          threadCount, MBPS.format(direct), MBPS.format(heap), heapVsDirect,
-          directEff, heapEff);
+      final double mbPerSec = findMbPerSec(rows, threadCount);
+      final double eff = baseline == 0 ? 0 : mbPerSec / baseline / threadCount;
+      System.out.printf("%8d | %12s | %10.2f%n", threadCount, MBPS.format(mbPerSec), eff);
     }
     System.out.println();
-    System.out.println("eff. = throughput vs 1-thread baseline / thread count (1.0 = linear scaling)");
+    System.out.println("efficiency = throughput vs 1-thread baseline / thread count (1.0 = linear scaling)");
   }
 
-  private static double findMbPerSec(List<ScalingRow> rows, int threadCount,
-      boolean heapBuffer) {
+  private static double findMbPerSec(List<ScalingRow> rows, int threadCount) {
     for (ScalingRow row : rows) {
-      if (row.threadCount == threadCount && row.heapBuffer == heapBuffer) {
+      if (row.threadCount == threadCount) {
         return row.mbPerSec;
       }
     }
@@ -234,13 +211,11 @@ public final class BlockOutputStreamWriteBenchmark {
   private static final class ScalingRow {
     private final int writeSize;
     private final int threadCount;
-    private final boolean heapBuffer;
     private final double mbPerSec;
 
-    private ScalingRow(int writeSize, int threadCount, boolean heapBuffer, double mbPerSec) {
+    private ScalingRow(int writeSize, int threadCount, double mbPerSec) {
       this.writeSize = writeSize;
       this.threadCount = threadCount;
-      this.heapBuffer = heapBuffer;
       this.mbPerSec = mbPerSec;
     }
   }
@@ -256,7 +231,7 @@ public final class BlockOutputStreamWriteBenchmark {
   private static int[] resolveScalingThreadCounts(int cpus) {
     final String property = System.getProperty("benchmark.scaling.threads");
     if (property == null || property.isEmpty()) {
-      return new int[] {1, 2, 7, 14, 28, 42, 56};
+      return new int[] {1, 2, 4, 7, 14, 28, 42};
     }
     return parseCommaSeparatedInts(property);
   }
@@ -273,13 +248,13 @@ public final class BlockOutputStreamWriteBenchmark {
   }
 
   private static Result runProfile(byte[] sourceBuffer, int writeSize,
-      boolean heapBuffer, ChecksumType checksumType, int threadCount,
+      ChecksumType checksumType, int threadCount,
       BenchmarkMockXceiverClient client)
       throws Exception {
-    System.out.printf("--- writeSize=%dKB heapBuffer=%s threads=%d writes/stream=%d ---%n",
-        writeSize / 1024, heapBuffer, threadCount, SOURCE_BUFFER_SIZE / writeSize);
+    System.out.printf("--- writeSize=%dKB threads=%d writes/stream=%d ---%n",
+        writeSize / 1024, threadCount, SOURCE_BUFFER_SIZE / writeSize);
 
-    final Result result = runProfileMeasured(sourceBuffer, writeSize, heapBuffer,
+    final Result result = runProfileMeasured(sourceBuffer, writeSize,
         checksumType, threadCount, client);
 
     System.out.printf("elapsed: %.2fs%n", result.elapsedSeconds);
@@ -297,13 +272,11 @@ public final class BlockOutputStreamWriteBenchmark {
   }
 
   private static Result runProfileMeasured(byte[] sourceBuffer, int writeSize,
-      boolean heapBuffer, ChecksumType checksumType, int threadCount,
+      ChecksumType checksumType, int threadCount,
       BenchmarkMockXceiverClient client)
       throws Exception {
-    runTimedWrite(sourceBuffer, writeSize, heapBuffer, checksumType,
-        threadCount, WARMUP_SECONDS, client);
-    return runTimedWrite(sourceBuffer, writeSize, heapBuffer, checksumType,
-        threadCount, BENCHMARK_SECONDS, client);
+    runTimedWrite(sourceBuffer, writeSize, checksumType, threadCount, WARMUP_SECONDS, client);
+    return runTimedWrite(sourceBuffer, writeSize, checksumType, threadCount, BENCHMARK_SECONDS, client);
   }
 
   private static int[] resolveWriteSizes() {
@@ -327,16 +300,8 @@ public final class BlockOutputStreamWriteBenchmark {
     return values;
   }
 
-  private static boolean[] resolveHeapBufferModes() {
-    final String property = System.getProperty("benchmark.heapBuffer");
-    if (property == null || property.isEmpty()) {
-      return new boolean[] {false, true};
-    }
-    return new boolean[] {Boolean.parseBoolean(property)};
-  }
-
   private static Result runTimedWrite(byte[] sourceBuffer, int writeSize,
-      boolean heapBuffer, ChecksumType checksumType, int threadCount,
+      ChecksumType checksumType, int threadCount,
       int seconds, BenchmarkMockXceiverClient client) throws Exception {
     final long writeChunksBefore =
         ContainerClientMetrics.acquire().getWriteChunksDuringWrite().value();
@@ -351,7 +316,7 @@ public final class BlockOutputStreamWriteBenchmark {
       final List<Future<WorkerResult>> futures = new ArrayList<>(threadCount);
       for (int i = 0; i < threadCount; i++) {
         futures.add(workers.submit(() ->
-            runWorker(sourceBuffer, writeSize, heapBuffer, checksumType, deadline, client)));
+            runWorker(sourceBuffer, writeSize, checksumType, deadline, client)));
       }
 
       long bytesWritten = 0;
@@ -388,14 +353,14 @@ public final class BlockOutputStreamWriteBenchmark {
   }
 
   private static WorkerResult runWorker(byte[] sourceBuffer, int writeSize,
-      boolean heapBuffer, ChecksumType checksumType, long deadline,
+      ChecksumType checksumType, long deadline,
       BenchmarkMockXceiverClient mockClient)
       throws Exception {
     long bytesWritten = 0;
     long writeOps = 0;
     long blocksWritten = 0;
 
-    try (BenchmarkSession session = BenchmarkSession.open(heapBuffer, checksumType, mockClient)) {
+    try (BenchmarkSession session = BenchmarkSession.open(checksumType, mockClient)) {
       while (System.nanoTime() < deadline) {
         try (BlockOutputStream stream = session.newStream()) {
           for (int offset = 0; offset + writeSize <= sourceBuffer.length
@@ -444,8 +409,8 @@ public final class BlockOutputStreamWriteBenchmark {
       this.responseExecutor = responseExecutor;
     }
 
-    static BenchmarkSession open(boolean heapBuffer,
-        ChecksumType checksumType, BenchmarkMockXceiverClient mockClient) throws IOException {
+    static BenchmarkSession open(ChecksumType checksumType,
+        BenchmarkMockXceiverClient mockClient) throws IOException {
       final Pipeline pipeline = mockClient.getPipeline();
       final XceiverClientManager xcm = mock(XceiverClientManager.class);
       when(xcm.acquireClient(any())).thenReturn(mockClient);
@@ -461,11 +426,6 @@ public final class BlockOutputStreamWriteBenchmark {
 
       final StreamBufferArgs streamBufferArgs =
           StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
-
-      // Both modes use the same BufferPool; ChunkBuffer.ALLOCATE_DIRECT controls
-      // which allocator is called inside ChunkBuffer.allocate(), giving a true
-      // apples-to-apples comparison of heap vs direct buffer serialisation overhead.
-      ChunkBuffer.ALLOCATE_DIRECT.set(!heapBuffer);
 
       return new BenchmarkSession(
           pipeline,
