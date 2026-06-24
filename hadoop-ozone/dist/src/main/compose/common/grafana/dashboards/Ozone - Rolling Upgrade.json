@@ -63,7 +63,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "suffix:Active Versions"
         },
         "overrides": []
       },
@@ -105,7 +105,7 @@
           "refId": "A"
         }
       ],
-      "title": "Active Versions",
+      "title": "",
       "type": "stat"
     },
     {
@@ -124,12 +124,12 @@
                 "0": {
                   "color": "yellow",
                   "index": 0,
-                  "text": "No"
+                  "text": "Unfinalized"
                 },
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "Yes"
+                  "text": "Finalized"
                 }
               },
               "type": "value"
@@ -189,7 +189,7 @@
           "refId": "A"
         }
       ],
-      "title": "Cluster Finalized?",
+      "title": "",
       "type": "stat"
     },
     {
@@ -217,7 +217,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "suffix:Instances Hidden"
         },
         "overrides": []
       },
@@ -259,7 +259,7 @@
           "refId": "A"
         }
       ],
-      "title": "Nodes Hidden by Selector",
+      "title": "",
       "type": "stat"
     },
     {
@@ -408,7 +408,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "version"
+            "displayName": "Version"
           }
         ]
       },
@@ -441,11 +441,15 @@
               "revision": true
             },
             "indexByName": {
-              "component": 1,
-              "instance": 0,
+              "component": 0,
+              "instance": 1,
               "version": 2
             },
-            "renameByName": {}
+            "renameByName": {
+              "component": "Component",
+              "instance": "Instance",
+              "version": "Version"
+            }
           }
         }
       ],
@@ -833,7 +837,6 @@
             "excludeByName": {
               "Time": true,
               "__name__": true,
-              "component": true,
               "context": true,
               "exported_component": true,
               "hostname": true,
@@ -842,11 +845,13 @@
               "version": true
             },
             "indexByName": {
-              "Finalized?": 1,
-              "Instance": 0
+              "component": 0,
+              "instance": 1,
+              "Value": 2
             },
             "renameByName": {
               "Value": "Finalized?",
+              "component": "Component",
               "instance": "Instance"
             }
           }

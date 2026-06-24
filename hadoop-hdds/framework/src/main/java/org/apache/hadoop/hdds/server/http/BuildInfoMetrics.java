@@ -73,8 +73,8 @@ public final class BuildInfoMetrics implements MetricsSource {
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(RECORD_NAME)
-        .add(new MetricsTag(
-            Interns.info("component", "Ozone component name"), component)).add(new MetricsTag(Interns.info("revision", "Source control revision"), revision))
+        .add(new MetricsTag(Interns.info("component", "Ozone component name"), component))
+        .add(new MetricsTag(Interns.info("revision", "Source control revision"), revision))
         .add(new MetricsTag(Interns.info("version", "Ozone build version"), version))
         .addGauge(Interns.info("BuildInfo", "Always 1; identifying info is in labels"), 1L);
     builder.endRecord();
