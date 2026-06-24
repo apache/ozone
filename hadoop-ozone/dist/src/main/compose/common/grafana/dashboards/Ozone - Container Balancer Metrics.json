@@ -18,7 +18,7 @@
     }
   ],
   "cursorSync": "Crosshair",
-  "description": "Comprehensive tracking of Ozone cluster balancing operations. Monitors real-time DataNode capacity convergence, current iteration health (Scheduled vs Completed), and lifetime data movement metrics.",
+  "description": "Comprehensive tracking of Ozone cluster balancing operations. Monitors real-time Datanode capacity convergence, current iteration health (Scheduled vs Completed), and lifetime data movement metrics.",
   "editable": true,
   "elements": {
     "panel-1": {
@@ -41,7 +41,7 @@
                     "spec": {
                       "editorMode": "code",
                       "expr": "sum(container_balancer_metrics_num_datanodes_unbalanced)",
-                      "legendFormat": "Unbalanced DataNodes",
+                      "legendFormat": "Unbalanced Datanodes",
                       "range": false
                     },
                     "version": "v0"
@@ -54,10 +54,10 @@
             "transformations": []
           }
         },
-        "description": "Tracks the total number of DataNodes whose capacity usage falls outside the configured cluster balance threshold. A healthy, fully balanced cluster should ideally maintain a value of 0.",
+        "description": "Tracks the total number of Datanodes whose capacity usage falls outside the configured cluster balance threshold. A healthy, fully balanced cluster should ideally maintain a value of 0.",
         "id": 1,
         "links": [],
-        "title": "Unbalanced DataNodes",
+        "title": "Unbalanced Datanodes",
         "vizConfig": {
           "group": "stat",
           "kind": "VizConfig",
@@ -262,7 +262,7 @@
             "transformations": []
           }
         },
-        "description": "Measures the total volume of data in gigabytes successfully transferred between source and target DataNodes during the most recently executed balancer iteration loop.",
+        "description": "Measures the total volume of data in gigabytes successfully transferred between source and target Datanodes during the most recently executed balancer iteration loop.",
         "id": 3,
         "links": [],
         "title": "Size Moved (Latest)",
@@ -334,7 +334,7 @@
                     "spec": {
                       "editorMode": "code",
                       "expr": "sum(container_balancer_metrics_num_datanodes_involved_in_latest_iteration)",
-                      "legendFormat": "Datanode Involved",
+                      "legendFormat": "Datanodes Involved",
                       "range": true
                     },
                     "version": "v0"
@@ -347,10 +347,10 @@
             "transformations": []
           }
         },
-        "description": "The count of unique DataNode hosts that actively participated as either a source (sender) or target (receiver) of data blocks in the latest iteration.",
+        "description": "The count of unique Datanode hosts that actively participated as either a source (sender) or target (receiver) of data blocks in the latest iteration.",
         "id": 4,
         "links": [],
-        "title": "Nodes Involved (Latest)",
+        "title": "Datanodes Involved (Latest)",
         "vizConfig": {
           "group": "stat",
           "kind": "VizConfig",
@@ -1080,7 +1080,7 @@
             "transformations": []
           }
         },
-        "description": "Tracks the raw physical bytes consumed across individual DataNode storage volumes over time. This panel visualizes how storage distribution scales and shifts across nodes during active cluster balancing.",
+        "description": "Tracks the raw physical bytes consumed across individual Datanode storage volumes over time. This panel visualizes how storage distribution scales and shifts across nodes during active cluster balancing.",
         "id": 9,
         "links": [],
         "title": "Datanode Disk Usage (Convergence)",
