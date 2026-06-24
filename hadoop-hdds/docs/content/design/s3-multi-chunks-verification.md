@@ -24,11 +24,17 @@ author: Chung-En Lee
 
 Ozone S3 Gateway (S3G) currently utilizes SignedChunksInputStream to handle aws-chunked content-encoding for AWS Signature V4. However, it doesn’t do any signature verification now. This proposal aims to complete the existing SignedChunksInputStream to make sure signature verification is correct and minimize performance overhead.
 
-# Goal
+# Goal & Non-Goal
+
+## Goal
 
 Support signature verification for AWS Signature Version 4 streaming chunked uploads with the following algorithms:
 - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
 - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
+
+## Non-Goal
+
+The following algorithms are out of scope for this proposal. We may consider supporting them in the future if there is demand, but there is not any use case for them currently in Ozone.
 - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
 - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
 
@@ -46,15 +52,9 @@ From a security perspective, this new API **will not expose the raw AWS Secret K
 
 ## HMAC-SHA256 Implementation
 
-We add `ChunksValidator` to handle related verification tasks, such as updating hashing, building `strToSign`, and verifying signatures. To achieve this with minimal overhead, we will extract the reusable SigV4 HMAC logic currently embedded in `AWSV4AuthValidator` into a shared utility module that both `ozone-manager` and `s3gateway` can depend on. The current `AWSV4AuthValidator` class is package-private and lives in the `ozone-manager` module, so `SignedChunksInputStream` must not depend on it directly. Instead, the refactoring will move common operations such as signing-key derivation and signature calculation into a buildable shared component, while `AWSV4AuthValidator` and `SignedChunksInputStream` each call that shared code from their respective modules. This still allows `SignedChunksInputStream` to compute the derived key strictly once per request, avoiding expensive HMAC recalculations per chunk and preserving reuse of the existing highly-optimized `ThreadLocal Mac`-based implementation.
-
-## ECDSA-SHA256 Implementation
-
-Currently, the Ozone S3 Gateway exclusively supports HMAC for AWS Signature V4. To implement ECDSA (SigV4a), we will extend the authentication flow across the Ozone Manager (OM) and S3 Gateway (S3G) through three key updates:
-
-- Public Key Provisioning (OM): Introduce a new OM API to set/get an ECDSA AccessID and Public Key. This endpoint will integrate with the existing Kerberos security model to ensure all access is verified. 
-- HTTP Request Authentication (S3G): Update the verification flow for HTTP requests from S3. OM will verify the HTTP request signature when requests are coming from S3G.
-- Chunked Upload Validation (S3G): Same as HMAC-SHA256, the SignedChunksInputStream will be enhanced to support ECDSA signature verification for chunked uploads.
+We add `ChunksValidator` to handle related verification tasks, such as updating hashing, building `strToSign`, and verifying signatures. To achieve this with minimal overhead, we will extract the reusable SigV4 HMAC logic currently embedded in `AWSV4AuthValidator` into a shared utility module that both `ozone-manager` and `s3gateway` can depend on.
+The current `AWSV4AuthValidator` class is package-private and lives in the `ozone-manager` module, so `SignedChunksInputStream` must not depend on it directly. Instead, the refactoring will move common operations such as signing-key derivation and signature calculation into a buildable shared component, while `AWSV4AuthValidator` and `SignedChunksInputStream` each call that shared code from their respective modules. 
+This still allows `SignedChunksInputStream` to compute the derived key strictly once per request, avoiding expensive HMAC recalculations per chunk and preserving reuse of the existing highly-optimized `ThreadLocal Mac`-based implementation.
 
 ## SignedChunksInputStream flow
 
@@ -66,7 +66,7 @@ graph TD
     classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px;
     classDef endpoint fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
 
-    Start((Start InputStream)):::endpoint --> GetDerivedKey[Get Derived Key from OM]:::action
+    Start((Start InputStream)):::endpoint --> GetDerivedKey[Get Derived Key from KeyOutputStream<br>#40;Created during createKey#41;]:::action
     GetDerivedKey --> Init[Initiate Validator with Derived Key & SignatureInfo]:::action
     Init --> ReadHeader[Read Chunk Header until CRLF]:::action
     
@@ -92,7 +92,7 @@ graph TD
     UpdateHash --> CheckChunkEnd{Is Chunk fully read?}:::check
     CheckChunkEnd -- "No" --> ReadPayload
     
-    CheckChunkEnd -- "Yes" --> ValidateChunk[Verify Chunk Signature via ECDSA]:::action
+    CheckChunkEnd -- "Yes" --> ValidateChunk[Verify Chunk Signature via HMAC]:::action
     
     ValidateChunk -- "Signature Mismatch" --> ThrowError
     ValidateChunk -- "Signature Matches" --> ConsumeCRLF[Consume trailing CRLF]:::action
@@ -115,7 +115,6 @@ To maintain a low memory footprint during the continuous buffering process, the 
 
 To ensure that introducing the real-time signature verification process does not significantly degrade the overall upload throughput, the architecture is designed with the following optimizations in mind. Furthermore, we plan to conduct simple benchmarks in the future to validate these performance expectations:
 
-- Extra RPC Calls: The additional RPC call from S3G to OM to retrieve the Derived Key is expected to add minimal latency compared to the overall upload time. This is a one-time cost per upload request and does not impact the per-chunk processing time.
 - Constant Memory: Incremental hashing processes byte streams on the fly. This prevents large memory allocations and avoids GC spikes during massive uploads.
 - CPU Offloading & Scalability: Verification computation is isolated in the stateless, horizontally scalable S3G instances. This allows verification throughput to scale easily by adding more S3G nodes, protecting backend OM and DataNodes from CPU bottlenecks.
 
@@ -133,10 +132,7 @@ To guarantee the correctness, stability, and security of the newly introduced ch
 - Unit Tests: 
   - There is an existing test class for SignedChunksInputStream.
   - We would likely add TestChunkSignatureValidator to cover various scenarios, including:
-    - Validating correct signatures for both HMAC and ECDSA algorithms.
+    - Validating correct signatures for both HMAC algorithms.
     - Simulating signature verification failures due to signature doesn't match.
 - Integration Tests: 
-  - We would likely add TestS3SDKInSecureCluster to cover tests for S3 signed APIs in a secure cluster, including ECDSA and HMAC.
-- Smoke Tests:
-  - Testing ECDSA-signed APIs with existed Ozone secure cluster.
-
+  - We would likely add TestS3SDKInSecureCluster to cover tests for S3 signed APIs in a secure cluster.
