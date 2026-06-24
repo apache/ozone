@@ -8,7 +8,7 @@
 - **Written against:** `master` @ HEAD (2026-06).
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
-- **Status:** DRAFT — under maintainer review (2026-06-10). Not yet ratified.
+- **Status:** DRAFT — under maintainer review (Siyao Meng / smengcl, 2026-06). Wave-1 answers (Q-secure, Q-ratis) folded; not yet fully ratified.
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -17,7 +17,7 @@
 - **Provenance legend:** *(documented)* = project source/docs/`SECURITY.md`;
   *(maintainer)* = an Ozone maintainer in this review; *(inferred)* = reasoned
   from code/architecture — each has a §14 open question.
-- **Draft confidence:** ~24 documented / 0 maintainer / 26 inferred.
+- **Draft confidence:** ~24 documented / 2 maintainer / 24 inferred (smengcl confirmed Q-secure + Q-ratis, 2026-06-23).
 
 **What it is.** Ozone is a multi-daemon distributed object store. The
 **Ozone Manager (OM)** owns the namespace/metadata and issues delegation +
@@ -72,7 +72,10 @@ library. There is no single "caller"; the roles split:
 - **Non-secure mode as a target.** With `ozone.security.enabled=false` Ozone
   performs **no authentication** — it is a development/sandbox posture. Findings
   that only manifest in non-secure mode are `OUT-OF-MODEL: non-default-build`
-  (§5a). *(inferred — Q-secure, wave 1.)*
+  (§5a). Secure mode is confirmed as the supported production posture.
+  *(maintainer — smengcl, 2026-06-23: secure mode is the supported posture; and
+  with security enabled the S3 Gateway rejects anonymous access — no plan to
+  support intended anonymous access, [HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961).)*
 - **Compromise of the SCM CA root key.** If the SCM CA private key is stolen, all
   service identity collapses by design; protecting it is operational (§10/§7).
 - Test/integration modules (`integration-test-*`, `*TestImpl`).
@@ -135,13 +138,17 @@ Transport encryption is configured separately: Hadoop RPC privacy, gRPC TLS
 **false** (non-secure mode): **no authentication at all** — intended only for
 dev/sandbox.
 
-**The insecure-default problem (wave-1 question).** If secure mode is the
-**supported production posture** (operators must enable it for any untrusted
-exposure), then non-secure-mode findings are `OUT-OF-MODEL: non-default-build`
-and §10 carries "run secure mode." Other knobs that move the envelope and need
-the same ruling: native vs Ranger ACL authorizer, S3 secret storage backend,
-TDE on/off, and whether the S3 Gateway requires authentication or allows
-anonymous access. **Q-secure / Q-knobs in §14.**
+**The insecure-default problem (wave-1 — answered).** Secure mode **is** the
+supported production posture *(maintainer — smengcl, 2026-06-23)*: operators must
+enable it for any untrusted exposure, so non-secure-mode findings are
+`OUT-OF-MODEL: non-default-build` and §10 carries "run secure mode." For the S3
+Gateway specifically: with security enabled, **anonymous access is rejected** and
+there is no plan to support intended anonymous access
+([HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961)) — so an
+"unauthenticated S3 request is accepted" finding in secure mode is `VALID`, not a
+disclaimed mode. Other knobs that move the envelope and still need a ruling:
+native vs Ranger ACL authorizer, S3 secret storage backend, and TDE on/off.
+**Q-knobs in §14.**
 
 ## §6 Assumptions about inputs
 
@@ -167,11 +174,14 @@ Per-boundary input trust (grouped by family):
   deployment has enabled transport encryption for the relevant protocol.
 - **Authenticated-but-Byzantine Datanode peer** — a compromised Datanode holding
   a legitimate SCM cert that then behaves arbitrarily in Ratis. In scope **up to
-  the Raft honest-majority threshold**: Ratis safety (no committed-log
-  divergence/data loss) holds while **> ½ of a Ratis ring is honest**; at or
-  beyond that, divergence is possible and **out of scope** (§3 / §8 conditions).
-  *(inferred — Q-ratis: confirm the threshold + whether block integrity has an
-  independent check.)*
+  the Raft honest-majority threshold**: Ratis gives standard Raft safety under an
+  **honest majority** (e.g. 2 of 3 replicas for `RATIS THREE`) — it is **not**
+  Byzantine fault tolerant. At or beyond a Byzantine majority, divergence is
+  possible and **out of scope** (§3 / §8 conditions). Block-integrity defence is
+  partial: Ozone has **checksum verification on normal reads plus replica/container
+  checks**, so ordinary single-replica corruption is detected — but there is **no
+  full guarantee against a Byzantine datanode that forges both data and metadata
+  on the path it serves**. *(maintainer — smengcl, 2026-06-23.)*
 - **Out of scope:** compromised KDC / Ranger / SCM-CA-key / operator host;
   side-channel/co-tenant adversaries against the host; a client that an operator
   has authorized to do the thing it did.
@@ -192,9 +202,15 @@ Per-boundary input trust (grouped by family):
    certificate-backed path. *Severity:* critical. *(documented —
    `CertificateClient`/`CertificateServer`.)*
 5. **Consensus safety (Ratis/Raft).** Committed metadata/data does not diverge or
-   silently lose under the honest-majority bound (§7). *Violation:* fork /
-   divergent replica state / acknowledged-write loss. *Severity:* critical;
-   observable across nodes. *(inferred — Q-ratis.)*
+   silently lose under the **honest-majority** bound (standard Raft safety, e.g.
+   2 of 3 for `RATIS THREE`; **not** BFT — §7). *Violation:* fork / divergent
+   replica state / acknowledged-write loss. *Severity:* critical; observable
+   across nodes. *(maintainer — smengcl, 2026-06-23.)*
+   - **Corollary — read-path integrity (partial).** Checksum verification on
+     normal reads plus replica/container checks detect ordinary single-replica
+     corruption; this does **not** extend to a Byzantine datanode that forges both
+     data and metadata on its served path (that is §9 / out of scope).
+     *(maintainer — smengcl, 2026-06-23.)*
 6. **Confidentiality on configured transports / at rest.** Hadoop RPC privacy,
    gRPC TLS, or HTTPS protect the wire when configured; TDE protects data at
    rest when enabled (keys in KMS). *Violation:* plaintext on a transport
@@ -212,7 +228,11 @@ Per-boundary input trust (grouped by family):
   operator decision, not an Ozone flaw (§10).
 - **It does not protect its dependencies.** KDC/Ranger/KMS/SCM-CA-key/network
   security are the operator's (§3/§10).
-- **No defence against a Byzantine majority** of a Ratis ring (§7).
+- **No defence against a Byzantine majority** of a Ratis ring, and **no full
+  guarantee against a single Byzantine datanode that forges both data and metadata
+  on the path it serves** — Ratis is not BFT, and while checksum + replica/container
+  checks catch ordinary corruption, a peer that can forge consistently on its
+  served path is out of model (§7). *(maintainer — smengcl, 2026-06-23.)*
 - **Block tokens are bearer capabilities** — a leaked block token grants access
   until expiry; the caller/operator must protect tokens in transit (TLS) and use
   reasonable expiry. *(inferred — Q-token.)*
@@ -284,17 +304,23 @@ Per-boundary input trust (grouped by family):
 
 **Wave 1 — the load-bearing ones.**
 
-- **Q-secure.** Confirm secure mode (`ozone.security.enabled=true`) is the
-  supported production posture, so non-secure-mode findings are
-  `OUT-OF-MODEL: non-default-build`. Does the S3 Gateway ever support intended
-  anonymous access (changing this for that path)? (§5a/§9/§11a/§13.)
+- **Q-secure.** *(Answered — maintainer, smengcl 2026-06-23: yes, secure mode is
+  the supported production posture; with security enabled the S3 Gateway rejects
+  anonymous access, no plan otherwise — [HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961). Folded into §3/§5a/§9/§11a.)*
+  Confirm secure mode (`ozone.security.enabled=true`) is the supported production
+  posture, so non-secure-mode findings are `OUT-OF-MODEL: non-default-build`. Does
+  the S3 Gateway ever support intended anonymous access? (§5a/§9/§11a/§13.)
 - **Q-roles.** Confirm the actor split (untrusted client / authenticated-
   unauthorized user / operator / service peer / Byzantine datanode) and that
   the in-scope adversaries are the first, second, third-on-the-wire, and the
   bounded Byzantine peer. (§2/§7.)
-- **Q-ratis.** What is the Ratis honest-majority safety bound you stand behind
-  (> ½ of a ring?), and is there an **independent block/container integrity
-  check** so a single Byzantine datanode can't serve corrupted data undetected?
+- **Q-ratis.** *(Answered — maintainer, smengcl 2026-06-23: standard Raft safety
+  under an honest majority (2 of 3 for `RATIS THREE`), not BFT; checksum +
+  replica/container checks detect ordinary single-replica corruption, but no full
+  guarantee against a Byzantine datanode forging both data and metadata on its
+  served path. Folded into §7/§8/§9.)* What is the Ratis honest-majority safety
+  bound you stand behind, and is there an independent block/container integrity
+  check so a single Byzantine datanode can't serve corrupted data undetected?
   (§7/§8.)
 
 **Wave 2 — mechanism confirmations.**
