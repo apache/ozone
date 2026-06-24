@@ -345,24 +345,23 @@ public class RpcClient implements ClientProtocol {
   }
 
   public static OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
-    OzoneManagerVersion version = OzoneManagerVersion.SOFTWARE_VERSION;
+    OzoneManagerVersion minOMVersion = OzoneManagerVersion.SOFTWARE_VERSION;
     for (ServiceInfo si : info.getServiceInfoList()) {
       if (si.getNodeType() == HddsProtos.NodeType.OM) {
-        OzoneManagerVersion current =
-            OzoneManagerVersion.deserialize(si.getProtobuf().getOMVersion());
-        if (version.compareTo(current) > 0) {
-          version = current;
+        OzoneManagerVersion omVersion = OzoneManagerVersion.deserialize(si.getProtobuf().getOMVersion());
+        if (!minOMVersion.isSupportedBy(omVersion)) {
+          minOMVersion = omVersion;
         }
       }
     }
-    LOG.trace("Ozone Manager version is {}", version.name());
-    return version;
+    LOG.trace("Ozone Manager version is {}", minOMVersion);
+    return minOMVersion;
   }
 
   static boolean validateOmVersion(OzoneManagerVersion minimumVersion,
                                    List<ServiceInfo> serviceInfoList) {
     if (minimumVersion == OzoneManagerVersion.UNKNOWN_VERSION) {
-      throw new IllegalArgumentException("Configuration error, expected "
+      throw new IllegalArgumentException("Configuration error, minimum "
           + "OzoneManager version config evaluates to an unknown version.");
     }
     // if expected version is unset or is the default, then any OM would do fine
@@ -371,13 +370,12 @@ public class RpcClient implements ClientProtocol {
       return true;
     }
 
-    boolean found = false; // At min one OM should be present.
+    // At least one OM must be present, but all OMs must meet the minimum version requirement.
+    boolean found = false;
     for (ServiceInfo s: serviceInfoList) {
       if (s.getNodeType() == HddsProtos.NodeType.OM) {
-        OzoneManagerVersion omv =
-            OzoneManagerVersion
-                .deserialize(s.getProtobuf().getOMVersion());
-        if (minimumVersion.compareTo(omv) > 0) {
+        boolean meetsMinVersion = minimumVersion.isSupportedBy(s.getProtobuf().getOMVersion());
+        if (!meetsMinVersion) {
           return false;
         } else {
           found = true;
