@@ -29,8 +29,10 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,6 +54,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -103,7 +106,6 @@ public class TestClientRetryContainerStateMachineFailures {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -222,6 +224,7 @@ public class TestClientRetryContainerStateMachineFailures {
       increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       System.out.println("Time taken: " + (Time.monotonicNow() - startTime));
     }
+    validateBlockData("testkey123", 2, true);
   }
 
   @Test
@@ -264,6 +267,7 @@ public class TestClientRetryContainerStateMachineFailures {
       increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       System.out.println("Time taken: " + (Time.monotonicNow() - startTime));
     }
+    validateBlockData("testkey1", 2, false);
   }
 
   @Test
@@ -309,6 +313,7 @@ public class TestClientRetryContainerStateMachineFailures {
       increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       System.out.println("Time taken: " + (Time.monotonicNow() - startTime));
     }
+    validateBlockData("testkey1", 2, true);
   }
 
   @Test
@@ -351,6 +356,7 @@ public class TestClientRetryContainerStateMachineFailures {
       increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       System.out.println("Time taken: " + (Time.monotonicNow() - startTime));
     }
+    validateBlockData("testkey1", 2, false);
   }
 
   private byte[] generateData(int size) {
@@ -378,5 +384,30 @@ public class TestClientRetryContainerStateMachineFailures {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void validateBlockData(String keyName, int matchCount, boolean missingContainer) throws IOException {
+    OzoneKeyDetails key = objectStore.getVolume(volumeName).getBucket(bucketName).getKey(keyName);
+    Map<Long, List<Long>> containerBlockListMap = new HashMap<>();
+    cluster.getHddsDatanodes().forEach(dn -> {
+      OzoneContainer container = dn.getDatanodeStateMachine().getContainer();
+      container.getContainerSet().getContainerMap().forEach((key1, value) -> {
+        List<Long> blockList = containerBlockListMap.getOrDefault(key1, new ArrayList<>());
+        blockList.add(value.getBlockCommitSequenceId());
+        containerBlockListMap.put(key1, blockList);
+      });
+    });
+    key.getOzoneKeyLocations().forEach(location -> {
+      List<Long> blockList = containerBlockListMap.getOrDefault(location.getContainerID(), Collections.emptyList());
+      if (missingContainer) {
+        Assertions.assertEquals(blockList.size(), matchCount, "Block list: " + blockList.size());
+        System.out.println("Block list: " + blockList.size());
+      } else {
+        long max = Collections.max(blockList);
+        long count = blockList.stream().filter(num -> num == max).count();
+        Assertions.assertTrue(count >= matchCount, "Count: " + count);
+        System.out.println("Block max bcsid: " + max + ", count: " + count + ", block list: " + blockList);
+      }
+    });
   }
 }

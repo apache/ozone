@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -73,6 +76,10 @@ public abstract class AbstractContainerSafeModeRuleTest {
     safeModeMetrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(safeModeMetrics);
+    when(conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
     when(containerManager.getContainers(LifeCycleState.DELETED)).thenReturn(deletedContainers);

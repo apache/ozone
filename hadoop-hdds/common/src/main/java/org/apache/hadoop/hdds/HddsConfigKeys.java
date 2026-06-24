@@ -116,6 +116,14 @@ public final class HddsConfigKeys {
       "hdds.scm.safemode.log.interval";
   public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
 
+  /**
+   * Interval for background refresh of safeMode rules. 0 disables the background thread.
+   */
+  public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
+      "hdds.scm.safemode.rule.refresh.interval";
+  public static final String
+      HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.

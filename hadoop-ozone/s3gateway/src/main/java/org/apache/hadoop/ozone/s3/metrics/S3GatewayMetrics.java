@@ -49,7 +49,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   // TODO: https://issues.apache.org/jira/browse/HDDS-13555
   @SuppressWarnings("PMD.SingularField")
   private MetricsRegistry registry;
-  private static S3GatewayMetrics instance;
+  private static volatile S3GatewayMetrics instance;
 
   // BucketEndpoint
   private @Metric MutableCounterLong getBucketSuccess;
@@ -303,14 +303,20 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
    *
    * @return S3GatewayMetrics
    */
-  public static synchronized S3GatewayMetrics create(OzoneConfiguration conf) {
-    if (instance != null) {
-      return instance;
+  public static S3GatewayMetrics create(OzoneConfiguration conf) {
+    S3GatewayMetrics local = instance;
+    if (local == null) {
+      synchronized (S3GatewayMetrics.class) {
+        local = instance;
+        if (local == null) {
+          MetricsSystem ms = DefaultMetricsSystem.instance();
+          local = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
+              new S3GatewayMetrics(conf));
+          instance = local;
+        }
+      }
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
-        new S3GatewayMetrics(conf));
-    return instance;
+    return local;
   }
 
   /**
@@ -857,7 +863,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     return value;
   }
 
-  public static synchronized S3GatewayMetrics getMetrics() {
+  public static S3GatewayMetrics getMetrics() {
     return instance;
   }
 }
