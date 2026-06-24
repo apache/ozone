@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -47,6 +49,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -210,12 +215,61 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           " blocks. Requested " + request.getNumBlocks() + " blocks",
           SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
+    Map<PipelineID, HddsProtos.Pipeline> pipelineProtoCache = new HashMap<>();
     for (AllocatedBlock block : allocatedBlocks) {
+      Pipeline pipeline = block.getPipeline();
+      HddsProtos.Pipeline pipelineProto = pipelineProtoCache.get(pipeline.getId());
+      if (pipelineProto == null) {
+        try {
+          pipelineProto = withWriteVersion(
+              pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS),
+              computeClusterWriteVersion(pipeline));
+        } catch (NodeNotFoundException e) {
+          throw new IllegalStateException("Datanode not found in NodeManager "
+              + "while computing the write version for pipeline "
+              + pipeline.getId() + " during block allocation. Should not happen", e);
+        }
+        pipelineProtoCache.put(pipeline.getId(), pipelineProto);
+      }
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));
+          .setPipeline(pipelineProto));
     }
 
+    return builder.build();
+  }
+
+  /**
+   * Computes the version clients should use for writes to the given pipeline:
+   * the lowest apparent version among the pipeline's datanodes. During a rolling
+   * upgrade a pipeline may mix finalized and unfinalized datanodes: an
+   * unfinalized datanode runs the newer software but reports the older apparent
+   * version until it finalizes. Clients must not enable newer write-path
+   * features until every datanode handling their writes has finalized, so the
+   * minimum apparent version across the pipeline is used.
+   */
+  private int computeClusterWriteVersion(Pipeline pipeline) throws NodeNotFoundException {
+    return scm.getScmNodeManager()
+        .getLowestApparentVersion(pipeline.getNodes().toArray(new DatanodeDetails[0]))
+        .serialize();
+  }
+
+  /**
+   * Returns a copy of the pipeline proto with every member's currentVersion
+   * overridden with the computed pipeline write version. The override is applied
+   * only to the outgoing proto sent to the client; the in-memory pipeline and
+   * its {@link DatanodeDetails} objects (shared with SCM internal state) are
+   * left untouched, so persistence and admin paths keep the real datanode
+   * version. Member order is preserved, keeping {@code memberOrders} and
+   * {@code memberReplicaIndexes} indices valid.
+   */
+  private static HddsProtos.Pipeline withWriteVersion(
+      HddsProtos.Pipeline proto, int writeVersion) {
+    HddsProtos.Pipeline.Builder builder = proto.toBuilder();
+    for (int i = 0; i < builder.getMembersCount(); i++) {
+      builder.setMembers(i,
+          builder.getMembers(i).toBuilder().setCurrentVersion(writeVersion));
+    }
     return builder.build();
   }
 
