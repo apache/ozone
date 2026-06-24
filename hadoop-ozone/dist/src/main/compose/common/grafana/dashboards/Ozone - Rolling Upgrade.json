@@ -606,7 +606,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "orange",
+                  "fixedColor": "semi-dark-yellow",
                   "mode": "fixed"
                 }
               }
@@ -807,7 +807,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "desc": false,
+            "desc": true,
             "displayName": "Finalized?"
           }
         ]
@@ -858,7 +858,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of selected instances which have finalized over time, with a dashed reference line at the total eligible instance count.",
+      "description": "Number of selected instances which have finalized over time, with a dashed reference line at the total eligible instance count. The shaded band between the lines shows instances still pending finalization.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -868,7 +868,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Hosts",
+            "axisLabel": "Instances",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
@@ -916,47 +916,57 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "total"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "finalized"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "blue",
+                  "fixedColor": "green",
                   "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "remaining"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillBelowTo",
+                "value": "finalized"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
                 }
               }
             ]
@@ -990,20 +1000,20 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0)",
-          "legendFormat": "finalized",
+          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
+          "legendFormat": "remaining",
           "range": true,
-          "refId": "A"
+          "refId": "C"
         },
         {
           "datasource": {
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
-          "legendFormat": "total",
+          "expr": "count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0)",
+          "legendFormat": "finalized",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
       ],
       "title": "Finalized vs Total Instances Over Time",
@@ -1084,5 +1094,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade",
   "uid": "ozone-rolling-upgrade",
-  "version": 1
+  "version": 3
 }
