@@ -38,7 +38,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of distinct build versions present across the cluster.",
+      "description": "Number of distinct build versions present across all instances in the cluster. 1 means the upgrade is complete. Ignores the instance selector.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -94,21 +94,21 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(count by (version) (ozone_build_info{component=~\"$component\",instance=~\"$instance\"}))",
+          "expr": "count(count by (version) (ozone_build_info))",
           "instant": true,
           "legendFormat": "",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Unique Versions Running",
+      "title": "Software Versions",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Indicates whether all nodes in the cluster have finalized.",
+      "description": "Yes when all instances in the cluster (excluding S3G and Recon) have finalized (software_version == apparent_version). S3G and Recon are excluded because they do not emit finalization metrics. Ignores the instance selector.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -178,21 +178,21 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - sum((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))) == bool 0",
+          "expr": "(count(component_version_manager_metrics_software_version * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))) == bool 0",
           "instant": true,
           "legendFormat": "",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Cluster Finalized?",
+      "title": "Cluster Finalized",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of instances hidden by the component and instance selectors at the top of the dashboard. 0 means all instances are visible.",
+      "description": "Number of instances excluded from this dashboard by the component / instance selectors. 0 means all nodes are visible.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -255,7 +255,7 @@
           "refId": "A"
         }
       ],
-      "title": "Hidden Instances",
+      "title": "Nodes Hidden by Selector",
       "type": "stat"
     },
     {
@@ -268,7 +268,7 @@
       },
       "id": 4,
       "panels": [],
-      "title": "Versions",
+      "title": "Build Versions",
       "type": "row"
     },
     {
@@ -677,7 +677,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Per host (excluding S3G and Recon): Software Version, Apparent Version, and Finalized? (true when software_version == apparent_version).",
+      "description": "Per host (excluding S3G and Recon): whether the host has finalized (software_version == apparent_version).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -814,92 +814,34 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left(component) (ozone_build_info{component!~\"recon\"})",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "component_version_manager_metrics_apparent_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})",
-          "format": "table",
-          "instant": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "editorMode": "code",
           "expr": "(component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})",
           "format": "table",
           "instant": true,
-          "refId": "C"
+          "refId": "A"
         }
       ],
       "title": "Finalization Status",
       "transformations": [
         {
-          "id": "joinByField",
-          "options": {
-            "byField": "instance",
-            "mode": "outer"
-          }
-        },
-        {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true,
               "__name__": true,
-              "__name__ 1": true,
-              "__name__ 2": true,
-              "__name__ 3": true,
               "component": true,
-              "component 1": true,
-              "component 2": true,
-              "component 3": true,
               "context": true,
-              "context 1": true,
-              "context 2": true,
-              "context 3": true,
               "exported_component": true,
-              "exported_component 1": true,
-              "exported_component 2": true,
-              "exported_component 3": true,
               "hostname": true,
-              "hostname 1": true,
-              "hostname 2": true,
-              "hostname 3": true,
               "job": true,
-              "job 1": true,
-              "job 2": true,
-              "job 3": true,
               "revision": true,
-              "revision 1": true,
-              "revision 2": true,
-              "revision 3": true,
-              "version": true,
-              "version 1": true,
-              "version 2": true,
-              "version 3": true
+              "version": true
             },
             "indexByName": {
-              "Apparent Version": 2,
-              "Finalized?": 3,
-              "Instance": 0,
-              "Software Version": 1
+              "Finalized?": 1,
+              "Instance": 0
             },
             "renameByName": {
-              "Value #A": "Software Version",
-              "Value #B": "Apparent Version",
-              "Value #C": "Finalized?",
+              "Value": "Finalized?",
               "instance": "Instance"
             }
           }
@@ -1128,5 +1070,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade",
   "uid": "ozone-rolling-upgrade",
-  "version": 19
+  "version": 20
 }
