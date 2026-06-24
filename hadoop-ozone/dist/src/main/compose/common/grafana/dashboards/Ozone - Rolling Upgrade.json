@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 10,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -38,7 +38,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of distinct build versions present across all instances in the cluster. 1 means the upgrade is complete. Ignores the instance selector.",
+      "description": "Number of distinct build versions present across all instances in the cluster. This will be 2 when an upgrade is in progress.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -54,8 +54,12 @@
                 "value": 0
               },
               {
-                "color": "orange",
+                "color": "yellow",
                 "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
               }
             ]
           },
@@ -101,14 +105,14 @@
           "refId": "A"
         }
       ],
-      "title": "Software Versions",
+      "title": "Active Versions",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Yes when all instances in the cluster (excluding S3G and Recon) have finalized (software_version == apparent_version). S3G and Recon are excluded because they do not emit finalization metrics. Ignores the instance selector.",
+      "description": "Indicates whether all instances in the cluster have been finalized.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -118,7 +122,7 @@
             {
               "options": {
                 "0": {
-                  "color": "red",
+                  "color": "yellow",
                   "index": 0,
                   "text": "No"
                 },
@@ -185,14 +189,14 @@
           "refId": "A"
         }
       ],
-      "title": "Cluster Finalized",
+      "title": "Cluster Finalized?",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of instances excluded from this dashboard by the component / instance selectors. 0 means all nodes are visible.",
+      "description": "Number of instances currently hidden by the component and instance selectors at the top of the dashboard. 0 means all nodes are visible.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -208,7 +212,7 @@
                 "value": 0
               },
               {
-                "color": "orange",
+                "color": "red",
                 "value": 1
               }
             ]
@@ -268,17 +272,18 @@
       },
       "id": 4,
       "panels": [],
-      "title": "Build Versions",
+      "title": "Versions",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Distribution of selected instances by build version. Each slice represents the share of instances on that build; the chart fills with a single slice when the upgrade completes.",
+      "description": "Total number of selected instances running each version. The chart fills with a single slice when the upgrade completes.",
       "fieldConfig": {
         "defaults": {
           "color": {
+            "fixedColor": "#354c6f",
             "mode": "palette-classic"
           },
           "custom": {
@@ -297,7 +302,7 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 5,
+        "w": 9,
         "x": 0,
         "y": 5
       },
@@ -309,7 +314,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true,
           "values": [
             "value",
@@ -345,7 +350,7 @@
           "refId": "A"
         }
       ],
-      "title": "Instances per Build Version",
+      "title": "Instances Per Version",
       "type": "piechart"
     },
     {
@@ -383,8 +388,8 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 18,
-        "x": 5,
+        "w": 14,
+        "x": 9,
         "y": 5
       },
       "id": 5,
@@ -403,7 +408,7 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "instance"
+            "displayName": "version"
           }
         ]
       },
@@ -539,7 +544,7 @@
           "refId": "A"
         }
       ],
-      "title": "Instances Per Version",
+      "title": "Instances Per Version Over Time",
       "type": "timeseries"
     },
     {
@@ -559,7 +564,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Share of selected hosts (excluding S3G and Recon) that have finalized (software_version == apparent_version). S3G and Recon are excluded because they do not emit finalization metrics.",
+      "description": "Total number of selected instances which have finalized. Recon and S3 gateway are excluded.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -611,7 +616,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 5,
+        "w": 9,
         "x": 0,
         "y": 24
       },
@@ -623,7 +628,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true,
           "values": [
             "value",
@@ -670,14 +675,14 @@
           "refId": "B"
         }
       ],
-      "title": "Finalized Hosts",
+      "title": "Finalized vs Total Instances",
       "type": "piechart"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Per host (excluding S3G and Recon): whether the host has finalized (software_version == apparent_version).",
+      "description": "Finalization status of each selected instance. All instances except S3 Gateway and Recon finalize automatically when a finalize command is given.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -763,7 +768,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 222
+                "value": 631
               }
             ]
           },
@@ -783,8 +788,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 18,
-        "x": 5,
+        "w": 14,
+        "x": 9,
         "y": 24
       },
       "id": 10,
@@ -802,8 +807,8 @@
         "showHeader": true,
         "sortBy": [
           {
-            "desc": true,
-            "displayName": "Apparent Version"
+            "desc": false,
+            "displayName": "Finalized?"
           }
         ]
       },
@@ -820,7 +825,7 @@
           "refId": "A"
         }
       ],
-      "title": "Finalization Status",
+      "title": "Finalized Instances",
       "transformations": [
         {
           "id": "organize",
@@ -853,7 +858,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of finalized hosts over time (excluding S3G and Recon), with a dashed reference line at the total eligible host count, scoped to the selected $instance.",
+      "description": "Number of selected instances which have finalized over time, with a dashed reference line at the total eligible instance count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -959,7 +964,7 @@
         ]
       },
       "gridPos": {
-        "h": 13,
+        "h": 9,
         "w": 23,
         "x": 0,
         "y": 32
@@ -1001,7 +1006,7 @@
           "refId": "B"
         }
       ],
-      "title": "Finalized vs Total",
+      "title": "Finalized vs Total Instances Over Time",
       "type": "timeseries"
     }
   ],
@@ -1059,6 +1064,15 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus"
+        },
+        "filters": [],
+        "name": "Filters",
+        "type": "adhoc"
       }
     ]
   },
@@ -1070,5 +1084,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade",
   "uid": "ozone-rolling-upgrade",
-  "version": 20
+  "version": 1
 }
