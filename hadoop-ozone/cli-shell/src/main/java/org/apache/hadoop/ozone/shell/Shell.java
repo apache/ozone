@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.shell;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.hadoop.hdds.cli.DeprecatedCliOption;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -90,7 +89,6 @@ public abstract class Shell extends GenericCli {
   }
 
   private int execute(CommandLine.ParseResult parseResult) {
-    DeprecatedCliOption.warnIfMatched(parseResult);
     name = spec.name();
 
     if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {

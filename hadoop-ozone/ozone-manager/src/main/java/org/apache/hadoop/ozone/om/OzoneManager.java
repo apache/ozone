@@ -221,6 +221,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -258,6 +259,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -5200,6 +5202,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(final OmBucketArgs args)
+      throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return rcReader.get().getBucketTagging(args);
+    }
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
@@ -5658,10 +5669,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily,
+      ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",

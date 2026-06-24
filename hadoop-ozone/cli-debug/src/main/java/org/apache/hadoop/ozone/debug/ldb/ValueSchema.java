@@ -56,12 +56,12 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ValueSchema.class);
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Table name")
   private String tableName;
 
-  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+  @CommandLine.Option(names = {"--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
   private String dnDBSchemaVersion;
