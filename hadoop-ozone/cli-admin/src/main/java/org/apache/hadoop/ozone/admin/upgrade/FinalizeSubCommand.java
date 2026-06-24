@@ -45,7 +45,8 @@ public class FinalizeSubCommand extends AbstractSubcommand implements Callable<I
     try (OzoneManagerProtocol client = getClient()) {
       OzoneManagerVersion omVersion = RpcClient.getOmVersion(client.getServiceInfo());
       if (!OzoneManagerVersion.ZDU.isSupportedBy(omVersion)) {
-        err().println("OM does not support ZDU. The cluster should be finalized with ozone admin om finalizeupgrade");
+        err().println("OM does not support zero downtime upgrade. The cluster should be finalized with " +
+            "`ozone admin om finalizeupgrade`");
         return 1;
       }
       client.finalizeUpgrade();

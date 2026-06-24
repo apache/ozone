@@ -115,7 +115,7 @@ public class TestFinalizeSubCommand {
     assertEquals(1, cmd.call());
 
     String errOutput = errContent.toString(DEFAULT_ENCODING);
-    assertTrue(errOutput.contains("OM does not support ZDU"));
+    assertTrue(errOutput.contains("OM does not support zero downtime upgrade"));
     verify(omClient, never()).finalizeUpgrade();
   }
 
