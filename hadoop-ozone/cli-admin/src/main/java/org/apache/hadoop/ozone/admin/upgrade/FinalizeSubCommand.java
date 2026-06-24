@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.admin.upgrade;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
@@ -33,18 +35,24 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class FinalizeSubCommand extends AbstractSubcommand implements Callable<Void> {
+public class FinalizeSubCommand extends AbstractSubcommand implements Callable<Integer> {
 
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @Override
-  public Void call() throws Exception {
+  public Integer call() throws Exception {
     try (OzoneManagerProtocol client = getClient()) {
+      OzoneManagerVersion omVersion = RpcClient.getOmVersion(client.getServiceInfo());
+      if (!OzoneManagerVersion.ZDU.isSupportedBy(omVersion)) {
+        err().println("OM does not support zero downtime upgrade. The cluster should be finalized with " +
+            "`ozone admin om finalizeupgrade`");
+        return 1;
+      }
       client.finalizeUpgrade();
       out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
     }
-    return null;
+    return 0;
   }
 
   protected OzoneManagerProtocol getClient() throws Exception {
