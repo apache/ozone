@@ -29,7 +29,6 @@ import io.opentelemetry.context.Scope;
 import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
@@ -106,9 +105,11 @@ public final class TracingUtil {
     if (batchSpanProcessor == null) {
       return;
     }
-    CompletableResultCode result = batchSpanProcessor.forceFlush().join(10, TimeUnit.SECONDS);
-    if (!result.isDone()) {
-      LOG.warn("Tracing flush did not complete within 10s; some spans may be lost");
+    try {
+      // Best-effort: wait up to 10s for span export; remaining spans may be dropped on exit.
+      batchSpanProcessor.forceFlush().join(10, TimeUnit.SECONDS);
+    } catch (Exception e) {
+      LOG.warn("Tracing flush: forceFlush failed", e);
     }
   }
 
