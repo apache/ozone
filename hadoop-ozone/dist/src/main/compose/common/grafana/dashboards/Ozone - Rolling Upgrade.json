@@ -858,7 +858,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of selected instances which have finalized over time, with a dashed reference line at the total eligible instance count. The shaded band between the lines shows instances still pending finalization.",
+      "description": "Number of selected instances which have finalized over time (green), stacked with the number still pending finalization (yellow). The top of the stack is the total eligible instance count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -929,6 +929,13 @@
               {
                 "id": "custom.fillOpacity",
                 "value": 25
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "A",
+                  "mode": "normal"
+                }
               }
             ]
           },
@@ -946,10 +953,6 @@
                 }
               },
               {
-                "id": "custom.fillBelowTo",
-                "value": "finalized"
-              },
-              {
                 "id": "custom.fillOpacity",
                 "value": 25
               },
@@ -960,6 +963,13 @@
               {
                 "id": "custom.showPoints",
                 "value": "never"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "A",
+                  "mode": "normal"
+                }
               },
               {
                 "id": "custom.hideFrom",
@@ -1000,20 +1010,20 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
-          "legendFormat": "remaining",
+          "expr": "count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0)",
+          "legendFormat": "finalized",
           "range": true,
-          "refId": "C"
+          "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0)",
-          "legendFormat": "finalized",
+          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - (count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0))",
+          "legendFormat": "remaining",
           "range": true,
-          "refId": "A"
+          "refId": "C"
         }
       ],
       "title": "Finalized vs Total Instances Over Time",
