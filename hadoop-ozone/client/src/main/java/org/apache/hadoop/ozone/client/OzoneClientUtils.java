@@ -63,46 +63,45 @@ public final class OzoneClientUtils {
                                                      Set<Pair<String,
                                                          String>> visited)
       throws IOException {
-    resolveLinkBucketProperties(bucket, objectStore.getClientProxy(), visited);
-    return bucket.getBucketLayout();
-  }
-
-  /**
-   * For link buckets, fetches the resolved source bucket and copies its
-   * operational properties onto {@code bucket}. Non-link buckets are unchanged.
-   */
-  public static void resolveLinkBucketProperties(OzoneBucket bucket,
-      ClientProtocol proxy,
-      Set<Pair<String, String>> visited) throws IOException {
-    if (!bucket.isLink()) {
-      return;
-    }
-    if (!visited.add(Pair.of(bucket.getVolumeName(), bucket.getName()))) {
-      throw new OMException("Detected loop in bucket links. Bucket name: " +
-          bucket.getName() + ", Volume name: " + bucket.getVolumeName(),
-          DETECTED_LOOP_IN_BUCKET_LINKS);
-    }
-
-    OzoneBucket sourceBucket;
-    try {
-      sourceBucket = proxy.getBucketDetails(bucket.getSourceVolume(),
-          bucket.getSourceBucket());
-    } catch (OMException ex) {
-      if (ex.getResult().equals(VOLUME_NOT_FOUND)
-          || ex.getResult().equals(BUCKET_NOT_FOUND)) {
-        bucket.setSourcePathExist(false);
-        LOG.error("Source bucket not found, orphan link bucket: {}",
-            bucket.getName());
-        bucket.markLinkPropertiesResolved();
-        return;
+    if (bucket.isLink()) {
+      if (!visited.add(Pair.of(bucket.getVolumeName(),
+          bucket.getName()))) {
+        throw new OMException("Detected loop in bucket links. Bucket name: " +
+            bucket.getName() + ", Volume name: " + bucket.getVolumeName(),
+            DETECTED_LOOP_IN_BUCKET_LINKS);
       }
-      throw ex;
-    }
 
-    if (sourceBucket.isLink()) {
-      resolveLinkBucketProperties(sourceBucket, proxy, visited);
+      OzoneBucket sourceBucket;
+      try {
+        sourceBucket =
+            objectStore.getVolume(bucket.getSourceVolume())
+                .getBucket(bucket.getSourceBucket());
+      } catch (OMException ex) {
+        if (ex.getResult().equals(VOLUME_NOT_FOUND)
+            || ex.getResult().equals(BUCKET_NOT_FOUND)) {
+          // for orphan link bucket, return layout as link bucket
+          bucket.setSourcePathExist(false);
+          LOG.error("Source Bucket is not found, its orphan bucket and " +
+              "used link bucket {} layout {}", bucket.getName(),
+              bucket.getBucketLayout());
+          return bucket.getBucketLayout();
+        }
+        // other case throw exception
+        throw ex;
+      }
+
+      /** If the source bucket is again a link, we recursively resolve the
+       * link bucket.
+       *
+       * For example:
+       * buck-link1 -> buck-link2 -> buck-link3 -> buck-link1 -> buck-src
+       * buck-src has the actual BucketLayout that will be used by the links.
+       */
+      if (sourceBucket.isLink()) {
+        return resolveLinkBucketLayout(sourceBucket, objectStore, visited);
+      }
     }
-    bucket.applyResolvedProperties(sourceBucket);
+    return bucket.getBucketLayout();
   }
 
   /**

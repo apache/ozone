@@ -3028,7 +3028,46 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketInfos();
 
-      return bucketManager.getBucketInfo(volume, bucket);
+      OmBucketInfo bucketInfo = bucketManager.getBucketInfo(volume, bucket);
+
+      // No links - return the bucket info right away.
+      if (!bucketInfo.isLink()) {
+        return bucketInfo;
+      }
+      // Otherwise follow the links to find the real bucket.
+      // We already know that `bucketInfo` is a linked one,
+      // so we skip one `getBucketInfo` and start with the known link.
+      ResolvedBucket resolvedBucket =
+          resolveBucketLink(Pair.of(
+                  bucketInfo.getSourceVolume(),
+                  bucketInfo.getSourceBucket()),
+              true);
+
+      // If it is a dangling link it means no real bucket exists,
+      // for example, it could have been deleted, but the links still present.
+      if (!resolvedBucket.isDangling()) {
+        OmBucketInfo realBucket =
+            bucketManager.getBucketInfo(
+                resolvedBucket.realVolume(),
+                resolvedBucket.realBucket());
+        // Pass the real bucket metadata in the link bucket info.
+        return bucketInfo.toBuilder()
+            .setDefaultReplicationConfig(
+                realBucket.getDefaultReplicationConfig())
+            .setIsVersionEnabled(realBucket.getIsVersionEnabled())
+            .setStorageType(realBucket.getStorageType())
+            .setQuotaInBytes(realBucket.getQuotaInBytes())
+            .setQuotaInNamespace(realBucket.getQuotaInNamespace())
+            .setUsedBytes(realBucket.getUsedBytes())
+            .setSnapshotUsedBytes(realBucket.getSnapshotUsedBytes())
+            .setSnapshotUsedNamespace(realBucket.getSnapshotUsedNamespace())
+            .setUsedNamespace(realBucket.getUsedNamespace())
+            .addAllMetadata(realBucket.getMetadata())
+            .setBucketLayout(realBucket.getBucketLayout())
+            .build();
+      }
+      // If no real bucket exists, return the requested one's info.
+      return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;

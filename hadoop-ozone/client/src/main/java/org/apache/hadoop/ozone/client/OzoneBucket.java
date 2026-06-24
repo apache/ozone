@@ -24,11 +24,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -136,7 +134,6 @@ public class OzoneBucket extends WithMetadata {
   private String sourceVolume;
   private String sourceBucket;
   private boolean sourcePathExist = true;
-  private volatile boolean linkPropertiesResolved = false;
 
   /**
    * Quota of bytes allocated for the bucket.
@@ -240,7 +237,6 @@ public class OzoneBucket extends WithMetadata {
    * @return storageType
    */
   public StorageType getStorageType() {
-    ensureLinkPropertiesResolved();
     return storageType;
   }
 
@@ -250,7 +246,6 @@ public class OzoneBucket extends WithMetadata {
    * @return versioning
    */
   public Boolean getVersioning() {
-    ensureLinkPropertiesResolved();
     return versioning;
   }
 
@@ -294,7 +289,6 @@ public class OzoneBucket extends WithMetadata {
    * @return quotaInBytes
    */
   public long getQuotaInBytes() {
-    ensureLinkPropertiesResolved();
     return quotaInBytes;
   }
 
@@ -304,7 +298,6 @@ public class OzoneBucket extends WithMetadata {
    * @return quotaInNamespace
    */
   public long getQuotaInNamespace() {
-    ensureLinkPropertiesResolved();
     return quotaInNamespace;
   }
 
@@ -704,22 +697,18 @@ public class OzoneBucket extends WithMetadata {
   }
 
   public long getUsedBytes() {
-    ensureLinkPropertiesResolved();
     return usedBytes;
   }
 
   public long getUsedNamespace() {
-    ensureLinkPropertiesResolved();
     return usedNamespace;
   }
 
   public long getPendingDeleteBytes() {
-    ensureLinkPropertiesResolved();
     return pendingDeleteBytes;
   }
 
   public long getPendingDeleteNamespace() {
-    ensureLinkPropertiesResolved();
     return pendingDeleteNamespace;
   }
 
@@ -775,27 +764,6 @@ public class OzoneBucket extends WithMetadata {
    */
   public boolean isLink() {
     return sourceVolume != null && sourceBucket != null;
-  }
-
-  private void ensureLinkPropertiesResolved() {
-    if (!isLink() || linkPropertiesResolved) {
-      return;
-    }
-    synchronized (this) {
-      if (linkPropertiesResolved) {
-        return;
-      }
-      try {
-        OzoneClientUtils.resolveLinkBucketProperties(this, proxy,
-            new HashSet<>());
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
-    }
-  }
-
-  void markLinkPropertiesResolved() {
-    this.linkPropertiesResolved = true;
   }
 
   /**
@@ -1248,25 +1216,6 @@ public class OzoneBucket extends WithMetadata {
 
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
-  }
-
-  /**
-   * Copies operational properties from a resolved source bucket onto this link
-   * bucket. Link identity fields (volume, name, owner, source path) are
-   * unchanged.
-   */
-  void applyResolvedProperties(OzoneBucket source) {
-    this.bucketLayout = source.bucketLayout;
-    this.defaultReplication = source.defaultReplication;
-    this.storageType = source.storageType;
-    this.versioning = source.versioning;
-    this.quotaInBytes = source.quotaInBytes;
-    this.quotaInNamespace = source.quotaInNamespace;
-    this.usedBytes = source.usedBytes;
-    this.usedNamespace = source.usedNamespace;
-    this.pendingDeleteBytes = source.pendingDeleteBytes;
-    this.pendingDeleteNamespace = source.pendingDeleteNamespace;
-    markLinkPropertiesResolved();
   }
 
   public boolean isSourcePathExist() {
@@ -2132,12 +2081,10 @@ public class OzoneBucket extends WithMetadata {
   }
 
   public BucketLayout getBucketLayout() {
-    ensureLinkPropertiesResolved();
     return bucketLayout;
   }
 
   public ReplicationConfig getReplicationConfig() {
-    ensureLinkPropertiesResolved();
     return this.defaultReplication;
   }
 }

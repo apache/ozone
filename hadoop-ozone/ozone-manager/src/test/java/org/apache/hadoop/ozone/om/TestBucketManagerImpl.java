@@ -409,34 +409,55 @@ class TestBucketManagerImpl extends OzoneTestBase {
 
     OmBucketInfo storedLinkBucket =
         writeClient.getBucketInfo(volume, "link-two");
-
-    assertEquals("link-two", storedLinkBucket.getBucketName());
-    assertEquals(volume, storedLinkBucket.getVolumeName());
-    assertEquals("link-one", storedLinkBucket.getSourceBucket());
-    assertEquals(volume, storedLinkBucket.getSourceVolume());
-
-    OmBucketInfo resolvedBucket = OzoneManagerUtils.getResolvedBucketInfo(
-        omTestManagers.getOzoneManager().getMetadataManager(), volume,
-        "link-two");
-    assertNotNull(resolvedBucket.getDefaultReplicationConfig(),
+    assertNotNull(storedLinkBucket.getDefaultReplicationConfig(),
         "Replication config is not set");
     assertEquals(ecConfig,
-        resolvedBucket.getDefaultReplicationConfig().getReplicationConfig());
-    assertEquals(bucketInfo.getBucketLayout(), resolvedBucket.getBucketLayout());
-    assertEquals(bucketInfo.getQuotaInBytes(), resolvedBucket.getQuotaInBytes());
-    assertEquals(bucketInfo.getQuotaInNamespace(),
-        resolvedBucket.getQuotaInNamespace());
-    assertEquals(bucketInfo.getUsedBytes(), resolvedBucket.getUsedBytes());
-    assertEquals(bucketInfo.getUsedNamespace(), resolvedBucket.getUsedNamespace());
-    assertEquals(bucketInfo.getSnapshotUsedBytes(),
-        resolvedBucket.getSnapshotUsedBytes());
-    assertEquals(bucketInfo.getSnapshotUsedNamespace(),
-        resolvedBucket.getSnapshotUsedNamespace());
-    assertEquals(bucketInfo.getDefaultReplicationConfig(),
-        resolvedBucket.getDefaultReplicationConfig());
-    assertEquals(bucketInfo.getMetadata(), resolvedBucket.getMetadata());
-    assertEquals(bucketInfo.getStorageType(), resolvedBucket.getStorageType());
-    assertEquals(bucketInfo.getIsVersionEnabled(),
-        resolvedBucket.getIsVersionEnabled());
+                        storedLinkBucket
+                            .getDefaultReplicationConfig()
+                            .getReplicationConfig());
+
+    assertEquals(
+        "link-two", storedLinkBucket.getBucketName());
+    assertEquals(
+        volume, storedLinkBucket.getVolumeName());
+
+    assertEquals(
+        "link-one", storedLinkBucket.getSourceBucket());
+    assertEquals(
+        volume, storedLinkBucket.getSourceVolume());
+
+    assertEquals(
+        bucketInfo.getBucketLayout(),
+        storedLinkBucket.getBucketLayout());
+    assertEquals(
+        bucketInfo.getQuotaInBytes(),
+        storedLinkBucket.getQuotaInBytes());
+    assertEquals(
+        bucketInfo.getQuotaInNamespace(),
+        storedLinkBucket.getQuotaInNamespace());
+    assertEquals(
+        bucketInfo.getUsedBytes(),
+        storedLinkBucket.getUsedBytes());
+    assertEquals(
+        bucketInfo.getUsedNamespace(),
+        storedLinkBucket.getUsedNamespace());
+    assertEquals(
+        bucketInfo.getSnapshotUsedBytes(),
+        storedLinkBucket.getSnapshotUsedBytes());
+    assertEquals(
+        bucketInfo.getSnapshotUsedNamespace(),
+        storedLinkBucket.getSnapshotUsedNamespace());
+    assertEquals(
+        bucketInfo.getDefaultReplicationConfig(),
+        storedLinkBucket.getDefaultReplicationConfig());
+    assertEquals(
+        bucketInfo.getMetadata(),
+        storedLinkBucket.getMetadata());
+    assertEquals(
+        bucketInfo.getStorageType(),
+        storedLinkBucket.getStorageType());
+    assertEquals(
+        bucketInfo.getIsVersionEnabled(),
+        storedLinkBucket.getIsVersionEnabled());
   }
 }
