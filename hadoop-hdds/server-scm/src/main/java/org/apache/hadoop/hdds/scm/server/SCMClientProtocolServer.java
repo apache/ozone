@@ -32,7 +32,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -1150,15 +1149,19 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().getContainerReport();
   }
 
+  /*
+   * This command is deprecated and is retained for backward compatibility. It no longer finalizes SCM
+   * as the process is driven from OM which will trigger the SCM finalize process.
+   */
   @Override
   @Deprecated
-  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
-      IOException {
-    if (!scm.getVersionManager().needsFinalization()) {
-      return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
-    }
-    finalizeUpgrade();
-    return new StatusAndMessages(STARTING_FINALIZATION, Collections.emptyList());
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) {
+    // This command is kept only for legacy upgrade scripts which would have first finalized SCM and then
+    // made a call to OM to finalize it. The new flow, is that a single call to OM triggers the finalization process.
+    // The legacy OM command now calls the new one and correctly starts the flow, so this command has become a
+    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow any scripts to move
+    // on and call OM to start the process.
+    return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
   }
 
   @Override
