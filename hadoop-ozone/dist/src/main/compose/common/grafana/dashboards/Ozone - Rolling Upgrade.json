@@ -18,51 +18,64 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 18,
+  "id": 10,
   "links": [],
   "panels": [
     {
-      "id": 12,
-      "type": "stat",
-      "title": "Filter active \u2014 instances hidden by selector",
-      "description": "Visible only when the component / instance selectors at the top of the dashboard are hiding one or more instances. Shows the count of instances currently excluded from every other panel on this dashboard. Disappears automatically when the selection covers everything.",
-      "datasource": {
-        "type": "prometheus"
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 2,
+        "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
       },
-      "repeat": "filter_active",
-      "repeatDirection": "h",
-      "maxPerRow": 1,
+      "id": 17,
+      "panels": [],
+      "title": "Full Cluster Summary",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Number of distinct build versions present across the cluster.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
+                "color": "green",
                 "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 2
               }
             ]
           },
-          "unit": "short",
-          "decimals": 0
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 15,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -71,7 +84,161 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value_and_name",
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count(count by (version) (ozone_build_info{component=~\"$component\",instance=~\"$instance\"}))",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Unique Versions Running",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Indicates whether all nodes in the cluster have finalized.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "No"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "Yes"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - sum((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))) == bool 0",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Cluster Finalized?",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Number of instances hidden by the component and instance selectors at the top of the dashboard. 0 means all instances are visible.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
         "wideLayout": true
       },
       "pluginVersion": "12.3.1",
@@ -83,11 +250,13 @@
           "editorMode": "code",
           "expr": "count(ozone_build_info) - count(ozone_build_info{component=~\"$component\",instance=~\"$instance\"})",
           "instant": true,
-          "legendFormat": "instances hidden",
+          "legendFormat": "",
           "range": false,
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Hidden Instances",
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -95,18 +264,18 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 4
       },
       "id": 4,
       "panels": [],
-      "title": "Build Versions",
+      "title": "Versions",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Distribution of cluster instances by build version, across the entire cluster (ignores the $instance selector). Each slice represents the share of instances on that build; the chart fills with a single slice when the upgrade completes.",
+      "description": "Distribution of selected instances by build version. Each slice represents the share of instances on that build; the chart fills with a single slice when the upgrade completes.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -130,7 +299,7 @@
         "h": 9,
         "w": 5,
         "x": 0,
-        "y": 3
+        "y": 5
       },
       "id": 2,
       "options": {
@@ -169,7 +338,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count by (version) (ozone_build_info)",
+          "expr": "count by (version) (ozone_build_info{component=~\"$component\",instance=~\"$instance\"})",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -216,7 +385,7 @@
         "h": 9,
         "w": 18,
         "x": 5,
-        "y": 3
+        "y": 5
       },
       "id": 5,
       "options": {
@@ -341,7 +510,7 @@
         "h": 9,
         "w": 23,
         "x": 0,
-        "y": 12
+        "y": 14
       },
       "id": 6,
       "options": {
@@ -379,7 +548,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 23
       },
       "id": 9,
       "panels": [],
@@ -390,7 +559,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Share of non-S3G hosts that have finalized (software_version == apparent_version), across the entire cluster (ignores the $instance selector). S3 Gateway is excluded automatically because it does not emit finalization metrics.",
+      "description": "Share of selected hosts (excluding S3G and Recon) that have finalized (software_version == apparent_version). S3G and Recon are excluded because they do not emit finalization metrics.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -444,7 +613,7 @@
         "h": 8,
         "w": 5,
         "x": 0,
-        "y": 22
+        "y": 24
       },
       "id": 3,
       "options": {
@@ -483,7 +652,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version)",
+          "expr": "sum((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
           "instant": true,
           "legendFormat": "finalized",
           "range": false,
@@ -494,7 +663,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(component_version_manager_metrics_software_version) - sum(component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version)",
+          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) - sum((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
           "instant": true,
           "legendFormat": "unfinalized",
           "range": false,
@@ -508,7 +677,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Per non-S3G host: Software Version, Apparent Version, and Finalized? (true when software_version == apparent_version).",
+      "description": "Per host (excluding S3G and Recon): Software Version, Apparent Version, and Finalized? (true when software_version == apparent_version).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -616,7 +785,7 @@
         "h": 8,
         "w": 18,
         "x": 5,
-        "y": 22
+        "y": 24
       },
       "id": 10,
       "options": {
@@ -645,7 +814,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left(component) ozone_build_info",
+          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left(component) (ozone_build_info{component!~\"recon\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -655,7 +824,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "component_version_manager_metrics_apparent_version{instance=~\"$instance\"}",
+          "expr": "component_version_manager_metrics_apparent_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"})",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -665,7 +834,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}",
+          "expr": "(component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -742,7 +911,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Number of finalized non-S3G hosts over time, with a dashed reference line at the total non-S3G host count, scoped to the selected $instance.",
+      "description": "Number of finalized hosts over time (excluding S3G and Recon), with a dashed reference line at the total eligible host count, scoped to the selected $instance.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -851,7 +1020,7 @@
         "h": 13,
         "w": 23,
         "x": 0,
-        "y": 30
+        "y": 32
       },
       "id": 11,
       "options": {
@@ -874,7 +1043,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) == 1) or vector(0)",
+          "expr": "count(((component_version_manager_metrics_software_version{instance=~\"$instance\"} == bool component_version_manager_metrics_apparent_version{instance=~\"$instance\"}) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == 1) or vector(0)",
           "legendFormat": "finalized",
           "range": true,
           "refId": "A"
@@ -884,7 +1053,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"})",
+          "expr": "count(component_version_manager_metrics_software_version{instance=~\"$instance\"} * on(instance) group_left() (ozone_build_info{component!~\"recon\"}))",
           "legendFormat": "total",
           "range": true,
           "refId": "B"
@@ -948,27 +1117,6 @@
         "regex": "",
         "sort": 1,
         "type": "query"
-      },
-      {
-        "datasource": {
-          "type": "prometheus"
-        },
-        "definition": "query_result(count(ozone_build_info) - count(ozone_build_info{component=~\"$component\",instance=~\"$instance\"}))",
-        "description": "Hidden helper. Returns one value when the component/instance selectors are hiding instances; empty otherwise. Used to repeat (and therefore conditionally show) the filter-flare panel. The regex only captures a positive integer between the closing brace and the timestamp, so a difference of 0 produces no match and the variable has no values.",
-        "hide": 2,
-        "includeAll": false,
-        "label": "filter active",
-        "multi": false,
-        "name": "filter_active",
-        "options": [],
-        "query": {
-          "query": "query_result(count(ozone_build_info) - count(ozone_build_info{component=~\"$component\",instance=~\"$instance\"}))",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 2,
-        "regex": "/\\}\\s+([1-9]\\d*)\\s+\\d+$/",
-        "sort": 0,
-        "type": "query"
       }
     ]
   },
@@ -980,5 +1128,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade",
   "uid": "ozone-rolling-upgrade",
-  "version": 11
+  "version": 19
 }
