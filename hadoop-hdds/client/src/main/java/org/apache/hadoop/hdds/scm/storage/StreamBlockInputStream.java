@@ -432,7 +432,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           return null; // Stream ended, queue is empty
         }
 
-        if (System.nanoTime() >= deadlineNs) {
+        if (System.nanoTime() - deadlineNs >= 0) {
           setFailedAndThrow(new TimeoutIOException(
               "Timed out waiting for response after " + readTimeout));
           return null;
@@ -442,8 +442,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private long getReadDeadlineNs() {
       final StreamingReadResponse r = getResponse();
-      final long deadlineNs = r != null ? r.getReadDeadlineNs() : 0;
-      return deadlineNs > 0 ? deadlineNs : System.nanoTime() + readTimeoutNanos;
+      return r != null && r.hasReadDeadline()
+          ? r.getReadDeadlineNs() : System.nanoTime() + readTimeoutNanos;
     }
 
     private void refreshReadDeadline() {

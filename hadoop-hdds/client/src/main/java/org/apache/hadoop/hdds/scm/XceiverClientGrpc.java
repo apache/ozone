@@ -578,12 +578,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           request.getReadBlock().getBlockID().getLocalID(),
           request.getReadBlock().getOffset(),
           request.getReadBlock().getLength());
-      final long now = System.nanoTime();
-      final long callerDeadlineNs = streamObserver.getReadDeadlineNs();
-      final long waitTimeoutNanos = callerDeadlineNs > 0 ? Math.max(0, callerDeadlineNs - now)
-          : TimeUnit.SECONDS.toNanos(timeout);
-      final long deadlineNs = callerDeadlineNs > 0 ? callerDeadlineNs : now + waitTimeoutNanos;
-      while (!obs.isReady() && System.nanoTime() < deadlineNs) {
+      final long deadlineNs = streamObserver.hasReadDeadline() ? streamObserver.getReadDeadlineNs()
+          : System.nanoTime() + TimeUnit.SECONDS.toNanos(timeout);
+      while (!obs.isReady() && System.nanoTime() - deadlineNs < 0) {
         LockSupport.parkNanos(10_000_000L);
         if (Thread.currentThread().isInterrupted()) {
           Thread.currentThread().interrupt();
@@ -591,8 +588,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
       }
       if (!obs.isReady()) {
-        throw new TimeoutIOException("Timed out waiting for stream to become ready after "
-            + TimeUnit.NANOSECONDS.toMillis(waitTimeoutNanos) + "ms");
+        throw new TimeoutIOException("Timed out waiting for stream to become ready: " + streamObserver);
       }
     }
 
