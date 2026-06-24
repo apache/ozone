@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.s3.awssdk.v1;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmKeyModificationTime;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModificationTime;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +45,8 @@ import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.CopyObjectResult;
+import com.amazonaws.services.s3.model.CopyPartRequest;
+import com.amazonaws.services.s3.model.CopyPartResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
@@ -512,6 +516,69 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     CopyObjectResult copyResult = s3Client.copyObject(sourceBucketName, sourceKey, destBucketName, destKey);
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectLastModifiedMatchesOmDb() throws Exception {
+    final String sourceBucketName = getBucketName();
+    final String destBucketName = getBucketName();
+    final String sourceKey = getKeyName();
+    final String destKey = getKeyName();
+    final String content = "copy-last-modified-test-content";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    final InputStream inputStream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(sourceBucketName, sourceKey, inputStream, new ObjectMetadata());
+
+    final long sourceModificationTime = getOmKeyModificationTime(cluster, sourceBucketName, sourceKey);
+
+    Thread.sleep(100);
+
+    final CopyObjectResult copyResult = s3Client.copyObject(sourceBucketName, sourceKey, destBucketName, destKey);
+
+    assertNotNull(copyResult.getLastModifiedDate());
+    final long responseModificationTime = copyResult.getLastModifiedDate().getTime();
+    final long destModificationTime = getOmKeyModificationTime(cluster, destBucketName, destKey);
+
+    assertEquals(destModificationTime, responseModificationTime);
+    assertNotEquals(sourceModificationTime, responseModificationTime);
+  }
+
+  @Test
+  public void testUploadPartCopyLastModifiedMatchesOmDb() throws Exception {
+    final String bucketName = getBucketName();
+    final String sourceKey = getKeyName();
+    final String destKey = getKeyName();
+    final String content = "copy-last-modified-test-content";
+    s3Client.createBucket(bucketName);
+
+    final InputStream inputStream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, sourceKey, inputStream, new ObjectMetadata());
+
+    final long sourceModificationTime = getOmKeyModificationTime(cluster, bucketName, sourceKey);
+
+    Thread.sleep(100);
+
+    final InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(
+        new InitiateMultipartUploadRequest(bucketName, destKey));
+    final String uploadId = initResponse.getUploadId();
+
+    final CopyPartResult copyPartResult = s3Client.copyPart(
+        new CopyPartRequest()
+            .withSourceBucketName(bucketName)
+            .withSourceKey(sourceKey)
+            .withDestinationBucketName(bucketName)
+            .withDestinationKey(destKey)
+            .withUploadId(uploadId)
+            .withPartNumber(1));
+
+    assertNotNull(copyPartResult.getLastModifiedDate());
+    final long responseModificationTime = copyPartResult.getLastModifiedDate().getTime();
+    final long destPartModificationTime = getOmPartModificationTime(cluster, bucketName, destKey, uploadId, 1);
+
+    assertEquals(destPartModificationTime, responseModificationTime);
+    assertNotEquals(sourceModificationTime, responseModificationTime);
   }
 
   @Test

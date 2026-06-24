@@ -1586,6 +1586,8 @@ message CommitKeyRequest {
 
 message CommitKeyResponse {
 
+    // Modification time of the committed key, set by OM during preExecute.
+    optional uint64 modificationTime = 1;
 }
 
 message AllocateBlockRequest {
@@ -1790,6 +1792,8 @@ message MultipartCommitUploadPartResponse {
     optional string partName = 1;
     // This one is returned as Etag for S3.
     optional string eTag = 2;
+    // Modification time of the committed part key, set by OM during preExecute.
+    optional uint64 modificationTime = 3;
 }
 
 message MultipartUploadCompleteRequest {

@@ -145,20 +145,21 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
+            super.close();
             keyContents.put(key, toByteArray());
+            final long mtime = getModificationTime();
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 key,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
+                mtime,
+                mtime,
                 new ArrayList<>(), finalReplicationCon, getMetadata(), null,
                 () -> readKey(key), true,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
-            super.close();
           }
         };
 
@@ -179,18 +180,19 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
+            super.close();
             keyContents.put(keyName, toByteArray());
+            final long mtime = getModificationTime();
             keyDetails.put(keyName, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 keyName,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
+                mtime,
+                mtime,
                 new ArrayList<>(), finalReplicationCon, metadata, null,
                 () -> readKey(keyName), true, null, null
             ));
-            super.close();
           }
         };
 
@@ -254,13 +256,14 @@ public final class OzoneBucketStub extends OzoneBucket {
             Map<String, String> objectMetadata = keyMetadata == null ?
                 new HashMap<>() : keyMetadata;
 
+            final long mtime = getModificationTime();
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 key,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
+                mtime,
+                mtime,
                 new ArrayList<>(), rConfig, objectMetadata, null,
                 null, false,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
@@ -340,7 +343,7 @@ public final class OzoneBucketStub extends OzoneBucket {
               buffer.get(bytes);
 
               Part part = new Part(key + size, bytes,
-                  getMetadata().get(ETAG));
+                  getMetadata().get(ETAG), getModificationTime());
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -518,8 +521,9 @@ public final class OzoneBucketStub extends OzoneBucket {
           new KeyMetadataAwareOutputStream((int) size, new HashMap<>()) {
             @Override
             public void close() throws IOException {
+              super.close();
               Part part = new Part(key + size,
-                  toByteArray(), getMetadata().get(ETAG));
+                  toByteArray(), getMetadata().get(ETAG), getModificationTime());
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -527,7 +531,6 @@ public final class OzoneBucketStub extends OzoneBucket {
               } else {
                 partList.get(key).put(partNumber, part);
               }
-              super.close();
             }
           };
       return new OzoneOutputStreamStub(keyOutputStream, key + size);
@@ -649,7 +652,7 @@ public final class OzoneBucketStub extends OzoneBucket {
         if (partEntry.getKey() > partNumberMarker) {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
-              Time.now(), partEntry.getValue().getContent().length,
+              partEntry.getValue().getModificationTime(), partEntry.getValue().getContent().length,
               DatatypeConverter.printHexBinary(eTagProvider.digest(partEntry
                   .getValue().getContent())).toLowerCase());
           partInfoList.add(partInfo);
@@ -732,13 +735,18 @@ public final class OzoneBucketStub extends OzoneBucket {
   public static class Part {
     private String partName;
     private byte[] content;
-
     private String eTag;
+    private long modificationTime;
 
-    public Part(String name, byte[] data, String eTag) {
+    public Part(String name, byte[] data, String eTag, long modificationTime) {
       this.partName = name;
       this.content = data.clone();
       this.eTag = eTag;
+      this.modificationTime = modificationTime;
+    }
+
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     public String getPartName() {
@@ -798,6 +806,7 @@ public final class OzoneBucketStub extends OzoneBucket {
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     private final Map<String, String> metadata;
     private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+    private long modificationTime;
 
     public KeyMetadataAwareOutputStream(Map<String, String> metadata) {
       super(null, null);
@@ -831,7 +840,13 @@ public final class OzoneBucketStub extends OzoneBucket {
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      modificationTime = Time.now();
       buffer.close();
+    }
+
+    @Override
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     @Override
@@ -859,6 +874,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     private final Map<String, String> metadata;
     private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+    private long modificationTime;
 
     public KeyMetadataAwareByteBufferStreamOutput(
         Map<String, String> metadata) {
@@ -878,10 +894,15 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     @Override
     public void close() throws IOException {
-
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      modificationTime = Time.now();
+    }
+
+    @Override
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     @Override

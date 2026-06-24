@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
-import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -81,7 +80,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -955,7 +956,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
-        return Response.ok(new CopyPartResult(eTag)).build();
+        final Instant lastModified = Instant.ofEpochMilli(omMultipartCommitUploadPartInfo.getModificationTime());
+        return Response.ok(new CopyPartResult(eTag, lastModified)).build();
       } else {
         getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
         return Response.ok().header(HttpHeaders.ETAG, eTag).build();
@@ -976,6 +978,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw os3Exception;
       }
       throw newError(bucketName, key, ex);
+    } catch (IOException ex) {
+      // Ensure we handle permission failures - these can surface as IOException wrapping OMException.
+      if (copyHeader != null) {
+        getMetrics().updateCopyObjectFailureStats(startNanos);
+      } else {
+        getMetrics().updateCreateMultipartKeyFailureStats(startNanos);
+      }
+      final OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
+      if (omEx != null) {
+        if (omEx.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
+          throw newError(NO_SUCH_UPLOAD, uploadID, omEx);
+        } else {
+          throw newError(bucketName, key, omEx);
+        }
+      }
+      throw ex;
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
@@ -986,7 +1004,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  void copy(OzoneVolume volume, DigestInputStream src, long srcKeyLen,
+  CopyResult copy(OzoneVolume volume, DigestInputStream src, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
@@ -995,29 +1013,36 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
     long copyLength;
-
+    final String eTag;
+    final long modificationTime;
     if (isDatastreamEnabled() && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > getDatastreamMinLength()) {
       perf.appendStreamMode();
-      copyLength = ObjectEndpointStreaming
+      final CopyResult copyResult = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
               getChunkSize(), replication, metadata, src, perf, startNanos, tags,
               writeConditions);
+      eTag = copyResult.getETag();
+      copyLength = copyResult.getSize();
+      modificationTime = copyResult.getModificationTime();
     } else {
-      try (OzoneOutputStream dest = openKeyForPut(
+      final OzoneOutputStream destStream = openKeyForPut(
           volume.getName(), destBucket, destKey, srcKeyLen,
-          replication, metadata, tags, writeConditions)) {
+          replication, metadata, tags, writeConditions);
+      try (OzoneOutputStream dest = destStream) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
-        final String md5Hash = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
-        dest.getMetadata().put(OzoneConsts.ETAG, md5Hash);
+        eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
+        destStream.getMetadata().put(OzoneConsts.ETAG, eTag);
       }
+      modificationTime = destStream.getModificationTime();
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
     perf.appendSizeBytes(copyLength);
+    return new CopyResult(eTag, copyLength, modificationTime);
   }
 
   private CopyObjectResponse copyObject(OzoneVolume volume,
@@ -1116,19 +1141,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
               "GetObject", () -> getClientProtocol().getKey(volume.getName(), sourceBucket, sourceKey));
            DigestInputStream sourceDigestInputStream = new DigestInputStream(src, md5Digest)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
-        runWithS3ActionString("PutObject", () -> {
-          copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket,
-              replicationConfig, customMetadata, perf, startNanos, tags, writeConditions);
-          return null;
-        });
-
-        final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
-            volume.getName(), destBucket, destkey);
+        final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
+            copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket,
+              replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
 
         getMetrics().updateCopyObjectSuccessStats(startNanos);
         CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-        copyObjectResponse.setETag(wrapInQuotes(destKeyDetails.getMetadata().get(OzoneConsts.ETAG)));
-        copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
+        copyObjectResponse.setETag(wrapInQuotes(copyResult.getETag()));
+        copyObjectResponse.setLastModified(Instant.ofEpochMilli(copyResult.getModificationTime()));
         return copyObjectResponse;
       }
     } catch (OMException ex) {

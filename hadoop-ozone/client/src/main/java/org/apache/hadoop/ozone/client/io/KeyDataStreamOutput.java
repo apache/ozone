@@ -476,6 +476,10 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
   }
 
+  public long getModificationTime() {
+    return blockDataStreamOutputEntryPool.getModificationTime();
+  }
+
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockDataStreamOutputEntryPool.getExcludeList();

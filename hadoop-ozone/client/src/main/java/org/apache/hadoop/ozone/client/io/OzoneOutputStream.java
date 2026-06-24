@@ -128,12 +128,20 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    KeyOutputStream keyOutputStream = getKeyOutputStream();
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
     if (keyOutputStream != null) {
       return keyOutputStream.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
+  }
+
+  public long getModificationTime() {
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (keyOutputStream != null) {
+      return keyOutputStream.getModificationTime();
+    }
+    throw new IllegalStateException("OutputStream is not a KeyOutputStream: " + outputStream.getClass());
   }
 
   public OutputStream getOutputStream() {

@@ -15,35 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.helpers;
-
 /**
- * This class holds information about the response from commit multipart
- * upload part request.
+ * Shared utilities and integration tests for the AWS S3 SDK.
  */
-public class OmMultipartCommitUploadPartInfo {
-
-  private final String partName;
-
-  private final String eTag;
-
-  private final long modificationTime;
-
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag, long modificationTime) {
-    this.partName = partName;
-    this.eTag = eTag;
-    this.modificationTime = modificationTime;
-  }
-
-  public String getETag() {
-    return eTag;
-  }
-
-  public String getPartName() {
-    return partName;
-  }
-
-  public long getModificationTime() {
-    return modificationTime;
-  }
-}
+package org.apache.hadoop.ozone.s3.awssdk;

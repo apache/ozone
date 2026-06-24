@@ -83,6 +83,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
+  private long modificationTime;
   private final long openID;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
@@ -329,8 +330,9 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
+        modificationTime = commitUploadPartInfo.getModificationTime();
       } else {
-        omClient.commitKey(buildKeyArgs(), openID);
+        modificationTime = omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -420,6 +422,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return commitUploadPartInfo;
+  }
+
+  public long getModificationTime() {
+    return modificationTime;
   }
 
   public ExcludeList getExcludeList() {
