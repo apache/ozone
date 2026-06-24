@@ -1084,15 +1084,6 @@
         "regex": "",
         "sort": 1,
         "type": "query"
-      },
-      {
-        "baseFilters": [],
-        "datasource": {
-          "type": "prometheus"
-        },
-        "filters": [],
-        "name": "Filters",
-        "type": "adhoc"
       }
     ]
   },
