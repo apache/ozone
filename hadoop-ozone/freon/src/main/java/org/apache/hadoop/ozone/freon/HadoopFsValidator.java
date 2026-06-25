@@ -22,6 +22,7 @@ import java.security.MessageDigest;
 import java.util.concurrent.Callable;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.kohsuke.MetaInfServices;
@@ -55,14 +56,19 @@ public class HadoopFsValidator extends HadoopBaseFreonGenerator
   public Void call() throws Exception {
     super.init();
 
-    Path file = new Path(getRootPath() + "/" + generateObjectName(0));
-    try (FSDataInputStream stream = getFileSystem().open(file)) {
-      referenceDigest = getDigest(stream);
+    FileSystem fileSystem = getFileSystem();
+    try {
+      Path file = new Path(getRootPath() + "/" + generateObjectName(0));
+      try (FSDataInputStream stream = fileSystem.open(file)) {
+        referenceDigest = getDigest(stream);
+      }
+
+      timer = getMetrics().timer("file-read");
+
+      runTests(this::validateFile);
+    } finally {
+      org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(fileSystem);
     }
-
-    timer = getMetrics().timer("file-read");
-
-    runTests(this::validateFile);
 
     return null;
   }
