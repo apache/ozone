@@ -26,9 +26,6 @@ Suite Setup         Get Security Enabled From Config
 *** Variables ***
 ${ENDPOINT_URL}       http://recon:9888
 ${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
-${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
-${UNHEALTHY_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers/unhealthy
-${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
 ${VOLUME}     vol1
 ${BUCKET}     bucket1
 
@@ -68,6 +65,23 @@ Check if the listKeys api responds OK
     Should contain  ${result}   "keys"
     Should contain  ${result}   "${volume}"
     Should contain  ${result}   "${bucket}"
+
+
+Verify admin-only API
+    [arguments]    ${path}
+
+    Execute    kdestroy
+    Check http return code    ${API_ENDPOINT_URL}${path}    401
+
+    kinit as non admin
+    Check http return code    ${API_ENDPOINT_URL}${path}    403
+
+    kinit as ozone admin
+    Check http return code    ${API_ENDPOINT_URL}${path}    200
+
+    kinit as recon admin
+    Check http return code    ${API_ENDPOINT_URL}${path}    200
+
 
 *** Test Cases ***
 Check if Recon picks up OM data
@@ -118,34 +132,13 @@ Check web UI access
     Check http return code      ${ENDPOINT_URL}     200
 
 Check admin only api access
-    Execute    kdestroy
-    Check http return code      ${ADMIN_API_ENDPOINT_URL}       401
-
-    kinit as non admin
-    Check http return code      ${ADMIN_API_ENDPOINT_URL}       403
-
-    kinit as ozone admin
-    Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
-
-    kinit as recon admin
-    Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
-
-Check unhealthy, (admin) api access
-    Execute    kdestroy
-    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       401
-
-    kinit as non admin
-    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       403
-
-    kinit as ozone admin
-    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
-
-    kinit as recon admin
-    Check http return code      ${UNHEALTHY_ENDPOINT_URL}       200
-
-Check normal api access
-    Execute    kdestroy
-    Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   401
-
-    kinit as non admin
-    Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   200
+    Verify admin-only API    /buckets
+    Verify admin-only API    /clusterState
+    Verify admin-only API    /containers
+    Verify admin-only API    /datanodes
+    Verify admin-only API    /keys/open/summary
+    Verify admin-only API    /pendingDeletion?component=om&limit=1
+    Verify admin-only API    /pipelines
+    Verify admin-only API    /task/status
+    Verify admin-only API    /utilization/fileCount
+    Verify admin-only API    /volumes

@@ -48,7 +48,8 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.tasks.DataNodeMetricsCollectionTask;
@@ -74,6 +75,7 @@ public class DataNodeMetricsService {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
+  private volatile String failedMessage = "Metrics collection task failed. Please retry after some time.";
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
@@ -160,6 +162,7 @@ public class DataNodeMetricsService {
     } catch (Exception e) {
       resetState();
       currentStatus = MetricCollectionStatus.FAILED;
+      failedMessage = e.getLocalizedMessage();
       isRunning.set(false);
     }
   }
@@ -301,27 +304,40 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  public DataNodeMetricsServiceResponse getCollectedMetrics(Integer limit) {
+  /**
+   * Returns either {@link DataNodeMetricsCompleteResponse} when collection is
+   * finished, or {@link DataNodeMetricsProgressResponse} otherwise.
+   */
+  public Object getCollectedMetrics(Integer limit) {
     startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
-      DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
-      dnMetricsBuilder
-          .setStatus(currentStatus)
-          .setTotalPendingDeletionSize(totalPendingDeletion)
-          .setTotalNodesQueried(totalNodesQueried)
-          .setTotalNodeQueryFailures(totalNodesFailed);
-
-      if (null == limit) {
-        return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
-      } else {
-        return dnMetricsBuilder.setPendingDeletion(
-            pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size())
-        )).build();
-      }
+      List<DatanodePendingDeletionMetrics> list =
+          (limit == null) ? pendingDeletionList :
+              pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size()));
+      return new DataNodeMetricsCompleteResponse(
+          currentStatus,
+          totalNodesQueried,
+          totalNodesFailed,
+          totalPendingDeletion,
+          list);
     }
-    return DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(currentStatus)
-        .build();
+
+    return new DataNodeMetricsProgressResponse(
+        currentStatus,
+        buildProgressMessage(currentStatus, failedMessage));
+  }
+
+  private static String buildProgressMessage(MetricCollectionStatus status, String failedMessage) {
+    switch (status) {
+    case IN_PROGRESS:
+      return "Metrics collection task is currently running. Please wait for task to finish.";
+    case FAILED:
+      return failedMessage;
+    case NOT_STARTED:
+      return "Metrics collection task has not started yet. Please retry shortly.";
+    default:
+      return "Metrics collection task is not complete yet. Please retry shortly.";
+    }
   }
 
   @PreDestroy

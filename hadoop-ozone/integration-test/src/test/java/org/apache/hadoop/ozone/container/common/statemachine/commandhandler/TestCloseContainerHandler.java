@@ -83,7 +83,6 @@ public class TestCloseContainerHandler {
   public void test() throws Exception {
     cluster.waitForClusterToBeReady();
 
-    //the easiest way to create an open container is creating a key
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       ObjectStore objectStore = client.getObjectStore();
       objectStore.createVolume("test");

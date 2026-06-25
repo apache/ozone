@@ -513,8 +513,8 @@ public class TestDiskBalancerSubCommands {
   public void testStatusDiskBalancerWithMultipleNodes() throws Exception {
     DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
     
-    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
-    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-1");
     
     when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto1, statusProto2);
@@ -522,12 +522,14 @@ public class TestDiskBalancerSubCommands {
     try (DiskBalancerMocks mocks = setupAllMocks()) {
 
       CommandLine c = new CommandLine(cmd);
-      c.parseArgs("host-1", "host-2");
+      c.parseArgs("host-2", "host-1");
       cmd.call();
 
       String output = outContent.toString(DEFAULT_ENCODING);
-      assertTrue(output.contains("host-1"));
-      assertTrue(output.contains("host-2"));
+      int host2Index = output.indexOf("host-2");
+      int host1Index = output.indexOf("host-1");
+      assertThat(host2Index).isGreaterThanOrEqualTo(0);
+      assertThat(host1Index).isGreaterThan(host2Index);
     }
   }
 
@@ -571,8 +573,10 @@ public class TestDiskBalancerSubCommands {
 
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("Status result"));
-      assertTrue(output.contains("host-1"));
-      assertTrue(output.contains("host-2"));
+      int host1Index = output.indexOf("host-1");
+      int host2Index = output.indexOf("host-2");
+      assertThat(host1Index).isGreaterThanOrEqualTo(0);
+      assertThat(host2Index).isGreaterThan(host1Index);
     }
   }
 
@@ -694,6 +698,30 @@ public class TestDiskBalancerSubCommands {
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("host-1"));
       assertTrue(output.contains("host-2"));
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithSameDensityKeepsInputOrder() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    DatanodeDiskBalancerInfoProto reportProto1 = createReportProto("host-1", 0.5, 10.0);
+    DatanodeDiskBalancerInfoProto reportProto2 = createReportProto("host-2", 0.5, 10.0);
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto2, reportProto1);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-2", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      int host2Index = output.indexOf("host-2");
+      int host1Index = output.indexOf("host-1");
+      assertThat(host2Index).isGreaterThanOrEqualTo(0);
+      assertThat(host1Index).isGreaterThan(host2Index);
     }
   }
 
@@ -885,4 +913,3 @@ public class TestDiskBalancerSubCommands {
         .build();
   }
 }
-

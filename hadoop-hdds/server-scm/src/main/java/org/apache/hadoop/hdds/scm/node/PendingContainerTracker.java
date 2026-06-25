@@ -105,7 +105,11 @@ public class PendingContainerTracker {
         previousWindow.clear();
         currentWindow.clear();
         lastRollTime = now;
-        LOG.debug("Double roll interval elapsed ({}ms): dropped {} pending containers", elapsed, dropped);
+        if (dropped > 0) {
+          LOG.warn("PendingContainerTracker: force-dropped {} unconfirmed pending containers "
+              + "on DN {} after {}ms (2x rollInterval). "
+              + "Container reports may have been lost.", dropped, datanodeID, elapsed);
+        }
       } else if (elapsed >= rollIntervalMs) {
         previousWindow.clear();
         final Set<ContainerID> tmp = previousWindow;
@@ -165,7 +169,11 @@ public class PendingContainerTracker {
       final int pendingAllocationCount = getCount();
       long allocatableCount = 0;
       for (StorageReportProto report : storageReports) {
-        final long allocatableCountOnThisDisk = VolumeUsage.getUsableSpace(report) / maxContainerSize;
+        if (report.hasFailed() && report.getFailed()) {
+          continue;
+        }
+        final long allocatableCountOnThisDisk =
+            Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
         allocatableCount += allocatableCountOnThisDisk;
         if (allocatableCount > pendingAllocationCount) {
           final boolean added = currentWindow.add(containerID);
@@ -235,11 +243,45 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Remove a pending container allocation from a specific DataNode.
-   * Removes from both current and previous windows.
-   * Called when container is confirmed.
+   * Returns true if the given datanode has at least one allocatable container slot
+   * available, accounting for pending in-flight allocations.
    *
-   * @param containerID The container to remove from pending
+   * <p>Slot availability is based on {@code maxContainerSize}: a slot exists for each
+   * {@code maxContainerSize}-worth of usable space on any volume. This check is intended for the placement policy.
+   * This rolls expired-window entries but does not consume a slot.
+   *
+   * @param datanodeInfo the datanode to check
+   * @return true if at least one container slot is available
+   */
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
+    if (storageReports.isEmpty()) {
+      return false;
+    }
+    TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
+    bucket.rollIfNeeded();
+    final int pendingCount = bucket.getCount();
+    long allocatableCount = 0;
+    for (StorageReportProto report : storageReports) {
+      if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
+      allocatableCount += Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
+      if (allocatableCount > pendingCount) {
+        return true;
+      }
+    }
+    LOG.debug("Datanode {} has no available container slots. Pending: {}, Allocatable: {}",
+        datanodeInfo.getID(), pendingCount, allocatableCount);
+    return false;
+  }
+
+  /**
+   * Remove pending allocation from the bucket for the given container.
+   *
+   * @param bucket TWO window bucket of the datanode
+   * @param containerID containerID
    */
   public void removePendingAllocation(TwoWindowBucket bucket, ContainerID containerID) {
     Objects.requireNonNull(containerID, "containerID == null");
