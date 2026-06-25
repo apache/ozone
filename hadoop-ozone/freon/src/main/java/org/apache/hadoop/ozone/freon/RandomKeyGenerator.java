@@ -116,36 +116,31 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = {"--num-of-threads", "--numOfThreads"},
-      description = "number of threads to be launched for the run. Full name " +
-          "--numOfThreads will be removed in later versions.",
+  @Option(names = {"--num-of-threads"},
+      description = "number of threads to be launched for the run.",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = {"--num-of-volumes", "--numOfVolumes"},
-      description = "specifies number of Volumes to be created in offline " +
-          "mode. Full name --numOfVolumes will be removed in later versions.",
+  @Option(names = {"--num-of-volumes"},
+      description = "specifies number of Volumes to be created in offline mode.",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = {"--num-of-buckets", "--numOfBuckets"},
-      description = "specifies number of Buckets to be created per Volume. " +
-          "Full name --numOfBuckets will be removed in later versions.",
+  @Option(names = {"--num-of-buckets"},
+      description = "specifies number of Buckets to be created per Volume.",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
   @Option(
-      names = {"--num-of-keys", "--numOfKeys"},
-      description = "specifies number of Keys to be created per Bucket. Full" +
-          " name --numOfKeys will be removed in later versions.",
+      names = {"--num-of-keys"},
+      description = "specifies number of Keys to be created per Bucket.",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
   @Option(
-      names = {"--key-size", "--keySize"},
-      description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions. " +
+      names = {"--key-size"},
+      description = "Specifies the size of Key in bytes to be created." +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
       converter = StorageSizeConverter.class
@@ -153,22 +148,19 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private StorageSize keySize;
 
   @Option(
-      names = {"--validate-writes", "--validateWrites"},
-      description = "Specifies whether to validate keys after writing. Full" +
-          " name --validateWrites will be removed in later versions."
+      names = {"--validate-writes"},
+      description = "Specifies whether to validate keys after writing"
   )
   private boolean validateWrites = false;
 
-  @Option(names = {"--num-of-validate-threads", "--numOfValidateThreads"},
-      description = "number of threads to be launched for validating keys." +
-          "Full name --numOfValidateThreads will be removed in later versions.",
+  @Option(names = {"--num-of-validate-threads"},
+      description = "number of threads to be launched for validating keys.",
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
   @Option(
-      names = {"--buffer-size", "--bufferSize"},
-      description = "Specifies the buffer size while writing. Full name " +
-          "--bufferSize will be removed in later versions.",
+      names = {"--buffer-size"},
+      description = "Specifies the buffer size while writing.",
       defaultValue = "4096"
   )
   private int bufferSize = 4096;

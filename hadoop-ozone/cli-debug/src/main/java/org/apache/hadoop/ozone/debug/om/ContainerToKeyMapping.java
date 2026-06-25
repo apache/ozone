@@ -81,7 +81,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       description = "Comma separated Container IDs")
   private String containers;
 
-  @CommandLine.Option(names = {"--onlyFileNames"},
+  @CommandLine.Option(names = {"--only-file-names"},
       defaultValue = "false",
       description = "Only display file names without full path")
   private boolean onlyFileNames;

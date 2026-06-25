@@ -30,9 +30,11 @@ import java.io.OutputStream;
 import java.io.SyncFailedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
+import org.apache.commons.io.IOUtils;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,9 +143,10 @@ public final class DiskCheckUtil {
     public boolean checkReadWrite(File storageDir,
         File testFileDir, int numBytesToWrite) {
       File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
+      Path testPath = testFile.toPath();
       byte[] writtenBytes = new byte[numBytesToWrite];
       RANDOM.nextBytes(writtenBytes);
-      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(testFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(testPath, CREATE, TRUNCATE_EXISTING, WRITE)) {
         fos.write(writtenBytes);
       } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s for " +
@@ -152,35 +155,41 @@ public final class DiskCheckUtil {
       } catch (SyncFailedException syncEx) {
         logError(storageDir, String.format("Could not sync file %s to disk.",
             testFile.getAbsolutePath()), syncEx);
+        FileUtils.deletePathQuietly(testPath);
         return false;
       } catch (IOException ioEx) {
         String msg = ioEx.getMessage();
         if (msg != null && msg.contains(LINUX_DISK_FULL_MESSAGE)) {
           LOG.warn("Could not write file {} for volume check", testFile.getAbsolutePath(), ioEx);
+          FileUtils.deletePathQuietly(testPath);
           return true;
         }
         logError(storageDir, String.format("Could not write file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
+        FileUtils.deletePathQuietly(testPath);
         return false;
       }
 
       // Read data back from the test file.
       byte[] readBytes = new byte[numBytesToWrite];
-      try (InputStream fis = Files.newInputStream(testFile.toPath())) {
-        int numBytesRead = fis.read(readBytes);
+      try (InputStream fis = Files.newInputStream(testPath)) {
+        int numBytesRead = IOUtils.read(fis, readBytes);
         if (numBytesRead != numBytesToWrite) {
           logError(storageDir, String.format("%d bytes written to file %s " +
                   "but %d bytes were read back.", numBytesToWrite,
               testFile.getAbsolutePath(), numBytesRead));
+          FileUtils.deletePathQuietly(testPath);
           return false;
         }
       } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s " +
             "for volume check.", testFile.getAbsolutePath()), notFoundEx);
+        FileUtils.deletePathQuietly(testPath);
         return false;
       } catch (IOException ioEx) {
         logError(storageDir, String.format("Could not read file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
+        FileUtils.deletePathQuietly(testPath);
         return false;
       }
 
@@ -189,6 +198,7 @@ public final class DiskCheckUtil {
         logError(storageDir, String.format("%d Bytes read from file " +
                 "%s do not match the %d bytes that were written.",
             writtenBytes.length, testFile.getAbsolutePath(), readBytes.length));
+        FileUtils.deletePathQuietly(testPath);
         return false;
       }
 

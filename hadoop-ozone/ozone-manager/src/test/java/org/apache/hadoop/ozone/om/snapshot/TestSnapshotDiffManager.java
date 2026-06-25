@@ -95,11 +95,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
@@ -1169,28 +1166,97 @@ public class TestSnapshotDiffManager {
   }
 
   private static Stream<Arguments> threadPoolFullScenarios() {
+    int fullThreadPoolSize = 2 * OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
     return Stream.of(
-        Arguments.of("When there is a wait time between job batches",
-            500L, 45, 0),
-        Arguments.of("When there is no wait time between job batches",
-            0L, 20, 25)
+        Arguments.of("When the pool drains between job batches",
+            true, 45, 0),
+        Arguments.of("When the pool does not drain between job batches",
+            false, fullThreadPoolSize, 45 - fullThreadPoolSize)
     );
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("threadPoolFullScenarios")
   public void testThreadPoolIsFull(String description,
-                                   long waitBetweenBatches,
+                                   boolean drainBetweenBatches,
                                    int expectInProgressJobsCount,
                                    int expectRejectedJobsCount)
       throws Exception {
-    ExecutorService executorService = new ThreadPoolExecutor(100, 100, 0,
-        TimeUnit.MILLISECONDS, new SynchronousQueue<>()
-    );
+    List<SnapshotInfo> snapshotInfos = createTestSnapshots(10);
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
 
+    CountDownLatch blockWorkers = new CountDownLatch(1);
+    AtomicInteger completedJobs = new AtomicInteger(0);
+    doAnswer(invocation -> {
+      blockWorkers.await();
+      completedJobs.incrementAndGet();
+      return null;
+    }).when(spy).generateSnapshotDiffReport(anyString(), anyString(),
+        eq(VOLUME_NAME), eq(BUCKET_NAME), anyString(), anyString(),
+        eq(false), eq(false));
+
+    if (drainBetweenBatches) {
+      blockWorkers.countDown();
+    }
+
+    try {
+      List<SnapshotDiffResponse> responses = new ArrayList<>();
+      int totalSubmitted = 0;
+      for (int i = 0; i < snapshotInfos.size(); i++) {
+        for (int j = i + 1; j < snapshotInfos.size(); j++) {
+          String fromSnapshotName = snapshotInfos.get(i).getName();
+          String toSnapshotName = snapshotInfos.get(j).getName();
+          responses.add(submitJob(spy, fromSnapshotName, toSnapshotName));
+          totalSubmitted++;
+        }
+        if (drainBetweenBatches) {
+          final int expected = totalSubmitted;
+          attempt(() -> {
+            if (completedJobs.get() < expected) {
+              throw new IllegalStateException("Waiting for jobs to complete");
+            }
+            return null;
+          }, 50, TimeDuration.valueOf(100, TimeUnit.MILLISECONDS), null, null);
+        }
+      }
+
+      int inProgressJobsCount = 0;
+      int rejectedJobsCount = 0;
+      for (SnapshotDiffResponse response : responses) {
+        if (response.getJobStatus() == IN_PROGRESS) {
+          inProgressJobsCount++;
+        } else if (response.getJobStatus() == REJECTED) {
+          rejectedJobsCount++;
+        } else {
+          throw new IllegalStateException("Unexpected job status.");
+        }
+      }
+
+      assertEquals(expectInProgressJobsCount, inProgressJobsCount);
+      assertEquals(expectRejectedJobsCount, rejectedJobsCount);
+
+      int notFoundJobs = 0;
+      for (int i = 0; i < snapshotInfos.size(); i++) {
+        for (int j = i + 1; j < snapshotInfos.size(); j++) {
+          SnapshotDiffJob diffJob =
+              getSnapshotDiffJobFromDb(snapshotInfos.get(i),
+                  snapshotInfos.get(j));
+          if (diffJob == null) {
+            notFoundJobs++;
+          }
+        }
+      }
+
+      // assert that rejected jobs were removed from the job table as well.
+      assertEquals(expectRejectedJobsCount, notFoundJobs);
+    } finally {
+      blockWorkers.countDown();
+    }
+  }
+
+  private List<SnapshotInfo> createTestSnapshots(int count) throws IOException {
     List<SnapshotInfo> snapshotInfos = new ArrayList<>();
-
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < count; i++) {
       UUID snapshotId = UUID.randomUUID();
       String snapshotName = "snap-" + snapshotId;
       SnapshotInfo snapInfo = new SnapshotInfo.Builder()
@@ -1201,74 +1267,10 @@ public class TestSnapshotDiffManager {
           .setSnapshotPath("fromSnapshotPath")
           .build();
       snapshotInfos.add(snapInfo);
-
-      when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,
-          snapshotName))).thenReturn(snapInfo);
+      when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME, snapshotName)))
+          .thenReturn(snapInfo);
     }
-
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
-
-    for (int i = 0; i < snapshotInfos.size(); i++) {
-      for (int j = i + 1; j < snapshotInfos.size(); j++) {
-        String fromSnapshotName = snapshotInfos.get(i).getName();
-        String toSnapshotName = snapshotInfos.get(j).getName();
-
-        doAnswer(invocation -> {
-          Thread.sleep(250L);
-          return null;
-        }).when(spy).generateSnapshotDiffReport(anyString(), anyString(),
-            eq(VOLUME_NAME), eq(BUCKET_NAME), eq(fromSnapshotName),
-            eq(toSnapshotName), eq(false), eq(false));
-      }
-    }
-
-    List<Future<SnapshotDiffResponse>> futures = new ArrayList<>();
-    for (int i = 0; i < snapshotInfos.size(); i++) {
-      for (int j = i + 1; j < snapshotInfos.size(); j++) {
-        String fromSnapshotName = snapshotInfos.get(i).getName();
-        String toSnapshotName = snapshotInfos.get(j).getName();
-
-        Future<SnapshotDiffResponse> future = executorService.submit(
-            () -> submitJob(spy, fromSnapshotName, toSnapshotName));
-        futures.add(future);
-      }
-      Thread.sleep(waitBetweenBatches);
-    }
-
-    // Wait to make sure that all jobs finish before assertion.
-    Thread.sleep(1000L);
-    int inProgressJobsCount = 0;
-    int rejectedJobsCount = 0;
-
-    for (Future<SnapshotDiffResponse> future : futures) {
-      SnapshotDiffResponse response = future.get();
-      if (response.getJobStatus() == IN_PROGRESS) {
-        inProgressJobsCount++;
-      } else if (response.getJobStatus() == REJECTED) {
-        rejectedJobsCount++;
-      } else {
-        throw new IllegalStateException("Unexpected job status.");
-      }
-    }
-
-    assertEquals(expectInProgressJobsCount, inProgressJobsCount);
-    assertEquals(expectRejectedJobsCount, rejectedJobsCount);
-
-    int notFoundJobs = 0;
-    for (int i = 0; i < snapshotInfos.size(); i++) {
-      for (int j = i + 1; j < snapshotInfos.size(); j++) {
-        SnapshotDiffJob diffJob =
-            getSnapshotDiffJobFromDb(snapshotInfos.get(i),
-                snapshotInfos.get(j));
-        if (diffJob == null) {
-          notFoundJobs++;
-        }
-      }
-    }
-
-    // assert that rejected jobs were removed from the job table as well.
-    assertEquals(expectRejectedJobsCount, notFoundJobs);
-    executorService.shutdown();
+    return snapshotInfos;
   }
 
   private SnapshotDiffResponse submitJob(SnapshotDiffManager diffManager,
@@ -1641,7 +1643,7 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     SnapshotDiffReportOzone dummyReport = new SnapshotDiffReportOzone(
-        SnapshotDiffManager.getSnapshotRootPath(ctx.volumeName, ctx.bucketName).toString(),
+        spy.getSnapshotRootPath(ctx.volumeName, ctx.bucketName).toString(),
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         expectedEntries, null);
     doReturn(dummyReport).when(spy).createPageResponse(any(SnapshotDiffJob.class),
