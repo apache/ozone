@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -125,6 +126,14 @@ public final class RegisterEndpointTask implements
         Preconditions.assertEquals(datanodeDetails.getUuidString(), response.getDatanodeUUID(), "datanodeID");
         Preconditions.assertTrue(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
+        if (response.getErrorCode() == errorNodeNotPermitted) {
+          LOG.error("SCM rejected this datanode's registration " +
+              "with software version {} and apparent version {}. " +
+              "This datanode will shut down. Check SCM logs for details and verify that the " +
+              "datanode software version is compatible with the cluster. ",
+              versionManager.getSoftwareVersion(), versionManager.getApparentVersion());
+          return rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
+        }
         Preconditions.assertSame(success, response.getErrorCode(), "ErrorCode");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());

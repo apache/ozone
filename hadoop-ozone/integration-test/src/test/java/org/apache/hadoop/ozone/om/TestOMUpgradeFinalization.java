@@ -32,8 +32,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.CodecException;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -100,18 +98,7 @@ class TestOMUpgradeFinalization {
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_PREPARE, AuditEventStatus.SUCCESS);
         omClient.cancelOzoneManagerPrepare();
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
-        // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
-        cluster.getOzoneManagersList().forEach(om -> {
-          try {
-            om.getMetadataManager().getMetaTable()
-                .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
-            om.getMetadataManager().getMetaTable()
-                .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
-          } catch (RocksDatabaseException | CodecException e) {
-            throw new RuntimeException(e);
-          }
-        });
-
+        omClient.finalizeUpgrade();
         waitForFinalization(omClient);
         AuditLogTestUtils.verifySystemAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
         // Ensure the finalization in progress key has been removed.

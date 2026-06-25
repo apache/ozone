@@ -32,10 +32,14 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
+import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpointTask;
 import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +87,41 @@ public class TestScmHAFinalization {
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @Test
+  public void testFinalizedDatanodesShutDownWithPrefinalizedScm() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.serialize());
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT, "1s");
+
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
+        .setNumOfActiveSCMs(NUM_SCMS)
+        .setSCMServiceId("scmservice")
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(NUM_DATANODES)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+            .build());
+
+    // Prevent terminateDatanode() from calling System.exit(1) and killing the test JVM.
+    ExitUtil.disableSystemExit();
+    LogCapturer logCapture = LogCapturer.captureLogs(RegisterEndpointTask.class);
+    // This starts the mini ozone cluster.
+    cluster = clusterBuilder.build();
+
+    // isStopped cannot be set to true unless a datanode was started first.
+    // Each datanode should be rejected since its apparent version exceeds the pre-finalized SCM's.
+    GenericTestUtils.waitFor(
+        () -> cluster.getHddsDatanodes().stream().allMatch(HddsDatanodeService::isStopped),
+        500, 30_000);
+
+    assertThat(logCapture.getOutput()).contains("SCM rejected this datanode's registration");
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      assertThat(scm.getScmNodeManager().getAllNodes()).isEmpty();
     }
   }
 

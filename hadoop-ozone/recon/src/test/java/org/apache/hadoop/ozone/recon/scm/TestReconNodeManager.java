@@ -20,8 +20,13 @@ package org.apache.hadoop.ozone.recon.scm;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,18 +42,24 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -62,6 +73,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for Recon Node Manager.
@@ -235,6 +249,70 @@ public class TestReconNodeManager {
         reconNodeManager.getNodes(DECOMMISSIONING, null);
     assertEquals(1, nodes.size());
     assertEquals(datanodeDetails.getUuid(), nodes.get(0).getUuid());
+  }
+
+  private static Stream<Arguments> reconDatanodeVersionCombinations() {
+    // Recon accepts old-software DNs even when finalized (unlike SCM), since Recon finalizes on startup.
+    return Stream.of(
+        /* RECON PRE-FINALIZED */
+
+        // Old DN accepted
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION),
+            success),
+        // Pre-finalized DN accepted
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION),
+            success),
+        // Finalized DN rejected (apparent > Recon apparent)
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            defaultVersionProto(),
+            errorNodeNotPermitted),
+        // Newer SW DN rejected
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            LayoutVersionProto.newBuilder()
+                .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            errorNodeNotPermitted),
+
+        /* RECON FINALIZED */
+
+        // Old DN accepted (Recon does not reject old-SW DNs after finalization, unlike SCM)
+        Arguments.of(HDDSVersion.SOFTWARE_VERSION,
+            toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION),
+            success),
+        // Pre-finalized DN accepted
+        Arguments.of(HDDSVersion.SOFTWARE_VERSION,
+            toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION),
+            success),
+        // Finalized DN accepted
+        Arguments.of(HDDSVersion.SOFTWARE_VERSION,
+            defaultVersionProto(),
+            success),
+        // Newer SW DN rejected
+        Arguments.of(HDDSVersion.SOFTWARE_VERSION,
+            LayoutVersionProto.newBuilder()
+                .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            errorNodeNotPermitted)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("reconDatanodeVersionCombinations")
+  public void testDatanodeFencingOnRegister(ComponentVersion reconApparent,
+      LayoutVersionProto dnVersionProto, ErrorCode expectedResult) throws IOException {
+    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
+    EventQueue eventQueue = new EventQueue();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
+    ScmVersionManager reconVersionManager = mockVersionManager(reconApparent);
+    try (ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, reconVersionManager, reconContext)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      RegisteredCommand cmd = reconNodeManager.register(datanodeDetails, null, null, dnVersionProto);
+      assertEquals(expectedResult, cmd.getError());
+    }
   }
 
   @Test

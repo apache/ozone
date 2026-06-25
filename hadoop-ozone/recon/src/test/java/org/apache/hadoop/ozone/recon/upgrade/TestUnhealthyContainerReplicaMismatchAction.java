@@ -19,10 +19,9 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.apache.ozone.recon.schema.SqlDbUtils.indexExists;
+import static org.apache.ozone.recon.schema.SqlDbUtils.constraintExists;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -36,42 +35,31 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for UnhealthyContainersStateContainerIdIndexUpgradeAction.
+ * Tests for UnhealthyContainerReplicaMismatchAction.
  */
-public class TestUnhealthyContainersStateContainerIdIndexUpgradeAction
-    extends AbstractReconSqlDBTest {
+public class TestUnhealthyContainerReplicaMismatchAction extends AbstractReconSqlDBTest {
 
-  private static final String INDEX_NAME = "idx_state_container_id";
+  private static final String CONSTRAINT_NAME = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
 
   private DSLContext dslContext;
   private DataSource dataSource;
-  private UnhealthyContainersStateContainerIdIndexUpgradeAction upgradeAction;
+  private UnhealthyContainerReplicaMismatchAction upgradeAction;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws SQLException {
     dslContext = getDslContext();
     dataSource = getInjector().getInstance(DataSource.class);
-    upgradeAction = new UnhealthyContainersStateContainerIdIndexUpgradeAction();
+    upgradeAction = new UnhealthyContainerReplicaMismatchAction();
+    createTableWithoutCheckConstraint();
   }
 
   @Test
-  public void testCreatesIndexWhenMissing() throws Exception {
-    createTableWithoutIndex();
-    assertFalse(tableHasIndex(INDEX_NAME));
-
+  public void testExecuteIsIdempotent() throws Exception {
     upgradeAction.execute(dataSource);
-
-    assertTrue(tableHasIndex(INDEX_NAME));
-  }
-
-  @Test
-  public void testExecuteIsIdempotentWhenIndexAlreadyExists() throws Exception {
-    createTableWithoutIndex();
-    upgradeAction.execute(dataSource);
-    assertTrue(tableHasIndex(INDEX_NAME));
-
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(constraintExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, CONSTRAINT_NAME));
+    }
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
-    assertTrue(tableHasIndex(INDEX_NAME));
   }
 
   @Test
@@ -80,7 +68,7 @@ public class TestUnhealthyContainersStateContainerIdIndexUpgradeAction
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
   }
 
-  private void createTableWithoutIndex() throws SQLException {
+  private void createTableWithoutCheckConstraint() throws SQLException {
     dropTableIfPresent();
     dslContext.createTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
         .column("container_id", SQLDataType.BIGINT.nullable(false))
@@ -95,12 +83,6 @@ public class TestUnhealthyContainersStateContainerIdIndexUpgradeAction
       if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         dslContext.dropTable(UNHEALTHY_CONTAINERS_TABLE_NAME).execute();
       }
-    }
-  }
-
-  private boolean tableHasIndex(String indexName) throws SQLException {
-    try (Connection conn = dataSource.getConnection()) {
-      return indexExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, indexName);
     }
   }
 }

@@ -17,22 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconVersion.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
-
-import javax.sql.DataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 
 /**
- * Upgrade action for handling the addition of a new unhealthy container state in Recon, which will be for containers,
- * that have replicas with different data checksums.
+ * Loads {@link ReconUpgradeAction} implementations annotated with {@link UpgradeActionRecon}.
  */
-@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH)
-public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
-  private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
+public final class ReconUpgradeActionProvider extends AbstractUpgradeActionProvider<ReconUpgradeAction> {
+
+  public static final String RECON_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.recon.upgrade";
+
+  public ReconUpgradeActionProvider() {
+    super(UpgradeActionRecon.class, ReconUpgradeAction.class, RECON_UPGRADE_CLASS_PACKAGE);
+  }
 
   @Override
-  public void execute(DataSource source) throws Exception {
-    ReconUpgradeAction.updateUnhealthyContainerStatesConstraint(source, LOG);
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionRecon annotation = clazz.getAnnotation(UpgradeActionRecon.class);
+    return annotation.feature();
   }
 }

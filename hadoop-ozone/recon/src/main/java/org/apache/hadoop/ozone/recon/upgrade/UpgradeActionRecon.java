@@ -53,7 +53,7 @@ import java.lang.annotation.Target;
 public @interface UpgradeActionRecon {
 
   /**
-   * Defines the layout feature this upgrade action is associated with.
+   * Defines the component version this upgrade action is associated with.
    */
-  ReconLayoutFeature feature();
+  ReconVersion feature();
 }
