@@ -24,6 +24,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -414,6 +415,23 @@ public final class LatestVersionedKWayMergeIterator implements
       return compareHeapOrder(
           this.current, this.index, other.current, other.index);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof HeapEntry)) {
+        return false;
+      }
+      HeapEntry other = (HeapEntry) o;
+      return index == other.index;
+    }
+
+    @Override
+    public int hashCode() {
+      return index;
+    }
   }
 
   private static final class RawSstIterator implements ClosableIterator<RawSstHeapHead> {
@@ -472,6 +490,10 @@ public final class LatestVersionedKWayMergeIterator implements
    * When the latest value has a higher sequence than the latest tombstone for
    * the same user key, both are emitted (delete followed by recreate). Otherwise
    * only the winning tombstone or value is emitted.
+   * <p>
+   * Key and value arrays are owned by this object. Callers must treat returned
+   * {@code byte[]} references as read-only; snapshot-diff integration should
+   * consume them once without retaining mutable aliases.
    */
   public static final class MergedKeyValue implements MergeHead {
     private final byte[] key;
@@ -482,7 +504,11 @@ public final class LatestVersionedKWayMergeIterator implements
     /** Creates a merged entry for unit tests. */
     @VisibleForTesting
     public static MergedKeyValue of(byte[] key, long sequence, int type, byte[] value) {
-      return new MergedKeyValue(key, UnsignedLong.fromLongBits(sequence), type, value);
+      return new MergedKeyValue(
+          Arrays.copyOf(key, key.length),
+          UnsignedLong.fromLongBits(sequence),
+          type,
+          value == null ? null : Arrays.copyOf(value, value.length));
     }
 
     private MergedKeyValue(byte[] key, UnsignedLong sequence, int type, byte[] value) {
