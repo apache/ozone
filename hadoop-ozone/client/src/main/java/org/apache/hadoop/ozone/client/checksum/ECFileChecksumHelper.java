@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.checksum;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,10 +93,9 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
     // Build a deterministic pipeline ID from the sorted node UUIDs so that
     // XceiverClientManager can cache and reuse the gRPC connection across files
     // that share the same EC placement group (avoids a new connection per file).
-    List<DatanodeDetails> sortedNodes = new ArrayList<>(nodes);
-    sortedNodes.sort(Comparator.comparing(DatanodeDetails::getUuidString));
-    String nodeKey = sortedNodes.stream()
+    String nodeKey = nodes.stream()
         .map(DatanodeDetails::getUuidString)
+        .sorted()
         .collect(Collectors.joining(","));
     PipelineID deterministicId = PipelineID.valueOf(
         UUID.nameUUIDFromBytes(nodeKey.getBytes(StandardCharsets.UTF_8)));

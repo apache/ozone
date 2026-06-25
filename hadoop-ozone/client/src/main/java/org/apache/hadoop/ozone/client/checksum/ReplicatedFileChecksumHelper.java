@@ -38,13 +38,6 @@ import org.apache.hadoop.security.token.Token;
  */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
-  public ReplicatedFileChecksumHelper(
-      OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient) throws IOException {
-    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
-  }
-
   public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
       String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,

@@ -68,14 +68,6 @@ public abstract class BaseFileChecksumHelper {
   private long crcPerBlock = 0;
 
   // initialization
-  BaseFileChecksumHelper(
-      OzoneVolume volume, OzoneBucket bucket, String keyName,
-      long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient) throws IOException {
-    this(volume, bucket, keyName, length, checksumCombineMode, rpcClient, null);
-  }
-
   public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
       String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
