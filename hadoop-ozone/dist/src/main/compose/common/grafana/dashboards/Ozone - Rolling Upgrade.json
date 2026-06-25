@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 13,
   "links": [],
   "panels": [
     {
@@ -112,7 +112,7 @@
       "datasource": {
         "type": "prometheus"
       },
-      "description": "Cluster finalization status. Unfinalized: no instances are finalized. Finalizing: some instances are finalized. Finalized: all instances are finalized. Recon and S3 Gateway are excluded.",
+      "description": "Cluster upgrade status. The upgrade is complete when all instances are running the same version and do not require finalization.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -122,9 +122,9 @@
             {
               "options": {
                 "0": {
-                  "color": "yellow",
+                  "color": "orange",
                   "index": 0,
-                  "text": "Unfinalized"
+                  "text": "Upgrading"
                 },
                 "1": {
                   "color": "orange",
@@ -132,9 +132,14 @@
                   "text": "Finalizing"
                 },
                 "2": {
-                  "color": "green",
+                  "color": "yellow",
                   "index": 2,
-                  "text": "Finalized"
+                  "text": "Unfinalized"
+                },
+                "3": {
+                  "color": "green",
+                  "index": 3,
+                  "text": "Complete"
                 }
               },
               "type": "value"
@@ -144,7 +149,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
+                "color": "orange",
                 "value": 0
               },
               {
@@ -152,8 +157,12 @@
                 "value": 1
               },
               {
-                "color": "green",
+                "color": "yellow",
                 "value": 2
+              },
+              {
+                "color": "green",
+                "value": 3
               }
             ]
           }
@@ -191,7 +200,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) > bool 0) + (sum((component_version_manager_metrics_software_version == bool component_version_manager_metrics_apparent_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == bool count(component_version_manager_metrics_software_version * on(instance) group_left() (ozone_build_info{component!~\"recon\"})))",
+          "expr": "(count(count by (version) (ozone_build_info)) == bool 1) * (1 + (1 - max(om_metrics_finalization_in_progress)) * (1 + (sum((component_version_manager_metrics_apparent_version != bool component_version_manager_metrics_software_version) * on(instance) group_left() (ozone_build_info{component!~\"recon\"})) == bool 0)))",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -373,7 +382,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -404,6 +413,7 @@
       "id": 5,
       "options": {
         "cellHeight": "sm",
+        "enablePagination": true,
         "footer": {
           "countRows": false,
           "enablePagination": true,
@@ -702,7 +712,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -781,7 +791,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 631
+                "value": 492
               }
             ]
           },
@@ -808,6 +818,7 @@
       "id": 10,
       "options": {
         "cellHeight": "sm",
+        "enablePagination": true,
         "footer": {
           "countRows": false,
           "enablePagination": true,
@@ -854,9 +865,9 @@
               "version": true
             },
             "indexByName": {
+              "Value": 2,
               "component": 0,
-              "instance": 1,
-              "Value": 2
+              "instance": 1
             },
             "renameByName": {
               "Value": "Finalized?",
@@ -1109,5 +1120,5 @@
   "timezone": "",
   "title": "Ozone - Rolling Upgrade",
   "uid": "ozone-rolling-upgrade",
-  "version": 3
+  "version": 1
 }
