@@ -17,14 +17,15 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest.HSYNC_FIELD_NUMBER;
-
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 public final class SnapshotDiffValueParser {
   private static final int INT_BYTES = 4;
   private static final int LONG_BYTES = 8;
+  private static final int HSYNC_METADATA_PRESENT_TAG = 1001;
   private static final String DIGEST_ALGORITHM = "SHA-256";
 
   private SnapshotDiffValueParser() {
@@ -83,9 +85,11 @@ public final class SnapshotDiffValueParser {
   public static byte[] computeKeyInfoCompareSignature(byte[] value) throws IOException {
     CodedInputStream input = CodedInputStream.newInstance(value);
     MessageDigest digest = newDigest();
-    boolean hasHsyncMetadata = false;
+    AtomicBoolean hasHsyncMetadata = new AtomicBoolean(false);
     int keyLocationListCount = 0;
     ByteString latestKeyLocationList = null;
+    List<byte[]> metadataSignatures = new ArrayList<>();
+    List<byte[]> tagSignatures = new ArrayList<>();
 
     int tag;
     while ((tag = input.readTag()) != 0) {
@@ -99,18 +103,18 @@ public final class SnapshotDiffValueParser {
         keyLocationListCount++;
         break;
       case KeyInfo.METADATA_FIELD_NUMBER:
-        MetadataEntry metadataEntry = parseMetadataEntry(input.readBytes().toByteArray());
-        if (metadataEntry != null) {
-          updateDigestWithRawBytes(digest, fieldNumber, metadataEntry.getDigest());
-          if (metadataEntry.hasHsync()) {
-            hasHsyncMetadata = true;
-          }
+        byte[] metadataDigest = parseKeyValueDigest(input.readBytes().toByteArray(), true, hasHsyncMetadata);
+        if (metadataDigest != null) {
+          metadataSignatures.add(metadataDigest);
         }
         break;
       case KeyInfo.FILECHECKSUM_FIELD_NUMBER:
       case KeyInfo.ACLS_FIELD_NUMBER:
       case KeyInfo.TAGS_FIELD_NUMBER:
-        updateDigestWithBytes(digest, fieldNumber, input.readBytes());
+        byte[] tagDigest = parseKeyValueDigest(input.readBytes().toByteArray(), false, null);
+        if (tagDigest != null) {
+          tagSignatures.add(tagDigest);
+        }
         break;
       default:
         input.skipField(tag);
@@ -121,7 +125,9 @@ public final class SnapshotDiffValueParser {
     if (latestKeyLocationList != null) {
       updateDigestWithBytes(digest, KeyInfo.KEYLOCATIONLIST_FIELD_NUMBER, latestKeyLocationList);
     }
-    updateDigestWithBoolean(digest, HSYNC_FIELD_NUMBER, hasHsyncMetadata);
+    addCanonicalizedDigest(digest, KeyInfo.METADATA_FIELD_NUMBER, metadataSignatures);
+    addCanonicalizedDigest(digest, KeyInfo.TAGS_FIELD_NUMBER, tagSignatures);
+    updateDigestWithBoolean(digest, HSYNC_METADATA_PRESENT_TAG, hasHsyncMetadata.get());
     updateDigestWithInt(digest, keyLocationListCount);
 
     return digest.digest();
@@ -169,15 +175,16 @@ public final class SnapshotDiffValueParser {
   public static byte[] computeDirectoryInfoCompareSignature(byte[] value) throws IOException {
     CodedInputStream input = CodedInputStream.newInstance(value);
     MessageDigest digest = newDigest();
+    List<byte[]> metadataSignatures = new ArrayList<>();
 
     int tag;
     while ((tag = input.readTag()) != 0) {
       int fieldNumber = WireFormat.getTagFieldNumber(tag);
       switch (fieldNumber) {
       case DirectoryInfo.METADATA_FIELD_NUMBER:
-        MetadataEntry metadataEntry = parseMetadataEntry(input.readBytes().toByteArray());
-        if (metadataEntry != null) {
-          updateDigestWithRawBytes(digest, fieldNumber, metadataEntry.getDigest());
+        byte[] metadataDigest = parseKeyValueDigest(input.readBytes().toByteArray(), false, null);
+        if (metadataDigest != null) {
+          metadataSignatures.add(metadataDigest);
         }
         break;
       case DirectoryInfo.ACLS_FIELD_NUMBER:
@@ -188,6 +195,8 @@ public final class SnapshotDiffValueParser {
         break;
       }
     }
+
+    addCanonicalizedDigest(digest, KeyInfo.METADATA_FIELD_NUMBER, metadataSignatures);
 
     return digest.digest();
   }
@@ -247,11 +256,25 @@ public final class SnapshotDiffValueParser {
     }
   }
 
-  private static MetadataEntry parseMetadataEntry(byte[] metadataBytes) throws IOException {
-    if (metadataBytes == null || metadataBytes.length == 0) {
+  private static void addCanonicalizedDigest(
+      MessageDigest digest, int fieldNumber, List<byte[]> metadataEntries) {
+    if (metadataEntries.isEmpty()) {
+      return;
+    }
+    metadataEntries.sort(SnapshotDiffValueParser::compareBytes);
+    MessageDigest metadataDigest = newDigest();
+    for (byte[] metadataEntry : metadataEntries) {
+      metadataDigest.update(metadataEntry);
+    }
+    updateDigestWithRawBytes(digest, fieldNumber, metadataDigest.digest());
+  }
+
+  private static byte[] parseKeyValueDigest(byte[] keyValueBytes, boolean computeHsync, AtomicBoolean hasHsync)
+      throws IOException {
+    if (keyValueBytes == null || keyValueBytes.length == 0) {
       return null;
     }
-    CodedInputStream input = CodedInputStream.newInstance(metadataBytes);
+    CodedInputStream input = CodedInputStream.newInstance(keyValueBytes);
     String key = null;
     String value = null;
     while (!input.isAtEnd()) {
@@ -272,28 +295,24 @@ public final class SnapshotDiffValueParser {
         break;
       }
     }
+    if (computeHsync && hasHsync != null && OzoneConsts.HSYNC_CLIENT_ID.equals(key)) {
+      hasHsync.set(true);
+    }
     MessageDigest entryDigest = newDigest();
     updateTaggedString(entryDigest, KeyValue.KEY_FIELD_NUMBER, key);
     updateTaggedString(entryDigest, KeyValue.VALUE_FIELD_NUMBER, value);
-    return new MetadataEntry(entryDigest.digest(), OzoneConsts.HSYNC_CLIENT_ID.equals(key));
+    return entryDigest.digest();
   }
 
-  private static final class MetadataEntry {
-    private final byte[] digest;
-    private final boolean hasHsync;
-
-    private MetadataEntry(byte[] digest, boolean hasHsync) {
-      this.digest = digest;
-      this.hasHsync = hasHsync;
+  private static int compareBytes(byte[] left, byte[] right) {
+    int length = Math.min(left.length, right.length);
+    for (int i = 0; i < length; i++) {
+      int diff = (left[i] & 0xFF) - (right[i] & 0xFF);
+      if (diff != 0) {
+        return diff;
+      }
     }
-
-    private byte[] getDigest() {
-      return digest;
-    }
-
-    private boolean hasHsync() {
-      return hasHsync;
-    }
+    return left.length - right.length;
   }
 
   /**
