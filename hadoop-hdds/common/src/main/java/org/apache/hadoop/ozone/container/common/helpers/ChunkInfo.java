@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -80,7 +80,7 @@ public class ChunkInfo {
    */
   public static ChunkInfo getFromProtoBuf(ContainerProtos.ChunkInfo info)
       throws IOException {
-    Preconditions.checkNotNull(info);
+    Objects.requireNonNull(info, "info == null");
 
     ChunkInfo chunkInfo = new ChunkInfo(info.getChunkName(), info.getOffset(),
         info.getLen());

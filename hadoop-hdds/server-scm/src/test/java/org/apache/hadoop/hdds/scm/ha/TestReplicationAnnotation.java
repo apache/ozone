@@ -20,17 +20,20 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.ha.invoker.ContainerStateManagerInvoker;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -52,8 +55,7 @@ public class TestReplicationAnnotation {
       }
 
       @Override
-      public void registerStateMachineHandler(
-          SCMRatisProtocol.RequestType handlerType, Object handler) {
+      public void registerStateMachineHandler(ScmInvoker<?> handler) {
       }
 
       @Override
@@ -122,9 +124,11 @@ public class TestReplicationAnnotation {
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
+    ContainerStateManager impl = mock(ContainerStateManager.class);
+    when(impl.getType()).thenReturn(RequestType.CONTAINER);
 
-    ContainerStateManager proxy = scmRatisServer.getProxyHandler(RequestType.CONTAINER,
-        ContainerStateManager.class, null);
+    ContainerStateManager proxy = scmRatisServer.getProxyHandler(
+        new ContainerStateManagerInvoker(impl, scmRatisServer));
 
     IOException e =
         assertThrows(IOException.class,

@@ -80,8 +80,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private static final int MAX_VOLUMES = 1000;
 
   private OzoneManager ozoneManager;
-  private OMMetrics omMetrics;
-  private AuditLogger auditLogger;
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
@@ -93,8 +91,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   @BeforeEach
   public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class, withSettings().stubOnly());
-    omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OMMetrics omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
@@ -102,7 +100,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));

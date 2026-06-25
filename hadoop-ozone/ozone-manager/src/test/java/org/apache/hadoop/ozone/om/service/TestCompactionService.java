@@ -58,7 +58,6 @@ class TestCompactionService {
   private static final int SERVICE_INTERVAL = 1;
   private static final int WAIT_TIME = (int) Duration.ofSeconds(10).toMillis();
   private OzoneManager ozoneManager;
-  private OMMetadataManager metadataManager;
 
   @BeforeAll
   void setup(@TempDir Path tempDir) {
@@ -73,7 +72,7 @@ class TestCompactionService {
     conf.setQuietMode(false);
 
     ozoneManager = mock(OzoneManager.class);
-    metadataManager = mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     TypedTable table = mock(TypedTable.class);
 

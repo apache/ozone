@@ -38,6 +38,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -125,7 +126,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     if (info.getLen() <= 0) {
@@ -181,16 +182,35 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
 
-    // When overwriting, update the bytes used if the new length is greater than the old length
-    // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
-    // with a larger chunk at the end of the block.
+    // Handle space accounting for overwrites that extend the file length.
+    // For overwrites, we must distinguish between:
+    // 1. Pure overwrites (no file growth): No space consumed, only I/O metrics updated
+    // 2. Overwrites with growth (file extends): Only the delta consumes new space
+    //
+    // Example: File is 4 bytes. Overwrite 6 bytes at offset 2.
+    // - I/O operation: 6 bytes written (tracked by updateWriteStats below)
+    // - Disk growth: 4 bytes (file grows from 4 -> 8, delta = 4)
+    // - Space consumed: 4 bytes (only the delta, not the full 6 bytes)
+    //
+    // We handle the delta BEFORE calling updateWriteStats to ensure correct accounting:
+    // - incrementBlockBytes(delta): Updates blockBytes for disk space growth
+    // - incrWriteBytes(delta): Updates usedSpace/committedBytes for space consumed
+    // - updateWriteStats(chunkLength, true): Updates I/O metrics (writeBytes, writeCount)
+    //   but skips space updates because overwrite=true
     if (overwrite) {
       long fileLengthAfterWrite = offset + chunkLength;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {
-        containerData.getStatistics().updateWrite(fileLengthAfterWrite - fileLengthBeforeWrite, false);
+        long delta = fileLengthAfterWrite - fileLengthBeforeWrite;
+        // Update disk space accounting for the file growth (delta only)
+        containerData.getStatistics().incrementBlockBytes(delta);
+        // Update volume space accounting for the new space consumed (delta only)
+        containerData.incrWriteBytes(delta);
       }
     }
 
+    // Update I/O metrics (writeBytes, writeCount) and space metrics for new writes.
+    // For overwrites (overwrite=true), this only updates I/O metrics.
+    // For new writes (overwrite=false), this updates both I/O and space metrics.
     containerData.updateWriteStats(chunkLength, overwrite);
   }
 
@@ -274,7 +294,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       throws StorageContainerException {
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
 
     final File file = getChunkFile(container, blockID);
 
@@ -287,8 +307,6 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
 
     if (verifyLength) {
-      Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
-          "chunk delete");
       checkFullDelete(info, file);
     }
 
@@ -302,6 +320,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
+    Objects.requireNonNull(info, "info == null");
     long fileLength = chunkFile.length();
     if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
       String msg = String.format(

@@ -44,7 +44,7 @@ import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Date;
@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.server.SCMSecurityProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -85,19 +86,14 @@ public class TestRootCARotationManager {
   private RootCARotationManager rootCARotationManager;
   private StorageContainerManager scm;
   private SCMCertificateClient scmCertClient;
-  private SCMServiceManager scmServiceManager;
-  private SCMHAManager scmhaManager;
   private SCMContext scmContext;
-  private SequenceIdGenerator sequenceIdGenerator;
-  private SCMStorageConfig scmStorageConfig;
-  private SCMSecurityProtocolServer scmSecurityProtocolServer;
   private RootCARotationHandlerImpl handler;
   private StatefulServiceStateManager statefulServiceStateManager;
   @TempDir
   private File testDir;
   private String cID = UUID.randomUUID().toString();
   private String scmID = UUID.randomUUID().toString();
-  private BigInteger certID = new BigInteger("1");
+  private BigInteger certID = BigInteger.ONE;
 
   @BeforeEach
   public void init() throws IOException, TimeoutException,
@@ -112,14 +108,14 @@ public class TestRootCARotationManager {
     securityConfig = new SecurityConfig(ozoneConfig);
     scmCertClient = new SCMCertificateClient(securityConfig, null, scmID, cID,
         certID.toString(), "localhost");
-    scmServiceManager = new SCMServiceManager();
+    SCMServiceManager scmServiceManager = new SCMServiceManager();
     scmContext = mock(SCMContext.class);
-    scmhaManager = mock(SCMHAManager.class);
-    sequenceIdGenerator = mock(SequenceIdGenerator.class);
-    scmStorageConfig = new SCMStorageConfig(ozoneConfig);
+    SCMHAManager scmhaManager = mock(SCMHAManager.class);
+    SequenceIdGenerator sequenceIdGenerator = mock(SequenceIdGenerator.class);
+    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(ozoneConfig);
     scmStorageConfig.setScmId(scmID);
     scmStorageConfig.setClusterId(cID);
-    scmSecurityProtocolServer = mock(SCMSecurityProtocolServer.class);
+    SCMSecurityProtocolServer scmSecurityProtocolServer = mock(SCMSecurityProtocolServer.class);
     handler = mock(RootCARotationHandlerImpl.class);
     statefulServiceStateManager = mock(StatefulServiceStateManager.class);
     when(scmContext.isLeader()).thenReturn(true);
@@ -130,7 +126,7 @@ public class TestRootCARotationManager {
     when(scm.getScmHAManager()).thenReturn(scmhaManager);
     when(scmhaManager.getRatisServer()).thenReturn(mock(SCMRatisServerImpl.class));
     when(scm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
-    when(sequenceIdGenerator.getNextId(anyString())).thenReturn(2L);
+    when(sequenceIdGenerator.getNextId(any(SequenceIdType.class))).thenReturn(2L);
     when(scm.getScmStorageConfig()).thenReturn(scmStorageConfig);
     when(scm.getSecurityProtocolServer()).thenReturn(scmSecurityProtocolServer);
     doNothing().when(scmSecurityProtocolServer).setRootCertificateServer(any());
@@ -191,7 +187,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(35));
+        ZonedDateTime.now(), Duration.ofSeconds(35));
     scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
@@ -223,7 +219,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(35));
+        ZonedDateTime.now(), Duration.ofSeconds(35));
     scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
@@ -254,7 +250,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(90));
+        ZonedDateTime.now(), Duration.ofSeconds(90));
     scmCertClient.setCACertificate(cert);
     CertificateCodec certCodec = new CertificateCodec(securityConfig,
         "scm/sub-ca");
@@ -308,11 +304,11 @@ public class TestRootCARotationManager {
   }
 
   private X509Certificate generateX509Cert(
-      OzoneConfiguration conf, LocalDateTime startDate,
+      OzoneConfiguration conf, ZonedDateTime startDate,
       Duration certLifetime) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return
         SelfSignedCertificate.newBuilder()
             .setBeginDate(start)

@@ -54,8 +54,6 @@ public class TestReconLayoutVersionManager {
   private ReconSchemaVersionTableManager schemaVersionTableManager;
   private ReconLayoutVersionManager layoutVersionManager;
   private MockedStatic<ReconLayoutFeature> mockedEnum;
-  private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
-  private ReconStorageContainerManagerFacade scmFacadeMock;
   private DataSource mockDataSource;
   private Connection mockConnection;
 
@@ -66,22 +64,21 @@ public class TestReconLayoutVersionManager {
 
     // Mocking ReconLayoutFeature.values() to return custom enum instances
     mockedEnum = mockStatic(ReconLayoutFeature.class);
-    mockedEnumUpgradeActionType = mockStatic(ReconUpgradeAction.UpgradeActionType.class);
 
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
-    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature1.getAction())
         .thenReturn(Optional.of(action1));
 
     ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
     when(feature2.getVersion()).thenReturn(2);
     ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
-    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature2.getAction())
         .thenReturn(Optional.of(action2));
 
     // Common mocks for all tests
-    scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
+    ReconStorageContainerManagerFacade scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
     mockDataSource = mock(DataSource.class);
     mockConnection = mock(Connection.class);
 
@@ -103,9 +100,6 @@ public class TestReconLayoutVersionManager {
   public void tearDown() {
     // Close the static mock after each test to deregister it
     mockedEnum.close();
-    if (mockedEnumUpgradeActionType != null) {
-      mockedEnumUpgradeActionType.close();
-    }
   }
 
   /**
@@ -183,7 +177,7 @@ public class TestReconLayoutVersionManager {
 
     // Simulate an exception being thrown during the upgrade action execution
     doThrow(new RuntimeException("Upgrade failed")).when(action1).execute(mockDataSource);
-    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature1.getAction())
         .thenReturn(Optional.of(action1));
 
     // Mock the static values method to return the custom feature
@@ -221,7 +215,7 @@ public class TestReconLayoutVersionManager {
     // Simulate an exception being thrown during the schema version update
     doThrow(new RuntimeException("Schema update failed")).when(schemaVersionTableManager).
         updateSchemaVersion(1, mockConnection);
-    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature1.getAction())
         .thenReturn(Optional.of(action1));
 
     // Mock the static values method to return the custom feature
@@ -254,19 +248,19 @@ public class TestReconLayoutVersionManager {
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
-    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature1.getAction())
         .thenReturn(Optional.of(action1));
 
     ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
     when(feature2.getVersion()).thenReturn(2);
     ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
-    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature2.getAction())
         .thenReturn(Optional.of(action2));
 
     ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
     when(feature3.getVersion()).thenReturn(3);
     ReconUpgradeAction action3 = mock(ReconUpgradeAction.class);
-    when(feature3.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature3.getAction())
         .thenReturn(Optional.of(action3));
 
     // Mock the static values method to return custom features in a jumbled order
@@ -315,13 +309,13 @@ public class TestReconLayoutVersionManager {
     ReconLayoutFeature feature1 = mock(ReconLayoutFeature.class);
     when(feature1.getVersion()).thenReturn(1);
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
-    when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature1.getAction())
         .thenReturn(Optional.of(action1));
 
     ReconLayoutFeature feature2 = mock(ReconLayoutFeature.class);
     when(feature2.getVersion()).thenReturn(2);
     ReconUpgradeAction action2 = mock(ReconUpgradeAction.class);
-    when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature2.getAction())
         .thenReturn(Optional.of(action2));
 
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
@@ -337,7 +331,7 @@ public class TestReconLayoutVersionManager {
     ReconLayoutFeature feature3 = mock(ReconLayoutFeature.class);
     when(feature3.getVersion()).thenReturn(3);
     ReconUpgradeAction action3 = mock(ReconUpgradeAction.class);
-    when(feature3.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
+    when(feature3.getAction())
         .thenReturn(Optional.of(action3));
 
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2, feature3});

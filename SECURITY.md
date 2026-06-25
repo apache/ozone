@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Please check the Apache Ozone [website](https://ozone.apache.org/downloads/) for the list of versions currently supported.
+Please check the Apache Ozone [website](https://ozone.apache.org/download/) for the list of versions currently supported.
 
 ## Reporting a Vulnerability
 

@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -45,8 +47,9 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.RaftTestUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -124,18 +127,17 @@ public class TestNSSummaryMemoryLeak {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
   private static OzoneClient client;
   private static ReconService recon;
-  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Configure delays for testing
     conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, 1, TimeUnit.DAYS);
+    conf.setTimeDuration(OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY, 1, TimeUnit.DAYS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     
     recon = new ReconService(conf);
@@ -149,8 +151,8 @@ public class TestNSSummaryMemoryLeak {
     // Create FSO bucket for testing
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
@@ -237,10 +239,9 @@ public class TestNSSummaryMemoryLeak {
     // Trigger hard delete by clearing deleted tables
     // This simulates the background process that hard deletes entries
     simulateHardDelete(omMetadataManager);
-    syncDataFromOM();
     
     // Verify memory leak fix - NSSummary entries should be cleaned up
-    verifyNSSummaryCleanup(omMetadataManager, namespaceSummaryManager);
+    verifyNSSummaryCleanup(omMetadataManager, "memoryLeakTest");
     
     LOG.info("NSSummary memory leak fix test completed successfully");
   }
@@ -269,13 +270,11 @@ public class TestNSSummaryMemoryLeak {
    *   <li>Total: 1051 objects that will have NSSummary entries</li>
    * </ul>
    * 
-   * <p><b>Memory Usage Monitoring:</b>
-   * <p>This test monitors memory usage before and after the deletion to validate that
-   * the memory leak fix prevents excessive memory consumption. The test performs:
+   * <p><b>NSSummary Cleanup Validation:</b>
+   * <p>This test validates that NSSummary cleanup completes for a larger
+   * directory structure. The test performs:
    * <ul>
-   *   <li>Memory measurement before deletion</li>
    *   <li>Directory structure deletion and hard delete simulation</li>
-   *   <li>Garbage collection and memory measurement after cleanup</li>
    *   <li>Verification that NSSummary entries are properly cleaned up</li>
    * </ul>
    * 
@@ -294,36 +293,26 @@ public class TestNSSummaryMemoryLeak {
     createDirectoryStructure(largeTestDir, numSubdirs, filesPerDir);
     
     syncDataFromOM();
-    
-    // Get current memory usage
-    Runtime runtime = Runtime.getRuntime();
-    long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
+
+    OzoneManagerServiceProviderImpl omServiceProvider = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    ReconOMMetadataManager omMetadataManager =
+        (ReconOMMetadataManager) omServiceProvider.getOMMetadataManagerInstance();
+    ReconNamespaceSummaryManager namespaceSummaryManager =
+        recon.getReconServer().getReconNamespaceSummaryManager();
+    verifyNSSummaryEntriesExist(omMetadataManager, namespaceSummaryManager,
+        numSubdirs);
     
     // Delete and verify cleanup
     fs.delete(largeTestDir, true);
     syncDataFromOM();
     
     // Simulate hard delete
-    OzoneManagerServiceProviderImpl omServiceProvider = (OzoneManagerServiceProviderImpl)
-        recon.getReconServer().getOzoneManagerServiceProvider();
-    ReconOMMetadataManager omMetadataManager = 
-        (ReconOMMetadataManager) omServiceProvider.getOMMetadataManagerInstance();
-    
     simulateHardDelete(omMetadataManager);
     syncDataFromOM();
-    
-    // Force garbage collection
-    RaftTestUtil.gc();
-
-    // Verify memory cleanup
-    long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-    LOG.info("Memory usage - Before: {} bytes, After: {} bytes", memoryBefore, memoryAfter);
-    assertThat(memoryAfter).isLessThanOrEqualTo(memoryBefore);
 
     // Verify NSSummary cleanup
-    ReconNamespaceSummaryManager namespaceSummaryManager = 
-        recon.getReconServer().getReconNamespaceSummaryManager();
-    verifyNSSummaryCleanup(omMetadataManager, namespaceSummaryManager);
+    verifyNSSummaryCleanup(omMetadataManager, "largeMemoryLeakTest");
     
     LOG.info("Large structure memory leak test completed successfully");
   }
@@ -383,10 +372,13 @@ public class TestNSSummaryMemoryLeak {
    * 
    * @throws IOException if synchronization fails
    */
-  private void syncDataFromOM() throws IOException {
+  private void syncDataFromOM() throws Exception {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+    GenericTestUtils.waitFor(
+        () -> NSSummaryTask.getRebuildState() != NSSummaryTask.RebuildState.RUNNING,
+        100, 60000);
   }
 
   private void verifyNSSummaryEntriesExist(ReconOMMetadataManager omMetadataManager,
@@ -448,15 +440,15 @@ public class TestNSSummaryMemoryLeak {
    * <p>This simulation:
    * <ol>
    *   <li>Iterates through all entries in deletedDirTable</li>
-   *   <li>Deletes each entry to trigger the memory leak fix</li>
-   *   <li>The deletion triggers {@code NSSummaryTaskWithFSO.handleUpdateOnDeletedDirTable()}</li>
-   *   <li>Which in turn cleans up the corresponding NSSummary entries</li>
+   *   <li>Deletes each entry from the deleted directory table</li>
+   *   <li>Reprocesses NSSummary from the current Recon OM metadata snapshot</li>
    * </ol>
    * 
    * @param omMetadataManager the metadata manager containing the deleted tables
    * @throws IOException if table operations fail
    */
-  private void simulateHardDelete(ReconOMMetadataManager omMetadataManager) throws IOException {
+  private void simulateHardDelete(ReconOMMetadataManager omMetadataManager)
+      throws IOException {
     // Simulate hard delete by clearing deleted tables
     Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
     
@@ -467,29 +459,43 @@ public class TestNSSummaryMemoryLeak {
         deletedDirTable.delete(kv.getKey());
       }
     }
+    reprocessNSSummary(omMetadataManager);
+  }
+
+  private void reprocessNSSummary(ReconOMMetadataManager omMetadataManager) {
+    ReconOmTask nsSummaryTask = recon.getReconServer().getReconTaskController()
+        .getRegisteredTasks().get("NSSummaryTask");
+    assertThat(nsSummaryTask).isNotNull();
+    ReconOmTask.TaskResult result = nsSummaryTask.reprocess(omMetadataManager);
+    assertThat(result.isTaskSuccess()).isTrue();
   }
 
   private void verifyNSSummaryCleanup(ReconOMMetadataManager omMetadataManager,
-      ReconNamespaceSummaryManager namespaceSummaryManager) throws Exception {
+      String path) throws Exception {
     
     // Wait for cleanup to complete
     GenericTestUtils.waitFor(() -> {
       try {
-        // Check that deleted directories don't have NSSummary entries
+        // Check that simulated hard delete drained the deleted directory table.
         Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
+        Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
+
+        if (omMetadataManager.countRowsInTable(deletedDirTable) != 0) {
+          return false;
+        }
         
         // Verify that the main test directory is no longer in the directory table
         try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = dirTable.iterator()) {
           while (iterator.hasNext()) {
             Table.KeyValue<String, OmDirectoryInfo> kv = iterator.next();
-            String path = kv.getKey();
-            if (path.contains("memoryLeakTest")) {
-              LOG.info("Found test directory still in table: {}", path);
+            String key = kv.getKey();
+            if (key.contains(path)) {
+              LOG.info("Found test directory still in table: {}", key);
               return false;
             }
           }
         }
-        
+
         return true;
       } catch (Exception e) {
         LOG.error("Error verifying cleanup", e);

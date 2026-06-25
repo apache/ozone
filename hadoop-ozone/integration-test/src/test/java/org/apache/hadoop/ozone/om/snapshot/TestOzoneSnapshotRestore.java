@@ -159,7 +159,7 @@ public class TestOzoneSnapshotRestore {
             .getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName = OmSnapshotManager
-        .getSnapshotPath(clientConf, snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
+        .getSnapshotPath(clientConf, snapshotInfo, 0) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
             1000, 120000);
     return snapshotKeyPrefix;

@@ -117,7 +117,7 @@ public class TestReconOmMetadataManagerImpl {
 
     //Update Recon OM DB with the OM DB checkpoint location.
     reconOMMetadataManager.updateOmDB(
-        checkpoint.getCheckpointLocation().toFile());
+        checkpoint.getCheckpointLocation().toFile(), true);
 
     //Now, the tables should have been initialized.
     assertNotNull(reconOMMetadataManager.getBucketTable());
@@ -141,7 +141,7 @@ public class TestReconOmMetadataManagerImpl {
     // Update again with an existing OM DB.
     DBStore current = reconOMMetadataManager.getStore();
     reconOMMetadataManager.updateOmDB(
-        newCheckpoint.getCheckpointLocation().toFile());
+        newCheckpoint.getCheckpointLocation().toFile(), true);
     // Verify that the existing DB instance is closed.
     assertTrue(current.isClosed());
   }

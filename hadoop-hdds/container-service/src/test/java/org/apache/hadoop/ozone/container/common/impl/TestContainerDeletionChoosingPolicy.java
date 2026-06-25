@@ -60,10 +60,8 @@ public class TestContainerDeletionChoosingPolicy {
   @TempDir
   private File tempFile;
   private String path;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private OzoneConfiguration conf;
-  private BlockDeletingService blockDeletingService;
   // the service timeout
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
   private static final int SERVICE_INTERVAL_IN_MILLISECONDS = 1000;
@@ -94,7 +92,7 @@ public class TestContainerDeletionChoosingPolicy {
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      data.incrPendingDeletionBlocks(20);
+      data.incrPendingDeletionBlocks(20, 256);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
@@ -102,7 +100,7 @@ public class TestContainerDeletionChoosingPolicy {
           containerSet.getContainerMapCopy())
               .containsKey(data.getContainerID());
     }
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
 
     int blockLimitPerInterval = 5;
     ContainerDeletionChoosingPolicy deletionPolicy =
@@ -159,7 +157,7 @@ public class TestContainerDeletionChoosingPolicy {
     KeyValueContainerData closingData = createContainerWithState(layout,
         ContainerProtos.ContainerDataProto.State.CLOSING);
 
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
 
@@ -191,7 +189,7 @@ public class TestContainerDeletionChoosingPolicy {
         containerId, layout, ContainerTestHelper.CONTAINER_MAX_SIZE,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
 
-    data.incrPendingDeletionBlocks(5);
+    data.incrPendingDeletionBlocks(5, 5 * 256);
     data.setState(state);
     containerSet.addContainer(new KeyValueContainer(data, conf));
 
@@ -229,7 +227,7 @@ public class TestContainerDeletionChoosingPolicy {
       if (i != numContainers) {
         int deletionBlocks = random.nextInt(numContainers) + 1;
         numberOfBlocks.add(deletionBlocks);
-        data.incrPendingDeletionBlocks(deletionBlocks);
+        data.incrPendingDeletionBlocks(deletionBlocks, 256);
         name2Count.put(containerId, deletionBlocks);
       }
       KeyValueContainer container = new KeyValueContainer(data, conf);
@@ -239,7 +237,7 @@ public class TestContainerDeletionChoosingPolicy {
     }
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
     List<ContainerBlockInfo> result0 = blockDeletingService
@@ -281,10 +279,10 @@ public class TestContainerDeletionChoosingPolicy {
   }
 
   private BlockDeletingService getBlockDeletingService() {
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
-    blockDeletingService = new BlockDeletingService(ozoneContainer,
+    BlockDeletingService blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, 10, conf, new ContainerChecksumTreeManager(conf));
     return blockDeletingService;

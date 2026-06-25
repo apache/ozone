@@ -19,19 +19,64 @@ package org.apache.hadoop.ozone.shell.acl;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import picocli.CommandLine.Option;
 
 /**
  * Get ACLs.
  */
 public abstract class GetAclHandler extends AclHandler {
 
+  @Option(names = "--json", negatable = true,
+      defaultValue = "true", fallbackValue = "true",
+      description = {
+          "Format output as JSON. Default is true.",
+          "Use --json=false or --no-json to turn off output JSON format."
+      })
+  private boolean json;
+
   @Override
   protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
     List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-    printObjectAsJson(result);
+    if (json) {
+      printObjectAsJson(result);
+    } else {
+      printAclsAsString(result);
+    }
+  }
+
+  /**
+   * Prints ACLs as a comma-separated string in the format:
+   * type:name:permissions or type:name:permissions[scope] if scope is DEFAULT.
+   * This format is compatible with setacl/addacl commands.
+   *
+   * @param acls List of OzoneAcl objects to print
+   */
+  private void printAclsAsString(List<OzoneAcl> acls) {
+    String aclString = acls.stream()
+        .map(this::formatAcl)
+        .collect(Collectors.joining(","));
+    out().println(aclString);
+  }
+
+  /**
+   * Formats a single ACL for string output.
+   * Omits the scope if it's ACCESS (the default) to match the input format.
+   *
+   * @param acl The OzoneAcl to format
+   * @return Formatted ACL string
+   */
+  private String formatAcl(OzoneAcl acl) {
+    String baseAcl = acl.toString();
+    // If the scope is ACCESS (default), remove it from the output
+    if (acl.getAclScope() == OzoneAcl.AclScope.ACCESS) {
+      // Remove [ACCESS] from the end
+      return baseAcl.replaceAll("\\[ACCESS\\]$", "");
+    }
+    return baseAcl;
   }
 
 }

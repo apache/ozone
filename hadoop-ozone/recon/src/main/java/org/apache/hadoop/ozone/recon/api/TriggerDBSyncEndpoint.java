@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.recon.api;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 
 /**
@@ -30,15 +33,17 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
  */
 @Path("/triggerdbsync")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class TriggerDBSyncEndpoint {
 
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconStorageContainerManagerFacade reconScm;
 
   @Inject
   public TriggerDBSyncEndpoint(
-      OzoneManagerServiceProvider ozoneManagerServiceProvider) {
+      OzoneManagerServiceProvider ozoneManagerServiceProvider,
+      OzoneStorageContainerManager reconScm) {
     this.ozoneManagerServiceProvider = ozoneManagerServiceProvider;
+    this.reconScm = (ReconStorageContainerManagerFacade) reconScm;
   }
 
   @GET
@@ -47,5 +52,31 @@ public class TriggerDBSyncEndpoint {
     boolean isSuccess =
         ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
     return Response.ok(isSuccess).build();
+  }
+
+  @POST
+  @Path("scm/snapshot")
+  public Response triggerSCMDBSnapshotSync() {
+    ReconStorageContainerManagerFacade.ScmDbSnapshotTriggerResponse response =
+        reconScm.triggerScmDbSnapshotSync();
+    return response.isAccepted()
+        ? Response.accepted(response).build()
+        : Response.status(Response.Status.CONFLICT).entity(response).build();
+  }
+
+  @GET
+  @Path("scm/snapshot/status")
+  public Response getSCMDBSnapshotSyncStatus() {
+    return Response.ok(reconScm.getScmDbSnapshotSyncStatus()).build();
+  }
+
+  @POST
+  @Path("scm/snapshot/cancel")
+  public Response cancelSCMDBSnapshotSync() {
+    ReconStorageContainerManagerFacade.ScmDbSnapshotCancelResponse response =
+        reconScm.cancelScmDbSnapshotSync();
+    return response.isCancelled()
+        ? Response.ok(response).build()
+        : Response.status(Response.Status.CONFLICT).entity(response).build();
   }
 }

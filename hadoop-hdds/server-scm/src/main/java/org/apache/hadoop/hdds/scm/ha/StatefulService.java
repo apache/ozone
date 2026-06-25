@@ -19,66 +19,58 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
+import com.google.protobuf.Parser;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 
 /**
  * A StatefulService is an SCMService that persists configuration to RocksDB.
- * The service must define this configuration as a Protobuf message.
+ *
+ * @param <CONF> The configuration type, which is a protobuf {@link Message}.
  */
-public abstract class StatefulService implements SCMService {
+public abstract class StatefulService<CONF extends Message> implements SCMService {
+  private final String name;
   private final StatefulServiceStateManager stateManager;
+  private final Parser<CONF> parser;
 
   /**
    * Initialize a StatefulService from an extending class.
    * @param stateManager a reference to the
    * {@link StatefulServiceStateManager} from SCM.
    */
-  protected StatefulService(StatefulServiceStateManager stateManager) {
+  protected StatefulService(StatefulServiceStateManager stateManager, Parser<CONF> parser) {
+    this.name = getClass().getSimpleName();
     this.stateManager = stateManager;
+    this.parser = parser;
+  }
+
+  @Override
+  public final String getServiceName() {
+    return name;
   }
 
   /**
-   * Persists the specified {@link Message} configurationMessage
-   * to RocksDB with this service's {@link SCMService#getServiceName()} as the
-   * key.
-   * @param configurationMessage configuration Message to persist
+   * Persists the given configuration to RocksDB with {@link SCMService#getServiceName()} as the key.
+   * @param configuration configuration to persist
    * @throws IOException on failure to persist configuration
    */
-  protected final void saveConfiguration(Message configurationMessage)
-      throws IOException {
-    stateManager.saveConfiguration(getServiceName(),
-        configurationMessage.toByteString());
+  protected final void saveConfiguration(CONF configuration) throws IOException {
+    stateManager.saveConfiguration(getServiceName(), configuration.toByteString());
   }
 
   /**
    * Reads persisted configuration mapped to this service's
    * {@link SCMService#getServiceName()} name.
    *
-   * @param configType the Class object of the protobuf message type
-   * @param <T>        the Type of the protobuf message
    * @return persisted protobuf message or null if the entry is not found
    * @throws IOException on failure to fetch the message from DB or when
    *                     parsing it. ensure the specified configType is correct
    */
-  protected final <T extends Message> T readConfiguration(
-      Class<T> configType) throws IOException {
+  protected final CONF readConfiguration() throws IOException {
     ByteString byteString = stateManager.readConfiguration(getServiceName());
     if (byteString == null) {
       return null;
     }
-    try {
-      return configType.cast(ReflectionUtil.getMethod(configType,
-              "parseFrom", ByteString.class)
-          .invoke(null, byteString));
-    } catch (NoSuchMethodException | IllegalAccessException
-        | InvocationTargetException e) {
-      e.printStackTrace();
-      throw new IOException("Message cannot be parsed. Ensure that "
-          + configType + " is the correct expected message type for " +
-          this.getServiceName(), e);
-    }
-
+    return parser.parseFrom(byteString);
   }
 
   /**

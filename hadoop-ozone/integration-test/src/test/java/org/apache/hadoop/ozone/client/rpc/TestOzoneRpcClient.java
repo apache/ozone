@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
+
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -32,6 +34,7 @@ class TestOzoneRpcClient extends OzoneRpcClientTests {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,

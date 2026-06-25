@@ -48,30 +48,26 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "or -1, with a default of 10 (specify '10' for 10 iterations).")
   private Optional<Integer> iterations;
 
-  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
-      "--maxDatanodesPercentageToInvolvePerIteration"},
+  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration. The value " +
           "should be in the range [0,100], with a default of 20 (specify " +
           "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
-  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
-      "--maxSizeToMovePerIterationInGB"},
+  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb"},
       description = "Maximum size that can be moved per iteration of " +
           "balancing. The value should be positive, with a default of 500 " +
           "(specify '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
-  @Option(names = {"-e", "--max-size-entering-target-in-gb",
-      "--maxSizeEnteringTargetInGB"},
+  @Option(names = {"-e", "--max-size-entering-target-in-gb"},
       description = "Maximum size that can enter a target datanode while " +
           "balancing. This is the sum of data from multiple sources. The value " +
           "should be positive, with a default of 26 (specify '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
-  @Option(names = {"-l", "--max-size-leaving-source-in-gb",
-      "--maxSizeLeavingSourceInGB"},
+  @Option(names = {"-l", "--max-size-leaving-source-in-gb"},
       description = "Maximum size that can leave a source datanode while " +
           "balancing. This is the sum of data moving to multiple targets. " +
           "The value should be positive, with a default of 26 " +
@@ -119,6 +115,21 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "by default (specify \"hostname1,hostname2,hostname3\").")
   private Optional<String> excludeNodes;
 
+  @Option(names = {"--exclude-containers"},
+      description = "A list of container IDs separated by commas. " +
+          "The containers specified in this list are excluded from balancing. " +
+          "This configuration is empty by default " +
+          "(specify \"1,2,3\" for container IDs).")
+  private Optional<String> excludeContainers;
+
+  @Option(names = {"--include-containers"},
+      description = "A list of container IDs separated by commas. " +
+          "Only the containers specified in this list will be included in balancing." +
+          " If --exclude-containers is also specified, those containers will " +
+          "be excluded. This configuration is empty by default " +
+          "(specify \"1,2,3\" for container IDs).")
+  private Optional<String> includeContainers;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     StartContainerBalancerResponseProto response = scmClient.
@@ -127,14 +138,17 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {
-      System.out.println("Failed to start Container Balancer.");
+      String reason = "";
+      System.err.println("Failed to start Container Balancer.");
       if (response.hasMessage()) {
-        System.out.printf("Failure reason: %s", response.getMessage());
+        reason = response.getMessage();
+        System.err.printf("Failure reason: %s%n", reason);
       }
+      throw new IOException("Failed to start Container Balancer. " + reason);
     }
   }
 }

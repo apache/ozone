@@ -70,8 +70,6 @@ public class TestRootedDDSWithFSO {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
   private static Path volumePath;
   private static Path bucketPath;
   private static OzoneClient client;
@@ -94,9 +92,9 @@ public class TestRootedDDSWithFSO {
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(client, getFSOBucketLayout());
-    volumeName = bucket.getVolumeName();
+    String volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
-    bucketName = bucket.getName();
+    String bucketName = bucket.getName();
     bucketPath = new Path(volumePath, bucketName);
 
     String rootPath = String.format("%s://%s/",

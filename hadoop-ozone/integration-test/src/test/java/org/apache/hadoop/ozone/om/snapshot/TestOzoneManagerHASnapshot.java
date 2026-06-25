@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,7 +42,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -61,6 +60,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests snapshot in OM HA setup.
@@ -197,21 +198,17 @@ public class TestOzoneManagerHASnapshot {
    */
   @Test
   public void testSnapshotNameConsistency() throws Exception {
-    store.createSnapshot(volumeName, bucketName, "");
+    String snapshotName = store.createSnapshot(volumeName, bucketName, "");
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
     List<String> snapshotNames = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
       await(120_000, 100, () -> {
-        String snapshotPrefix = OM_KEY_PREFIX + volumeName +
-            OM_KEY_PREFIX + bucketName;
-        SnapshotInfo snapshotInfo = null;
-        try (Table.KeyValueIterator<String, SnapshotInfo>
-                 iterator = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable().iterator(snapshotPrefix)) {
-          while (iterator.hasNext()) {
-            snapshotInfo = iterator.next().getValue();
-          }
+        SnapshotInfo snapshotInfo;
+        try {
+          snapshotInfo = ozoneManager.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -298,6 +295,83 @@ public class TestOzoneManagerHASnapshot {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster.getOMLeader().getMetadataManager();
     // Verify that the snapshot chain is not corrupted even after deletions.
     assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
+  }
+
+  /**
+   * Tests that SnapshotDeletingService (SDS) correctly handles an OM leader
+   * failover with {@code numSnapshots} snapshots queued for deletion. The old
+   * leader's SDS is suspended (simulating SDS being blocked or mid-cleanup)
+   * before the failover. After the failover, the new leader's SDS must pick up
+   * all pending deletions, purge them from the DB, and leave the snapshot chain
+   * consistent. (HDDS-8703)
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 3})
+  public void testSnapshotDeletingServiceDuringOMFailover(int numSnapshots)
+      throws Exception {
+    OzoneManager oldLeader = cluster.getOMLeader();
+    String oldLeaderId = oldLeader.getOMNodeId();
+
+    List<String> snapshotNames = new ArrayList<>();
+    List<String> tableKeys = new ArrayList<>();
+
+    // Create numSnapshots snapshots, each capturing distinct state.
+    for (int i = 0; i < numSnapshots; i++) {
+      createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+      String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+      createSnapshot(volumeName, bucketName, snapshotName);
+      snapshotNames.add(snapshotName);
+      tableKeys.add(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+    }
+
+    // Suspend SDS on the current leader before any snapshot is deleted,
+    // simulating SDS being blocked while cleanup is pending.
+    oldLeader.getKeyManager().getSnapshotDeletingService().suspend();
+
+    // Queue all snapshots for deletion.
+    for (String snapshotName : snapshotNames) {
+      store.deleteSnapshot(volumeName, bucketName, snapshotName);
+    }
+
+    // Wait for every snapshot to reach SNAPSHOT_DELETED state on the old leader.
+    for (String tableKey : tableKeys) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          SnapshotInfo info = oldLeader.getMetadataManager()
+              .getSnapshotInfoTable().get(tableKey);
+          return info != null
+              && info.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 30000);
+    }
+
+    try {
+      // Trigger OM leader failover: with 3 OMs and quorum=2, the remaining
+      // two nodes elect a new leader.
+      cluster.shutdownOzoneManager(oldLeader);
+      cluster.waitForLeaderOM();
+
+      OzoneManager newLeader = cluster.getOMLeader();
+      assertNotNull(newLeader);
+      // Confirm that a genuinely different OM node became leader.
+      assertNotEquals(oldLeaderId, newLeader.getOMNodeId());
+
+      // The new leader's SDS (not suspended) must purge all deleted snapshots,
+      // even though the old leader's SDS never ran the cleanup.
+      for (String tableKey : tableKeys) {
+        checkSnapshotIsPurgedFromDB(newLeader, tableKey);
+      }
+
+      // Verify the snapshot chain is not corrupted after all cleanups.
+      OmMetadataManagerImpl metadataManager =
+          (OmMetadataManagerImpl) newLeader.getMetadataManager();
+      assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
+    } finally {
+      // Restore the 3-node cluster for subsequent tests.
+      cluster.restartOzoneManager(oldLeader, true);
+    }
   }
 
   private void createFileKey(OzoneBucket bucket, String keyName)
@@ -410,7 +484,7 @@ public class TestOzoneManagerHASnapshot {
 
     String tableKey = SnapshotInfo.getTableKey(volName, buckName, snapName);
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(cluster.getOMLeader(), tableKey);
-    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("Snapshot directory doesn't exist");

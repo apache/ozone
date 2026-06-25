@@ -27,10 +27,10 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.Message;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -67,8 +67,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
   public SCMDatanodeHeartbeatDispatcher(NodeManager nodeManager,
                                         EventPublisher eventPublisher) {
-    Preconditions.checkNotNull(nodeManager);
-    Preconditions.checkNotNull(eventPublisher);
+    Objects.requireNonNull(nodeManager, "nodeManager == null");
+    Objects.requireNonNull(eventPublisher, "eventPublisher == null");
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
   }

@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.container.common.volume;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
@@ -38,9 +40,20 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   // Stores the index of the next volume to be returned.
   private int nextVolumeIndex = 0;
+  private final ReentrantLock lock;
+
+  public RoundRobinVolumeChoosingPolicy(ReentrantLock globalLock) {
+    lock = globalLock;
+  }
+
+  // only for testing purposes
+  @VisibleForTesting
+  public RoundRobinVolumeChoosingPolicy() {
+    lock = new ReentrantLock();
+  }
 
   @Override
-  public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
+  public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
@@ -56,23 +69,28 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
     int startVolumeIndex = currentVolumeIndex;
 
-    while (true) {
-      final HddsVolume volume = volumes.get(currentVolumeIndex);
-      // adjust for remaining capacity in Open containers
-      boolean hasEnoughSpace = filter.test(volume);
+    lock.lock();
+    try {
+      while (true) {
+        final HddsVolume volume = volumes.get(currentVolumeIndex);
+        // adjust for remaining capacity in Open containers
+        boolean hasEnoughSpace = filter.test(volume);
 
-      currentVolumeIndex = (currentVolumeIndex + 1) % volumes.size();
+        currentVolumeIndex = (currentVolumeIndex + 1) % volumes.size();
 
-      if (hasEnoughSpace) {
-        logIfSomeVolumesOutOfSpace(filter, LOG);
-        nextVolumeIndex = currentVolumeIndex;
-        volume.incCommittedBytes(maxContainerSize);
-        return volume;
+        if (hasEnoughSpace) {
+          logIfSomeVolumesOutOfSpace(filter, LOG);
+          nextVolumeIndex = currentVolumeIndex;
+          volume.incCommittedBytes(maxContainerSize);
+          return volume;
+        }
+
+        if (currentVolumeIndex == startVolumeIndex) {
+          throwDiskOutOfSpace(filter, LOG);
+        }
       }
-
-      if (currentVolumeIndex == startVolumeIndex) {
-        throwDiskOutOfSpace(filter, LOG);
-      }
+    } finally {
+      lock.unlock();
     }
   }
 }

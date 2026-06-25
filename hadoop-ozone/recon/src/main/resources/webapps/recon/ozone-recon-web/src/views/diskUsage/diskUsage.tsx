@@ -241,7 +241,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -328,7 +328,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               isLoading: false,
               showPanel: false
             });
-            showDataFetchError(error.toString());
+            showDataFetchError(error);
           });
           return;
         }
@@ -480,7 +480,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         isLoading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
@@ -525,7 +525,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         isLoading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 

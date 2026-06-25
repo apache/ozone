@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -66,5 +68,43 @@ public class TestOzoneFsUtils {
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);
 
     assertEquals(canEnableHsync, OzoneFSUtils.canEnableHsync(conf, isClient));
+  }
+
+  @Test
+  public void testIsValidKeyPath() throws OMException {
+    // Valid paths
+    assertEquals("a/b/c", OzoneFSUtils.isValidKeyPath("a/b/c", true));
+    assertEquals("a/b/c", OzoneFSUtils.isValidKeyPath("a/b/c", false));
+    assertEquals("file", OzoneFSUtils.isValidKeyPath("file", true));
+    assertEquals("file.txt", OzoneFSUtils.isValidKeyPath("file.txt", true));
+    assertEquals("dir/subdir/file", OzoneFSUtils.isValidKeyPath("dir/subdir/file", true));
+
+    // Empty path - throwOnEmpty=true should throw exception
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("", true));
+
+    // Empty path - throwOnEmpty=false should return empty string
+    assertEquals("", OzoneFSUtils.isValidKeyPath("", false));
+
+    // Invalid paths - leading slash
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("/a/b", true));
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("/a/b", false));
+
+    // Invalid paths - contains ".."
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a/../b", true));
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("../a/b", true));
+
+    // Invalid paths - contains "."
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a/./b", true));
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("./file", true));
+
+    // Invalid paths - contains ":"
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a:b", true));
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a/b:c", true));
+
+    // Invalid paths - contains "//" in the middle
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a//b", true));
+
+    // Valid path ending with "/"
+    assertEquals("a/b/", OzoneFSUtils.isValidKeyPath("a/b/", true));
   }
 }

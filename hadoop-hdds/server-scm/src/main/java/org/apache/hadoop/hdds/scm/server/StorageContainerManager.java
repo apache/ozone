@@ -32,6 +32,7 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -62,6 +63,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -167,6 +169,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -174,16 +177,17 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.TableMapping;
+import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
@@ -222,8 +226,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM metrics.
    */
-  private static SCMMetrics metrics;
-  private static SCMPerformanceMetrics perfMetrics;
+  private SCMMetrics metrics;
+  private SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
   private final NettyMetrics nettyMetrics;
 
@@ -282,11 +286,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final OzoneConfiguration configuration;
+  private OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
-  private PlacementPolicy ecContainerPlacementPolicy;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
@@ -350,12 +353,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
     Objects.requireNonNull(configurator, "configurator cannot be null");
-    Objects.requireNonNull(conf, "configuration cannot be null");
+    configuration = Objects.requireNonNull(conf, "configuration cannot be null");
+    TracingConfig tracingConfig = configuration.getObject(TracingConfig.class);
+    TracingReconfigurationCallback tracingReconfigurationCallback =
+        TracingReconfigurationCallback.init("StorageContainerManager", tracingConfig);
     // It is assumed the scm --init command creates the SCM Storage Config.
     scmStorageConfig = new SCMStorageConfig(conf);
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    configuration = conf;
+
     initMetrics();
     initPerfMetrics();
 
@@ -374,8 +380,25 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // This is for the clusters which got upgraded from older version of Ozone.
     // We enable Ratis by default.
     if (!scmStorageConfig.isSCMHAEnabled()) {
+      // Create Ratis snapshot directory for upgrade scenario.
+      // This must be done before initializeRatis() since SCMSnapshotProvider
+      // expects the directory to already exist during normal startup.
+      String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+      HddsUtils.createDir(snapshotDir);
+      LOG.info("Upgrade: created Ratis snapshot directory: {}", snapshotDir);
+
       // Since we have initialized Ratis, we have to reload StorageConfig
       scmStorageConfig = initializeRatis(conf);
+    } else {
+      // For clusters upgraded from older versions that already have SCMHAEnabled
+      // but may not have the snapshot directory (it was auto-created by
+      // SCMSnapshotProvider in older versions), ensure the directory exists.
+      String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+      File snapshotDirFile = new File(snapshotDir);
+      if (!snapshotDirFile.exists()) {
+        HddsUtils.createDir(snapshotDir);
+        LOG.info("Created missing Ratis snapshot directory for upgraded cluster: {}", snapshotDir);
+      }
     }
 
     threadNamePrefix = getScmNodeDetails().threadNamePrefix();
@@ -400,11 +423,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(tracingConfig)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
-                this::reconfOzoneReadOnlyAdmins);
+                this::reconfOzoneReadOnlyAdmins)
+            .register(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
+                this::reconfigureSafeModeLogInterval);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+    reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     initializeSystemManagers(conf, configurator);
 
@@ -478,7 +505,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
-        pipelineManager, containerManager);
+        pipelineManager, containerManager, null);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
@@ -603,6 +630,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return configuration;
   }
 
+  @VisibleForTesting
+  public void setConfiguration(OzoneConfiguration conf) {
+    this.configuration = conf;
+  }
+
   /**
    * Create an SCM instance based on the supplied configuration.
    *
@@ -680,6 +712,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getLayoutVersion());
+    VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         finalizationExecutor;
@@ -720,7 +753,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
             ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
     dnsToSwitchMapping =
@@ -740,7 +773,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
 
-    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+    PlacementPolicy ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
         conf, scmNodeManager, clusterMap, true, placementMetrics);
 
     placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
@@ -1172,9 +1205,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmhaNodeDetails.getLocalNodeDetails().getNodeId());
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     final String fetchedId = scmInfo.getClusterId();
-    Preconditions.checkNotNull(fetchedId);
+    Objects.requireNonNull(fetchedId, "fetchedId == null");
     if (state == StorageState.INITIALIZED) {
-      Preconditions.checkNotNull(scmStorageConfig.getScmId());
+      Objects.requireNonNull(scmStorageConfig.getScmId(), "scmId == null");
       if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
             "Could not bootstrap as SCM is already initialized with cluster "
@@ -1202,6 +1235,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
         scmStorageConfig.setSCMHAFlag(true);
         scmStorageConfig.initialize();
+
+        // Create Ratis storage and snapshot directories during bootstrap
+        // This ensures they exist before the bootstrapped SCM starts normally
+        String ratisStorageDir = SCMHAUtils.getSCMRatisDirectory(conf);
+        String ratisSnapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+        HddsUtils.createDir(ratisStorageDir);
+        HddsUtils.createDir(ratisSnapshotDir);
+        LOG.info("Created Ratis storage directory: {}", ratisStorageDir);
+        LOG.info("Created Ratis snapshot directory: {}", ratisSnapshotDir);
+
         LOG.info("SCM BootStrap  is successful for ClusterID {}, SCMID {}",
             scmInfo.getClusterId(), scmStorageConfig.getScmId());
         LOG.info("Primary SCM Node ID {}",
@@ -1259,7 +1302,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
           // clusterId must be an UUID
-          Preconditions.checkNotNull(UUID.fromString(clusterId));
+          Objects.requireNonNull(UUID.fromString(clusterId), "clusterId UUID == null");
           scmStorageConfig.setClusterId(clusterId);
         }
 
@@ -1282,6 +1325,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
+
+        // Create Ratis snapshot directory during init.
+        // This must be done before SCM starts normally since SCMSnapshotProvider
+        // expects the directory to already exist.
+        String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+        HddsUtils.createDir(snapshotDir);
+        LOG.info("Init: created Ratis snapshot directory: {}", snapshotDir);
+
         scmStorageConfig = initializeRatis(conf);
 
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
@@ -1343,7 +1394,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       ConfigurationSource conf) throws IOException {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
         conf);
-    Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
+    Objects.requireNonNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
     if (HddsUtils.getScmServiceId(conf) != null) {
@@ -1376,28 +1427,28 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Initialize SCM metrics.
    */
-  public static void initMetrics() {
-    metrics = SCMMetrics.create();
+  public void initMetrics() {
+    metrics = SCMMetrics.create(configuration);
   }
 
   /**
    * Return SCM metrics instance.
    */
-  public static SCMMetrics getMetrics() {
-    return metrics == null ? SCMMetrics.create() : metrics;
+  public SCMMetrics getMetrics() {
+    return metrics;
   }
 
   /**
    * Initialize SCMPerformance metrics.
    */
-  public static void initPerfMetrics() {
+  public void initPerfMetrics() {
     perfMetrics = SCMPerformanceMetrics.create();
   }
 
   /**
    * Return SCMPerformance metrics instance.
    */
-  public static SCMPerformanceMetrics getPerfMetrics() {
+  public SCMPerformanceMetrics getPerfMetrics() {
     return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
   }
 
@@ -1510,8 +1561,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void start() throws IOException {
-    finalizationManager.runPrefinalizeStateActions();
-
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
           "StorageContainerLocationProtocol RPC server",
@@ -1531,10 +1580,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // If HA is enabled, start datanode protocol server once leader is ready.
-    if (!scmStorageConfig.isSCMHAEnabled()) {
-      getDatanodeProtocolServer().start();
-    }
+    // start datanode protocol server
+    getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -1604,7 +1651,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void stop() {
     if (isStopped.getAndSet(true)) {
       LOG.info("Storage Container Manager is not running.");
-      IOUtils.close(LOG, scmHAManager);
+      IOUtils.close(LOG, reconfigurationHandler, scmHAManager);
       stopReplicationManager(); // started eagerly
       return;
     }
@@ -1806,6 +1853,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SCMHAManager.
    */
+  @Override
   public SCMHAManager getScmHAManager() {
     return scmHAManager;
   }
@@ -1911,8 +1959,23 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     checkAdminAccess(getRemoteUser(), false);
   }
 
+  /**
+   * Check if admin privilege authorization should be enforced.
+   * This controls system-level admin operations (upgrades, decommission, etc.)
+   *
+   * @return true if admin authorization checks should be performed
+   */
+  public boolean isAdminAuthorizationEnabled() {
+    return securityConfig != null && securityConfig.isAuthorizationEnabled();
+  }
+
   public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)
       throws IOException {
+    // Skip check if authorization is disabled
+    if (!isAdminAuthorizationEnabled()) {
+      return;
+    }
+    
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       if (!isRead || !scmReadOnlyAdmins.isAdmin(remoteUser)) {
         throw new AccessControlException(
@@ -1958,6 +2021,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SequenceIdGen.
    */
+  @Override
   public SequenceIdGenerator getSequenceIdGen() {
     return sequenceIdGen;
   }
@@ -1996,6 +2060,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Returns the SCM metadata Store.
    * @return SCMMetadataStore
    */
+  @Override
   public SCMMetadataStore getScmMetadataStore() {
     return scmMetadataStore;
   }
@@ -2182,9 +2247,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
-        getConfiguration(), scmStarterUser);
+    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfigValue(
+        newVal, scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
@@ -2192,9 +2256,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneReadOnlyAdmins(String newVal) {
-    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
-        getConfiguration());
+    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfigValue(
+        newVal);
     scmReadOnlyAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now read only admins are: {}",
         OZONE_READONLY_ADMINISTRATORS,
@@ -2202,6 +2265,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(newVal);
   }
 
+  private String reconfigureSafeModeLogInterval(String newLogInterval) {
+    getConfiguration().set(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, newLogInterval);
+    long newIntervalMs = getConfiguration().getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    
+    scmSafeModeManager.reconfigureLogInterval(newIntervalMs, TimeUnit.MILLISECONDS);
+
+    LOG.info("Reconfigured {} to {}", HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, newLogInterval);
+    return newLogInterval;
+  }
+  
   /**
    * This will remove the given SCM node from HA Ring by removing it from
    * Ratis Ring.
@@ -2224,8 +2300,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
         "removePeerFromHARing");
 
-    Preconditions.checkNotNull(getScmHAManager().getRatisServer()
-        .getDivision().getGroup());
+    Objects.requireNonNull(getScmHAManager().getRatisServer()
+        .getDivision().getGroup(), "Group == null");
 
     // check valid scmid in ratis peers list
     if (getScmHAManager().getRatisServer().getDivision()
@@ -2243,6 +2319,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     return getScmHAManager().removeSCM(request);
 
+  }
+
+  /**
+   * Check if the input scmId exists in the peers list.
+   * @return true if the nodeId is self, or it exists in peer node list,
+   *         false otherwise.
+   */
+  @VisibleForTesting
+  public boolean doesPeerExist(String scmId) {
+    if (getScmId().equals(scmId)) {
+      return true;
+    }
+    return getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeer(RaftPeerId.valueOf(scmId)) != null;
   }
 
   public void scmHAMetricsUpdate(String leaderId) {

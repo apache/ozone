@@ -121,13 +121,13 @@ public abstract class RDBSnapshotProvider implements Closeable {
       numDownloaded.incrementAndGet();
       injectPause();
 
-      RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
+      Path unTarredDb = untarContentsOfTarball(targetFile,
           candidateDir, true);
       LOG.info("Successfully untar the downloaded snapshot {} at {}.",
-          targetFile, checkpoint.getCheckpointLocation());
-      if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
+          targetFile, unTarredDb.toAbsolutePath());
+      if (ratisSnapshotComplete(unTarredDb)) {
         LOG.info("Ratis snapshot transfer is complete.");
-        return checkpoint;
+        return getCheckpointFromUntarredDb(unTarredDb);
       }
     }
   }
@@ -175,15 +175,25 @@ public abstract class RDBSnapshotProvider implements Closeable {
   }
 
   /**
-   * Untar the downloaded snapshot and convert to {@link RocksDBCheckpoint}.
+   * convert untarredDbDir to to {@link RocksDBCheckpoint}.
    *
-   * @param snapshot the downloaded snapshot tar file
-   * @param untarDir the directory to place the untarred files
-   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
    * @return {@link RocksDBCheckpoint}
    * @throws IOException
    */
-  public RocksDBCheckpoint getCheckpointFromSnapshotFile(File snapshot,
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
+    return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  /**
+   *
+   * Untar the downloaded snapshot.
+   * @param snapshot the downloaded snapshot tar file
+   * @param untarDir the directory to place the untarred files
+   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
+   * @return  path of untarred dbDir.
+   * @throws IOException
+   */
+  private Path untarContentsOfTarball(File snapshot,
       File untarDir, boolean deleteSnapshot) throws IOException {
     // Untar the checkpoint file.
     Path untarredDbDir = untarDir.toPath();
@@ -192,7 +202,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
     if (deleteSnapshot) {
       FileUtil.fullyDelete(snapshot);
     }
-    return new RocksDBCheckpoint(untarredDbDir);
+    return untarredDbDir;
   }
 
   /**

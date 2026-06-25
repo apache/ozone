@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -50,16 +50,6 @@ public interface ReconContainerMetadataManager {
       throws IOException;
 
   /**
-   * Store the container to Key prefix mapping into the Recon Container DB.
-   *
-   * @param containerKeyPrefix the containerId, key-prefix tuple.
-   * @param count              Count of Keys with that prefix.
-   */
-  @Deprecated
-  void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                Integer count) throws IOException;
-
-  /**
    * Returns staged DB container metadata manager.
    *
    * @param stagedReconDbStore staged Recon DB store
@@ -86,16 +76,6 @@ public interface ReconContainerMetadataManager {
                                      Integer count) throws IOException;
 
   /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException
-   */
-  @Deprecated
-  void storeContainerKeyCount(Long containerID, Long count) throws IOException;
-
-  /**
    * Store the containerID -&gt; no. of keys count into a batch.
    *
    * @param batch the batch operation we store into
@@ -115,7 +95,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void storeContainerReplicaHistory(Long containerID,
-      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException;
+      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException;
 
   /**
    * Batch version of storeContainerReplicaHistory.
@@ -124,7 +104,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void batchStoreContainerReplicaHistory(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException;
 
   /**
@@ -159,7 +139,7 @@ public interface ReconContainerMetadataManager {
    * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException
    */
-  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+  Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException;
 
   /**

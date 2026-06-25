@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -438,9 +439,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        ReplicationManagerReport report = new ReplicationManagerReport();
+        ReplicationManagerReport report = new ReplicationManagerReport(
+            replicationManager.getConfig().getContainerSampleLimit());
         replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
-        boolean replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+        boolean replicatedOK = report.getStat(ContainerHealthState.UNDER_REPLICATED) == 0;
 
         if (replicatedOK) {
           sufficientlyReplicated++;
@@ -495,11 +497,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {
     StringBuilder sb = new StringBuilder();
-    sb.append("Replicas{");
-    sb.append(replicas.stream()
-        .map(Object::toString)
-        .collect(Collectors.joining(",")));
-    sb.append('}');
+    sb.append("Replicas{")
+        .append(replicas.stream()
+            .map(Object::toString)
+            .collect(Collectors.joining(",")))
+        .append('}');
     return sb.toString();
   }
 

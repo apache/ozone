@@ -22,8 +22,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,7 +36,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -85,10 +90,8 @@ public class TestDeadNodeHandler {
   private DeadNodeHandler deadNodeHandler;
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
-  private EventQueue eventQueue;
   @TempDir
   private File storageDir;
-  private SCMContext scmContext;
   private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
@@ -96,17 +99,22 @@ public class TestDeadNodeHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
+    // The test drives node health transitions manually. Disable the periodic
+    // health check so it does not resurrect a node forced to DEAD (the node's
+    // heartbeat stays fresh), which would race with the handlers under test.
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        1, TimeUnit.HOURS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir.getPath());
-    eventQueue = new EventQueue();
+    EventQueue eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    scmContext = new SCMContext.Builder()
-        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
-        .setLeader(true)
-        .setSCM(scm).build();
+    SCMContext scmContext = new SCMContext.Builder()
+                                .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
+                                .setLeader(true)
+                                .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
     pipelineManager.setScmContext(scmContext);
@@ -228,6 +236,7 @@ public class TestDeadNodeHandler {
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
+    setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     // make sure the node is removed from
     // ClusterNetworkTopology when it is considered as dead
@@ -260,6 +269,13 @@ public class TestDeadNodeHandler {
     nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
+    // Changing the operational state of a DEAD node fires a DEAD_NODE event on
+    // SCM's event queue. Let SCM's own DeadNodeHandler process it here, so its
+    // asynchronous topology removal does not race with the handlers driven
+    // below (it could otherwise remove the node right after
+    // HealthyReadOnlyNodeHandler re-adds it).
+    ((EventQueue) scm.getEventQueue()).processAll(60000L);
+    setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another
     //deadNodeHandler.onMessage call will not change this
@@ -290,6 +306,182 @@ public class TestDeadNodeHandler {
     assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+  }
+
+  /**
+   * Verifies that DeadNodeHandler skips topology removal when the node has
+   * already been resurrected (state changed from DEAD to HEALTHY_READONLY).
+   */
+  @Test
+  public void testDeadNodeHandlerSkipsRemovalWhenNodeResurrected(
+      @TempDir File tempDir) throws Exception {
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    String storagePath = tempDir.getPath()
+        .concat("/data-" + datanode.getID());
+    String metaStoragePath = tempDir.getPath()
+        .concat("/metadata-" + datanode.getID());
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        datanode.getID(), storagePath, 100 * OzoneConsts.TB,
+        10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
+    MetadataStorageReportProto metaStorageReport =
+        HddsTestUtils.createMetadataStorageReport(metaStoragePath,
+            100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
+            90 * OzoneConsts.GB, null);
+    nodeManager.register(datanode,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metaStorageReport)), null);
+    datanode = nodeManager.getNode(datanode.getID());
+
+    assertTrue(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode));
+
+    // Simulate: DEAD_NODE event was fired, but before DeadNodeHandler
+    // processes it, the node heartbeated and was resurrected to
+    // HEALTHY_READONLY. The handler should see the current state and
+    // skip removal.
+    setNodeHealthState(datanode, HddsProtos.NodeState.HEALTHY_READONLY);
+    deadNodeHandler.onMessage(datanode, publisher);
+
+    assertTrue(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode),
+        "Node should remain in topology when it has been resurrected");
+  }
+
+  /**
+   * Verifies that HealthyReadOnlyNodeHandler re-adds a node to topology
+   * even if it was removed by a concurrent DeadNodeHandler.
+   */
+  @Test
+  public void testHealthyReadOnlyHandlerAddsRemovedNode(
+      @TempDir File tempDir) throws Exception {
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    String storagePath = tempDir.getPath()
+        .concat("/data-" + datanode.getID());
+    String metaStoragePath = tempDir.getPath()
+        .concat("/metadata-" + datanode.getID());
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        datanode.getID(), storagePath, 100 * OzoneConsts.TB,
+        10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
+    MetadataStorageReportProto metaStorageReport =
+        HddsTestUtils.createMetadataStorageReport(metaStoragePath,
+            100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
+            90 * OzoneConsts.GB, null);
+    nodeManager.register(datanode,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metaStorageReport)), null);
+    datanode = nodeManager.getNode(datanode.getID());
+
+    // Manually remove node from topology to simulate DeadNodeHandler
+    // having run first.
+    nodeManager.getClusterNetworkTopologyMap().remove(datanode);
+    assertFalse(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode));
+
+    // HealthyReadOnlyNodeHandler should add it back unconditionally.
+    healthyReadOnlyNodeHandler.onMessage(datanode, publisher);
+    assertTrue(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode),
+        "Node should be re-added to topology by HealthyReadOnlyNodeHandler");
+  }
+
+  /**
+   * Reproduces the race condition between DeadNodeHandler and
+   * HealthyReadOnlyNodeHandler where interleaved execution could leave
+   * a resurrected node missing from the network topology.
+   *
+   * The interleaving being tested:
+   * 1. DeadNodeHandler starts processing (slow: closing containers, etc.)
+   * 2. Node is resurrected (DEAD -> HEALTHY_READONLY) via heartbeat
+   * 3. HealthyReadOnlyNodeHandler runs, sees node in topology, does not add
+   * 4. DeadNodeHandler finishes and removes node from topology
+   *
+   * With the fix: step 4 checks current state and skips removal.
+   */
+  @Test
+  public void testDeadNodeAndHealthyReadOnlyRaceCondition(
+      @TempDir File tempDir) throws Exception {
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    String storagePath = tempDir.getPath()
+        .concat("/data-" + datanode.getID());
+    String metaStoragePath = tempDir.getPath()
+        .concat("/metadata-" + datanode.getID());
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        datanode.getID(), storagePath, 100 * OzoneConsts.TB,
+        10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
+    MetadataStorageReportProto metaStorageReport =
+        HddsTestUtils.createMetadataStorageReport(metaStoragePath,
+            100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
+            90 * OzoneConsts.GB, null);
+    nodeManager.register(datanode,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metaStorageReport)), null);
+    datanode = nodeManager.getNode(datanode.getID());
+
+    assertTrue(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode));
+
+    // Block DeadNodeHandler just before the topology removal by making
+    // deletedBlockLog.onDatanodeDead() pause. This call happens right
+    // before the topology check in the handler.
+    CountDownLatch deadHandlerBlocked = new CountDownLatch(1);
+    CountDownLatch proceedWithRemoval = new CountDownLatch(1);
+
+    DeletedBlockLog blockingDeletedBlockLog = mock(DeletedBlockLog.class);
+    doAnswer(invocation -> {
+      deadHandlerBlocked.countDown();
+      proceedWithRemoval.await();
+      return null;
+    }).when(blockingDeletedBlockLog).onDatanodeDead(any());
+
+    setNodeHealthState(datanode, HddsProtos.NodeState.DEAD);
+
+    DeadNodeHandler blockingDeadHandler = new DeadNodeHandler(nodeManager,
+        mock(PipelineManager.class), containerManager,
+        blockingDeletedBlockLog);
+
+    DatanodeDetails finalDatanode = datanode;
+    AtomicReference<Exception> threadException = new AtomicReference<>();
+    Thread deadHandlerThread = new Thread(() -> {
+      try {
+        blockingDeadHandler.onMessage(finalDatanode, publisher);
+      } catch (Exception e) {
+        threadException.set(e);
+      }
+    });
+    deadHandlerThread.start();
+
+    // Wait for DeadNodeHandler to be blocked mid-execution.
+    assertTrue(deadHandlerBlocked.await(10, TimeUnit.SECONDS),
+        "DeadNodeHandler should have started processing");
+
+    // Simulate resurrection: node transitions to HEALTHY_READONLY.
+    setNodeHealthState(datanode, HddsProtos.NodeState.HEALTHY_READONLY);
+
+    // HealthyReadOnlyNodeHandler runs while DeadNodeHandler is blocked.
+    healthyReadOnlyNodeHandler.onMessage(datanode, publisher);
+
+    // Release the DeadNodeHandler to finish.
+    proceedWithRemoval.countDown();
+    deadHandlerThread.join(10_000);
+
+    assertNull(threadException.get(),
+        "DeadNodeHandler should not throw");
+
+    // With the fix, the node should remain in topology because
+    // DeadNodeHandler sees the node is no longer DEAD and skips removal.
+    assertTrue(
+        nodeManager.getClusterNetworkTopologyMap().contains(datanode),
+        "Resurrected node must remain in topology after race between "
+            + "DeadNodeHandler and HealthyReadOnlyNodeHandler");
+  }
+
+  private void setNodeHealthState(DatanodeDetails datanode,
+      HddsProtos.NodeState healthState) throws NodeNotFoundException {
+    DatanodeInfo dnInfo = nodeManager.getNodeStateManager()
+        .getNode(datanode);
+    NodeStatus current = dnInfo.getNodeStatus();
+    dnInfo.setNodeStatus(NodeStatus.valueOf(
+        current.getOperationalState(), healthState));
   }
 
   private void registerReplicas(ContainerManager contManager,

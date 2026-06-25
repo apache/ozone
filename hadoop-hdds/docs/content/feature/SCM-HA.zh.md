@@ -191,7 +191,7 @@ layoutVersion=0
 如果所有的容器元数据都已复制，您还可以创建数据并使用 `ozone debug` 工具进行双重检查。
 
 ```shell
-bin/ozone freon randomkeys --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=10000 --keySize=524288 --replicationType=RATIS --numOfThreads=8 --factor=THREE --bufferSize=1048576
+bin/ozone freon randomkeys --num-of-volumes=1 --num-of-buckets=1 --num-of-keys=10000 --key-size=524288 --type=RATIS --num-of-threads=8 --factor=THREE --buffer-size=1048576
 
 
 # 使用 debug ldb 工具逐一检查各机上的 scm.db

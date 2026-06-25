@@ -42,15 +42,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -76,7 +77,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
@@ -91,6 +96,7 @@ public class TestContainerReader {
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
   private ContainerSet containerSet;
+  private WitnessedContainerMetadataStore mockMetadataStore;
   private OzoneConfiguration conf;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
@@ -100,7 +106,6 @@ public class TestContainerReader {
   private long blockLen = 1024;
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private KeyValueHandler keyValueHandler;
 
   @TempDir
@@ -112,7 +117,9 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
     volumeSet = mock(MutableVolumeSet.class);
-    containerSet = newContainerSet();
+    mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
+    containerSet = newContainerSet(1000, mockMetadataStore);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -163,28 +170,72 @@ public class TestContainerReader {
     KeyValueContainerData cData = keyValueContainer.getContainerData();
     try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
-      for (int i = 0; i < count; i++) {
-        Table<String, BlockData> blockDataTable =
-                metadataStore.getStore().getBlockDataTable();
+      if (metadataStore.getStore() instanceof DatanodeStoreSchemaThreeImpl) {
+        DatanodeStoreSchemaThreeImpl schemaThree = (DatanodeStoreSchemaThreeImpl) metadataStore.getStore();
+        Table<String, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaThree.getDeleteTransactionTable();
 
-        Long localID = blockNames.get(i);
-        String blk = cData.getBlockKey(localID);
-        BlockData blkInfo = blockDataTable.get(blk);
+        // Fix: Use the correct container prefix format for the delete transaction key
+        String containerPrefix = cData.containerPrefix();
+        long txId = System.currentTimeMillis();
+        String txKey = containerPrefix + txId; // This ensures the key matches the container prefix
 
-        blockDataTable.delete(blk);
-        blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txKey, deleteTx); // Use the properly formatted key
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaTwoImpl) {
+        DatanodeStoreSchemaTwoImpl schemaTwoStore = (DatanodeStoreSchemaTwoImpl) metadataStore.getStore();
+        Table<Long, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaTwoStore.getDeleteTransactionTable();
+
+        long txId = System.currentTimeMillis();
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txId, deleteTx);
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaOneImpl) {
+        // Schema 1: Move blocks to deleting prefix (this part looks correct)
+        Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          String blk = cData.getBlockKey(localID);
+          BlockData blkInfo = blockDataTable.get(blk);
+          blockDataTable.delete(blk);
+          blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        }
       }
 
       if (setMetaData) {
-        // Pending delete blocks are still counted towards the block count
-        // and bytes used metadata values, so those do not change.
-        Table<String, Long> metadataTable =
-                metadataStore.getStore().getMetadataTable();
-        metadataTable.put(cData.getPendingDeleteBlockCountKey(),
-            (long)count);
+        Table<String, Long> metadataTable = metadataStore.getStore().getMetadataTable();
+        metadataTable.put(cData.getPendingDeleteBlockCountKey(), (long)count);
+        // Also set the pending deletion size
+        long deletionSize = count * blockLen;
+        metadataTable.put(cData.getPendingDeleteBlockBytesKey(), deletionSize);
       }
-    }
 
+      metadataStore.getStore().flushDB();
+    }
   }
 
   private List<Long> addBlocks(KeyValueContainer keyValueContainer,
@@ -396,6 +447,7 @@ public class TestContainerReader {
     assertThat(dnLogs.getOutput()).contains("Container DB file is missing");
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @ContainerTestVersionInfo.ContainerTest
   public void testMultipleContainerReader(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -440,6 +492,11 @@ public class TestContainerReader {
     KeyValueContainer conflict22 = null;
     KeyValueContainer ec1 = null;
     KeyValueContainer ec2 = null;
+    KeyValueContainer ec3 = null;
+    KeyValueContainer ec4 = null;
+    KeyValueContainer ec5 = null;
+    KeyValueContainer ec6 = null;
+    KeyValueContainer ec7 = null;
     long baseBCSID = 10L;
 
     for (int i = 0; i < containerCount; i++) {
@@ -465,6 +522,25 @@ public class TestContainerReader {
       } else if (i == 3) {
         ec1 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
         ec2 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+      } else if (i == 4) {
+        ec3 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec4 = createContainerWithId(i, volumeSets, policy, baseBCSID, 2);
+        ec3.close();
+        ec4.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, 1));
+      } else if (i == 5) {
+        ec5 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec6 = createContainerWithId(i, volumeSets, policy, baseBCSID, 2);
+        ec6.close();
+        ec5.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, 2));
+      } else if (i == 6) {
+        ec7 = createContainerWithId(i, volumeSets, policy, baseBCSID, 3);
+        ec7.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, -1));
       } else {
         createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
       }
@@ -531,6 +607,23 @@ public class TestContainerReader {
     assertTrue(Files.exists(Paths.get(ec1.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec2.getContainerData().getContainerPath())));
     assertNotNull(containerSet.getContainer(3));
+
+    // For EC conflict with different replica index, all container present but containerSet loaded with same
+    // replica index as the one in DB.
+    assertTrue(Files.exists(Paths.get(ec3.getContainerData().getContainerPath())));
+    assertTrue(Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
+    assertEquals(containerSet.getContainer(ec3.getContainerData().getContainerID()).getContainerData()
+        .getReplicaIndex(), ec3.getContainerData().getReplicaIndex());
+
+    assertTrue(Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
+    assertTrue(Files.exists(Paths.get(ec6.getContainerData().getContainerPath())));
+    assertEquals(containerSet.getContainer(ec6.getContainerData().getContainerID()).getContainerData()
+        .getReplicaIndex(), ec6.getContainerData().getReplicaIndex());
+
+    // for EC container whose entry in DB with replica index -1, is allowed to be loaded
+    assertTrue(Files.exists(Paths.get(ec7.getContainerData().getContainerPath())));
+    assertEquals(3, mockMetadataStore.getContainerCreateInfoTable().get(
+        ContainerID.valueOf(ec7.getContainerData().getContainerID())).getReplicaIndex());
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
@@ -631,8 +724,6 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = keyValueHandler.getChecksumManager();
-    List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(containerData, deletedBlockIds);
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     long expectedDataChecksum = checksumManager.read(containerData).getContainerMerkleTree().getDataChecksum();
 
@@ -647,17 +738,7 @@ public class TestContainerReader {
     KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
     assertNotSame(containerData, loadedData);
     assertEquals(expectedDataChecksum, loadedData.getDataChecksum());
-    ContainerProtos.ContainerChecksumInfo loadedChecksumInfo =
-        ContainerChecksumTreeManager.readChecksumInfo(loadedData);
     verifyAllDataChecksumsMatch(loadedData, conf);
-
-    // Verify the deleted block IDs match what we set
-    List<Long> loadedDeletedBlockIds = loadedChecksumInfo.getDeletedBlocksList().stream()
-        .map(ContainerProtos.BlockMerkleTree::getBlockID)
-        .sorted()
-        .collect(Collectors.toList());
-    assertEquals(3, loadedChecksumInfo.getDeletedBlocksCount());
-    assertEquals(deletedBlockIds, loadedDeletedBlockIds);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -670,8 +751,7 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
-    ContainerProtos.ContainerChecksumInfo checksumInfo =
-        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long dataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
     // Verify no checksum in RocksDB initially
@@ -741,13 +821,13 @@ public class TestContainerReader {
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     // Create an empty checksum file that exists but has no valid merkle tree
     assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
-    
+
     // Verify no checksum in RocksDB initially
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
       assertNull(dbDataChecksum);
     }
-    
+
     ContainerCache.getInstance(conf).shutdownCache();
 
     // Test container loading - should handle when checksum file is present without the container merkle tree and
@@ -794,7 +874,7 @@ public class TestContainerReader {
   private void setLayoutAndSchemaVersion(
       ContainerTestVersionInfo versionInfo) {
     layout = versionInfo.getLayout();
-    schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }

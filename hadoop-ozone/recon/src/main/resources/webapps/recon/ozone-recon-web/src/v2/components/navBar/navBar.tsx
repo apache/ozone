@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React, {useEffect, useRef, useState} from 'react';
-import {AxiosResponse} from 'axios';
+import React, {useEffect} from 'react';
 import {Layout, Menu} from 'antd';
 import {
   BarChartOutlined,
@@ -29,14 +28,16 @@ import {
   FolderOpenOutlined,
   InboxOutlined,
   LayoutOutlined,
-  PieChartOutlined
+  PieChartOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import {Link, useLocation} from 'react-router-dom';
 
 
 import logo from '@/logo.png';
 import {showDataFetchError} from '@/utils/common';
-import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import {useApiData} from '@/v2/hooks/useAPIData.hook';
+import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
 import './navBar.less';
 
@@ -51,34 +52,29 @@ const NavBar: React.FC<NavBarProps> = ({
   collapsed = false,
   onCollapse = () => { }
 }) => {
-  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(false);
-  const cancelDisabledFeatureSignal = useRef<AbortController>();
   const location = useLocation();
-
-  const fetchDisabledFeatures = async () => {
-    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
-    const { request, controller } = AxiosGetHelper(
-      disabledfeaturesEndpoint,
-      cancelDisabledFeatureSignal.current
-    )
-    cancelDisabledFeatureSignal.current = controller;
-    try {
-      const response: AxiosResponse<string[]> = await request;
-      const heatmapDisabled = response?.data?.includes('HEATMAP')
-      setIsHeatmapEnabled(!heatmapDisabled);
-    } catch (error: unknown) {
-      showDataFetchError((error as Error).toString())
+  
+  const { data: disabledFeatures, error } = useApiData<string[]>(
+    '/api/v1/features/disabledFeatures',
+    [],
+    {
+      onError: (error) => showDataFetchError(error)
     }
-  }
+  );
 
+  const { data: chatbotHealth, success: chatbotHealthLoaded } = useApiData<{
+    enabled: boolean;
+    llmClientAvailable: boolean;
+  }>(
+    CHATBOT_ENDPOINTS.HEALTH,
+    { enabled: false, llmClientAvailable: false },
+    {
+      retryAttempts: 0,
+    }
+  );
 
-  useEffect(() => {
-    fetchDisabledFeatures();
-    // Component will unmount
-    return (() => {
-      cancelRequests([cancelDisabledFeatureSignal.current!])
-    })
-  }, [])
+  const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
+  const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
     <Menu.Item key='/Overview'
@@ -138,6 +134,12 @@ const NavBar: React.FC<NavBarProps> = ({
       <Link to='/NamespaceUsage' />
     </Menu.Item>
   ), (
+    <Menu.Item key='/Capacity'
+      icon={<PieChartOutlined />}>
+      <span>Cluster Capacity</span>
+      <Link to='/Capacity' />
+    </Menu.Item>
+  ),(
     isHeatmapEnabled &&
     <Menu.Item key='/Heatmap'
       icon={<LayoutOutlined />}>
@@ -147,6 +149,13 @@ const NavBar: React.FC<NavBarProps> = ({
         state: { isHeatmapEnabled: isHeatmapEnabled }
       }}
       />
+    </Menu.Item>
+  ),(
+    isChatbotEnabled &&
+    <Menu.Item key='/Assistant'
+      icon={<ThunderboltOutlined />}>
+      <span>Recon AI</span>
+      <Link to='/Assistant' />
     </Menu.Item>
   )]
   return (

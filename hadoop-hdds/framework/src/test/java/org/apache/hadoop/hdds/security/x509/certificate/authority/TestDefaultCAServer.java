@@ -44,9 +44,11 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -450,9 +452,64 @@ public class TestDefaultCAServer {
     }
   }
 
+  @Test
+  public void testDaylightSavingZone() throws Exception {
+    TimeZone defaultTimeZone = TimeZone.getDefault();
+    TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"));
+
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    KeyPair keyPair =
+        new HDDSKeyGenerator(securityConfig).generateKey();
+    //TODO: generateCSR!
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .addIpAddress("8.8.8.8")
+        .addServiceName("OzoneMarketingCluster002")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        clusterId, scmId, caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    Future<CertPath> holder = testCA.requestCertificate(
+        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,
+        String.valueOf(System.nanoTime()));
+    // Right now our calls are synchronous. Eventually this will have to wait.
+    assertTrue(holder.isDone());
+    //Test that the cert path returned contains the CA certificate in proper
+    // place
+    List<? extends Certificate> certBundle = holder.get().getCertificates();
+
+    // verify new created SCM certificate
+    X509Certificate certificate = (X509Certificate) certBundle.get(0);
+    Date startDate = certificate.getNotBefore();
+    Date endDate = certificate.getNotAfter();
+    assertEquals(securityConfig.getMaxCertificateDuration().toMillis(),
+        endDate.toInstant().toEpochMilli() - startDate.toInstant().toEpochMilli());
+
+    // verify root CA
+    List<? extends Certificate> certificateList = testCA.getCaCertPath().getCertificates();
+    certificate = (X509Certificate) certificateList.get(0);
+    startDate = certificate.getNotBefore();
+    endDate = certificate.getNotAfter();
+    assertEquals(securityConfig.getMaxCertificateDuration().toMillis(),
+        endDate.toInstant().toEpochMilli() - startDate.toInstant().toEpochMilli());
+    TimeZone.setDefault(defaultTimeZone);
+  }
+
   private X509Certificate generateExternalCert(KeyPair keyPair) throws Exception {
-    LocalDateTime notBefore = LocalDateTime.now();
-    LocalDateTime notAfter = notBefore.plusYears(1);
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";

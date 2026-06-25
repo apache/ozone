@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,12 +65,13 @@ class TestContainerBalancerSubCommand {
   private static final Pattern WAITING_TO_STOP = Pattern.compile(
       "^Sending\\sstop\\scommand.\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
       "Container\\sBalancer\\sstopped.");
+  private static final Pattern STOP_FAILED = Pattern.compile("^Failed\\sto\\sstop\\sContainer\\sBalancer$");
 
   private static final String BALANCER_CONFIG_OUTPUT = "Container Balancer Configuration values:\n" +
       "Key                                                Value\n" +
       "Threshold                                          10.0\n" +
       "Max Datanodes to Involve per Iteration(percent)    20\n" +
-      "Max Size to Move per Iteration                     0GB\n" +
+      "Max Size to Move per Iteration                     50GB\n" +
       "Max Size Entering Target per Iteration             26GB\n" +
       "Max Size Leaving Source per Iteration              26GB\n" +
       "Number of Iterations                               3\n" +
@@ -77,6 +80,7 @@ class TestContainerBalancerSubCommand {
       "Interval between each Iteration                    0min\n" +
       "Whether to Enable Network Topology                 false\n" +
       "Whether to Trigger Refresh Datanode Usage Info     false\n" +
+      "Container IDs to Include in Balancing              None\n" +
       "Container IDs to Exclude from Balancing            None\n" +
       "Datanodes Specified to be Balanced                 None\n" +
       "Datanodes Excluded from Balancing                  None";
@@ -434,11 +438,19 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  public void testContainerBalancerStopSubcommandInvalidState() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    doThrow(IOException.class).when(scmClient).stopContainerBalancer();
+    assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
+    assertThat(err.get()).containsPattern(STOP_FAILED);
+  }
+
+  @Test
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -454,15 +466,14 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)
             .setMessage("")
             .build());
-    startCmd.execute(scmClient);
-
-    assertThat(out.get()).containsPattern(FAILED_TO_START);
+    assertThrows(IOException.class, () -> startCmd.execute(scmClient));
+    assertThat(err.get()).containsPattern(FAILED_TO_START);
   }
 
 }

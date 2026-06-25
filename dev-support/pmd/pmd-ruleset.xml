@@ -34,13 +34,22 @@
   <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
   <rule ref="category/java/bestpractices.xml/SimplifiableTestAssertion" />
 
+  <rule ref="category/java/design.xml/SingularField" />
+
   <rule ref="category/java/performance.xml/AddEmptyString"/>
   <rule ref="category/java/performance.xml/AppendCharacterWithChar" />
   <rule ref="category/java/performance.xml/AvoidFileStream"/>
+  <rule ref="category/java/performance.xml/BigIntegerInstantiation"/>
+  <rule ref="category/java/performance.xml/ConsecutiveAppendsShouldReuse"/>
   <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
   <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
   <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/StringToString"/>
+  <rule ref="category/java/performance.xml/UseArraysAsList"/>
+  <rule ref="category/java/performance.xml/UseIndexOfChar"/>
+  <rule ref="category/java/performance.xml/UseStringBufferForStringAppends"/>
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
+  <rule ref="category/java/performance.xml/UselessStringValueOf"/>
 
   <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
     <properties>
@@ -50,4 +59,6 @@
   </rule>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/generated-test-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/org/apache/hadoop/.*_/.*</exclude-pattern>
 </ruleset>

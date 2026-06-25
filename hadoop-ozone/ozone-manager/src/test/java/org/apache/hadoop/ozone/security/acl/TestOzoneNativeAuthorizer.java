@@ -335,7 +335,7 @@ public class TestOzoneNativeAuthorizer {
     String group = (!testUgi.getGroups().isEmpty()) ?
         testUgi.getGroups().get(0) : "";
 
-    RequestContext.Builder builder = new RequestContext.Builder()
+    RequestContext.Builder builder = RequestContext.newBuilder()
         .setClientUgi(testUgi)
         .setAclType(accessType);
 

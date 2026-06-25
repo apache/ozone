@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
-
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
-import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Recon startup is not blocked. During rebuild, APIs that depend on
  * the tree may return initializing responses as designed.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.NSSUMMARY_AGGREGATED_TOTALS, type = FINALIZE)
+@UpgradeActionRecon(feature = ReconLayoutFeature.NSSUMMARY_AGGREGATED_TOTALS)
 public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAggregatedTotalsUpgrade.class);
@@ -50,16 +47,15 @@ public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
           "Guice injector not initialized. NSSummary rebuild cannot proceed during upgrade.");
     }
 
-    ReconNamespaceSummaryManager nsMgr = injector.getInstance(ReconNamespaceSummaryManager.class);
-    ReconOMMetadataManager omMgr = injector.getInstance(ReconOMMetadataManager.class);
-
-    // Fire and forget: unified control using ReconUtils -> NSSummaryTask
+    ReconTaskController reconTaskController = injector.getInstance(ReconTaskController.class);
     LOG.info("Triggering asynchronous NSSummary tree rebuild for materialized totals (upgrade action).");
-    ReconUtils.triggerAsyncNSSummaryRebuild(nsMgr, omMgr);
-  }
-
-  @Override
-  public UpgradeActionType getType() {
-    return FINALIZE;
+    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+      LOG.error(
+          "Failed to queue reinitialization event for manual trigger (result: {}), failing the reinitialization " +
+              "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
+              "scheduler task.", result);
+    }
   }
 }

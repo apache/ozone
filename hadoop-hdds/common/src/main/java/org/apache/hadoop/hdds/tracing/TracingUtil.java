@@ -17,27 +17,43 @@
 
 package org.apache.hadoop.hdds.tracing;
 
-import io.jaegertracing.Configuration;
-import io.jaegertracing.internal.JaegerTracer;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.SpanContext;
-import io.opentracing.Tracer;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class to collect all the tracing helper methods.
  */
 public final class TracingUtil {
-
+  private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
 
   private static volatile boolean isInit = false;
+  private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
+  private static SdkTracerProvider sdkTracerProvider;
 
   private TracingUtil() {
   }
@@ -45,16 +61,91 @@ public final class TracingUtil {
   /**
    * Initialize the tracing with the given service name.
    */
-  public static void initTracing(
-      String serviceName, ConfigurationSource conf) {
-    if (!GlobalTracer.isRegistered() && isTracingEnabled(conf)) {
-      Configuration config = Configuration.fromEnv(serviceName);
-      JaegerTracer tracer = config.getTracerBuilder()
-          .registerExtractor(StringCodec.FORMAT, new StringCodec())
-          .registerInjector(StringCodec.FORMAT, new StringCodec())
-          .build();
-      GlobalTracer.registerIfAbsent(tracer);
+  public static synchronized void initTracing(
+      String serviceName, TracingConfig tracingConfig) {
+    if (!tracingConfig.isTracingEnabled() || isInit) {
+      return;
+    }
+
+    try {
+      initialize(serviceName, tracingConfig);
       isInit = true;
+      LOG.info("Initialized tracing service: {}", serviceName);
+    } catch (Exception e) {
+      LOG.error("Failed to initialize tracing", e);
+    }
+  }
+
+  /**
+   * Receives serviceName and configurationSource.
+   * Delegates tracing initiation to {@link #initTracing(String, TracingConfig)}.
+   */
+  public static synchronized void initTracing(
+      String serviceName, ConfigurationSource conf) {
+    initTracing(serviceName, conf.getObject(TracingConfig.class));
+  }
+
+  /**
+   * Shuts down and re-initializes tracing.
+   * Called after tracing-related keys are reconfigured on OM/SCM/DN.
+   */
+  public static synchronized void reconfigureTracing(
+      String serviceName, TracingConfig tracingConfig) {
+    shutdownTracing();
+    initTracing(serviceName, tracingConfig);
+  }
+
+  private static void shutdownTracing() {
+    if (sdkTracerProvider != null) {
+      sdkTracerProvider.shutdown();
+      sdkTracerProvider = null;
+    }
+    tracer = OpenTelemetry.noop().getTracer("noop");
+    isInit = false;
+  }
+
+  private static void initialize(String serviceName, TracingConfig tracingConfig) {
+    //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
+    String otelEndPoint = tracingConfig.getTracingEndpoint();
+    double samplerRatio = tracingConfig.getTraceSamplerRatio();
+    LOG.info("Sampling Trace Config = '{}'", samplerRatio);
+    String spanSamplingConfig = tracingConfig.getSpanSampling();
+    LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
+
+    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
+
+    Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
+    OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+        .setEndpoint(otelEndPoint)
+        .build();
+
+    SimpleSpanProcessor spanProcessor = SimpleSpanProcessor.builder(spanExporter).build();
+
+    // Choose sampler based on span sampling config. If it is empty use trace based sampling only.
+    // else use custom SpanSampler.
+    Sampler sampler;
+    if (spanMap.isEmpty()) {
+      sampler = Sampler.traceIdRatioBased(samplerRatio);
+    } else {
+      Sampler rootSampler = Sampler.traceIdRatioBased(samplerRatio);
+      sampler = new SpanSampler(rootSampler, spanMap);
+    }
+
+    SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+        .addSpanProcessor(spanProcessor)
+        .setResource(resource)
+        .setSampler(sampler)
+        .build();
+
+    try {
+      OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+          .setTracerProvider(tracerProvider)
+          .build();
+      tracer = openTelemetry.getTracer(serviceName);
+      sdkTracerProvider = tracerProvider;
+    } catch (RuntimeException e) {
+      tracerProvider.shutdown();
+      throw e;
     }
   }
 
@@ -64,21 +155,16 @@ public final class TracingUtil {
    * @return encoded tracing context.
    */
   public static String exportCurrentSpan() {
-    return exportSpan(GlobalTracer.get().activeSpan());
-  }
-
-  /**
-   * Export the specific span as a string.
-   *
-   * @return encoded tracing context.
-   */
-  public static String exportSpan(Span span) {
-    if (span != null && isInit) {
-      StringBuilder builder = new StringBuilder();
-      GlobalTracer.get().inject(span.context(), StringCodec.FORMAT, builder);
-      return builder.toString();
+    Span currentSpan = Span.current();
+    if (!currentSpan.getSpanContext().isValid()) {
+      return NULL_SPAN_AS_STRING;
     }
-    return NULL_SPAN_AS_STRING;
+
+    StringBuilder builder = new StringBuilder();
+    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
+    propagator.inject(Context.current(), builder,
+        (carrier, key, value) -> carrier.append(key).append('=').append(value).append(';'));
+    return builder.toString();
   }
 
   /**
@@ -86,26 +172,18 @@ public final class TracingUtil {
    *
    * @param name          name of the newly created scope
    * @param encodedParent Encoded parent span (could be null or empty)
-   *
-   * @return OpenTracing scope.
+   * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
-    Tracer tracer = GlobalTracer.get();
-    return tracer.buildSpan(name)
-        .asChildOf(extractParent(encodedParent, tracer))
-        .start();
-  }
-
-  private static SpanContext extractParent(String parent, Tracer tracer) {
-    if (!GlobalTracer.isRegistered()) {
-      return null;
+    if (encodedParent == null || encodedParent.isEmpty()) {
+      return tracer.spanBuilder(name).setNoParent().startSpan();
     }
 
-    if (parent == null || parent.isEmpty()) {
-      return null;
-    }
-
-    return tracer.extract(StringCodec.FORMAT, new StringBuilder(parent));
+    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
+    Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
+    return tracer.spanBuilder(name)
+        .setParent(extract)
+        .startSpan();
   }
 
   /**
@@ -130,20 +208,55 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  public static boolean isTracingEnabled(
-      ConfigurationSource conf) {
-    return conf.getBoolean(
-        ScmConfigKeys.HDDS_TRACING_ENABLED,
-        ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+  public static boolean isTracingEnabled(ConfigurationSource conf) {
+    return conf.getObject(TracingConfig.class).isTracingEnabled();
+  }
+
+  /**
+   * Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
+   * The sample rate must be a number between 0 and 1. Any value other than that will LOG an error.
+   */
+  static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
+    Map<String, LoopSampler> result = new HashMap<>();
+    if (configStr == null || configStr.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    for (String entry : configStr.split(",")) {
+      String trimmed = entry.trim();
+      int colon = trimmed.indexOf(':');
+
+      if (colon <= 0 || colon >= trimmed.length() - 1) {
+        continue;
+      }
+
+      String name = trimmed.substring(0, colon).trim();
+      String val = trimmed.substring(colon + 1).trim();
+
+      try {
+        double rate = Double.parseDouble(val);
+        //if the rate  is less than or equal to zero , no sampling config is taken for that key value pair.
+        if (rate > 0) {
+          // cap it at 1.0 when a number greater than 1 is entered
+          double effectiveRate = Math.min(rate, 1.0);
+          result.put(name, new LoopSampler(effectiveRate));
+        } else {
+          LOG.warn("rate for span '{}' is 0 or less, ignoring sample configuration", name);
+        }
+      } catch (NumberFormatException e) {
+        LOG.error("Invalid rate '{}' for span '{}', ignoring sample configuration", val, name);
+      }
+    }
+    return result;
   }
 
   /**
    * Execute {@code runnable} inside an activated new span.
+   * If a parent span exists in the current context, this becomes a child span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
-    Span span = GlobalTracer.get()
-        .buildSpan(spanName).start();
+    Span span = buildSpan(spanName);
     executeInSpan(span, runnable);
   }
 
@@ -152,24 +265,25 @@ public final class TracingUtil {
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
-    Span span = GlobalTracer.get()
-        .buildSpan(spanName).start();
+    Span span = buildSpan(spanName);
     return executeInSpan(span, supplier);
   }
 
   /**
    * Execute {@code supplier} in the given {@code span}.
+   *
    * @return the value returned by {@code supplier}
    */
   private static <R, E extends Exception> R executeInSpan(Span span,
       CheckedSupplier<R, E> supplier) throws E {
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = span.makeCurrent()) {
       return supplier.get();
     } catch (Exception ex) {
-      span.setTag("failed", true);
+      span.addEvent("Failed with exception: " + ex.getMessage());
+      span.setStatus(StatusCode.ERROR);
       throw ex;
     } finally {
-      span.finish();
+      span.end();
     }
   }
 
@@ -178,13 +292,14 @@ public final class TracingUtil {
    */
   private static <E extends Exception> void executeInSpan(Span span,
       CheckedRunnable<E> runnable) throws E {
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = span.makeCurrent()) {
       runnable.run();
     } catch (Exception ex) {
-      span.setTag("failed", true);
+      span.addEvent("Failed with exception: " + ex.getMessage());
+      span.setStatus(StatusCode.ERROR);
       throw ex;
     } finally {
-      span.finish();
+      span.end();
     }
   }
 
@@ -203,12 +318,117 @@ public final class TracingUtil {
    * This is a simplified way to use span as there is no way to add any tag
    * in case of Exceptions.
    */
-  public static AutoCloseable createActivatedSpan(String spanName) {
-    Span span = GlobalTracer.get().buildSpan(spanName).start();
-    Scope scope = GlobalTracer.get().activateSpan(span);
+  public static TraceCloseable createActivatedSpan(String spanName) {
+    Span span = buildSpan(spanName);
+    Scope scope = span.makeCurrent();
     return () -> {
       scope.close();
-      span.finish();
+      span.end();
+    };
+  }
+
+  public static Span getActiveSpan() {
+    return Span.current();
+  }
+
+  /**
+   * AutoCloseable interface for tracing span but no exception is thrown in close.
+   */
+  public interface TraceCloseable extends AutoCloseable {
+    @Override
+    void close();
+  }
+
+  /**
+   * A TextMapGetter implementation to extract tracing info from String.
+   */
+  public static class TextExtractor implements io.opentelemetry.context.propagation.TextMapGetter<String> {
+    private Map<String, String> map = new HashMap<>();
+
+    @Override
+    public Iterable<String> keys(String carrier) {
+      if (map.isEmpty()) {
+        parse(carrier);
+      }
+      return map.keySet();
+    }
+
+    @Override
+    public String get(String carrier, String key) {
+      if (map.isEmpty()) {
+        parse(carrier);
+      }
+      return map.get(key);
+    }
+
+    private void parse(String carrier) {
+      if (carrier == null || carrier.isEmpty()) {
+        return;
+      }
+      String[] parts = carrier.split(";");
+      for (String part : parts) {
+        String[] kv = part.split("=");
+        if (kv.length == 2) {
+          map.put(kv[0].trim(), kv[1].trim());
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates a new span, using the current context as a parent if valid;
+   * otherwise, creates a root span.
+   */
+  private static Span buildSpan(String spanName) {
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan.getSpanContext().isValid()) {
+      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      return tracer.spanBuilder(spanName).setNoParent().startSpan();
+    }
+  }
+
+  /**
+   * A TextMapGetter implementation to extract tracing info from getHeader.
+   */
+  public static class HttpHeaderGetter implements TextMapGetter<Function<String, String>> {
+
+    @Override
+    public Iterable<String> keys(Function<String, String> carrier) {
+      // Not used during the extract call, so returning an empty list.
+      return Collections.emptyList();
+    }
+
+    @Override
+    public String get(Function<String, String> carrier, String key) {
+      return carrier == null ? null : carrier.apply(key);
+    }
+  }
+
+  public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
+      String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
+    if (conf == null || !isTracingEnabled(conf)) {
+      return () -> { };
+    }
+
+    Context remote = W3CTraceContextPropagator.getInstance()
+        .extract(Context.current(), getHeader, new HttpHeaderGetter());
+
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
+      return createActivatedSpan(spanName);
+    }
+
+    Span span = tracer.spanBuilder(spanName)
+        .setParent(remote)
+        .startSpan();
+
+    Scope scope = span.makeCurrent();
+
+    return () -> {
+      scope.close();
+      span.end();
     };
   }
 }

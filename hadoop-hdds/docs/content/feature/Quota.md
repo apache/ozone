@@ -7,7 +7,6 @@ icon: user
 menu:
    main:
       parent: Features
-summary: Introduction to Ozone Quota
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more

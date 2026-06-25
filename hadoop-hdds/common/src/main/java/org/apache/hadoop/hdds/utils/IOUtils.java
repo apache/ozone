@@ -23,10 +23,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
 import org.apache.ratis.util.AtomicFileOutputStream;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 
 /**
@@ -118,5 +121,24 @@ public final class IOUtils {
       props.load(in);
     }
     return props;
+  }
+
+  /**
+   * Get the INode for file.
+   *
+   * @param file File whose INode is to be retrieved.
+   * @return INode for file.
+   */
+  public static Object getINode(Path file) throws IOException {
+    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+  }
+
+  /** Round the given required size up to the next multiple of the given chunk size. */
+  public static long roundUp(long requiredSize, int chunkSize) {
+    final long n = (requiredSize - 1) / chunkSize;
+    final long rounded = (n + 1) * chunkSize;
+    Preconditions.assertTrue(rounded >= requiredSize);
+    Preconditions.assertTrue(rounded - chunkSize < requiredSize);
+    return rounded;
   }
 }

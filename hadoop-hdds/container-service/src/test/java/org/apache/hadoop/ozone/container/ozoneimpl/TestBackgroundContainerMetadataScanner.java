@@ -38,8 +38,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -49,6 +51,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -255,5 +258,26 @@ public class TestBackgroundContainerMetadataScanner extends
     scanner.shutdown();
     // The container should remain healthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  /**
+   * When metadata scan reports only "too many open files" errors due to file-descriptor exhaustion, 
+   * the container must not be marked UNHEALTHY.
+   */
+  @Test
+  public void testMetadataScanOnlyTooManyOpenFilesDoesNotMarkUnhealthy() throws Exception {
+    Container<?> container = mockKeyValueContainer();
+    IOException emf = new IOException("Too many open files");
+    MetadataScanResult scanResult = MetadataScanResult.fromErrors(Collections.singletonList(
+            new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, new File("."), emf)));
+    when(container.scanMetaData()).thenReturn(scanResult);
+
+    setContainers(container);
+    scanner.runIteration();
+
+    verify(controller, never()).markContainerUnhealthy(anyLong(), any(ScanResult.class));
+    assertEquals(1, scanner.getMetrics().getNumScanIterations());
+    assertEquals(0, scanner.getMetrics().getNumContainersScanned());
+    assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
   }
 }

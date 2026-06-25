@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.hadoop.fs.ByteBufferReadable;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * An {@link ByteReaderStrategy} implementation which supports ByteBuffer as the
@@ -32,18 +33,22 @@ public class ByteBufferReader implements ByteReaderStrategy {
   private int targetLen;
 
   public ByteBufferReader(ByteBuffer buf) {
-    if (buf == null) {
-      throw new NullPointerException();
-    }
-    this.readBuf = buf;
+    this.readBuf = Objects.requireNonNull(buf, "buf == null");
     this.targetLen = buf.remaining();
+  }
+
+  ByteBuffer getBuffer() {
+    return readBuf;
+  }
+
+  int readImpl(InputStream inputStream) throws IOException {
+    return Preconditions.assertInstanceOf(inputStream, ByteBufferReadable.class)
+        .read(readBuf);
   }
 
   @Override
   public int readFromBlock(InputStream is, int numBytesToRead) throws
       IOException {
-    Preconditions.checkArgument(is != null);
-    Preconditions.checkArgument(is instanceof ByteBufferReadable);
     // change buffer limit
     int bufferLimit = readBuf.limit();
     if (numBytesToRead < targetLen) {
@@ -51,7 +56,7 @@ public class ByteBufferReader implements ByteReaderStrategy {
     }
     int numBytesRead;
     try {
-      numBytesRead = ((ByteBufferReadable)is).read(readBuf);
+      numBytesRead = readImpl(is);
     } finally {
       // restore buffer limit
       if (numBytesToRead < targetLen) {

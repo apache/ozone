@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from 'react';
-import { AxiosError } from 'axios';
+import React, { useState } from 'react';
 import { Alert, Button, Tooltip } from 'antd';
 import { InfoCircleFilled, ReloadOutlined, } from '@ant-design/icons';
 import { ValueType } from 'react-select';
@@ -27,7 +26,7 @@ import NUPieChart from '@/v2/components/plots/nuPieChart';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
 import { showDataFetchError, showInfoNotification } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 
 import { NUResponse } from '@/v2/types/namespaceUsage.types';
 
@@ -41,37 +40,38 @@ const LIMIT_OPTIONS: Option[] = [
   { label: '30', value: '30' }
 ]
 
+const DEFAULT_NU_RESPONSE: NUResponse = {
+  status: '',
+  path: '/',
+  subPathCount: 0,
+  size: 0,
+  sizeWithReplica: 0,
+  subPaths: [],
+  sizeDirectKey: 0
+};
+
 const NamespaceUsage: React.FC<{}> = () => {
-  const [loading, setLoading] = useState<boolean>(false);
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
-  const [duResponse, setDUResponse] = useState<NUResponse>({
-    status: '',
-    path: '/',
-    subPathCount: 0,
-    size: 0,
-    sizeWithReplica: 0,
-    subPaths: [],
-    sizeDirectKey: 0
-  });
+  const [currentPath, setCurrentPath] = useState<string>('/');
 
-  const cancelPieSignal = useRef<AbortController>();
+  // Use the modern hooks pattern
+  const namespaceUsageData = useApiData<NUResponse>(
+    `/api/v1/namespace/usage?path=${currentPath}&files=true&sortSubPaths=true`,
+    DEFAULT_NU_RESPONSE,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-  function loadData(path: string) {
-    console.log("Loading data at: ", path);
-    setLoading(true);
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/namespace/usage?path=${path}&files=true&sortSubPaths=true`,
-      cancelPieSignal.current
-    );
-    cancelPieSignal.current = controller;
-
-    request.then(response => {
-      const duResponse: NUResponse = response.data;
-      console.log(duResponse);
+  // Process data when it changes
+  React.useEffect(() => {
+    if (namespaceUsageData.data) {
+      const duResponse = namespaceUsageData.data;
       const status = duResponse.status;
+      
       if (status === 'PATH_NOT_FOUND') {
-        setLoading(false);
-        showDataFetchError(`Invalid Path: ${path}`);
+        showDataFetchError(`Invalid Path: ${currentPath}`);
         return;
       }
 
@@ -79,27 +79,19 @@ const NamespaceUsage: React.FC<{}> = () => {
         showInfoNotification("Information being initialized", "Namespace Summary is being initialized, please wait.")
         return;
       }
+    }
+  }, [namespaceUsageData.data, currentPath]);
 
-      setDUResponse(duResponse);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
+  const loadData = (path: string) => {
+    setCurrentPath(path);
+  };
 
   function handleLimitChange(selected: ValueType<Option, false>) {
     setLimit(selected as Option);
   }
 
-  React.useEffect(() => {
-    //On mount load default data
-    loadData(duResponse.path)
-
-    return (() => {
-      cancelRequests([cancelPieSignal.current!]);
-    })
-  }, []);
+  const duResponse = namespaceUsageData.data || DEFAULT_NU_RESPONSE;
+  const loading = namespaceUsageData.loading;
 
   return (
     <>
@@ -149,7 +141,7 @@ const NamespaceUsage: React.FC<{}> = () => {
               subPaths={duResponse.subPaths}
               sizeWithReplica={duResponse.sizeWithReplica}
               size={duResponse.size} />
-            <NUMetadata path={duResponse.path} />
+            <NUMetadata path={currentPath} />
           </div>
         </div>
       </div>

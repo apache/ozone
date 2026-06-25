@@ -66,7 +66,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
 
     try {
       UserGroupInformation ugi = createUGIForApi();
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+      if (ozoneManager.isAdminAuthorizationEnabled() && !ozoneManager.isAdmin(ugi)) {
         throw new OMException("Access denied for user "
             + ugi + ". " +
             "Superuser privilege is required to cancel ozone manager " +

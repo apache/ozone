@@ -46,11 +46,9 @@ import org.junit.jupiter.api.Test;
 public class  TestMultiRaftSetup {
 
   private MiniOzoneCluster cluster;
-  private StorageContainerManager scm;
   private NodeManager nodeManager;
   private PipelineManager pipelineManager;
 
-  private long pipelineDestroyTimeoutInMillis;
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
@@ -60,18 +58,15 @@ public class  TestMultiRaftSetup {
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(dnCount).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    pipelineDestroyTimeoutInMillis = 1000;
+    long pipelineDestroyTimeoutInMillis = 1000;
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
         pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS);
     cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
     nodeManager = scm.getScmNodeManager();
     pipelineManager = scm.getPipelineManager();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();

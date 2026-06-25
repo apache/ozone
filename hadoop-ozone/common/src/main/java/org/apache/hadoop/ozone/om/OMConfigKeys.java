@@ -30,6 +30,9 @@ public final class OMConfigKeys {
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY =
+      "ozone.om.snapshot.rename.allowed";
+  public static final boolean OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT = false;
 
   // Location where the OM stores its DB files. In the future we may support
   // multiple entries for performance (sharding)..
@@ -62,6 +65,8 @@ public final class OMConfigKeys {
       "ozone.om.node.id";
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
+  public static final String OZONE_OM_LISTENER_NODES_KEY =
+      "ozone.om.listener.nodes";
 
   public static final String OZONE_OM_FEATURES_DISABLED =
       "ozone.om.features.disabled";
@@ -99,10 +104,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
-
-  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
-      "ozone.om.volume.listall.allowed";
-  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
@@ -165,6 +166,10 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL =
+      "ozone.om.snapshot.directory.metrics.update.interval";
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
+
   /**
    * OM Ratis related configurations.
    */
@@ -205,9 +210,6 @@ public final class OMConfigKeys {
       "ozone.om.ratis.server.pending.write.element-limit";
   public static final int OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT = 4096;
 
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT = "ozone.om.ratis.server.pending.write.byte-limit";
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT = "64MB";
-
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
@@ -229,7 +231,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY
       = "ozone.om.ratis.snapshot.max.total.sst.size";
   public static final long
-      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 100_000_000;
+      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 10737418240L;
+
+  public static final String OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY
+      = "ozone.om.db.checkpoint.use.inode.based.transfer";
+  public static final boolean OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT = true;
 
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
@@ -386,11 +392,16 @@ public final class OMConfigKeys {
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
+  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
+      "ozone.path.deleting.limit.per.task";
+  // default is 20000 taking account of 32MB buffer size
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+
   /**
    * Configuration properties for Snapshot Directory Service.
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
-  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = true;
   /**
    * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
    * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
@@ -426,10 +437,21 @@ public final class OMConfigKeys {
       "ozone.snapshot.deleting.limit.per.task";
   public static final int SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT = 10;
 
+  // Snapshot defragmentation service configuration
+  public static final String SNAPSHOT_DEFRAG_LIMIT_PER_TASK =
+      "ozone.snapshot.defrag.limit.per.task";
+  public static final int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT = 1;
+
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
       "ozone.snapshot.filtering.service.interval";
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL =
+      "ozone.snapshot.defrag.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT = "-1";
+  // TODO: Disabled by default. Do not enable by default until upgrade handling is complete.
 
   public static final String
       OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT =
@@ -528,6 +550,11 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT
       = 100_000;
 
+  public static final String OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE
+      = "ozone.om.container.location.datanode.cache.size";
+  public static final int
+      OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT = 10_000;
+
   public static final String OZONE_OM_CONTAINER_LOCATION_CACHE_TTL
       = "ozone.om.container.location.cache.ttl";
 
@@ -564,7 +591,7 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
       = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
-      = 1000;
+      = 5000;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
       = "ozone.om.snapshot.diff.thread.pool.size";
@@ -594,7 +621,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(60);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
@@ -611,7 +638,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.max.allowed.keys.changed.per.job";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
-      = 10_000_000;
+      = 1_000_000_000L;
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
@@ -652,7 +679,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
@@ -660,6 +687,21 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
       "ozone.om.snapshot.compact.non.snapshot.diff.tables";
   public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
+
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT =
+      "ozone.om.hierarchical.resource.locks.soft.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT = 1024;
+
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT =
+      "ozone.om.hierarchical.resource.locks.hard.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT = 10000;
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
+      "ozone.om.snapshot.local.data.manager.service.interval";
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
+
+  public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.om.ratis.events.max.limit";
+  public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

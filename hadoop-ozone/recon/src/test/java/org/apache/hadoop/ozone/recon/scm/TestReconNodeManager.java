@@ -71,7 +71,6 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
-  private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
   private ReconContext reconContext;
 
@@ -81,7 +80,7 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     ReconUtils reconUtils = new ReconUtils();
-    reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
+    ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
@@ -233,7 +232,7 @@ public class TestReconNodeManager {
     List<DatanodeDetails> nodes =
         reconNodeManager.getNodes(DECOMMISSIONING, null);
     assertEquals(1, nodes.size());
-    assertEquals(datanodeDetails.getUuid(), nodes.get(0).getUuid());
+    assertEquals(datanodeDetails.getID(), nodes.get(0).getID());
   }
 
   @Test

@@ -203,6 +203,22 @@
               {
                 "name": "GetContainerBalancerStatusInfo",
                 "integer": 44
+              },
+              {
+                "name": "ReconcileContainer",
+                "integer": 45
+              },
+              {
+                "name": "GetDeletedBlocksTransactionSummary",
+                "integer": 46
+              },
+              {
+                "name": "ListContainerIDs",
+                "integer": 47
+              },
+              {
+                "name": "SuppressContainer",
+                "integer": 48
               }
             ]
           },
@@ -494,7 +510,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountRequest",
                 "type": "ResetDeletedBlockRetryCountRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -506,7 +528,13 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnRequest",
                 "type": "GetFailedDeletedBlocksTxnRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
@@ -536,6 +564,30 @@
                 "id": 48,
                 "name": "containerBalancerStatusInfoRequest",
                 "type": "ContainerBalancerStatusInfoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerRequest",
+                "type": "ReconcileContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 50,
+                "name": "getDeletedBlocksTxnSummaryRequest",
+                "type": "GetDeletedBlocksTxnSummaryRequestProto",
+                "optional": true
+              },
+              {
+                "id": 51,
+                "name": "scmListContainerIDsRequest",
+                "type": "SCMListContainerIDsRequestProto",
+                "optional": true
+              },
+              {
+                "id": 52,
+                "name": "suppressContainerRequest",
+                "type": "SuppressContainerRequestProto",
                 "optional": true
               }
             ]
@@ -793,7 +845,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountResponse",
                 "type": "ResetDeletedBlockRetryCountResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -805,7 +863,13 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnResponse",
                 "type": "GetFailedDeletedBlocksTxnResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
@@ -836,6 +900,30 @@
                 "name": "containerBalancerStatusInfoResponse",
                 "type": "ContainerBalancerStatusInfoResponseProto",
                 "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerResponse",
+                "type": "ReconcileContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 50,
+                "name": "getDeletedBlocksTxnSummaryResponse",
+                "type": "GetDeletedBlocksTxnSummaryResponseProto",
+                "optional": true
+              },
+              {
+                "id": 51,
+                "name": "scmListContainerIDsResponse",
+                "type": "SCMListContainerIDsResponseProto",
+                "optional": true
+              },
+              {
+                "id": 52,
+                "name": "suppressContainerResponse",
+                "type": "SuppressContainerResponseProto",
+                "optional": true
               }
             ]
           },
@@ -846,7 +934,7 @@
                 "id": 2,
                 "name": "replicationFactor",
                 "type": "ReplicationFactor",
-                "required": true
+                "optional": true
               },
               {
                 "id": 3,
@@ -864,6 +952,12 @@
                 "id": 5,
                 "name": "traceID",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "ecReplicationConfig",
+                "type": "ECReplicationConfig",
                 "optional": true
               }
             ]
@@ -1069,6 +1163,46 @@
             ]
           },
           {
+            "name": "SCMListContainerIDsRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "count",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "startContainerID",
+                "type": "ContainerID",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "state",
+                "type": "LifeCycleState",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMListContainerIDsResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerIDs",
+                "type": "ContainerID",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "SCMListContainerRequestProto",
             "fields": [
               {
@@ -1111,6 +1245,12 @@
                 "id": 7,
                 "name": "ecReplicationConfig",
                 "type": "ECReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "suppressed",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -1498,7 +1638,15 @@
             ]
           },
           {
-            "name": "GetContainerCountRequestProto"
+            "name": "GetContainerCountRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "LifeCycleState",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "GetContainerCountResponseProto",
@@ -1750,6 +1898,20 @@
             ]
           },
           {
+            "name": "GetDeletedBlocksTxnSummaryRequestProto"
+          },
+          {
+            "name": "GetDeletedBlocksTxnSummaryResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "summary",
+                "type": "DeletedBlocksTransactionSummary",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "FinalizeScmUpgradeRequestProto",
             "fields": [
               {
@@ -1970,6 +2132,18 @@
               {
                 "id": 15,
                 "name": "excludeNodes",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "excludeContainers",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "includeContainers",
                 "type": "string",
                 "optional": true
               }
@@ -2253,6 +2427,48 @@
                 "name": "metricsJson",
                 "type": "string",
                 "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReconcileContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ReconcileContainerResponseProto"
+          },
+          {
+            "name": "SuppressContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerIDs",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "suppress",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SuppressContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedContainerIDs",
+                "type": "int64",
+                "is_repeated": true
               }
             ]
           }

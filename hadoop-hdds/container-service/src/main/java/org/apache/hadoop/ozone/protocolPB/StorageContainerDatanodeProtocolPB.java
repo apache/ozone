@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.protocolPB;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageContainerDatanodeProtocolService;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**

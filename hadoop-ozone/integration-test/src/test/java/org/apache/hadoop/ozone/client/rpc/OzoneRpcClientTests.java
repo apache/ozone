@@ -30,13 +30,21 @@ import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByI
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ATOMIC_WRITE_CONFLICT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ETAG_MISMATCH;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -163,13 +171,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
+import org.apache.hadoop.ozone.om.OmTestUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -185,6 +192,7 @@ import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -196,6 +204,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -207,6 +216,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -226,18 +236,20 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static String remoteUserName = "remoteUser";
-  private static String remoteGroupName = "remoteGroup";
+  private static final String REMOTE_GROUP_NAME = "remoteGroup";
   private static OzoneAcl defaultUserAcl = OzoneAcl.of(USER, remoteUserName,
       DEFAULT, READ);
-  private static OzoneAcl defaultGroupAcl = OzoneAcl.of(GROUP, remoteGroupName,
+  private static OzoneAcl defaultGroupAcl = OzoneAcl.of(GROUP, REMOTE_GROUP_NAME,
       DEFAULT, READ);
   private static OzoneAcl inheritedUserAcl = OzoneAcl.of(USER, remoteUserName,
       ACCESS, READ);
   private static OzoneAcl inheritedGroupAcl = OzoneAcl.of(GROUP,
-      remoteGroupName, ACCESS, READ);
+      REMOTE_GROUP_NAME, ACCESS, READ);
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
   private static GenericTestUtils.PrintStreamCapturer output;
+  private static final BucketLayout VERSIONING_TEST_BUCKET_LAYOUT =
+      BucketLayout.OBJECT_STORE;
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
@@ -246,10 +258,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     output = GenericTestUtils.captureOut();
   }
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * @param conf Configurations to start the cluster.
-   */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     startCluster(conf, MiniOzoneCluster.newBuilder(conf));
   }
@@ -259,6 +267,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.MB)
         .setDataStreamMinPacketSize(1)
@@ -319,11 +330,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
    */
   @Test
   public void testOMClientProxyProvider() {
-
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
-
-    List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
+    final List<OMProxyInfo<OzoneManagerProtocolPB>> omProxies
+        = OmTestUtil.getFailoverProxyProvider(store).getOMProxies();
 
     // For a non-HA OM service, there should be only one OM proxy.
     assertEquals(1, omProxies.size());
@@ -1138,16 +1146,81 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     bucket.deleteKeys(keysToDelete);
 
     String consoleOutput = output.get();
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=key1, dataSize=" + valueLength + ", replicationConfig=RATIS/THREE");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=key2, dataSize=" + valueLength + ", replicationConfig=EC{rs-3-2-1024k}");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=dir1, Transaction");
-    assertThat(consoleOutput).contains("op=DELETE_KEYS {volume=" + volumeName + ", bucket=" + bucketName +
-        ", deletedKeysList={key=dir1/key4, dataSize=" + valueLength +
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"dir1\",\"Transaction\"");
+    assertThat(consoleOutput).contains("op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
         ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
-        ", replicationConfig=EC{rs-3-2-1024k}}, unDeletedKeysList=");
+        ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
+  }
+
+  /**
+   * Verifies pendingDelete* fields are populated after key delete,
+   * with/without snapshot retention.
+   *
+   * @param withSnapshot whether to create a snapshot before deleting the key
+   * @throws Exception on failure
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testBucketPendingDeleteBytes(boolean withSnapshot) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String snapshotName = "snap-" + UUID.randomUUID();
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+
+    OzoneBucket bucketAfterKeyWrite = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyWrite.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyWrite.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteNamespace()).isEqualTo(0);
+
+    if (withSnapshot) {
+      store.createSnapshot(volumeName, bucketName, snapshotName);
+    }
+    bucket.deleteKey(keyName);
+    // After delete: usedBytes should still be totalBucketSpace.
+    OzoneBucket bucketAfterKeyDelete = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyDelete.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteNamespace()).isEqualTo(1);
+
+    if (withSnapshot) {
+      // if snapshot is present bytes won't be released until snapshot is deleted.
+      store.deleteSnapshot(volumeName, bucketName, snapshotName);
+    }
+
+    GenericTestUtils.waitFor(() -> {
+      OzoneBucket buck = null;
+      try {
+        buck = store.getVolume(volumeName).getBucket(bucketName);
+      } catch (IOException e) {
+        fail("Failed to get bucket details", e);
+      }
+      return buck.getUsedBytes() == 0 && buck.getUsedNamespace() == 0;
+    }, 1000, 30000);
+    OzoneBucket bucketAfterKeyPurge = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyPurge.getUsedBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getUsedNamespace()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteNamespace()).isEqualTo(0);
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
@@ -1353,7 +1426,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       keyInfo = ozoneManager.lookupKey(keyArgs);
 
       OMException e = assertThrows(OMException.class, out::close);
-      assertEquals(KEY_NOT_FOUND, e.getResult());
+      assertEquals(ATOMIC_WRITE_CONFLICT, e.getResult());
       assertThat(e).hasMessageContaining("does not match the expected generation to rewrite");
     } finally {
       if (out != null) {
@@ -1364,6 +1437,26 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
     assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
     assertUnchanged(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteRejectsNonPositiveGeneration(BucketLayout layout)
+      throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails key1Details = createTestKey(bucket, "key1", "value".getBytes(UTF_8));
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> {
+        bucket.rewriteKey("key2",
+            1024,
+            EXPECTED_GEN_CREATE_IF_ABSENT,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            singletonMap("key", "value"));
+        });
+
+    assertThat(e).hasMessageContaining("existingKeyGeneration must be positive");
+    assertKeyContent(bucket, key1Details.getName(), "value".getBytes(UTF_8));
   }
 
   @ParameterizedTest
@@ -1392,6 +1485,125 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertThat(e).hasMessageContaining("not found");
   }
 
+  @ParameterizedTest
+  @EnumSource
+  void testCreateKeyIfNotExistsSuccess(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    String keyName = "create-if-not-exists-" + layout.name();
+    byte[] content = "test-content".getBytes(UTF_8);
+
+    try (OzoneOutputStream out = bucket.createKeyIfNotExists(
+        keyName, content.length,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        Collections.emptyMap(), Collections.emptyMap())) {
+      out.write(content);
+    }
+
+    assertKeyContent(bucket, keyName, content);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testCreateKeyIfNotExistsFailsWhenKeyExists(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    byte[] newContent = "new-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.createKeyIfNotExists(
+          keyDetails.getName(), newContent.length,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          Collections.emptyMap(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(KEY_ALREADY_EXISTS, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchSuccess(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKeyWithETag(bucket);
+    String etag = keyDetails.getMetadata().get(ETAG);
+    assertNotNull(etag, "Key should have an ETag");
+
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+    Map<String, String> rewrittenMetadata = new HashMap<>(keyDetails.getMetadata());
+    String rewrittenETag = UUID.randomUUID().toString();
+    rewrittenMetadata.put(ETAG, rewrittenETag);
+    try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+        keyDetails.getName(), newContent.length, etag,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        rewrittenMetadata, Collections.emptyMap())) {
+      out.write(newContent);
+    }
+
+    assertKeyContent(bucket, keyDetails.getName(), newContent);
+    assertEquals(rewrittenETag, bucket.getKey(keyDetails.getName())
+        .getMetadata().get(ETAG));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWithWrongETag(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKeyWithETag(bucket);
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          keyDetails.getName(), newContent.length, "wrong-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(ETAG_MISMATCH, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWhenETagNotAvailable(BucketLayout layout)
+      throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          keyDetails.getName(), newContent.length, "some-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(OMException.ResultCodes.ETAG_NOT_AVAILABLE, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWhenKeyNotFound(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    byte[] content = "content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          "nonexistent-key", content.length, "some-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          Collections.emptyMap(), Collections.emptyMap())) {
+        out.write(content);
+      }
+    });
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+  }
+
   private static void rewriteKey(
       OzoneBucket bucket, OzoneKeyDetails keyDetails, byte[] newContent
   ) throws IOException {
@@ -1400,20 +1612,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         keyDetails.getMetadata())) {
       out.write(newContent);
     }
-  }
-
-  private static OzoneKeyDetails assertKeyContent(
-      OzoneBucket bucket, String keyName, byte[] expectedContent
-  ) throws IOException {
-    OzoneKeyDetails updatedKeyDetails = bucket.getKey(keyName);
-
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[expectedContent.length];
-      IOUtils.readFully(is, fileContent);
-      assertArrayEquals(expectedContent, fileContent);
-    }
-
-    return updatedKeyDetails;
   }
 
   private OzoneBucket createBucket(BucketLayout layout) throws IOException {
@@ -1551,17 +1749,17 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testBucketUsedBytes() throws IOException {
+  public void testBucketUsedBytes() throws IOException, InterruptedException, TimeoutException {
     bucketUsedBytesTestHelper(BucketLayout.OBJECT_STORE);
   }
 
   @Test
-  public void testFSOBucketUsedBytes() throws IOException {
+  public void testFSOBucketUsedBytes() throws IOException, InterruptedException, TimeoutException {
     bucketUsedBytesTestHelper(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   private void bucketUsedBytesTestHelper(BucketLayout bucketLayout)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
@@ -1578,22 +1776,22 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     writeKey(bucket, keyName, ONE, value, valueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     writeKey(bucket, keyName, ONE, value, valueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     // pre-allocate more blocks than needed
     int fakeValueLength = valueLength + blockSize;
     writeKey(bucket, keyName, ONE, value, fakeValueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     bucket.deleteKey(keyName);
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
   static Stream<BucketLayout> bucketLayouts() {
@@ -1645,7 +1843,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   //       do cleanup when EC branch gets merged into master.
   @ParameterizedTest
   @MethodSource("replicationConfigs")
-  void testBucketQuota(ReplicationConfig repConfig) throws IOException {
+  void testBucketQuota(ReplicationConfig repConfig) throws IOException, InterruptedException, TimeoutException {
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
@@ -1656,7 +1854,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private void bucketQuotaTestHelper(int keyLength, ReplicationConfig repConfig)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -1672,33 +1870,35 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneOutputStream out = bucket.createKey(keyName, keyLength,
         repConfig, new HashMap<>());
     // Write a new key and do not update Bucket UsedBytes until commit.
-    assertEquals(0,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0 ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
     out.write(value);
     out.close();
     // After committing the new key, the Bucket UsedBytes must be updated to
     // keyQuota.
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     out = bucket.createKey(keyName, keyLength, repConfig, new HashMap<>());
     // Overwrite an old key. The Bucket UsedBytes are not updated before the
     // commit. So the Bucket UsedBytes remain unchanged.
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
     out.write(value);
     out.close();
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     bucket.deleteKey(keyName);
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == store.getVolume(volumeName)
+        .getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
+  @Flaky("HDDS-13879")
   @ParameterizedTest
   @MethodSource("bucketLayoutsWithEnablePaths")
-  public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths) throws IOException {
+  public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths)
+      throws IOException, InterruptedException, TimeoutException {
     boolean originalEnablePaths = cluster.getOzoneManager().getConfig().isFileSystemPathEnabled();
     cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(enablePaths);
     String volumeName = UUID.randomUUID().toString();
@@ -1716,16 +1916,23 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName2 = UUID.randomUUID().toString();
 
     writeKey(bucket, keyName1, ONE, value, valueLength);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     // Test create a file twice will not increase usedNamespace twice
     writeKey(bucket, keyName1, ONE, value, valueLength);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     writeKey(bucket, keyName2, ONE, value, valueLength);
-    assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 2L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     bucket.deleteKey(keyName1);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor(
+        (CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName, bucketName),
+        1000, 30000);
     bucket.deleteKey(keyName2);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor(
+        (CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName, bucketName),
+        1000, 30000);
 
     RpcClient client = new RpcClient(cluster.getConf(), null);
     try {
@@ -1733,10 +1940,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       String directoryName2 = UUID.randomUUID().toString();
 
       client.createDirectory(volumeName, bucketName, directoryName1);
-      assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
       // Test create a directory twice will not increase usedNamespace twice
       client.createDirectory(volumeName, bucketName, directoryName2);
-      assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 2L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
 
       if (layout == BucketLayout.LEGACY) {
         handleLegacyBucketDelete(volumeName, bucketName, directoryName1, directoryName2);
@@ -1755,7 +1964,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private void handleLegacyBucketDelete(String volumeName, String bucketName, String dir1, String dir2)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     cluster.getConf().set(FS_DEFAULT_NAME_KEY, rootPath);
     FileSystem fs = FileSystem.get(cluster.getConf());
@@ -1764,17 +1973,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     org.apache.hadoop.fs.Path dir2Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir2);
 
     fs.delete(dir1Path, false);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     fs.delete(dir2Path, false);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
   }
 
   private void handleNonLegacyBucketDelete(RpcClient client, String volumeName, String bucketName, String dir1,
-      String dir2) throws IOException {
+      String dir2) throws IOException, InterruptedException, TimeoutException {
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir1), false);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir2), false);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
   }
 
   @ParameterizedTest
@@ -1869,7 +2082,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testBucketQuotaInNamespace() throws IOException {
+  public void testBucketQuotaInNamespace() throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String key1 = UUID.randomUUID().toString();
@@ -1907,8 +2120,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
     bucket.deleteKeys(Arrays.asList(key1, key2));
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace(), 1000, 30000);
   }
 
   private void writeKey(OzoneBucket bucket, String keyName,
@@ -2910,6 +3123,46 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  public void testListKeyDirectoriesAreNotFiles()
+      throws IOException {
+    // Test that directories in multilevel keys are not marked as files
+
+    String volumeA = "volume-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "bucket-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    OzoneVolume volA = store.getVolume(volumeA);
+    volA.createBucket(bucketA);
+    OzoneBucket volAbucketA = volA.getBucket(bucketA);
+
+    String keyBaseA = "key-a/";
+    for (int i = 0; i < 10; i++) {
+      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      OzoneOutputStream one = volAbucketA.createKey(
+          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      one.write(value);
+      one.close();
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter1 = volAbucketA.listKeys(null);
+    while (volABucketAIter1.hasNext()) {
+      OzoneKey key = volABucketAIter1.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter2 = volAbucketA.listKeys("key-");
+    while (volABucketAIter2.hasNext()) {
+      OzoneKey key = volABucketAIter2.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+  }
+
+  @Test
   public void testListKeyOnEmptyBucket()
       throws IOException {
     String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
@@ -3683,6 +3936,159 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  public void testConditionalCompleteMultipartUploadIfNoneMatch() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate and upload part
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-None-Match semantics (key doesn't exist, should succeed)
+    OmMultipartUploadCompleteInfo result = bucket.completeMultipartUpload(
+        keyName, uploadID, partsMap,
+        EXPECTED_GEN_CREATE_IF_ABSENT, null);
+
+    assertNotNull(result);
+    assertEquals(keyName, result.getKey());
+    assertNotNull(result.getHash());
+
+    // Verify object exists
+    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+    assertNotNull(keyDetails);
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfNoneMatchFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key
+    createTestKey(bucket, keyName, "existing content");
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-None-Match semantics (key exists, should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            EXPECTED_GEN_CREATE_IF_ABSENT, null));
+
+    assertEquals(KEY_ALREADY_EXISTS, omEx.getResult());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatch() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key with ETag
+    OzoneKeyDetails existingKey = createTestKeyWithETag(bucket, keyName, "existing content");
+    String existingETag = existingKey.getMetadata().get(ETAG);
+    assertNotNull(existingETag);
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match semantics (ETag matches, should succeed)
+    OmMultipartUploadCompleteInfo result = bucket.completeMultipartUpload(
+        keyName, uploadID, partsMap, null, existingETag);
+
+    assertNotNull(result);
+    assertEquals(keyName, result.getKey());
+    assertNotNull(result.getHash());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatchFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key with ETag
+    createTestKeyWithETag(bucket, keyName, "existing content");
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match semantics (wrong ETag, should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            null, "wrong-etag"));
+
+    assertEquals(ETAG_MISMATCH, omEx.getResult());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatchMissingKeyFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate and upload part (key doesn't exist)
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match on non-existent key (should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            null, "some-etag"));
+
+    assertEquals(KEY_NOT_FOUND, omEx.getResult());
+  }
+
+  @Test
   public void testAbortUploadSuccessWithOutAnyParts() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -4254,9 +4660,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Combine all parts data, and check is it matching with get key data.
     String part1 = new String(data, UTF_8);
     String part2 = new String(data, UTF_8);
-    sb.append(part1);
-    sb.append(part2);
-    sb.append(part3);
+    sb.append(part1)
+        .append(part2)
+        .append(part3);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -4353,8 +4759,35 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private OzoneKeyDetails createTestKey(
       OzoneBucket bucket, String keyName, byte[] bytes
   ) throws IOException {
+    return createTestKey(bucket, keyName, bytes, createTestKeyMetadata());
+  }
+
+  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket)
+      throws IOException {
+    Map<String, String> metadata = createTestKeyMetadata();
+    metadata.put(ETAG, UUID.randomUUID().toString());
+    return createTestKey(bucket, getTestName(),
+        UUID.randomUUID().toString().getBytes(UTF_8), metadata);
+  }
+
+  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket,
+      String keyName, String content) throws IOException {
+    Map<String, String> metadata = createTestKeyMetadata();
+    metadata.put(ETAG, UUID.randomUUID().toString());
+    return createTestKey(bucket, keyName, content.getBytes(UTF_8), metadata);
+  }
+
+  private static Map<String, String> createTestKeyMetadata() {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("key", RandomStringUtils.secure().nextAscii(10));
+    return metadata;
+  }
+
+  private OzoneKeyDetails createTestKey(
+      OzoneBucket bucket, String keyName, byte[] bytes,
+      Map<String, String> metadata
+  ) throws IOException {
     RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-    Map<String, String> metadata = singletonMap("key", RandomStringUtils.secure().nextAscii(10));
     try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, metadata)) {
       out.write(bytes);
     }
@@ -4431,15 +4864,15 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       verifyReplication(volumeName, bucketName, keyName,
           RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
     }
-
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
+    omKeyInfo = omKeyInfo.withMetadataMutations(
+        metadata -> metadata.remove(OzoneConsts.GDPR_FLAG));
 
-    omMetadataManager.getKeyTable(getBucketLayout())
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
             omKeyInfo);
 
@@ -4587,10 +5020,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
 
@@ -4606,7 +5035,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // information. This is easier to do with object store keys.
     volume.createBucket(bucketName, BucketArgs.newBuilder()
         .setVersioning(versioning)
-        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
+        .setBucketLayout(VERSIONING_TEST_BUCKET_LAYOUT).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     TestDataUtil.createKey(bucket, keyName,
@@ -4619,38 +5048,35 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
-    OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable(getBucketLayout()).get(
-            cluster.getOzoneManager().getMetadataManager()
-                .getOzoneKey(volumeName, bucketName, keyName));
+    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+    String ozoneKey = metadataManager.getOzoneKey(volumeName, bucketName, keyName);
+
+    OmKeyInfo omKeyInfo = metadataManager.getKeyTable(VERSIONING_TEST_BUCKET_LAYOUT).get(ozoneKey);
 
     assertNotNull(omKeyInfo);
-    assertEquals(expectedCount,
-        omKeyInfo.getKeyLocationVersions().size());
+    assertEquals(expectedCount, omKeyInfo.getKeyLocationVersions().size());
 
+    // Suspend KeyDeletingService to prevent it from purging entries from deleted table
+    cluster.getOzoneManager().getKeyManager().getDeletingService().suspend();
     // ensure flush double buffer for deleted Table
     cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
-          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-          .getRangeKVs(null, 100,
-              cluster.getOzoneManager().getMetadataManager()
-              .getOzoneKey(volumeName, bucketName, keyName));
+          = metadataManager.getDeletedTable().getRangeKVs(null, 100, ozoneKey);
 
-      assertThat(rangeKVs.size()).isGreaterThan(0);
+      assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
-          .getOzoneManager().getMetadataManager()
-          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
-              .getOzoneKey(volumeName, bucketName, keyName));
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          metadataManager.getDeletedTable().get(ozoneKey);
 
       assertNull(repeatedOmKeyInfo);
     }
+    cluster.getOzoneManager().getKeyManager().getDeletingService().resume();
   }
 
   @Test
@@ -5231,5 +5657,57 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @Test
+  public void testCreateEmptyKeySkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createKey(keyName, 0);
+    out.close();
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testCreateEmptyFileNotSkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createFile(keyName, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        false,
+        false);
+    out.close();
+
+    // OM should call allocateBlock in OMFileCreateRequest regardless of data size
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
   }
 }

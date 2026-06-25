@@ -22,11 +22,9 @@ import com.google.common.base.Preconditions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -35,19 +33,16 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,14 +118,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.blockInfo = blockInfo;
     this.blockID = blockInfo.getBlockID();
     this.length = blockInfo.getLength();
-    setPipeline(pipeline);
+    pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.verifyChecksum = config.isChecksumVerify();
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
-    this.retryPolicy =
-        HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
-            TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
+    this.retryPolicy = getReadRetryPolicy(config);
   }
 
   // only for unit tests
@@ -182,7 +175,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         }
         catchEx = ex;
       }
-    } while (shouldRetryRead(catchEx));
+    } while (shouldRetryRead(catchEx, retryPolicy, ++retries));
 
     if (chunks == null) {
       throw catchEx;
@@ -215,37 +208,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  /**
-   * Check if this exception is because datanodes are not reachable.
-   */
-  private boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
-  }
-
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
-        blockID, pipelineRef.get().getId(), cause.getMessage());
-    if (refreshFunction != null) {
-      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
-      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
-      if (blockLocationInfo == null) {
-        LOG.warn("No new block location info for block {}", blockID);
-      } else {
-        setPipeline(blockLocationInfo.getPipeline());
-        LOG.info("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
-
-        tokenRef.set(blockLocationInfo.getToken());
-        if (blockLocationInfo.getToken() != null) {
-          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
-          LOG.info("A new token is added for block {}. Expiry: {}",
-              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
-        }
-      }
-    } else {
-      throw cause;
-    }
+    refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
   /**
@@ -275,26 +239,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
         xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
     return response.getBlockData();
-  }
-
-  private void setPipeline(Pipeline pipeline) throws IOException {
-    if (pipeline == null) {
-      return;
-    }
-    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
-
-    if (replicaIndexes > 1) {
-      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
-          pipeline));
-    }
-
-    // irrespective of the container state, we will always read via Standalone
-    // protocol.
-    boolean okForRead =
-        pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
-            || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead();
-    pipelineRef.set(readPipeline);
   }
 
   private static void validate(ContainerCommandResponseProto response)
@@ -382,14 +326,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
+        if (shouldRetryRead(e, retryPolicy, ++retries)) {
           handleReadError(e);
           continue;
         } else {
           throw e;
         }
       } catch (IOException ex) {
-        if (shouldRetryRead(ex)) {
+        if (shouldRetryRead(ex, retryPolicy, ++retries)) {
           if (isConnectivityIssue(ex)) {
             handleReadError(ex);
           } else {
@@ -571,31 +515,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private synchronized void storePosition() {
     blockPosition = getPos();
-  }
-
-  private boolean shouldRetryRead(IOException cause) throws IOException {
-    RetryPolicy.RetryAction retryAction;
-    try {
-      retryAction = retryPolicy.shouldRetry(cause, ++retries, 0, true);
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-    if (retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY) {
-      if (retryAction.delayMillis > 0) {
-        try {
-          LOG.debug("Retry read after {}ms", retryAction.delayMillis);
-          Thread.sleep(retryAction.delayMillis);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          String msg = "Interrupted: action=" + retryAction.action + ", retry policy=" + retryPolicy;
-          throw new IOException(msg, e);
-        }
-      }
-      return true;
-    }
-    return false;
   }
 
   private void handleReadError(IOException cause) throws IOException {

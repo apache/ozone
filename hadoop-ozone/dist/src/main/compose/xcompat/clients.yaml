@@ -32,7 +32,7 @@ x-old-config:
 
 x-new-config:
   &new-config
-  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  image: ${OZONE_RUNNER_CLIENT_IMAGE}:${OZONE_RUNNER_CLIENT_VERSION}
   <<: *common-config
   volumes:
     - ../..:/opt/hadoop
@@ -67,6 +67,10 @@ services:
 
   old_client_2_0_0:
     image: ${OZONE_IMAGE}:2.0.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
+  old_client_2_1_0:
+    image: ${OZONE_IMAGE}:2.1.0${OZONE_IMAGE_FLAVOR}
     <<: *old-config
 
   new_client:

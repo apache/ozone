@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -62,29 +61,21 @@ import org.junit.jupiter.api.Test;
  * Tests the containerStateMachine failure handling by set flush delay.
  */
 public class TestContainerStateMachineFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
     keyString = UUID.randomUUID().toString();
 
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
@@ -104,10 +95,10 @@ public class TestContainerStateMachineFlushDelay {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster =
@@ -117,7 +108,6 @@ public class TestContainerStateMachineFlushDelay {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -126,9 +116,6 @@ public class TestContainerStateMachineFlushDelay {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -139,39 +126,39 @@ public class TestContainerStateMachineFlushDelay {
 
   @Test
   public void testContainerStateMachineFailures() throws Exception {
-    OzoneOutputStream key =
+    OmKeyLocationInfo omKeyLocationInfo;
+    try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                    ReplicationFactor.ONE), new HashMap<>());
-    // Now ozone.client.stream.buffer.flush.delay is currently enabled
-    // by default. Here we  written data(length 110) greater than chunk
-    // Size(length 100), make sure flush will sync data.
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, 110)
-            .getBytes(UTF_8);
-    // First write and flush creates a container in the datanode
-    key.write(data);
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
+                    ReplicationFactor.ONE), new HashMap<>())) {
+      // Now ozone.client.stream.buffer.flush.delay is currently enabled
+      // by default. Here we write data (length 110) greater than chunk
+      // size (length 100), making sure flush will sync data.
+      byte[] data =
+          ContainerTestHelper.getFixedLengthString(keyString, 110)
+              .getBytes(UTF_8);
+      // First write and flush creates a container in the datanode.
+      key.write(data);
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
 
-    //get the name of a valid container
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+      // Get the name of a valid container.
+      KeyOutputStream groupOutputStream =
+          (KeyOutputStream) key.getOutputStream();
 
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
 
-    // delete the container dir
-    FileUtil.fullyDelete(new File(
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
-            .getContainerPath()));
-
-    key.close();
+      // Delete the container directory.
+      FileUtil.fullyDelete(new File(
+          cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
+              .getContainerPath()));
+    }
     // Make sure the container is marked unhealthy
     assertSame(
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()

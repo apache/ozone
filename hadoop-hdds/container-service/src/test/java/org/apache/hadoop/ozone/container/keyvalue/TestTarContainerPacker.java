@@ -182,7 +182,7 @@ public class TestTarContainerPacker {
 
     //write container checksum file in the metadata directory
     ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
-    checksumTreeManager.writeContainerDataTree(sourceContainerData, treeWriter);
+    checksumTreeManager.updateTree(sourceContainerData, treeWriter);
     assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(sourceContainerData).exists());
 
     //sample container descriptor file

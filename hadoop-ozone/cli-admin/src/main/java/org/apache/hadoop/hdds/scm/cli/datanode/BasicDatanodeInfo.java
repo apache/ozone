@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 /**
  * Represents filtered Datanode information for json use.
  */
-public class BasicDatanodeInfo {
+public final class BasicDatanodeInfo {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private Long used = null;
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -37,20 +39,58 @@ public class BasicDatanodeInfo {
   private final DatanodeDetails dn;
   private final HddsProtos.NodeOperationalState opState;
   private final HddsProtos.NodeState healthState;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer totalVolumeCount = null;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer healthyVolumeCount = null;
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<String> failedVolumes = null;
   
-  public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState) {
-    this.dn = dnDetails;
-    this.opState = opState;
-    this.healthState = healthState;
+  private BasicDatanodeInfo(Builder builder) {
+    this.dn = builder.dn;
+    this.opState = builder.opState;
+    this.healthState = builder.healthState;
+    this.used = builder.used;
+    this.capacity = builder.capacity;
+    this.percentUsed = builder.percentUsed;
+    this.totalVolumeCount = builder.totalVolumeCount;
+    this.healthyVolumeCount = builder.healthyVolumeCount;
+    this.failedVolumes = builder.failedVolumes;
   }
 
-  public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState, long used, long capacity, double percentUsed) {
-    this(dnDetails, opState, healthState);
-    this.used = used;
-    this.capacity = capacity;
-    this.percentUsed = percentUsed;
+  /**
+   * Builder class for creating instances of BasicDatanodeInfo.
+   */
+  public static class Builder {
+    private final DatanodeDetails dn;
+    private final HddsProtos.NodeOperationalState opState;
+    private final HddsProtos.NodeState healthState;
+    private Long used;
+    private Long capacity;
+    private Double percentUsed;
+    private final Integer totalVolumeCount;
+    private final Integer healthyVolumeCount;
+    private final List<String> failedVolumes;
+
+    public Builder(HddsProtos.Node node) {
+      dn = DatanodeDetails.getFromProtoBuf(node.getNodeID());
+      healthState = node.getNodeStates(0);
+      opState = node.getNodeOperationalStates(0);
+      totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
+      healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
+      failedVolumes = getFailedVolumes(node);
+    }
+
+    public Builder withUsageInfo(long usedBytes, long capacityBytes, double percentUsedBytes) {
+      this.used = usedBytes;
+      this.capacity = capacityBytes;
+      this.percentUsed = percentUsedBytes;
+      return this;
+    }
+
+    public BasicDatanodeInfo build() {
+      return new BasicDatanodeInfo(this);
+    }
   }
   
   @JsonProperty(index = 5)
@@ -158,8 +198,36 @@ public class BasicDatanodeInfo {
     return percentUsed;
   }
 
+  @JsonProperty(index = 110)
+  public Integer getTotalVolumeCount() {
+    return totalVolumeCount;
+  }
+
+  @JsonProperty(index = 111)
+  public Integer getHealthyVolumeCount() {
+    return healthyVolumeCount;
+  }
+
+  @JsonProperty(index = 112)
+  public List<String> getFailedVolumes() {
+    return failedVolumes;
+  }
+
   @JsonIgnore
   public DatanodeDetails getDatanodeDetails() {
     return dn;
   }
+
+  private static List<String> getFailedVolumes(HddsProtos.Node node) {
+    int count = node.getFailedVolumesCount();
+    if (count == 0) {
+      return Collections.emptyList();
+    }
+    List<String> result = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      result.add(node.getFailedVolumes(i));
+    }
+    return result;
+  }
+
 }

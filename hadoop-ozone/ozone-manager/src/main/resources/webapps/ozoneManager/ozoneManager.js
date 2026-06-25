@@ -27,7 +27,165 @@
         $routeProvider
             .when("/metrics/ozoneManager", {
                 template: "<om-metrics></om-metrics>"
+            })
+            .when("/snapshots", {
+                template: "<om-snapshots></om-snapshots>"
+            })
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
+            })
+            .when("/metrics/deletion", {
+                template: "<om-deletion></om-deletion>"
             });
+    });
+    angular.module('ozoneManager').component('omSnapshots', {
+        templateUrl: 'om-snapshots.html',
+        controller: function ($http, $scope) {
+            var ctrl = this;
+            ctrl.snapshotMetrics = [];
+            ctrl.snapshotDiffJobs = [];
+            ctrl.snapshots = [];
+            ctrl.snapshotUsageMetrics = {
+                'NumSnapshotActive': 0,
+                'NumSnapshotDeleted': 0,
+                'NumSnapshotCacheSize': 0
+            };
+
+            ctrl.listSnapshots = function(volume, bucket) {
+                if (volume && bucket) {
+                    $http.get("snapshotList?volume=" + volume + "&bucket=" + bucket)
+                        .then(function (result) {
+                            ctrl.snapshots = result.data;
+                        })
+                        .catch(function (error) {
+                            console.error("Error fetching snapshots:", error);
+                            ctrl.snapshots = [];
+                        });
+                } else {
+                    ctrl.snapshots = [];
+                }
+            };
+
+            ctrl.formatBytes = function(bytes, decimals) {
+                if (bytes == 0) return '0 Bytes';
+                if (!bytes) return 'N/A';
+                var k = 1024,
+                    dm = decimals + 1 || 3,
+                    sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
+                    i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            }
+
+            $scope.reverse = false;
+            $scope.columnName = "jobId";
+            let snapDiffJobsCopy = [];
+            $scope.RecordsToDisplay = "10";
+            $scope.currentPage = 1;
+            $scope.lastIndex = 0;
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        ctrl.snapshotUsageMetrics.NumSnapshotActive = metrics.NumSnapshotActive || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotDeleted = metrics.NumSnapshotDeleted || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotCacheSize = metrics.NumSnapshotCacheSize || 0;
+                        for (var key in metrics) {
+                            if (key.match(/NumSnapshot|NumCancelSnapshotDiff|NumListSnapshotDiffJob/)) {
+                                ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                            }
+                        }
+                    }
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OmSnapshotInternalMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        for (var key in metrics) {
+                            if (!isIgnoredJmxKeys(key)) {
+                                ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                            }
+                        }
+                    }
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=SnapshotDiffManager")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        snapDiffJobsCopy = result.data.beans[0].SnapshotDiffJobs;
+                        $scope.totalItems = snapDiffJobsCopy.length;
+                        $scope.lastIndex = Math.ceil(snapDiffJobsCopy.length / $scope.RecordsToDisplay);
+                        ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(0, $scope.RecordsToDisplay);
+                    }
+                });
+
+            /*if option is 'All' display all records else display specified record on page*/
+            $scope.UpdateRecordsToShow = () => {
+                if($scope.RecordsToDisplay == 'All') {
+                    $scope.lastIndex = 1;
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy;
+                } else {
+                    $scope.lastIndex = Math.ceil(snapDiffJobsCopy.length / $scope.RecordsToDisplay);
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(0, $scope.RecordsToDisplay);
+                }
+                $scope.currentPage = 1;
+            }
+            /* Page Slicing  logic */
+            $scope.handlePagination = (pageIndex, isDisabled) => {
+                if(!isDisabled && $scope.RecordsToDisplay != 'All') {
+                    pageIndex = parseInt(pageIndex);
+                    let startIndex = 0, endIndex = 0;
+                    $scope.currentPage = pageIndex;
+                    startIndex = ($scope.currentPage - 1) * parseInt($scope.RecordsToDisplay);
+                    endIndex = startIndex + parseInt($scope.RecordsToDisplay);
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(startIndex, endIndex);
+                }
+            }
+            /*column sort logic*/
+            $scope.columnSort = (colName) => {
+                $scope.columnName = colName;
+                $scope.reverse = !$scope.reverse;
+            }
+            /*show page*/
+            $scope.getPagesArray = function () {
+                return Array.from({ length: $scope.lastIndex }, (_, index) => index + 1);
+            };
+            /*show last item index*/
+            $scope.getCurrentPageLastItemIndex = ()  => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return $scope.totalItems;
+                }
+
+                let endIndex = $scope.currentPage * parseInt($scope.RecordsToDisplay);
+                return Math.min(endIndex, $scope.totalItems);
+            }
+            /*show first item index*/
+            $scope.getCurrentPageFirstItemIndex = () => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return 1;
+                }
+                return ($scope.currentPage - 1) * $scope.RecordsToDisplay + 1;
+            }
+        }
+    });
+    angular.module('ozoneManager').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
+        }
     });
     angular.module('ozoneManager').component('omMetrics', {
         templateUrl: 'om-metrics.html',
@@ -115,16 +273,6 @@
         },
         controller: function ($http) {
             var ctrl = this;
-            ctrl.Date = Date;
-
-            ctrl.formatBytes = function(bytes, decimals) {
-               if(bytes == 0) return '0 Bytes';
-               var k = 1024, // or 1024 for binary
-                   dm = decimals + 1 || 3,
-                   sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
-                   i = Math.floor(Math.log(bytes) / Math.log(k));
-               return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-            }
 
             ctrl.convertMsToTime = function(ms) {
               let seconds = (ms / 1000).toFixed(1);
@@ -154,14 +302,82 @@
                         ctrl.elapsedTime.Value = ctrl.convertMsToTime(ctrl.elapsedTime.Value);
                     }
                 });
+        }
+    });
 
-            // Add JMX query to fetch DeletingServiceMetrics data
+    angular.module('ozoneManager').component('omDeletion', {
+        templateUrl: "om-deletion.html",
+        controller: function ($http) {
+            var ctrl = this;
+            ctrl.Date = Date;
+
+            ctrl.formatBytes = function (bytes, decimals) {
+                if (bytes === 0) {
+                    return "0 Bytes";
+                }
+                if (!bytes) {
+                    return "N/A";
+                }
+                var k = 1024,
+                    dm = decimals + 1 || 3,
+                    sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"],
+                    i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+            };
+
+            ctrl.convertMsToTime = function (ms) {
+                var seconds = (ms / 1000).toFixed(1);
+                var minutes = (ms / (1000 * 60)).toFixed(1);
+                var hours = (ms / (1000 * 60 * 60)).toFixed(1);
+                var days = (ms / (1000 * 60 * 60 * 24)).toFixed(1);
+                if (seconds < 60) {
+                    return seconds + " Seconds";
+                } else if (minutes < 60) {
+                    return minutes + " Minutes";
+                } else if (hours < 24) {
+                    return hours + " Hours";
+                } else {
+                    return days + " Days";
+                }
+            };
+
+            ctrl.deletionConfigs = [];
+
+            $http.get("conf?cmd=getPropertyByTag&tags=DELETION")
+                .then(function (result) {
+                    var deletionByTag = result.data.DELETION || {};
+                    var list = [];
+                    for (var k in deletionByTag) {
+                        if (deletionByTag.hasOwnProperty(k)) {
+                            var pDel = deletionByTag[k];
+                            list.push({
+                                name: pDel.name || k,
+                                value: pDel.value,
+                                description: pDel.description || ""
+                            });
+                        }
+                    }
+                    list.sort(function (a, b) {
+                        return a.name.localeCompare(b.name);
+                    });
+                    ctrl.deletionConfigs = list;
+                });
+
+            $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
+                .then(function (result) {
+                    ctrl.role = result.data.beans[0];
+                });
+
             $http.get("jmx?qry=Hadoop:service=OzoneManager,name=DeletingServiceMetrics")
                 .then(function (result) {
-                    if (result.data.beans && result.data.beans.length > 0) {
-                        // Merge the DeletingServiceMetrics data into the existing overview.jmx object
-                        ctrl.overview.jmx = {...ctrl.overview.jmx, ...result.data.beans[0]};
-                    }
+                    ctrl.del = result.data.beans && result.data.beans.length > 0
+                        ? result.data.beans[0] : null;
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMPerformanceMetrics")
+                .then(function (result) {
+                    ctrl.perf = result.data.beans && result.data.beans.length > 0
+                        ? result.data.beans[0] : null;
                 });
         }
     });

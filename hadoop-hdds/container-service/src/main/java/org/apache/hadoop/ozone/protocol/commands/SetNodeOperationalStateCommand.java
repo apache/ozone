@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
@@ -80,7 +80,7 @@ public class SetNodeOperationalStateCommand
 
   public static SetNodeOperationalStateCommand getFromProtobuf(
       SetNodeOperationalStateCommandProto cmdProto) {
-    Preconditions.checkNotNull(cmdProto);
+    Objects.requireNonNull(cmdProto, "cmdProto == null");
     return new SetNodeOperationalStateCommand(cmdProto.getCmdId(),
         cmdProto.getNodeOperationalState(),
         cmdProto.getStateExpiryEpochSeconds());

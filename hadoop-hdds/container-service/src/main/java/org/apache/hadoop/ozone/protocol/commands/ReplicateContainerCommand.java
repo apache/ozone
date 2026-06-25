@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import static java.util.Collections.emptyList;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -110,7 +110,7 @@ public final class ReplicateContainerCommand
 
   public static ReplicateContainerCommand getFromProtobuf(
       ReplicateContainerCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     List<DatanodeDetailsProto> sources = protoMessage.getSourcesList();
     List<DatanodeDetails> sourceNodes = !sources.isEmpty()
@@ -157,13 +157,13 @@ public final class ReplicateContainerCommand
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(getType());
-    sb.append(": cmdID: ").append(getId())
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
         .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
-        .append(", deadlineMsSinceEpoch: ").append(getDeadline());
-    sb.append(", containerId=").append(getContainerID());
-    sb.append(", replicaIndex=").append(getReplicaIndex());
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", containerId=").append(getContainerID())
+        .append(", replicaIndex=").append(getReplicaIndex());
     if (targetDatanode != null) {
       sb.append(", targetNode=").append(targetDatanode);
     } else {

@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,19 +113,18 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
    * pending deletion in Ozone.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
-      throws IOException {
+  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+      OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    if (iterator != null) {
+    Table<String, RepeatedOmKeyInfo> table = omMetadataManager.getDeletedTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          RepeatedOmKeyInfo repeatedOmKeyInfo = (RepeatedOmKeyInfo) kv
-              .getValue();
+          RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
           Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
           unReplicatedSize += result.getRight();
           replicatedSize += result.getLeft();

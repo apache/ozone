@@ -39,11 +39,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,7 +61,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -250,6 +251,7 @@ public final class HttpServer2 implements FilterContainer {
     private String authFilterConfigurationPrefix =
         "hadoop.http.authentication.";
     private String excludeCiphers;
+    private String includeCiphers;
 
     private boolean xFrameEnabled;
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
@@ -377,6 +379,11 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
+    public Builder includeCiphers(String pIncludeCiphers) {
+      this.includeCiphers = pIncludeCiphers;
+      return this;
+    }
+
     /**
      * Adds the ability to control X_FRAME_OPTIONS on HttpServer2.
      * @param enabled - True enables X_FRAME_OPTIONS false disables it.
@@ -448,6 +455,7 @@ public final class HttpServer2 implements FilterContainer {
       trustStoreType = sslConf.get(SSLFactory.SSL_SERVER_TRUSTSTORE_TYPE,
           SSLFactory.SSL_SERVER_TRUSTSTORE_TYPE_DEFAULT);
       excludeCiphers = sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST);
+      includeCiphers = sslConf.get(SSLFactory.SSL_SERVER_INCLUDE_CIPHER_LIST);
     }
 
     public Builder withoutDefaultApps() {
@@ -456,7 +464,7 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     public HttpServer2 build() throws IOException {
-      Preconditions.checkNotNull(name, "name is not set");
+      Objects.requireNonNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
 
       if (hostName == null) {
@@ -509,7 +517,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpsChannelConnector(server.webServer,
               httpConfig);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "unknown scheme for endpoint:" + ep);
         }
         connector.setHost(ep.getHost());
@@ -565,16 +573,39 @@ public final class HttpServer2 implements FilterContainer {
           sslContextFactory.setTrustStorePassword(trustStorePassword);
         }
       }
-      if (null != excludeCiphers && !excludeCiphers.isEmpty()) {
+      if (excludeCiphers != null && !excludeCiphers.isEmpty()) {
         sslContextFactory.setExcludeCipherSuites(
             StringUtils.getTrimmedStrings(excludeCiphers));
         LOG.info("Excluded Cipher List: {}", excludeCiphers);
       }
 
+      if (includeCiphers != null && !includeCiphers.isEmpty()) {
+        sslContextFactory.setIncludeCipherSuites(
+            StringUtils.getTrimmedStrings(includeCiphers));
+        LOG.info("Included Cipher List: {}", includeCiphers);
+      }
+
+      setEnabledProtocols(sslContextFactory);
+
       conn.addFirstConnectionFactory(new SslConnectionFactory(sslContextFactory,
           HttpVersion.HTTP_1_1.asString()));
 
       return conn;
+    }
+
+    private void setEnabledProtocols(SslContextFactory sslContextFactory) {
+      String enabledProtocols = conf.get(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS,
+          conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT));
+      List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
+      String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
+
+      List<String> finalExcludedProtocols = new ArrayList<>(originalExcludedProtocols);
+      finalExcludedProtocols.removeAll(Arrays.asList(enabledProtocolsArray));
+
+      sslContextFactory.setExcludeProtocols(finalExcludedProtocols.toArray(new String[0]));
+      LOG.info("Disabled protocols: {}", finalExcludedProtocols);
+      sslContextFactory.setIncludeProtocols(enabledProtocolsArray);
+      LOG.info("Enabled protocols: {}", enabledProtocols);
     }
   }
 
@@ -605,7 +636,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initializeWebServer(Builder builder) throws IOException {
-    Preconditions.checkNotNull(webAppContext);
+    Objects.requireNonNull(webAppContext, "webAppContext == null");
 
     int maxThreads = builder.conf.getInt(HTTP_MAX_THREADS_KEY, -1);
     // If HTTP_MAX_THREADS is not configured, QueueThreadPool() will use the
@@ -645,13 +676,12 @@ public final class HttpServer2 implements FilterContainer {
           LegacyHadoopConfigurationSource.asHadoopConfiguration(builder.conf);
       Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
           builder.authFilterConfigurationPrefix);
+      // create copy of the config with each <prefix>.<key> also added as hadoop.http.authentication.<key>
+      // (getFilterConfigMap removes prefix)
+      OzoneConfiguration copy = new OzoneConfiguration(hadoopConf);
+      filterConfig.forEach((k, v) -> copy.set("hadoop.http.authentication." + k, v));
       for (FilterInitializer c : initializers) {
-        if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
-          addFilter("authentication",
-              AuthenticationFilter.class.getName(), filterConfig);
-        } else {
-          c.initFilter(this, hadoopConf);
-        }
+        c.initFilter(this, copy);
       }
     }
 

@@ -29,11 +29,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestAWSV4AuthValidator {
 
-  private String strToSign;
-  private String signature;
-  private String awsAccessKey;
-  private Boolean result;
-
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][]{
         {
@@ -77,11 +72,7 @@ public class TestAWSV4AuthValidator {
   @MethodSource("data")
   public void testValidateRequest(String stringToSign, String sign,
                                   String accessKey, Boolean testResult) {
-    this.strToSign = stringToSign;
-    this.signature = sign;
-    this.awsAccessKey = accessKey;
-    this.result = testResult;
-    assertEquals(result, AWSV4AuthValidator.validateRequest(
-            strToSign, signature, awsAccessKey));
+    assertEquals(testResult, AWSV4AuthValidator.validateRequest(
+        stringToSign, sign, accessKey));
   }
 }

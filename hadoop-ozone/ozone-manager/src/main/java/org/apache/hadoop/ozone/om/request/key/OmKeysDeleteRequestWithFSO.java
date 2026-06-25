@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -87,39 +88,46 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   }
 
   @Override
-  protected long markKeysAsDeletedInCache(
-          OzoneManager ozoneManager, long trxnLogIndex,
-          List<OmKeyInfo> omKeyInfoList,
-          List<OmKeyInfo> dirList, OMMetadataManager omMetadataManager,
-          long quotaReleased, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
-
+  protected Pair<Long, Integer> markKeysAsDeletedInCache(
+      OzoneManager ozoneManager, long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
+    long quotaReleased = 0L;
+    int emptyKeys = 0;
     // Mark all keys which can be deleted, in cache as deleted.
-    for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+    for (int i = 0; i < omKeyInfoList.size(); i++) {
+      final OmKeyInfo omKeyInfo = omKeyInfoList.get(i);
+
       final long volumeId = omMetadataManager.getVolumeId(
               omKeyInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
       final long parentId = omKeyInfo.getParentObjectID();
       final String fileName = omKeyInfo.getFileName();
-      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(omMetadataManager
-              .getOzonePathKey(volumeId, bucketId, parentId, fileName)),
-          CacheValue.get(trxnLogIndex));
-
-      omKeyInfo.setUpdateID(trxnLogIndex);
-      quotaReleased += sumBlockLengths(omKeyInfo);
+      final String dbKey = omMetadataManager.getOzonePathKey(
+          volumeId, bucketId, parentId, fileName);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(dbKey),
+              CacheValue.get(trxnLogIndex));
+      emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
+      final OmKeyInfo updatedOmKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
+      quotaReleased += sumBlockLengths(updatedOmKeyInfo);
+      omKeyInfoList.set(i, updatedOmKeyInfo);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
-      String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      final String hsyncClientId = updatedOmKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
       if (hsyncClientId != null) {
-        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
-        String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
-        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
+        final Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        final String dbOpenKey = omMetadataManager.getOpenFileName(
+            volumeId, bucketId, parentId, fileName, hsyncClientId);
+        final OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          final OmKeyInfo updatedOpenKeyInfo = openKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
+          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
-          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+          openKeyInfoMap.put(dbOpenKey, updatedOpenKeyInfo);
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -127,21 +135,28 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
     }
 
     // Mark directory keys.
-    for (OmKeyInfo omKeyInfo : dirList) {
+    for (int i = 0; i < dirList.size(); i++) {
+      final OmKeyInfo dirInfo = dirList.get(i);
       final long volumeId = omMetadataManager.getVolumeId(
-              omKeyInfo.getVolumeName());
+              dirInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
-              omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
-      omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(
-              omMetadataManager.getOzonePathKey(volumeId, bucketId,
-                      omKeyInfo.getParentObjectID(),
-                  omKeyInfo.getFileName())),
-          CacheValue.get(trxnLogIndex));
+              dirInfo.getVolumeName(), dirInfo.getBucketName());
+      final long parentId = dirInfo.getParentObjectID();
+      final String dirName = dirInfo.getFileName();
 
-      omKeyInfo.setUpdateID(trxnLogIndex);
-      quotaReleased += sumBlockLengths(omKeyInfo);
+      final String dbDirKey = omMetadataManager.getOzonePathKey(
+          volumeId, bucketId, parentId, dirName);
+      omMetadataManager.getDirectoryTable()
+          .addCacheEntry(new CacheKey<>(dbDirKey),
+            CacheValue.get(trxnLogIndex));
+
+      final OmKeyInfo updatedDirInfo = dirInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
+      quotaReleased += sumBlockLengths(updatedDirInfo);
+      dirList.set(i, updatedDirInfo);
     }
-    return quotaReleased;
+    return Pair.of(quotaReleased, emptyKeys);
   }
 
   @Nonnull @Override

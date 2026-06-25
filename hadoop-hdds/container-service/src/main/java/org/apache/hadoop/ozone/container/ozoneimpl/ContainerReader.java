@@ -21,22 +21,26 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +83,7 @@ public class ContainerReader implements Runnable {
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
       ConfigurationSource conf, boolean shouldDelete) {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume,  "volume == null");
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
@@ -93,15 +97,14 @@ public class ContainerReader implements Runnable {
     try {
       readVolume(hddsVolumeDir);
     } catch (Throwable t) {
-      LOG.error("Caught an exception during reading container files" +
-          " from Volume {} {}", hddsVolumeDir, t);
+      LOG.error("Could not read container files from the volume {}. " +
+          "Marking the volume as failed", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
     }
   }
 
   public void readVolume(File hddsVolumeRootDir) {
-    Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
-        "cannot be null");
+    Objects.requireNonNull(hddsVolumeRootDir, "hddsVolumeRootDir == null");
 
     //filtering storage directory
     File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
@@ -117,32 +120,19 @@ public class ContainerReader implements Runnable {
     // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
     // operations to perform here in that case.
     if (storageDirs.length > 0) {
-      File clusterIDDir = new File(hddsVolumeRootDir,
-          hddsVolume.getClusterID());
-      // The subdirectory we should verify containers within.
-      // If this volume was formatted pre SCM HA, this will be the SCM ID.
-      // A cluster ID symlink will exist in this case only if this cluster is
-      // finalized for SCM HA.
-      // If the volume was formatted post SCM HA, this will be the cluster ID.
-      File idDir = clusterIDDir;
-      if (storageDirs.length == 1 && !clusterIDDir.exists()) {
-        // If the one directory is not the cluster ID directory, assume it is
-        // the old SCM ID directory used before SCM HA.
-        idDir = storageDirs[0];
-      } else {
-        // There are 1 or more storage directories. We only care about the
-        // cluster ID directory.
-        if (!clusterIDDir.exists()) {
-          LOG.error("Volume {} is in an inconsistent state. Expected " +
-              "clusterID directory {} not found.", hddsVolumeRootDir,
-              clusterIDDir);
-          volumeSet.failVolume(hddsVolumeRootDir.getPath());
-          return;
-        }
+      File currentDir;
+      try {
+        currentDir = StorageVolumeUtil.resolveContainerCurrentDir(hddsVolumeRootDir, 
+            hddsVolume.getClusterID(), storageDirs);
+      } catch (InconsistentStorageStateException e) {
+        LOG.error("Volume {} is in an inconsistent state. Expected " +
+                "clusterID directory {} not found.", hddsVolumeRootDir,
+            new File(hddsVolumeRootDir, hddsVolume.getClusterID()));
+        volumeSet.failVolume(hddsVolumeRootDir.getPath());
+        return;
       }
 
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-      File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null && containerTopDirs.length > 0) {
         for (File containerTopDir : containerTopDirs) {
@@ -235,6 +225,10 @@ public class ContainerReader implements Runnable {
         return;
       }
 
+      if (!isMatchedLastLoadedECContainer(kvContainer, containerSet.getContainerMetadataStore())) {
+        return;
+      }
+
       try {
         containerSet.addContainer(kvContainer);
         // this should be the last step of this block
@@ -259,6 +253,30 @@ public class ContainerReader implements Runnable {
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
     }
+  }
+
+  private boolean isMatchedLastLoadedECContainer(
+      KeyValueContainer kvContainer, WitnessedContainerMetadataStore containerMetadataStore) throws IOException {
+    if (null != containerMetadataStore && kvContainer.getContainerData().getReplicaIndex() != 0) {
+      ContainerCreateInfo containerCreateInfo = containerMetadataStore.getContainerCreateInfoTable()
+          .get(ContainerID.valueOf(kvContainer.getContainerData().getContainerID()));
+      // check for EC container replica index matching if db entry is present for container as last loaded,
+      // and ignore loading container if not matched.
+      // Ignore matching container replica index -1 in db as no previous replica index
+      if (null != containerCreateInfo
+          && containerCreateInfo.getReplicaIndex() != ContainerCreateInfo.INVALID_REPLICA_INDEX
+          && containerCreateInfo.getReplicaIndex() != kvContainer.getContainerData().getReplicaIndex()) {
+        LOG.info("EC Container {} with replica index {} present at path {} is not matched with DB replica index {}," +
+                " ignoring the load of the container.",
+            kvContainer.getContainerData().getContainerID(),
+            kvContainer.getContainerData().getReplicaIndex(),
+            kvContainer.getContainerData().getContainerPath(),
+            containerCreateInfo.getReplicaIndex());
+        return false;
+      }
+    }
+    // return true if not an EC container or entry not present in db or matching replica index
+    return true;
   }
 
   /**

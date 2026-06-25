@@ -53,10 +53,16 @@
         <th>Directory</th>
         <th>Storage Type</th>
         <th>Volume Type</th>
-        <th>Used Space</th>
-        <th>Available Space</th>
+        <th>Ozone Capacity</th>
+        <th>Ozone Used</th>
+        <th>Ozone Available</th>
         <th>Reserved</th>
-        <th>Total Capacity</th>
+        <th>Filesystem Capacity</th>
+        <th>Filesystem Available</th>
+        <th>Filesystem Used</th>
+        <th>Min Free Space</th>
+        <th>Hard Min Free Space</th>
+        <th>Non-Ozone Used</th>
         <th>Containers</th>
         <th>State</th>
     </tr>
@@ -66,10 +72,16 @@
         <td>{{volumeInfo["tag.StorageDirectory"]}}</td>
         <td>{{volumeInfo["tag.StorageType"]}}</td>
         <td>{{volumeInfo["tag.VolumeType"]}}</td>
-        <td>{{volumeInfo.Used}}</td>
-        <td>{{volumeInfo.Available}}</td>
+        <td>{{volumeInfo.OzoneCapacity}}</td>
+        <td>{{volumeInfo.OzoneUsed}}</td>
+        <td>{{volumeInfo.OzoneAvailable}}</td>
         <td>{{volumeInfo.Reserved}}</td>
-        <td>{{volumeInfo.TotalCapacity}}</td>
+        <td>{{volumeInfo.FilesystemCapacity}}</td>
+        <td>{{volumeInfo.FilesystemAvailable}}</td>
+        <td>{{volumeInfo.FilesystemUsed}}</td>
+        <td>{{volumeInfo.MinFreeSpace}}</td>
+        <td>{{volumeInfo.HardMinFreeSpace}}</td>
+        <td>{{volumeInfo.NonOzoneUsed}}</td>
         <td>{{volumeInfo.Containers}}</td>
         <td>{{volumeInfo["tag.VolumeState"]}}</td>
     </tr>

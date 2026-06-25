@@ -69,7 +69,6 @@ public class TestOzoneManagerRatisServer {
 
   private OzoneConfiguration conf;
   private OzoneManagerRatisServer omRatisServer;
-  private String omID;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
   private OMMetadataManager omMetadataManager;
@@ -86,7 +85,7 @@ public class TestOzoneManagerRatisServer {
   @BeforeEach
   public void init(@TempDir Path metaDirPath) throws Exception {
     conf = new OzoneConfiguration();
-    omID = UUID.randomUUID().toString();
+    String omID = UUID.randomUUID().toString();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -144,6 +143,46 @@ public class TestOzoneManagerRatisServer {
     assertEquals(LifeCycle.State.RUNNING,
         omRatisServer.getServerState(),
         "Ratis Server should be in running state");
+  }
+
+  /**
+   * RaftPeer.address must preserve the configured host string
+   * verbatim -- not a Java-resolved {@code InetSocketAddress} form. When
+   * the operator configured a hostname, the hostname must survive into
+   * RaftPeer.address so gRPC's {@code DnsNameResolver} can re-resolve it
+   * on connection failure (Kubernetes pod restarts). When the operator
+   * configured an IP literal, that literal must survive too. The
+   * regression this test guards is "{@code createRaftPeer} pre-resolved
+   * a hostname into a numeric IP and handed the resolved form to
+   * RaftPeer," which would freeze the gRPC channel at that IP for the
+   * channel's lifetime.
+   */
+  @Test
+  public void testCreateRaftPeerUsesHostnameAddress() {
+    String hostname = "om-2.om.example.svc.cluster.local";
+    int rpcPort = 9862;
+    int ratisPort = 9872;
+    OMNodeDetails peer = new OMNodeDetails.Builder()
+        .setOMServiceId("test-service")
+        .setOMNodeId("om2")
+        .setHostAddress(hostname)
+        .setRpcPort(rpcPort)
+        .setRatisPort(ratisPort)
+        .build();
+
+    org.apache.ratis.protocol.RaftPeer raftPeer =
+        OzoneManagerRatisServer.createRaftPeer(peer);
+    String addr = raftPeer.getAddress();
+    assertEquals(hostname + ":" + ratisPort, addr,
+        "RaftPeer address must preserve the configured host string "
+            + "verbatim. The configured hostname must survive into "
+            + "RaftPeer so gRPC can re-resolve it -- pre-resolving into a "
+            + "numeric IP would freeze the channel at that IP for its "
+            + "lifetime.");
+    // Defensive: the configured hostname must not have been pre-resolved
+    // into a numeric IPv4 octet form before reaching RaftPeer.
+    String host = addr.substring(0, addr.lastIndexOf(':'));
+    assertThat(host).doesNotMatch("^\\d{1,3}(\\.\\d{1,3}){3}$");
   }
 
   @Test

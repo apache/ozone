@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo.INVALID_REPLICA_INDEX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
@@ -61,12 +63,19 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
+  /**
+   * Max attempts to acquire {@link Container#writeLock()} while verifying this set's id → container mapping
+   * is same (e.g. another thread may {@link #updateContainer} / DiskBalancer swap the instance).
+   */
+  private static final int MAX_CONTAINER_MAP_SWAP_RETRIES = 5;
+
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
-  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
-      new ConcurrentSkipListMap<>();
+
+  private final ConcurrentSkipListSet<RecoveringContainer> recoveringContainerSet =
+      new ConcurrentSkipListSet<>();
   private final Clock clock;
   private long recoveringTimeout;
   @Nullable
@@ -80,7 +89,7 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public static ContainerSet newRwContainerSet(
       WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
-    Objects.requireNonNull(metadataStore, "WitnessedContainerMetadataStore == null");
+    Objects.requireNonNull(metadataStore, "metadataStore == null");
     return new ContainerSet(metadataStore, recoveringTimeout);
   }
 
@@ -96,6 +105,11 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public long getCurrentTime() {
     return clock.millis();
+  }
+
+  @Nullable
+  public WitnessedContainerMetadataStore getContainerMetadataStore() {
+    return containerMetadataStore;
   }
 
   @VisibleForTesting
@@ -180,7 +194,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   private boolean addContainer(Container<?> container, boolean overwrite) throws
       StorageContainerException {
-    Preconditions.checkNotNull(container, "container cannot be null");
+    Objects.requireNonNull(container, "container == null");
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
@@ -192,11 +206,16 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      updateContainerIdTable(containerId, containerState);
+      updateContainerIdTable(containerId, container.getContainerData());
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
-        recoveringContainerMap.put(
-            clock.millis() + recoveringTimeout, containerId);
+        recoveringContainerSet.add(
+            new RecoveringContainer(clock.millis() + recoveringTimeout,
+                containerId));
+      }
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(containerId);
       }
       return true;
     } else {
@@ -207,14 +226,54 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
+  private void updateContainerIdTable(long containerId, ContainerData containerData) throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
-        containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
-            ContainerCreateInfo.valueOf(containerState));
+        ContainerID containerIdObj = ContainerID.valueOf(containerId);
+        Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable =
+            containerMetadataStore.getContainerCreateInfoTable();
+        ContainerCreateInfo containerCreateInfo = containerCreateInfoTable.get(containerIdObj);
+        if (containerCreateInfo == null || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX) {
+          containerCreateInfoTable.put(containerIdObj,
+              ContainerCreateInfo.valueOf(containerData.getState(), containerData.getReplicaIndex()));
+        }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
+    }
+  }
+
+  /**
+   * Update Container to container map.
+   * @param container container to be added
+   * @return If container is added to containerMap returns true, otherwise
+   * false
+   */
+  public Container updateContainer(Container<?> container) throws
+      StorageContainerException {
+    Objects.requireNonNull(container, "container cannot be null");
+
+    long containerId = container.getContainerData().getContainerID();
+    if (!containerMap.containsKey(containerId)) {
+      LOG.error("Container doesn't exists with container Id {}", containerId);
+      throw new StorageContainerException("Container doesn't exist with " +
+          "container Id " + containerId,
+          ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    } else {
+      LOG.debug("Container with container Id {} is updated to containerMap",
+          containerId);
+      Container<?> oldContainer = containerMap.put(containerId, container);
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(container.getContainerData().getContainerID());
+      }
+      if (oldContainer != null) {
+        volume = oldContainer.getContainerData().getVolume();
+        if (volume != null) {
+          volume.removeContainer(oldContainer.getContainerData().getContainerID());
+        }
+      }
+      return oldContainer;
     }
   }
 
@@ -226,6 +285,54 @@ public class ContainerSet implements Iterable<Container<?>> {
   public Container<?> getContainer(long containerId) {
     Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
     return containerMap.get(containerId);
+  }
+
+  /**
+   * Returns the max retry for a container map swap while acquiring container lock.
+   * @return max retry count
+   */
+  public static int maxContainerMapSwapRetries() {
+    return MAX_CONTAINER_MAP_SWAP_RETRIES;
+  }
+
+  /**
+   * Locks the container mapped to {@code containerId} for write, and verifies that the instance locked is still
+   * the one stored in this set. If the mapping is swapped, unlocks and retries up to
+   * {@link #maxContainerMapSwapRetries()} times, then returns {@code null}.
+   *
+   * @return the locked container, or {@code null} if the mapping could not be stabilized after all retries
+   * @throws StorageContainerException with {@code CONTAINER_NOT_FOUND}
+   */
+  @Nullable
+  public Container<?> getContainerWithWriteLock(long containerId) throws StorageContainerException {
+    for (int retry = 0; retry < MAX_CONTAINER_MAP_SWAP_RETRIES; retry++) {
+      Container<?> candidate = getContainer(containerId);
+      if (candidate == null) {
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      candidate.writeLock();
+      Container<?> current = getContainer(containerId);
+      if (current == null) {
+        candidate.writeUnlock();
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      if (current != candidate) {
+        candidate.writeUnlock();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Container {} mapping changed during lock acquisition (attempt {}); retrying.",
+              containerId, retry);
+        }
+        continue;
+      }
+      return candidate;
+    }
+    LOG.warn("Container {} mapping kept changing after {} attempts; giving up.",
+        containerId, MAX_CONTAINER_MAP_SWAP_RETRIES);
+    return null;
   }
 
   /**
@@ -286,6 +393,10 @@ public class ContainerSet implements Iterable<Container<?>> {
           "containerMap", containerId);
       return false;
     } else {
+      HddsVolume volume = removed.getContainerData().getVolume();
+      if (volume != null) {
+        volume.removeContainer(containerId);
+      }
       LOG.debug("Container with containerId {} is removed from containerMap",
           containerId);
       return true;
@@ -312,16 +423,16 @@ public class ContainerSet implements Iterable<Container<?>> {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
     //it might take a little long time to iterate all the entries
-    // in recoveringContainerMap, but it seems ok here since:
+    // in recoveringContainerSet, but it seems ok here since:
     // 1 In the vast majority of cases，there will not be too
     // many recovering containers.
     // 2 closing container is not a sort of urgent action
     //
     // we can revisit here if any performance problem happens
-    Iterator<Map.Entry<Long, Long>> it = getRecoveringContainerIterator();
+    Iterator<RecoveringContainer> it = getRecoveringContainerIterator();
     while (it.hasNext()) {
-      Map.Entry<Long, Long> entry = it.next();
-      if (entry.getValue() == containerId) {
+      RecoveringContainer entry = it.next();
+      if (entry.getContainerId() == containerId) {
         it.remove();
         return true;
       }
@@ -380,11 +491,11 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   /**
    * Return an container Iterator over
-   * {@link ContainerSet#recoveringContainerMap}.
-   * @return {@literal Iterator<Container<?>>}
+   * {@link ContainerSet#recoveringContainerSet}.
+   * @return {@literal Iterator<RecoveringContainer>}
    */
-  public Iterator<Map.Entry<Long, Long>> getRecoveringContainerIterator() {
-    return recoveringContainerMap.entrySet().iterator();
+  public Iterator<RecoveringContainer> getRecoveringContainerIterator() {
+    return recoveringContainerSet.iterator();
   }
 
   /**
@@ -395,14 +506,20 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return {@literal Iterator<Container<?>>}
    */
   public Iterator<Container<?>> getContainerIterator(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-            .getStorageID()))
-        .sorted(ContainerDataScanOrder.INSTANCE)
-        .iterator();
+    Objects.requireNonNull(volume, "volume == null");
+    Iterator<Long> containerIdIterator = volume.getContainerIterator();
+
+    List<Container<?>> containers = new ArrayList<>();
+    while (containerIdIterator.hasNext()) {
+      Long containerId = containerIdIterator.next();
+      Container<?> container = containerMap.get(containerId);
+      if (container != null && container.getContainerData().getVolume() == volume) {
+        containers.add(container);
+      }
+    }
+    containers.sort(ContainerDataScanOrder.INSTANCE);
+
+    return containers.iterator();
   }
 
   /**
@@ -412,12 +529,8 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return number of containers
    */
   public long containerCount(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-        .getStorageID())).count();
+    Objects.requireNonNull(volume, "volume == null");
+    return volume.getContainerCount();
   }
 
   /**
@@ -456,8 +569,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   public void listContainer(long startContainerId, long count,
                             List<ContainerData> data) throws
       StorageContainerException {
-    Preconditions.checkNotNull(data,
-        "Internal assertion: data cannot be null");
+    Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(startContainerId >= 0,
         "Start container Id cannot be negative");
     Preconditions.checkState(count > 0,
@@ -556,5 +668,53 @@ public class ContainerSet implements Iterable<Container<?>> {
         }
       }
     });
+  }
+
+  /**
+   * A class that holds information about a recovering container.
+   */
+  public static class RecoveringContainer
+      implements Comparable<RecoveringContainer> {
+    private final long timeout;
+    private final long containerId;
+
+    public RecoveringContainer(long timeout, long containerId) {
+      this.timeout = timeout;
+      this.containerId = containerId;
+    }
+
+    public long getTimeout() {
+      return timeout;
+    }
+
+    public long getContainerId() {
+      return containerId;
+    }
+
+    @Override
+    public int compareTo(RecoveringContainer other) {
+      int timeoutCompare = Long.compare(this.timeout, other.timeout);
+      if (timeoutCompare != 0) {
+        return timeoutCompare;
+      }
+      return Long.compare(this.containerId, other.containerId);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      RecoveringContainer that = (RecoveringContainer) o;
+      return timeout == that.timeout && containerId == that.containerId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(timeout, containerId);
+    }
   }
 }

@@ -50,6 +50,10 @@ public final class S3Consts {
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MATCH =
+      COPY_SOURCE_IF_PREFIX + "match";
+  public static final String COPY_SOURCE_IF_NONE_MATCH =
+      COPY_SOURCE_IF_PREFIX + "none-match";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
       COPY_SOURCE_IF_PREFIX + "modified-since";
   public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
@@ -91,10 +95,27 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  /** AWS S3 maximum number of keys per DeleteObjects request. */
+  public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
+
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
   public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
   public static final String EXPECTED_SOURCE_BUCKET_OWNER_HEADER = "x-amz-source-expected-bucket-owner";
+
+  public static final String CHECKSUM_HEADER = "Content-MD5";
+
+  // Conditional request headers
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String IF_MATCH_HEADER = "If-Match";
+  public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
+  public static final String IF_UNMODIFIED_SINCE_HEADER =
+      "If-Unmodified-Since";
+
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
 
   //Never Constructed
   private S3Consts() {
@@ -107,6 +128,35 @@ public final class S3Consts {
   public enum CopyDirective {
     COPY, // Default directive
     REPLACE
+  }
+
+  /** Constants for query parameters. */
+  public static final class QueryParams {
+    public static final String ACL = "acl";
+    public static final String CONTINUATION_TOKEN = "continuation-token";
+    public static final String DELETE = "delete";
+    public static final String DELIMITER = "delimiter";
+    public static final String ENCODING_TYPE = "encoding-type";
+    public static final String KEY_MARKER = "key-marker";
+    // GetBucketLocation is not implemented
+    public static final String LOCATION = "location";
+    public static final String MARKER = "marker";
+    public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
+    public static final String MAX_KEYS = "max-keys";
+    public static final String MAX_PARTS = "max-parts";
+    public static final String MAX_UPLOADS = "max-uploads";
+    public static final String PART_NUMBER = "partNumber";
+    public static final String PART_NUMBER_MARKER = "part-number-marker";
+    public static final String PREFIX = "prefix";
+    public static final String START_AFTER = "start-after";
+    public static final String TAGGING = "tagging";
+    public static final String UPLOAD_ID = "uploadId";
+    public static final String UPLOAD_ID_MARKER = "upload-id-marker";
+    public static final String UPLOADS = "uploads";
+
+    private QueryParams() {
+      // no instances
+    }
   }
 
 }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,12 +25,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.http.HttpResponse;
@@ -80,19 +81,16 @@ public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCa
       serviceMap.put(serviceInfo.getNodeType(), serviceInfo);
     }
 
-    InetSocketAddress omAddress =
-        getOmAddressForClients(conf);
+    String omAddress = OmUtils.getOmRpcAddress(conf);
     ServiceInfo omInfo = serviceMap.get(HddsProtos.NodeType.OM);
 
-    assertEquals(omAddress.getHostName(), omInfo.getHostname());
-    assertEquals(omAddress.getPort(),
-        omInfo.getPort(ServicePort.Type.RPC));
+    assertEquals(omAddress, omInfo.getHostname() + ":" + omInfo.getPort(ServicePort.Type.RPC));
     assertEquals(server.getHttpAddress().getPort(),
         omInfo.getPort(ServicePort.Type.HTTP));
 
-    assertTrue(getScmAddressForClients(conf).iterator().hasNext());
-    InetSocketAddress scmAddress =
-        getScmAddressForClients(conf).iterator().next();
+    Iterator<InetSocketAddress> scmAddressIterator = getScmAddressForClients(conf).iterator();
+    assertTrue(scmAddressIterator.hasNext());
+    InetSocketAddress scmAddress = scmAddressIterator.next();
     ServiceInfo scmInfo = serviceMap.get(HddsProtos.NodeType.SCM);
 
     assertEquals(scmAddress.getHostName(), scmInfo.getHostname());

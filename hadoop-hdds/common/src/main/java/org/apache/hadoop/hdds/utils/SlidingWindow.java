@@ -149,12 +149,17 @@ public class SlidingWindow {
     return clock.millis();
   }
 
+  public long getExpiryDurationMillis() {
+    return expiryDurationMillis;
+  }
+
   /**
-   * A custom monotonic clock implementation.
+   * A custom monotonic clock implementation to allow overriding the current time for testing purposes.
    * Implementation of Clock that uses System.nanoTime() for real usage.
-   * See {@see org.apache.ozone.test.TestClock}
+   * The class {@code org.apache.ozone.test.TestClock} provides a mock clock which can be used
+   * to manipulate the current time in tests.
    */
-  private static final class MonotonicClock extends Clock {
+  public static final class MonotonicClock extends Clock {
     @Override
     public long millis() {
       return TimeUnit.NANOSECONDS.toMillis(System.nanoTime());

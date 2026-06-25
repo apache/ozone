@@ -31,9 +31,11 @@ public enum S3GAction implements AuditAction {
   PUT_ACL,
   LIST_MULTIPART_UPLOAD,
   MULTI_DELETE,
+  GET_BUCKET_LOCATION,
 
   //RootEndpoint
   LIST_S3_BUCKETS,
+  LIST_DIRECTORY_BUCKETS,
 
   //ObjectEndpoint
   CREATE_MULTIPART_KEY,

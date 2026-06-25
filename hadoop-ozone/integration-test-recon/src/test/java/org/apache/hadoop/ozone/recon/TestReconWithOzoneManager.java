@@ -75,7 +75,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconWithOzoneManager {
   private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
   private static String taskStatusURL;
@@ -83,7 +82,7 @@ public class TestReconWithOzoneManager {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     int socketTimeout = (int) conf.getTimeDuration(
         OZONE_RECON_OM_SOCKET_TIMEOUT,
         conf.get(
@@ -96,7 +95,7 @@ public class TestReconWithOzoneManager {
             ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
             OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int)conf.getTimeDuration(
+    int connectionRequestTimeout = (int) conf.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT,
         conf.get(
             ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,

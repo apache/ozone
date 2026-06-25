@@ -162,8 +162,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      fullKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(fileName);
       String dbNodeName = omMetadataManager.getOzonePathKey(volumeId,
           omBucketInfo.getObjectID(), lastKnownParentId, fileName);
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().

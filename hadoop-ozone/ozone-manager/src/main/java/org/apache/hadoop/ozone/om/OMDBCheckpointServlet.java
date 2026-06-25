@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -27,12 +28,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -45,7 +46,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -69,20 +70,22 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  *
- * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
- * configured in `ozone.administrator` (along with the user that starts OM,
- * which automatically becomes an Ozone administrator but not necessarily in
- * the config) are allowed to access this endpoint.
+ * When Ozone authorization is enabled (`ozone.authorization.enabled`=`true`),
+ * only users/principals configured in `ozone.administrator` (along with the user
+ * that starts OM, which automatically becomes an Ozone administrator but not
+ * necessarily in the config) are allowed to access this endpoint.
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
@@ -123,12 +126,32 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     initialize(om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
 
     lock = new Lock(om);
+  }
+
+  @Override
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as "
+          + "this OM is not the leader or not ready to serve requests";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
+    super.processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
   @Override
@@ -347,26 +370,28 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneConfiguration conf = getConf();
 
     Set<Path> snapshotPaths = new HashSet<>();
-
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     // get snapshotInfo entries
-    OmMetadataManagerImpl checkpointMetadataManager =
+    try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        iterator = checkpointMetadataManager
-        .getSnapshotInfoTable().iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            iterator = checkpointMetadataManager
+            .getSnapshotInfoTable().iterator()) {
 
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
-        Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        if (waitForDir) {
-          waitForDirToExist(path);
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+                 snapshotLocalDataManager.getOmSnapshotLocalDataMeta(entry.getValue())) {
+          Path path = Paths.get(getSnapshotPath(conf, entry.getValue(), snapMetaProvider.getMeta().getVersion()));
+          if (waitForDir) {
+            waitForDirToExist(path);
+          }
+          snapshotPaths.add(path);
         }
-        snapshotPaths.add(path);
       }
-    } finally {
-      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }
@@ -528,8 +553,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Check if the files are hard linked to each other.
       // Note comparison must be done against srcPath, because
       // destPath may only exist on Follower.
-      if (OmSnapshotUtils.getINode(srcPath).equals(
-          OmSnapshotUtils.getINode(file))) {
+      if (getINode(srcPath).equals(getINode(file))) {
         return destPath;
       } else {
         LOG.info("Found non linked sst files with the same name: {}, {}",
@@ -655,45 +679,25 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   static class Lock extends BootstrapStateHandler.Lock {
-    private final List<BootstrapStateHandler.Lock> locks;
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
-      Preconditions.checkNotNull(om);
-      Preconditions.checkNotNull(om.getKeyManager());
-      Preconditions.checkNotNull(om.getMetadataManager());
-      Preconditions.checkNotNull(om.getMetadataManager().getStore());
-
+      super((readLock) -> {
+        return om.getMetadataManager().getLock().acquireResourceLock(BOOTSTRAP_LOCK);
+      });
       this.om = om;
-
-      locks = Stream.of(
-          om.getKeyManager().getDeletingService(),
-          om.getKeyManager().getDirDeletingService(),
-          om.getKeyManager().getSnapshotSstFilteringService(),
-          om.getKeyManager().getSnapshotDeletingService(),
-          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
-      )
-          .filter(Objects::nonNull)
-          .map(BootstrapStateHandler::getBootstrapStateLock)
-          .collect(Collectors.toList());
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
-      // First lock all the handlers.
-      for (BootstrapStateHandler.Lock lock : locks) {
-        lock.lock();
-      }
-
+    public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
-      return this;
+      return super.acquireWriteLock();
     }
 
     @Override
-    public void unlock() {
-      locks.forEach(BootstrapStateHandler.Lock::unlock);
+    public UncheckedAutoCloseable acquireReadLock() {
+      throw new UnsupportedOperationException("Read locks are not supported for OMDBCheckpointServlet");
     }
   }
 }

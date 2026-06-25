@@ -24,8 +24,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_CIPHERS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROTOCOLS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT;
@@ -71,10 +73,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,9 +85,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -104,6 +112,15 @@ public class SecurityConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecurityConfig.class);
   private static volatile Provider provider;
+
+  /**
+   * Test-only configuration property to enable authorization checks without
+   * requiring full security (Kerberos) setup. This is for testing purposes
+   * only.
+   */
+  public static final String OZONE_TEST_AUTHORIZATION_ENABLED = "ozone.test.authorization.enabled";
+  public static final boolean OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT = false;
+
   private final int size;
   private final String keyAlgo;
   private final String providerString;
@@ -133,9 +150,12 @@ public class SecurityConfig {
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
   private final Duration caAckTimeout;
   private final SslProvider grpcSSLProvider;
+  private final String[] grpcTlsProtocols;
+  private final List<String> grpcTlsCiphers;
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
+  private final boolean authorizationEnabled;
 
   /**
    * Constructs a SecurityConfig.
@@ -143,7 +163,7 @@ public class SecurityConfig {
    * @param configuration - HDDS Configuration
    */
   public SecurityConfig(ConfigurationSource configuration) {
-    Preconditions.checkNotNull(configuration, "Configuration cannot be null");
+    Objects.requireNonNull(configuration, "Configuration cannot be null");
     this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
     this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
@@ -199,6 +219,14 @@ public class SecurityConfig {
     this.isSecurityEnabled = configuration.getBoolean(
         OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
+
+    // Authorization is only effective when security is enabled, unless test mode is enabled
+    boolean testAuthorizationEnabled = configuration.getBoolean(
+        OZONE_TEST_AUTHORIZATION_ENABLED,
+        OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT);
+    this.authorizationEnabled = (isSecurityEnabled || testAuthorizationEnabled) &&
+        configuration.getBoolean(OZONE_AUTHORIZATION_ENABLED,
+            OZONE_AUTHORIZATION_ENABLED_DEFAULT);
 
     String certDurationString =
         configuration.get(HDDS_X509_DEFAULT_DURATION,
@@ -262,6 +290,18 @@ public class SecurityConfig {
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
             HDDS_GRPC_TLS_PROVIDER_DEFAULT));
+
+    String protocolsValue = configuration.get(HDDS_GRPC_TLS_PROTOCOLS);
+    this.grpcTlsProtocols =
+        StringUtils.isBlank(protocolsValue)
+        ? null
+        : configuration.getTrimmedStrings(HDDS_GRPC_TLS_PROTOCOLS);
+
+    String ciphersValue = configuration.get(HDDS_GRPC_TLS_CIPHERS);
+    this.grpcTlsCiphers =
+        StringUtils.isBlank(ciphersValue)
+        ? null
+        : Collections.unmodifiableList(Arrays.asList(configuration.getTrimmedStrings(HDDS_GRPC_TLS_CIPHERS)));
   }
 
   public static synchronized void initSecurityProvider(ConfigurationSource configuration) {
@@ -425,8 +465,7 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, keyDir);
   }
 
@@ -438,8 +477,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, certificateDir);
   }
 
@@ -450,8 +488,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component);
   }
 
@@ -555,6 +592,22 @@ public class SecurityConfig {
     return grpcSSLProvider;
   }
 
+  /**
+   * Returns TLS protocol versions for gRPC servers,
+   * or null for provider defaults.
+   */
+  public String[] getGrpcTlsProtocols() {
+    return grpcTlsProtocols == null ? null : Arrays.copyOf(grpcTlsProtocols, grpcTlsProtocols.length);
+  }
+
+  /**
+   * Returns TLS cipher suites for gRPC servers,
+   * or null for provider defaults.
+   */
+  public List<String> getGrpcTlsCiphers() {
+    return grpcTlsCiphers;
+  }
+
   public boolean useExternalCACertificate(String component) {
     return component.equals(OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME) &&
         !externalRootCaCert.isEmpty() && externalRootCaPrivateKeyPath.getNameCount() != 0;
@@ -610,5 +663,16 @@ public class SecurityConfig {
 
   public boolean isTokenEnabled() {
     return blockTokenEnabled || containerTokenEnabled;
+  }
+
+  /**
+   * Check if authorization checks should be performed in Ozone.
+   * Authorization is only effective when security is enabled, unless test mode is enabled.
+   * This controls both admin privilege checks and ACL checks.
+   *
+   * @return true if authorization checks should be performed
+   */
+  public boolean isAuthorizationEnabled() {
+    return authorizationEnabled;
   }
 }

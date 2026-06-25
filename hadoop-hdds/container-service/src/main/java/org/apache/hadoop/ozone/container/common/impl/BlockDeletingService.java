@@ -123,7 +123,7 @@ public class BlockDeletingService extends BackgroundService {
     });
   }
 
-  public synchronized void updateAndRestart(OzoneConfiguration ozoneConf) {
+  public void updateAndRestart(OzoneConfiguration ozoneConf) {
     long newInterval = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     int newCorePoolSize = ozoneConf.getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -134,11 +134,15 @@ public class BlockDeletingService extends BackgroundService {
             ", core pool size {} and timeout {} {}",
         newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
         TimeUnit.NANOSECONDS.name().toLowerCase());
+    // shutdown() awaits the executor; do not hold this monitor (same object as
+    // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
     shutdown();
-    setInterval(newInterval, TimeUnit.SECONDS);
-    setPoolSize(newCorePoolSize);
-    setServiceTimeoutInNanos(newTimeout);
-    start();
+    synchronized (this) {
+      setInterval(newInterval, TimeUnit.SECONDS);
+      setPoolSize(newCorePoolSize);
+      setServiceTimeoutInNanos(newTimeout);
+      start();
+    }
   }
 
   /**
@@ -210,6 +214,7 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
 
     AtomicLong totalPendingBlockCount = new AtomicLong(0L);
+    AtomicLong totalPendingBlockBytes = new AtomicLong(0L);
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> (checkPendingDeletionBlocks(
@@ -222,10 +227,12 @@ public class BlockDeletingService extends BackgroundService {
               totalPendingBlockCount
                   .addAndGet(
                       ContainerUtils.getPendingDeletionBlocks(containerData));
+              totalPendingBlockBytes.addAndGet(ContainerUtils.getPendingDeletionBytes(containerData));
               return containerData;
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
+    metrics.setTotalPendingBlockBytes(totalPendingBlockBytes.get());
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }

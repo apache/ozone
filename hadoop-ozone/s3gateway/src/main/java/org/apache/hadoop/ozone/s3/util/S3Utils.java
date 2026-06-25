@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
@@ -32,10 +34,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -164,9 +168,13 @@ public final class S3Utils {
     }
   }
 
-  public static String validateSignatureHeader(HttpHeaders headers, String resource) throws OS3Exception {
+  public static String validateSignatureHeader(HttpHeaders headers, String resource, boolean isSignedPayload)
+      throws OS3Exception {
     String xAmzContentSha256Header = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
     if (xAmzContentSha256Header == null) {
+      if (!isSignedPayload) {
+        return UNSIGNED_PAYLOAD;
+      }
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
       ex.setErrorMessage("An error occurred (InvalidArgument): " +
           "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");
@@ -196,6 +204,74 @@ public final class S3Utils {
    */
   public static String generateCanonicalUserId(String input) {
     return DigestUtils.sha256Hex(input);
+  }
+
+  /**
+   * Strips leading and trailing double quotes from the given string.
+   *
+   * @param value the input string
+   * @return the string without leading and trailing double quotes
+   */
+  public static String stripQuotes(String value) {
+    return StringUtils.strip(value, "\"");
+  }
+
+  /**
+   * Normalizes an ETag header value by trimming whitespace and removing
+   * surrounding double quotes.
+   *
+   * @param value the raw header value
+   * @return the normalized ETag, or {@code null} if the input is null
+   */
+  public static String parseETag(String value) {
+    if (value == null) {
+      return null;
+    }
+    return stripQuotes(value.trim());
+  }
+
+  /**
+   * Wraps the given string in double quotes.
+   *
+   * @param value the input string
+   * @return the string wrapped in double quotes
+   */
+  public static String wrapInQuotes(String value) {
+    return StringUtils.wrap(value, '\"');
+  }
+
+  /**
+   * Validates the Content-MD5 header against the actual MD5 hash.
+   *
+   * <p>Throws {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#INVALID_DIGEST}
+   * when the Content-MD5 header is absent, contains an invalid Base64 string,
+   * or decodes to a byte array that is not exactly 16 bytes (i.e. not a valid
+   * MD5 digest).  Throws
+   * {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#BAD_DIGEST}
+   * when the header is well-formed but does not match the computed hash.
+   *
+   * @param clientMD5 the base64-encoded MD5 from Content-MD5 header
+   * @param serverMD5 the hex-encoded MD5 hash of the data
+   * @param resource  the resource path for error messages
+   * @throws OS3Exception if the Content-MD5 is invalid or does not match
+   */
+  public static void validateContentMD5(String clientMD5, String serverMD5, String resource)
+      throws OS3Exception {
+    if (clientMD5 == null) {
+      throw newError(INVALID_DIGEST, resource);
+    }
+
+    try {
+      byte[] decoded = Base64.getDecoder().decode(clientMD5);
+      if (decoded.length != 16) {
+        throw newError(INVALID_DIGEST, resource);
+      }
+      if (!Hex.encodeHexString(decoded).equals(serverMD5)) {
+        throw newError(BAD_DIGEST, resource);
+      }
+    } catch (IllegalArgumentException ex) {
+      throw newError(INVALID_DIGEST, resource);
+    }
   }
 
 }

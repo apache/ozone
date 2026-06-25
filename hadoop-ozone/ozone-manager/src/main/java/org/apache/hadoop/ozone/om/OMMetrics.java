@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.LinkedList;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -26,6 +29,8 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -35,6 +40,9 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
+
+  private final LinkedList<String> ratisEvents = new LinkedList<>();
+  private final int maxRatisEvents;
 
   // OM request type op metrics
   private @Metric MutableCounterLong numVolumeOps;
@@ -106,6 +114,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numGetObjectTagging;
   private @Metric MutableCounterLong numPutObjectTagging;
   private @Metric MutableCounterLong numDeleteObjectTagging;
+
+  private @Metric MutableCounterLong numLinearizableRead;
+  private @Metric MutableCounterLong numLeaderSkipLinearizableRead;
+
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseSuccess;
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseFailLog;
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseFailTime;
 
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
@@ -245,20 +260,56 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
   private final DBCheckpointMetrics dbCheckpointMetrics;
+  private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
 
-  public OMMetrics() {
+  // Bucket Tagging Metrics
+  private @Metric MutableCounterLong numGetBucketTagging;
+  private @Metric MutableCounterLong numPutBucketTagging;
+  private @Metric MutableCounterLong numDeleteBucketTagging;
+  private @Metric MutableCounterLong numGetBucketTaggingFails;
+  private @Metric MutableCounterLong numPutBucketTaggingFails;
+  private @Metric MutableCounterLong numDeleteBucketTaggingFails;
+
+  public OMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
+    this.maxRatisEvents = maxRatisEvents;
   }
 
-  public static OMMetrics create() {
+  public static OMMetrics create(ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    int maxRatisEvents = conf == null
+        ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
+        : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
-        new OMMetrics());
+        new OMMetrics(maxRatisEvents));
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
     return dbCheckpointMetrics;
+  }
+
+  /**
+   * Starts periodic updates for snapshot directory metrics.
+   * Creates the metrics instance if it doesn't exist.
+   *
+   * @param configuration OzoneConfiguration for reading update interval
+   * @param metadataManager OMMetadataManager for accessing snapshot directories
+   */
+  public void startSnapshotDirectoryMetrics(OzoneConfiguration configuration,
+      OMMetadataManager metadataManager) {
+    if (snapshotDirectoryMetrics == null) {
+      snapshotDirectoryMetrics = OMSnapshotDirectoryMetrics.create(configuration,
+          "OM Metrics", metadataManager);
+    }
+    snapshotDirectoryMetrics.start();
+  }
+
+  public void stopSnapshotDirectoryMetrics() {
+    if (snapshotDirectoryMetrics != null) {
+      snapshotDirectoryMetrics.stop();
+    }
   }
 
   public void incNumS3BucketCreates() {
@@ -959,6 +1010,46 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numDeleteObjectTaggingFails.incr();
   }
 
+  public void incNumLinearizableRead() {
+    numLinearizableRead.incr();
+  }
+
+  public long getNumLinearizableRead() {
+    return numLinearizableRead.value();
+  }
+
+  public void incNumLeaderSkipLinearizableRead() {
+    numLeaderSkipLinearizableRead.incr();
+  }
+
+  public long getNumLeaderSkipLinearizableRead() {
+    return numLeaderSkipLinearizableRead.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseSuccess() {
+    numFollowerReadLocalLeaseSuccess.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseSuccess() {
+    return numFollowerReadLocalLeaseSuccess.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseFailLog() {
+    numFollowerReadLocalLeaseFailLog.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseFailLog() {
+    return numFollowerReadLocalLeaseFailLog.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseFailTime() {
+    numFollowerReadLocalLeaseFailTime.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseFailTime() {
+    return numFollowerReadLocalLeaseFailTime.value();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -1488,6 +1579,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     ecBucketCreateFailsTotal.incr();
   }
 
+  @Override
+  public void incNumGetBucketTagging() {
+    numGetBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  @Override
+  public void incNumGetBucketTaggingFails() {
+    numGetBucketTaggingFails.incr();
+  }
+
+  public void incNumPutBucketTagging() {
+    numPutBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumPutBucketTaggingFails() {
+    numPutBucketTaggingFails.incr();
+  }
+
+  public void incNumDeleteBucketTagging() {
+    numDeleteBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumDeleteBucketTaggingFails() {
+    numDeleteBucketTaggingFails.incr();
+  }
+
   public void incNumRecoverLease() {
     numKeyOps.incr();
     numFSOps.incr();
@@ -1498,9 +1618,28 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numRecoverLeaseFails.incr();
   }
 
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= maxRatisEvents) {
+        ratisEvents.removeFirst();
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  @Metric("Ratis state machine events")
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
+  }
+
   public void unRegister() {
     if (dbCheckpointMetrics != null) {
       dbCheckpointMetrics.unRegister();
+    }
+    if (snapshotDirectoryMetrics != null) {
+      snapshotDirectoryMetrics.unRegister();
     }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);

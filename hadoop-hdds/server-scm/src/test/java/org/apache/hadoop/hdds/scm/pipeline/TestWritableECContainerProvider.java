@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoo
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -182,13 +183,13 @@ public class TestWritableECContainerProvider {
   void testPipelinesCreatedBasedOnTotalDiskCountWithFactor(
       PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
-    int factor = 10;
+    double factor = 0.5;
     providerConf.setMinimumPipelines(1);
     providerConf.setPipelinePerVolumeFactor(factor);
-    nodeManager.setNumHealthyVolumes(5);
+    nodeManager.setNumHealthyVolumes(20);
 
     int volumeCount = nodeManager.totalHealthyVolumeCount();
-    int pipelineLimit = factor * volumeCount / repConfig.getRequiredNodes();
+    int pipelineLimit = (int) (factor * volumeCount / repConfig.getRequiredNodes());
     Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit);
     assertReusesExisting(allocated, pipelineLimit);
   }
@@ -353,7 +354,7 @@ public class TestWritableECContainerProvider {
           List<DatanodeDetails> favoredNodes)
           throws IOException {
         if (throwError) {
-          throw new IOException("Cannot create pipelines");
+          throw new RocksDatabaseException("Cannot create pipelines");
         }
         throwError = true;
         return super.createPipeline(repConfig);
@@ -418,8 +419,7 @@ public class TestWritableECContainerProvider {
         dbStore, scmhaManager, nodeManager) {
 
       @Override
-      public NavigableSet<ContainerID> getContainersInPipeline(
-          PipelineID pipelineID) throws IOException {
+      public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
         throw new PipelineNotFoundException("Simulated exception");
       }
     };

@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.container.common.volume;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
@@ -43,9 +46,20 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       CapacityVolumeChoosingPolicy.class);
+  private final ReentrantLock lock;
+
+  public CapacityVolumeChoosingPolicy(ReentrantLock globalLock) {
+    lock = globalLock;
+  }
+
+  // only for testing purposes
+  @VisibleForTesting
+  public CapacityVolumeChoosingPolicy() {
+    lock = new ReentrantLock();
+  }
 
   @Override
-  public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
+  public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
@@ -55,43 +69,62 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
     AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
 
-    List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
-        .filter(filter)
-        .collect(Collectors.toList());
+    lock.lock();
+    try {
+      List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
+          .filter(filter)
+          .collect(Collectors.toList());
 
-    if (volumesWithEnoughSpace.isEmpty()) {
-      throwDiskOutOfSpace(filter, LOG);
-    } else {
-      logIfSomeVolumesOutOfSpace(filter, LOG);
+      if (volumesWithEnoughSpace.isEmpty()) {
+        throwDiskOutOfSpace(filter, LOG);
+      } else {
+        logIfSomeVolumesOutOfSpace(filter, LOG);
+      }
+
+      int count = volumesWithEnoughSpace.size();
+      HddsVolume selectedVolume = volumesWithEnoughSpace.get(0);
+      if (count > 1) {
+        // Even if we don't have too many volumes in volumesWithEnoughSpace, this
+        // algorithm will still help us choose the volume with lower
+        // utilization than other volumes.
+        // Say we have vol1 with lower utilization than vol2, for two choices,
+        // the distribution of possibility is as follows:
+        // 1. vol1 + vol2: 25%, result is vol1
+        // 2. vol1 + vol1: 25%, result is vol1
+        // 3. vol2 + vol1: 25%, result is vol1
+        // 4. vol2 + vol2: 25%, result is vol2
+        // So we have a total of 75% chances to choose vol1, which meets our
+        // expectation.
+        int firstIndex = ThreadLocalRandom.current().nextInt(count);
+        int secondIndex = ThreadLocalRandom.current().nextInt(count);
+
+        HddsVolume firstVolume = volumesWithEnoughSpace.get(firstIndex);
+        HddsVolume secondVolume = volumesWithEnoughSpace.get(secondIndex);
+
+        double firstRatio = freeSpaceRatio(firstVolume);
+        double secondRatio = freeSpaceRatio(secondVolume);
+        selectedVolume = firstRatio < secondRatio ? secondVolume : firstVolume;
+      }
+      selectedVolume.incCommittedBytes(maxContainerSize);
+      return selectedVolume;
+    } finally {
+      lock.unlock();
     }
+  }
 
-    int count = volumesWithEnoughSpace.size();
-    HddsVolume selectedVolume = volumesWithEnoughSpace.get(0);
-    if (count > 1) {
-      // Even if we don't have too many volumes in volumesWithEnoughSpace, this
-      // algorithm will still help us choose the volume with larger
-      // available space than other volumes.
-      // Say we have vol1 with more available space than vol2, for two choices,
-      // the distribution of possibility is as follows:
-      // 1. vol1 + vol2: 25%, result is vol1
-      // 2. vol1 + vol1: 25%, result is vol1
-      // 3. vol2 + vol1: 25%, result is vol1
-      // 4. vol2 + vol2: 25%, result is vol2
-      // So we have a total of 75% chances to choose vol1, which meets our
-      // expectation.
-      int firstIndex = ThreadLocalRandom.current().nextInt(count);
-      int secondIndex = ThreadLocalRandom.current().nextInt(count);
-
-      HddsVolume firstVolume = volumesWithEnoughSpace.get(firstIndex);
-      HddsVolume secondVolume = volumesWithEnoughSpace.get(secondIndex);
-
-      long firstAvailable = firstVolume.getCurrentUsage().getAvailable()
-          - firstVolume.getCommittedBytes();
-      long secondAvailable = secondVolume.getCurrentUsage().getAvailable()
-          - secondVolume.getCommittedBytes();
-      selectedVolume = firstAvailable < secondAvailable ? secondVolume : firstVolume;
+  // Fraction of capacity still free for hdds, excluding space committed to open containers.
+  // Comparing the ratio (not absolute bytes) keeps utilization balanced across volumes of
+  // different capacity.
+  @VisibleForTesting
+  static double freeSpaceRatio(HddsVolume volume) {
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    long capacity = usage.getCapacity();
+    if (capacity <= 0) {
+      return 0;
     }
-    selectedVolume.incCommittedBytes(maxContainerSize);
-    return selectedVolume;
+    // Clamp at 0: committed can exceed available, and a negative ratio would skew the
+    // comparison (matches the guard in HddsVolume.checkVolumeUsages).
+    long free = Math.max(0, usage.getAvailable() - volume.getCommittedBytes());
+    return (double) free / capacity;
   }
 }

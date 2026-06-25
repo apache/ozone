@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
 
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
+# contributor license agreements. See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
 # The ASF licenses this file to You under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# the License. You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
 
 # The name of the script being executed.
 OZONE_SHELL_EXECNAME="ozone"
 MYNAME="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
+
+## @description  true when the ozone-iceberg artifact is present in this distribution
+## @audience     private
+function ozone_iceberg_available
+{
+  local lib_dir="${HDDS_LIB_JARS_DIR:-${OZONE_HOME}/share/ozone/lib}"
+
+  [[ -f "${OZONE_HOME}/share/ozone/classpath/ozone-iceberg.classpath" ]] \
+    && compgen -G "${lib_dir}/ozone-iceberg-*.jar" > /dev/null
+}
 
 ## @description  build up the ozone command's usage text.
 ## @audience     public
@@ -33,13 +45,13 @@ function ozone_usage
   ozone_add_option "--hosts filename" "list of hosts to use in worker mode"
   ozone_add_option "--loglevel level" "set the log4j level for this command"
   ozone_add_option "--workers" "turn on worker mode"
-  ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
-  ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
+  ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be appended after these jvmargs"
+  ozone_add_option "--validate [continue]" "validate that all required jars are present on the classpath; with 'continue', keep running even if validation fails"
 
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "completion" client "generate autocompletion script for bash/zsh"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
-  ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
+  ozone_add_subcommand "envvars" client "display computed Ozone environment variables"
   ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
@@ -51,17 +63,21 @@ function ozone_usage
   ozone_add_subcommand "httpfs" daemon "run the HTTPFS compatible REST gateway"
   ozone_add_subcommand "csi" daemon "run the standalone CSI daemon"
   ozone_add_subcommand "recon" daemon "run the Recon service"
-  ozone_add_subcommand "sh" client "command line interface for object store operations"
+  ozone_add_subcommand "sh" client "command line interface for object store operations (alias: shell)"
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
   ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
+  ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
-
+  ozone_add_subcommand "vapor" client "Ozone server simulator"
+  if ozone_iceberg_available; then
+    ozone_add_subcommand "iceberg" client "commands for Iceberg tables on Ozone (see ozone iceberg --help for subcommands)"
+  fi
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
 
@@ -100,14 +116,14 @@ function ozonecmd_case
     ;;
     completion)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-dist"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       ozone_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
       OZONE_DATANODE_OPTS="${RATIS_OPTS} ${OZONE_DATANODE_OPTS}"
-      OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties,${OZONE_CONF_DIR}/dn-container-log4j2.properties ${OZONE_DATANODE_OPTS}"
-      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties,${OZONE_CONF_DIR}/dn-container-log4j2.properties -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="${OZONE_DATANODE_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="ozone-datanode"
     ;;
@@ -127,6 +143,11 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-freon"
+      if ozone_is_freon_command_moved_to_vapor; then
+        # backward compatibility
+        OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Vapor
+        OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
+      fi
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
@@ -137,8 +158,8 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
       ozone_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
-      OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
-      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
+      OZONE_OM_OPTS="${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
     sh | shell)
@@ -156,35 +177,36 @@ function ozonecmd_case
       OZONE_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
       ozone_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
       OZONE_SCM_OPTS="${RATIS_OPTS} ${OZONE_SCM_OPTS}"
-      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
-      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
+      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="hdds-server-scm"
     ;;
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
-      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} ${RATIS_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} ${RATIS_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
     tenant)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.tenant.TenantShell
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.csi.CsiServer'
+      OZONE_CSI_OPTS="${OZONE_CSI_OPTS} -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
       OZONE_RUN_ARTIFACT_NAME="ozone-csi"
     ;;
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
-      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${RATIS_OPTS} -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-recon"
     ;;
     fs)
@@ -194,7 +216,7 @@ function ozonecmd_case
     ;;
     daemonlog)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.utils.LogLevel
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="hdds-server-framework"
     ;;
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
@@ -212,6 +234,11 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
+    interactive)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-interactive"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+    ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
@@ -220,17 +247,31 @@ function ozonecmd_case
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-debug"
     ;;
     repair)
       check_running_ozone_services
       OZONE_CLASSNAME=org.apache.hadoop.ozone.repair.OzoneRepair
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-repair"
     ;;
     ratis)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    vapor)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Vapor
+      OZONE_VAPOR_OPTS="${OZONE_VAPOR_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
+    ;;
+    iceberg)
+      if ! ozone_iceberg_available; then
+        ozone_error "ERROR: ozone iceberg is not available in this distribution (requires JDK 11+ build)."
+        exit 1
+      fi
+      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.IcebergCommand"
+      OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
@@ -267,7 +308,9 @@ function check_running_ozone_services
 function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
-      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-iceberg" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF

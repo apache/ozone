@@ -26,7 +26,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -181,10 +181,10 @@ public final class OzoneAcl {
 
     // Check if acl string contains scope info.
     if (parts[2].matches(ACL_SCOPE_REGEX)) {
-      int indexOfOpenBracket = parts[2].indexOf("[");
+      int indexOfOpenBracket = parts[2].indexOf('[');
       bits = parts[2].substring(0, indexOfOpenBracket);
       aclScope = AclScope.valueOf(parts[2].substring(indexOfOpenBracket + 1,
-          parts[2].indexOf("]")));
+          parts[2].indexOf(']')));
     }
 
     EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
@@ -310,7 +310,7 @@ public final class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return Proto2Utils.unsafeByteString(bytes);
+    return UnsafeByteOperations.unsafeWrap(bytes);
   }
 
   @JsonIgnore

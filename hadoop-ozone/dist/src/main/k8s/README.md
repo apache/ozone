@@ -15,6 +15,8 @@
 Ozone on Kubernetes
 ===
 
+**Note:** The Kubernetes examples and scripts in this project have been tested with Kubernetes 1.34.2 (k3s v1.34.2+k3s1).
+
 ## Connecting IDE to Ozone on Kubernetes
 
 ### Setup Ozone and Kubernetes

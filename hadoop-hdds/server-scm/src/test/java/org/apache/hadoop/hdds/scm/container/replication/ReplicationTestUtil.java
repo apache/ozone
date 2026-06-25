@@ -161,6 +161,30 @@ public final class ReplicationTestUtil {
     return replicas;
   }
 
+  /**
+   * Creates a single replica with a specific origin, operational state, replica state, and BCSID.
+   */
+  public static ContainerReplica createReplicaWithOriginAndSeqId(
+      ContainerID containerID, DatanodeID originNodeId,
+      HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId) {
+    return createContainerReplica(containerID, 0, opState, replicaState, 123L, 1234L,
+        MockDatanodeDetails.randomDatanodeDetails(), originNodeId, seqId);
+  }
+
+  /**
+   * Adds {@code count} replicas with the given origin, operational state, replica state, and BCSID.
+   * to the provided set.
+   */
+  public static void addReplicasWithOriginAndSeqId(
+      Set<ContainerReplica> replicas, ContainerID containerID,
+      DatanodeID originNodeId, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId, int count) {
+    for (int i = 0; i < count; i++) {
+      replicas.add(createReplicaWithOriginAndSeqId(containerID, originNodeId, opState, replicaState, seqId));
+    }
+  }
+
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {

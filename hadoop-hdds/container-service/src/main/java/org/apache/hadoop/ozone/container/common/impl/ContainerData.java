@@ -402,7 +402,7 @@ public abstract class ContainerData {
    * Also decrement committed bytes against the bytes written.
    * @param bytes the number of bytes write into the container.
    */
-  private void incrWriteBytes(long bytes) {
+  public void incrWriteBytes(long bytes) {
     /*
        Increase the cached Used Space in VolumeInfo as it
        maybe not updated, DU or DedicatedDiskSpaceUsage runs
@@ -569,9 +569,34 @@ public abstract class ContainerData {
    */
   public abstract long getBlockCommitSequenceId();
 
+  /**
+   * Update write statistics for chunk operations.
+   * <p>
+   * This method handles two distinct cases:
+   * 1. New writes (overwrite=false):
+   *    - Updates I/O metrics: writeBytes, writeCount
+   *    - Updates disk metrics: blockBytes
+   *    - Updates space metrics: usedSpace, committedBytes (via incrWriteBytes)
+   * 2. Overwrites (overwrite=true):
+   *    - Updates I/O metrics only: writeBytes, writeCount
+   *    - Does NOT update space metrics (file may not grow)
+   *    - blockBytes is handled separately for file growth
+   * <p>
+   * Example for overwrite with growth (file 4 bytes, overwrite 6 bytes at offset 2):
+   * - bytesWritten=6, overwrite=true
+   * - writeBytes += 6 (I/O operation size)
+   * - writeCount += 1 (one operation)
+   * - usedSpace/committedBytes NOT updated here (delta handled separately)
+   * - blockBytes NOT updated here (delta=4 handled by incrementBlockBytes)
+   * 
+   * @param bytesWritten Number of bytes in the I/O operation
+   * @param overwrite Whether this is an overwrite operation
+   */
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
     getStatistics().updateWrite(bytesWritten, overwrite);
-    incrWriteBytes(bytesWritten);
+    if (!overwrite) {
+      incrWriteBytes(bytesWritten);
+    }
   }
 
   @Override
@@ -591,11 +616,13 @@ public abstract class ContainerData {
     private final long bytes;
     private final long count;
     private final long pendingDeletion;
+    private final long pendingDeletionBytes;
 
-    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
+    public BlockByteAndCounts(long bytes, long count, long pendingDeletion, long pendingDeletionBytes) {
       this.bytes = bytes;
       this.count = count;
       this.pendingDeletion = pendingDeletion;
+      this.pendingDeletionBytes = pendingDeletionBytes;
     }
 
     public long getBytes() {
@@ -608,6 +635,10 @@ public abstract class ContainerData {
 
     public long getPendingDeletion() {
       return pendingDeletion;
+    }
+
+    public long getPendingDeletionBytes() {
+      return pendingDeletionBytes;
     }
   }
 
@@ -625,6 +656,7 @@ public abstract class ContainerData {
     private long blockBytes;
     private long blockCount;
     private long blockPendingDeletion;
+    private long blockPendingDeletionBytes;
 
     public synchronized long getWriteBytes() {
       return writeBytes;
@@ -635,11 +667,15 @@ public abstract class ContainerData {
     }
 
     public synchronized BlockByteAndCounts getBlockByteAndCounts() {
-      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
+      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion, blockPendingDeletionBytes);
     }
 
     public synchronized long getBlockPendingDeletion() {
       return blockPendingDeletion;
+    }
+
+    public synchronized long getBlockPendingDeletionBytes() {
+      return blockPendingDeletionBytes;
     }
 
     public synchronized void incrementBlockCount() {
@@ -661,16 +697,30 @@ public abstract class ContainerData {
       writeBytes += length;
     }
 
-    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
-      blockBytes -= deletedBytes;
-      blockCount -= deletedBlockCount;
-      blockPendingDeletion -= processedBlockCount;
+    /**
+     * Increment blockBytes by the given delta.
+     * This is used for overwrite operations that extend the file.
+     */
+    public synchronized void incrementBlockBytes(long delta) {
+      blockBytes += delta;
     }
 
-    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
+    public synchronized void decDeletion(long deletedBytes, long processedBytes, long deletedBlockCount,
+        long processedBlockCount) {
+
+      // After subtraction if blockBytes is 0, let it be. Only if it becomes negative, set the size to 1 byte.
+      blockBytes -= deletedBytes;
+      if (blockBytes < 0) {
+        blockBytes = 1L;
+      }
+      blockCount = Math.max(0L, blockCount - deletedBlockCount);
+      blockPendingDeletion = Math.max(0L, blockPendingDeletion - processedBlockCount);
+      blockPendingDeletionBytes = Math.max(0L, blockPendingDeletionBytes - processedBytes);
+    }
+
+    public synchronized void updateBlocks(long bytes, long count) {
       blockBytes = bytes;
       blockCount = count;
-      blockPendingDeletion += pendingDeletionIncrement;
     }
 
     public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
@@ -689,12 +739,19 @@ public abstract class ContainerData {
           .setKeyCount(blockCount);
     }
 
-    public synchronized void addBlockPendingDeletion(long count) {
+    public synchronized void setBlockPendingDeletion(long count, long bytes) {
+      blockPendingDeletion = count;
+      blockPendingDeletionBytes = bytes;
+    }
+
+    public synchronized void addBlockPendingDeletion(long count, long bytes) {
       blockPendingDeletion += count;
+      blockPendingDeletionBytes += bytes;
     }
 
     public synchronized void resetBlockPendingDeletion() {
       blockPendingDeletion = 0;
+      blockPendingDeletionBytes = 0;
     }
 
     public synchronized void assertRead(long expectedBytes, long expectedCount) {
@@ -726,7 +783,8 @@ public abstract class ContainerData {
       return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
           + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
           + ", block(" + blockBytes + " bytes, #" + blockCount
-          + ", pendingDelete=" + blockPendingDeletion + ")}";
+          + ", pendingDelete=" + blockPendingDeletion
+          + ", pendingDeleteBytes=" + blockPendingDeletionBytes + ")}";
     }
   }
 }

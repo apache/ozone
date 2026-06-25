@@ -36,7 +36,7 @@ import org.apache.hadoop.util.Time;
 import picocli.CommandLine;
 
 /**
- * Handler of ozone admin om finalizeUpgrade command.
+ * Handler of ozone admin om prepare command.
  */
 @CommandLine.Command(
     name = "prepare",
@@ -53,15 +53,11 @@ public class PrepareSubCommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID",
-      required = true
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
-      names = {"-tawt", "--transaction-apply-wait-timeout"},
+      names = {"--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
       defaultValue = "120",
@@ -70,7 +66,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long txnApplyWaitTimeSeconds;
 
   @CommandLine.Option(
-      names = {"-tact", "--transaction-apply-check-interval"},
+      names = {"--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
           "all transactions to be applied to the OM DB.",
       defaultValue = "5",
@@ -79,7 +75,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long txnApplyCheckIntervalSeconds;
 
   @CommandLine.Option(
-      names = {"-pct", "--prepare-check-interval"},
+      names = {"--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
           " preparation.",
       defaultValue = "10",
@@ -88,7 +84,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private long prepareCheckInterval;
 
   @CommandLine.Option(
-      names = {"-pt", "--prepare-timeout"},
+      names = {"--prepare-timeout"},
       description = "Max time in SECONDS to wait for all OMs to be prepared",
       defaultValue = "300",
       hidden = true
@@ -97,7 +93,13 @@ public class PrepareSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client = parent.createOmClient(omServiceId);
+    try (OzoneManagerProtocol client = omServiceOption.newClient()) {
+      execute(client);
+    }
+    return null;
+  }
+
+  private void execute(OzoneManagerProtocol client) throws Exception {
     long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
         txnApplyCheckIntervalSeconds);
     System.out.println("Ozone Manager Prepare Request successfully returned " +
@@ -105,7 +107,7 @@ public class PrepareSubCommand implements Callable<Void> {
 
     Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
     Set<String> omHosts = getOmHostsFromConfig(
-        parent.getParent().getOzoneConf(), omServiceId);
+        parent.getParent().getOzoneConf(), omServiceOption.getServiceID());
     omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
     Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
     Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
@@ -122,7 +124,7 @@ public class PrepareSubCommand implements Callable<Void> {
         if (!e.getValue()) {
           String omHost = e.getKey();
           try (OzoneManagerProtocol singleOmClient =
-                    parent.createOmClient(omServiceId, omHost, false)) {
+                    parent.createOmClient(omServiceOption.getServiceID(), omHost, false)) {
             PrepareStatusResponse response =
                 singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
             PrepareStatus status = response.getStatus();
@@ -165,8 +167,6 @@ public class PrepareSubCommand implements Callable<Void> {
       System.out.println("No new write requests will be allowed until " +
           "preparation is cancelled or upgrade/downgrade is done.");
     }
-
-    return null;
   }
 
 }

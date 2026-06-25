@@ -31,7 +31,6 @@ import static org.assertj.core.api.Assertions.fail;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileStatus;
@@ -39,7 +38,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,11 +97,9 @@ public abstract class AbstractContractRootDirectoryTest extends AbstractFSContra
     final FileSystem fs = getFileSystem();
     final AtomicInteger iterations = new AtomicInteger(0);
     final FileStatus[] originalChildren = listChildren(fs, root);
-    LambdaTestUtils.eventually(
-        OBJECTSTORE_RETRY_TIMEOUT,
-        new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
             FileStatus[] deleted = deleteChildren(fs, root, true);
             FileStatus[] children = listChildren(fs, root);
             if (children.length > 0) {
@@ -114,10 +111,11 @@ public abstract class AbstractContractRootDirectoryTest extends AbstractFSContra
                   dumpStats("deleted", deleted),
                   dumpStats("original", originalChildren)));
             }
-            return null;
+            return true;
+          } catch (IOException e) {
+            return false;
           }
-        },
-        new LambdaTestUtils.ProportionalRetryInterval(50, 1000));
+        }, 50, OBJECTSTORE_RETRY_TIMEOUT);
     // then try to delete the empty one
     boolean deleted = fs.delete(root, false);
     LOG.info("rm / of empty dir result is {}", deleted);

@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,22 +40,35 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -272,6 +287,108 @@ public class TestBackgroundContainerDataScanner extends
     verifyContainerMarkedUnhealthy(healthy, never());
   }
 
+  /**
+   * Scanner shuts down cleanly when volume failure is detected mid-iteration.
+   */
+  @Test
+  public void testVolumeFailureDuringIterationShutdownsScanner()
+      throws Exception {
+    // isFailed() is called twice per container (scanContainer + shouldScanMetadata).
+    // Return false for both checks of the first container, then true after that.
+    when(vol.isFailed()).thenReturn(false, false, true);
+
+    CountDownLatch firstContainerScanned = new CountDownLatch(1);
+    when(healthy.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .then(i -> {
+          firstContainerScanned.countDown();
+          return getHealthyDataScanResult();
+        });
+
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    scanner.start();
+
+    assertTrue(firstContainerScanned.await(5, TimeUnit.SECONDS),
+        "First container should have been scanned");
+
+    long deadline = System.currentTimeMillis() + 5000;
+    while (scanner.isAlive() && System.currentTimeMillis() < deadline) {
+      Thread.sleep(100);
+    }
+
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
+    assertFalse(scanner.isAlive(),
+        "Scanner thread should have terminated after detecting volume failure");
+    assertEquals(0, metrics.getNumScanIterations(),
+        "No full iteration should have completed after volume failure");
+    verify(corruptData, never()).scanData(any(), any());
+  }
+
+  /**
+   * Scan completes without exception when the underlying DB is closed
+   * concurrently (simulates StorageVolumeChecker calling failVolume() while
+   * BackgroundContainerDataScanner holds an open iterator).
+   */
+  @Test
+  public void testScanExitsCleanlyWhenDBClosedDuringIteration(
+      @TempDir File tempDir) throws Exception {
+    File dbDir = new File(tempDir, "container-db");
+
+    // DatanodeTable disables iterator(), so get the raw RDBTable via the
+    // column family definition for iteration.
+    try (DatanodeStoreSchemaThreeImpl datanodeStore =
+        new DatanodeStoreSchemaThreeImpl(
+            new OzoneConfiguration(), dbDir.getAbsolutePath(), false)) {
+      Table<String, Long> metaTableForPut = datanodeStore.getMetadataTable();
+      for (int i = 0; i < 50; i++) {
+        metaTableForPut.put("key-" + i, (long) i);
+      }
+      Table<String, Long> iterableMetaTable =
+          DatanodeSchemaThreeDBDefinition.METADATA.getTable(datanodeStore.getStore());
+
+      CountDownLatch iteratorOpen = new CountDownLatch(1);
+      CountDownLatch resumeIteration = new CountDownLatch(1);
+
+      when(healthy.scanData(
+          any(DataTransferThrottler.class), any(Canceler.class)))
+          .then(invocation -> {
+            try (Table.KeyValueIterator<String, Long> iter =
+                iterableMetaTable.iterator()) {
+              iteratorOpen.countDown();
+              assertTrue(resumeIteration.await(5, TimeUnit.SECONDS),
+                  "resumeIteration latch should have been released");
+              while (iter.hasNext()) {
+                iter.next();
+              }
+            }
+            return getHealthyDataScanResult();
+          });
+
+      ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
+      Future<?> scanFuture = scanExecutor.submit(() -> scanner.runIteration());
+
+      assertTrue(iteratorOpen.await(5, TimeUnit.SECONDS),
+          "Iterator should have been opened inside scanData()");
+
+      // Simulate failVolume() on a separate thread
+      ExecutorService closeExecutor = Executors.newSingleThreadExecutor();
+      Future<?> closeFuture = closeExecutor.submit((Callable<Void>) () -> {
+        datanodeStore.stop();
+        return null;
+      });
+      Thread.sleep(50);
+
+      resumeIteration.countDown();
+
+      assertDoesNotThrow(() -> scanFuture.get(5, TimeUnit.SECONDS),
+          "Scan must complete without exception when DB is closed concurrently");
+      assertDoesNotThrow(() -> closeFuture.get(5, TimeUnit.SECONDS),
+          "DB close must complete after iterator is released");
+
+      scanExecutor.shutdown();
+      closeExecutor.shutdown();
+    }
+  }
+
   @Test
   public void testMerkleTreeWritten() throws Exception {
     scanner.runIteration();
@@ -287,5 +404,29 @@ public class TestBackgroundContainerDataScanner extends
       verify(controller, times(1))
           .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
+  }
+
+  /**
+   * When data scan reports only "too many open files" errors due to file-descriptor exhaustion,
+   * the container must not be marked UNHEALTHY.
+   */
+  @Test
+  public void testDataScanOnlyTooManyOpenFilesDoesNotMarkUnhealthy() throws Exception {
+    Container<?> container = mockKeyValueContainer();
+    IOException ex = new IOException("Too many open files");
+    DataScanResult scanResult = DataScanResult.fromErrors(Collections.singletonList(
+                    new ContainerScanError(FailureType.CORRUPT_CHUNK, new File("."), ex)),
+            new ContainerMerkleTreeWriter());
+    when(container.scanData(any(DataTransferThrottler.class), any(Canceler.class))).thenReturn(scanResult);
+
+    setContainers(container);
+    scanner.runIteration();
+
+    verify(controller, never()).markContainerUnhealthy(anyLong(), any(ScanResult.class));
+    verify(controller, never()).updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    verify(controller, never()).updateDataScanTimestamp(eq(container.getContainerData().getContainerID()), any());
+    assertEquals(1, scanner.getMetrics().getNumScanIterations());
+    assertEquals(0, scanner.getMetrics().getNumContainersScanned());
+    assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
   }
 }

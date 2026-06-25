@@ -187,7 +187,7 @@ public class WritableECContainerProvider
     int volumeBasedCount = 0;
     if (factor > 0) {
       int volumes = nodeManager.totalHealthyVolumeCount();
-      volumeBasedCount = (int) factor * volumes / repConfig.getRequiredNodes();
+      volumeBasedCount = (int) (factor * volumes / repConfig.getRequiredNodes());
     }
     return Math.max(volumeBasedCount, providerConfig.getMinimumPipelines());
   }
@@ -277,7 +277,7 @@ public class WritableECContainerProvider
 
     private static final String PREFIX = "ozone.scm.ec";
 
-    @Config(key = "pipeline.minimum",
+    @Config(key = "ozone.scm.ec.pipeline.minimum",
         defaultValue = "5",
         reconfigurable = true,
         type = ConfigType.INT,
@@ -293,7 +293,7 @@ public class WritableECContainerProvider
     private static final String EC_PIPELINE_PER_VOLUME_FACTOR_KEY =
         PREFIX + "." + PIPELINE_PER_VOLUME_FACTOR_KEY;
 
-    @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
+    @Config(key = "ozone.scm.ec.pipeline.per.volume.factor",
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
         reconfigurable = true,

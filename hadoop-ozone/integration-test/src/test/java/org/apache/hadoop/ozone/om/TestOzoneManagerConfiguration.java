@@ -56,8 +56,6 @@ public class TestOzoneManagerConfiguration {
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
-  private OzoneManager om;
-  private OzoneManagerRatisServer omRatisServer;
 
   private static final long RATIS_RPC_TIMEOUT = 500L;
 
@@ -90,7 +88,7 @@ public class TestOzoneManagerConfiguration {
   @Test
   public void testNoConfiguredOMAddress() throws Exception {
     startCluster();
-    om = cluster.getOzoneManager();
+    OzoneManager om = cluster.getOzoneManager();
 
     assertTrue(NetUtils.isLocalAddress(
         om.getOmRpcServerAddr().getAddress()));
@@ -122,7 +120,7 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, omNode1Id);
 
     startCluster();
-    om = cluster.getOzoneManager();
+    OzoneManager om = cluster.getOzoneManager();
     assertEquals("0.0.0.0",
         om.getOmRpcServerAddr().getHostName());
     assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
@@ -145,8 +143,8 @@ public class TestOzoneManagerConfiguration {
   public void testSingleNodeOMservice() throws Exception {
     // Default settings of MiniOzoneCluster start a sinle node OM service.
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
     // OM's Ratis server should have only 1 peer (itself) in its RaftGroup
@@ -196,8 +194,8 @@ public class TestOzoneManagerConfiguration {
     conf.setInt(omNode3RatisPortKey, 9898);
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
@@ -271,8 +269,8 @@ public class TestOzoneManagerConfiguration {
     conf.setInt(omNode3RatisPortKey, 9898);
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     // Verify Peer details
     List<OMNodeDetails> peerNodes = om.getPeerNodes();
@@ -432,8 +430,8 @@ public class TestOzoneManagerConfiguration {
         "126.0.0.127:9862");
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 

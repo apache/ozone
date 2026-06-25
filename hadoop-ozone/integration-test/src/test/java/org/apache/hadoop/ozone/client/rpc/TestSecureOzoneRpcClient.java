@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -90,6 +91,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -115,6 +117,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     CertificateClientTestImpl certificateClientTest =
@@ -310,10 +313,12 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         assertEquals(committedBytes + dataSize,
             getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
         // check used quota
-        bucket = volume.getBucket(bucketName);
-        assertEquals(1, bucket.getUsedNamespace());
-        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
-
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> 1 == volume.getBucket(bucketName).getUsedNamespace(),
+            1000, 30000);
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> dataSize * ReplicationFactor.THREE.getValue()
+                == volume.getBucket(bucketName).getUsedBytes(), 1000, 30000);
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();

@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.client.checksum;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.function.LongToIntFunction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.common.PureJavaCrc32ByteBuffer;
+import org.apache.hadoop.ozone.common.PureJavaCrc32CByteBuffer;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,18 +37,18 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class CrcComposer {
+public final class CrcComposer {
   private static final int CRC_SIZE_BYTES = 4;
   private static final Logger LOG = LoggerFactory.getLogger(CrcComposer.class);
 
-  private final int crcPolynomial;
+  private final LongToIntFunction mod;
   private final int precomputedMonomialForHint;
   private final long bytesPerCrcHint;
   private final long stripeLength;
 
   private int curCompositeCrc = 0;
   private long curPositionInStripe = 0;
-  private ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
 
   /**
    * Returns a CrcComposer which will collapse all ingested CRCs into a single
@@ -53,12 +56,9 @@ public class CrcComposer {
    *
    * @param type type.
    * @param bytesPerCrcHint bytesPerCrcHint.
-   * @throws IOException raised on errors performing I/O.
    * @return a CrcComposer which will collapse all ingested CRCs into a single value.
    */
-  public static CrcComposer newCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint)
-      throws IOException {
+  public static CrcComposer newCrcComposer(DataChecksum.Type type, long bytesPerCrcHint) {
     return newStripedCrcComposer(type, bytesPerCrcHint, Long.MAX_VALUE);
   }
 
@@ -77,33 +77,28 @@ public class CrcComposer {
    * @param stripeLength stripeLength.
    * @return a CrcComposer which will collapse CRCs for every combined.
    * underlying data size which aligns with the specified stripe boundary.
-   * @throws IOException raised on errors performing I/O.
    */
-  public static CrcComposer newStripedCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
-      throws IOException {
-    int polynomial = org.apache.hadoop.ozone.client.checksum.CrcUtil.getCrcPolynomialForType(type);
-    return new CrcComposer(
-        polynomial,
-        org.apache.hadoop.ozone.client.checksum.CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
-        bytesPerCrcHint,
-        stripeLength);
+  public static CrcComposer newStripedCrcComposer(DataChecksum.Type type, long bytesPerCrcHint, long stripeLength) {
+    return new CrcComposer(type, bytesPerCrcHint, stripeLength);
   }
 
-  CrcComposer(
-      int crcPolynomial,
-      int precomputedMonomialForHint,
-      long bytesPerCrcHint,
-      long stripeLength) {
-    LOG.debug(
-        "crcPolynomial=0x{}, precomputedMonomialForHint=0x{}, "
-        + "bytesPerCrcHint={}, stripeLength={}",
-        Integer.toString(crcPolynomial, 16),
-        Integer.toString(precomputedMonomialForHint, 16),
-        bytesPerCrcHint,
-        stripeLength);
-    this.crcPolynomial = crcPolynomial;
-    this.precomputedMonomialForHint = precomputedMonomialForHint;
+  /** @return the mod function for the given type. */
+  static LongToIntFunction getModFunction(DataChecksum.Type type) {
+    switch (type) {
+    case CRC32:
+      return PureJavaCrc32ByteBuffer::mod;
+    case CRC32C:
+      return PureJavaCrc32CByteBuffer::mod;
+    default:
+      throw new IllegalArgumentException("Unexpected type: " + type);
+    }
+  }
+
+  private CrcComposer(DataChecksum.Type type, long bytesPerCrcHint, long stripeLength) {
+    LOG.debug("type={}, bytesPerCrcHint={}, stripeLength={}",
+        type, bytesPerCrcHint, stripeLength);
+    this.mod = getModFunction(type);
+    this.precomputedMonomialForHint = CrcUtil.getMonomial(bytesPerCrcHint, mod);
     this.bytesPerCrcHint = bytesPerCrcHint;
     this.stripeLength = stripeLength;
   }
@@ -117,20 +112,17 @@ public class CrcComposer {
    * @param offset offset.
    * @param length must be a multiple of the expected byte-size of a CRC.
    * @param bytesPerCrc bytesPerCrc.
-   * @throws IOException raised on errors performing I/O.
    */
-  public void update(
-      byte[] crcBuffer, int offset, int length, long bytesPerCrc)
-      throws IOException {
+  public void update(byte[] crcBuffer, int offset, int length, long bytesPerCrc) {
     if (length % CRC_SIZE_BYTES != 0) {
-      throw new IOException(String.format(
+      throw new IllegalArgumentException(String.format(
           "Trying to update CRC from byte array with length '%d' at offset "
           + "'%d' which is not a multiple of %d!",
           length, offset, CRC_SIZE_BYTES));
     }
     int limit = offset + length;
     while (offset < limit) {
-      int crcB = org.apache.hadoop.ozone.client.checksum.CrcUtil.readInt(crcBuffer, offset);
+      final int crcB = CrcUtil.readInt(crcBuffer, offset);
       update(crcB, bytesPerCrc);
       offset += CRC_SIZE_BYTES;
     }
@@ -161,30 +153,27 @@ public class CrcComposer {
    *
    * @param crcB crcB.
    * @param bytesPerCrc bytesPerCrc.
-   * @throws IOException raised on errors performing I/O.
    */
-  public void update(int crcB, long bytesPerCrc) throws IOException {
+  public void update(int crcB, long bytesPerCrc) {
     if (curCompositeCrc == 0) {
       curCompositeCrc = crcB;
     } else if (bytesPerCrc == bytesPerCrcHint) {
-      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.composeWithMonomial(
-          curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
+      curCompositeCrc = CrcUtil.composeWithMonomial(curCompositeCrc, crcB, precomputedMonomialForHint, mod);
     } else {
-      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.compose(
-          curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
+      curCompositeCrc = CrcUtil.compose(curCompositeCrc, crcB, bytesPerCrc, mod);
     }
 
     curPositionInStripe += bytesPerCrc;
 
     if (curPositionInStripe > stripeLength) {
-      throw new IOException(String.format(
+      throw new IllegalStateException(String.format(
           "Current position in stripe '%d' after advancing by bytesPerCrc '%d' "
           + "exceeds stripeLength '%d' without stripe alignment.",
           curPositionInStripe, bytesPerCrc, stripeLength));
     } else if (curPositionInStripe == stripeLength) {
       // Hit a stripe boundary; flush the curCompositeCrc and reset for next
       // stripe.
-      digestOut.write(org.apache.hadoop.ozone.client.checksum.CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
+      digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
       curCompositeCrc = 0;
       curPositionInStripe = 0;
     }

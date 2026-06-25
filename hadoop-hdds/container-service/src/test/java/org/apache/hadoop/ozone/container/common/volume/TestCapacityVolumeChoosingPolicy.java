@@ -122,6 +122,79 @@ public class TestCapacityVolumeChoosingPolicy {
   }
 
   @Test
+  public void testChoosesLowerUtilizationAcrossDifferentCapacities() throws Exception {
+    // big has more free bytes but is 90% full; small is only 60% full.
+    // The policy must prefer the less-utilized volume, not the one with more free bytes.
+    SpaceUsageSource bigSource = MockSpaceUsageSource.fixed(1000, 100);
+    HddsVolume bigVolume = new HddsVolume.Builder(baseDir + "big")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            bigSource, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    SpaceUsageSource smallSource = MockSpaceUsageSource.fixed(200, 80);
+    HddsVolume smallVolume = new HddsVolume.Builder(baseDir + "small")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            smallSource, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+
+    List<HddsVolume> mixedVolumes = new ArrayList<>();
+    mixedVolumes.add(bigVolume);
+    mixedVolumes.add(smallVolume);
+
+    Map<HddsVolume, Integer> chooseCount = new HashMap<>();
+    chooseCount.put(bigVolume, 0);
+    chooseCount.put(smallVolume, 0);
+
+    try {
+      for (int i = 0; i < 1000; i++) {
+        HddsVolume volume = policy.chooseVolume(mixedVolumes, 0);
+        chooseCount.put(volume, chooseCount.get(volume) + 1);
+      }
+      assertThat(chooseCount.get(smallVolume))
+          .isGreaterThan(chooseCount.get(bigVolume));
+    } finally {
+      bigVolume.shutdown();
+      smallVolume.shutdown();
+    }
+  }
+
+  @Test
+  public void testFreeSpaceRatioIsZeroWhenCapacityUnknown() throws Exception {
+    // A volume with unknown capacity (<= 0) yields ratio 0 instead of dividing by zero,
+    // so it is never preferred over a volume with known capacity.
+    SpaceUsageSource unknown = MockSpaceUsageSource.fixed(0, 0);
+    HddsVolume volume = new HddsVolume.Builder(baseDir + "unknown")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            unknown, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    try {
+      assertEquals(0.0, CapacityVolumeChoosingPolicy.freeSpaceRatio(volume));
+    } finally {
+      volume.shutdown();
+    }
+  }
+
+  @Test
+  public void testFreeSpaceRatioIsClampedToZeroWhenOverCommitted() throws Exception {
+    // committed exceeds available, so the raw free space is negative.
+    // The ratio must clamp to 0 rather than return a negative value.
+    SpaceUsageSource source = MockSpaceUsageSource.fixed(1000, 50);
+    HddsVolume volume = new HddsVolume.Builder(baseDir + "overcommitted")
+        .conf(CONF)
+        .usageCheckFactory(MockSpaceUsageCheckFactory.of(
+            source, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE))
+        .build();
+    try {
+      volume.incCommittedBytes(100);
+      assertEquals(0.0, CapacityVolumeChoosingPolicy.freeSpaceRatio(volume));
+    } finally {
+      volume.shutdown();
+    }
+  }
+
+  @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
     Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 500));
@@ -129,7 +202,7 @@ public class TestCapacityVolumeChoosingPolicy {
     String msg = e.getMessage();
     assertThat(msg)
         .contains("No volumes have enough space for a new container.  " +
-            "Most available space: 250 bytes");
+            "Most available space: 243 bytes");
   }
 
   @Test

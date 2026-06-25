@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Test;
  */
 public class TestChecksumImplsComputeSameValues {
 
-  private int dataSize = 1024 * 1024 * 64;
-  private ByteBuffer data = ByteBuffer.allocate(dataSize);
+  private static final int DATA_SIZE = 1024 * 1024 * 64;
+  private ByteBuffer data = ByteBuffer.allocate(DATA_SIZE);
   private int[] bytesPerChecksum = {512, 1024, 2048, 4096, 32768, 1048576};
 
   @Test
@@ -45,7 +45,7 @@ public class TestChecksumImplsComputeSameValues {
     data.put(RandomUtils.secure().randomBytes(data.remaining()));
     for (int bpc : bytesPerChecksum) {
       List<ChecksumByteBuffer> impls = new ArrayList<>();
-      impls.add(new PureJavaCrc32ByteBuffer());
+      impls.add(ChecksumByteBufferFactory.crc32Impl());
       impls.add(new ChecksumByteBufferImpl(new PureJavaCrc32()));
       impls.add(new ChecksumByteBufferImpl(new CRC32()));
       if (NativeCRC32Wrapper.isAvailable()) {
@@ -61,7 +61,7 @@ public class TestChecksumImplsComputeSameValues {
     data.put(RandomUtils.secure().randomBytes(data.remaining()));
     for (int bpc : bytesPerChecksum) {
       List<ChecksumByteBuffer> impls = new ArrayList<>();
-      impls.add(new PureJavaCrc32CByteBuffer());
+      impls.add(ChecksumByteBufferFactory.crc32CImpl());
       impls.add(new ChecksumByteBufferImpl(new PureJavaCrc32C()));
       try {
         impls.add(new ChecksumByteBufferImpl(

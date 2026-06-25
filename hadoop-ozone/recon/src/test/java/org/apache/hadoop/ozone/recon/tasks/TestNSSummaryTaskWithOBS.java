@@ -60,8 +60,7 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
-        getReconOMMetadataManager(),
-        threshold);
+        getReconOMMetadataManager(), threshold, 5, 20, 2000);
   }
 
   /**
@@ -139,11 +138,6 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
 
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
-    private OMDBUpdateEvent keyEvent3;
-    private OMDBUpdateEvent keyEvent4;
-
     @BeforeEach
     public void setUp() throws IOException {
       // reinit Recon RocksDB's namespace CF.
@@ -168,14 +162,14 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
               OM_KEY_PREFIX + KEY_SIX;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_SIX,
           KEY_SIX, KEY_SIX_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_SIX_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omPutKey)
-          .setValue(omPutKeyInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .build();
+      OMDBUpdateEvent keyEvent1 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omPutKey)
+                                      .setValue(omPutKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .build();
       // PUT Key7 in Bucket1.
       omPutKey =
           OM_KEY_PREFIX + VOL
@@ -183,14 +177,14 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
               OM_KEY_PREFIX + KEY_SEVEN;
       omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_SEVEN,
           KEY_SEVEN, KEY_SEVEN_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_SEVEN_SIZE);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omPutKey)
-          .setValue(omPutKeyInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .build();
+      OMDBUpdateEvent keyEvent2 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omPutKey)
+                                      .setValue(omPutKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .build();
 
       // Test DELETE Event.
       // Delete Key1 in Bucket1.
@@ -200,14 +194,14 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
               OM_KEY_PREFIX + KEY_ONE;
       OmKeyInfo omDeleteKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_ONE,
           KEY_ONE, KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_ONE_SIZE);
-      keyEvent3 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omDeleteKey)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setValue(omDeleteKeyInfo)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-          .build();
+      OMDBUpdateEvent keyEvent3 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omDeleteKey)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setValue(omDeleteKeyInfo)
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+                                      .build();
 
       // Test UPDATE Event.
       // Resize Key2 in Bucket1.
@@ -221,15 +215,15 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
       OmKeyInfo newOmResizeKeyInfo =
           buildOmKeyInfo(VOL, BUCKET_ONE, KEY_TWO, KEY_TWO, KEY_TWO_OBJECT_ID,
               BUCKET_ONE_OBJECT_ID, KEY_TWO_OLD_SIZE + 100);
-      keyEvent4 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omResizeKey)
-          .setOldValue(oldOmResizeKeyInfo)
-          .setValue(newOmResizeKeyInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
-          .build();
+      OMDBUpdateEvent keyEvent4 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omResizeKey)
+                                      .setOldValue(oldOmResizeKeyInfo)
+                                      .setValue(newOmResizeKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+                                      .build();
 
       return new OMUpdateEventBatch(
           Arrays.asList(keyEvent1, keyEvent2, keyEvent3, keyEvent4), 0L);

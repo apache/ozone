@@ -130,6 +130,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class tests container commands for reconciliation.
  */
+@Flaky("HDDS-13401")
 public class TestContainerCommandReconciliation {
 
   private static MiniOzoneHAClusterImpl cluster;
@@ -150,7 +151,6 @@ public class TestContainerCommandReconciliation {
   private static File spnegoKeytab;
   private static File testUserKeytab;
   private static String testUserPrincipal;
-  private static String host;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -191,7 +191,7 @@ public class TestContainerCommandReconciliation {
     }
 
     if (cluster != null) {
-      cluster.stop();
+      cluster.shutdown();
     }
   }
 
@@ -374,7 +374,6 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
-  @Flaky("HDDS-13401")
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -486,7 +485,6 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
-  @Flaky("HDDS-13401")
   public void testDataChecksumReportedAtSCM() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -621,8 +619,7 @@ public class TestContainerCommandReconciliation {
           (KeyValueContainer) dn.getDatanodeStateMachine().getContainer().getController()
               .getContainer(containerID);
       if (keyValueContainer != null) {
-        keyValueHandler.getChecksumManager().writeContainerDataTree(
-            keyValueContainer.getContainerData(), tree);
+        keyValueHandler.getChecksumManager().updateTree(keyValueContainer.getContainerData(), tree);
       }
     }
   }
@@ -662,8 +659,8 @@ public class TestContainerCommandReconciliation {
 
   private static void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
     String curUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(OZONE_ADMINISTRATORS, curUser);

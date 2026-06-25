@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -47,15 +48,17 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -159,21 +162,26 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
+    List<SnapshotInfo> snapshotInfos = new ArrayList<>();
+    for (String snapshotKey : snapshotDbKeysToPurge) {
+      snapshotInfos.add(getOmMetadataManager().getSnapshotInfoTable().get(snapshotKey));
+    }
 
     // Check if all the checkpoints are created.
     for (Path checkpoint : checkpointPaths) {
       assertTrue(Files.exists(checkpoint));
       assertTrue(Files.exists(Paths.get(
-          OmSnapshotManager.getSnapshotLocalPropertyYamlPath(checkpoint))));
+          OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(checkpoint))));
     }
 
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
 
     OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
-
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(TransactionInfo.getTermIndex(200L));
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMSnapshotPurgeRequest.class);
     OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
-        omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
+        omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), transactionInfo.getTransactionIndex());
 
     for (String snapshotTableKey: snapshotDbKeysToPurge) {
       assertNull(getOmMetadataManager().getSnapshotInfoTable().get(snapshotTableKey));
@@ -190,9 +198,20 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     // Check if all the checkpoints are cleared.
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
-      assertFalse(Files.exists(Paths.get(
-          OmSnapshotManager.getSnapshotLocalPropertyYamlPath(checkpoint))));
     }
+    OmSnapshotLocalDataManager snapshotLocalDataManager =
+        getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      try (ReadableOmSnapshotLocalDataProvider snapProvider =
+               snapshotLocalDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+        assertEquals(transactionInfo, snapProvider.getSnapshotLocalData().getTransactionInfo());
+      }
+      assertThat(logCapturer.getOutput()).contains(
+          snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')");
+    }
+    assertThat(logCapturer.getOutput()).contains(
+        "along with updating snapshots: {");
+
     assertEquals(initialSnapshotPurgeCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
   }

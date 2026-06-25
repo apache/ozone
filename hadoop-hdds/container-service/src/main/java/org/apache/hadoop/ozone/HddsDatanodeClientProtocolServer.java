@@ -33,14 +33,19 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos;
+import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.VersionInfo;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,12 +61,13 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
 
   protected HddsDatanodeClientProtocolServer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf,
-      VersionInfo versionInfo, ReconfigurationHandler reconfigurationHandler
+      VersionInfo versionInfo, ReconfigurationHandler reconfigurationHandler,
+      DiskBalancerProtocol diskBalancerProtocol
   ) throws IOException {
     super(versionInfo);
     this.conf = conf;
 
-    rpcServer = getRpcServer(conf, reconfigurationHandler);
+    rpcServer = getRpcServer(conf, reconfigurationHandler, diskBalancerProtocol);
     clientRpcAddress = ServerUtils.updateRPCListenAddress(this.conf,
         HDDS_DATANODE_CLIENT_ADDRESS_KEY,
         HddsUtils.getDatanodeRpcAddress(conf), rpcServer);
@@ -96,12 +102,15 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
    * running then returns the same.
    */
   private RPC.Server getRpcServer(OzoneConfiguration configuration,
-      ReconfigurationHandler reconfigurationHandler)
+      ReconfigurationHandler reconfigurationHandler,
+      DiskBalancerProtocol diskBalancerProtocol)
       throws IOException {
     InetSocketAddress rpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
-    // Add reconfigureProtocolService.
+    // Set protocol engines for all protocols before creating the server.
     RPC.setProtocolEngine(
         configuration, ReconfigureProtocolDatanodePB.class, ProtobufRpcEngine.class);
+    RPC.setProtocolEngine(
+        configuration, DiskBalancerProtocolPB.class, ProtobufRpcEngine.class);
 
     final int handlerCount = conf.getInt(HDDS_DATANODE_HANDLER_COUNT_KEY,
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);
@@ -113,8 +122,17 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(configuration, rpcAddress,
+    RPC.Server server = startRpcServer(configuration, rpcAddress,
         ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads);
+    if (diskBalancerProtocol != null) {
+      DiskBalancerProtocolServerSideTranslatorPB diskBalancerTranslator =
+          new DiskBalancerProtocolServerSideTranslatorPB(diskBalancerProtocol);
+      BlockingService diskBalancerService = DiskBalancerProtocolProtos
+          .DiskBalancerProtocolService.newReflectiveBlockingService(diskBalancerTranslator);
+      HddsServerUtil.addPBProtocol(configuration, DiskBalancerProtocolPB.class,
+          diskBalancerService, server);
+    }
+    return server;
   }
 
   /**

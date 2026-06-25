@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,8 +51,9 @@ public class TestReconScmSnapshot {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.set("ozone.scm.stale.node.interval", "6s");
-    conf.set("ozone.scm.dead.node.interval", "8s");
+    conf.set("ozone.scm.heartbeat.thread.interval", "1s");
+    conf.set("ozone.scm.stale.node.interval", "3s");
+    conf.set("ozone.scm.dead.node.interval", "5s");
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
@@ -120,7 +120,6 @@ public class TestReconScmSnapshot {
   }
 
   @Test
-  @Flaky("HDDS-11645")
   public void testExplicitRemovalOfNode() throws Exception {
     ReconNodeManager nodeManager = (ReconNodeManager) recon.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();
@@ -138,7 +137,7 @@ public class TestReconScmSnapshot {
         fail("getNodeStatus() Failed for " + datanodeDetails, e);
         throw new RuntimeException(e);
       }
-    }, 2000, 10000);
+    }, 2000, 13000);
 
     // Even after one node is DEAD, node manager is still keep tracking the DEAD node.
     long nodeDBCountAfter = nodeManager.getNodeDBKeyCount();

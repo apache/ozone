@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -62,11 +64,12 @@ public class SimpleMockNodeManager implements NodeManager {
   private Map<DatanodeID, DatanodeInfo> nodeMap = new ConcurrentHashMap<>();
   private Map<DatanodeID, Set<PipelineID>> pipelineMap = new ConcurrentHashMap<>();
   private Map<DatanodeID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
+  private PendingContainerTracker pendingContainerTracker;
 
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null));
+    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
@@ -243,6 +246,21 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  @Nullable
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
+    return null;
+  }
+
+  @Override
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    return true;
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  }
+
+  @Override
   public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
     return null;
   }
@@ -348,12 +366,6 @@ public class SimpleMockNodeManager implements NodeManager {
     return null;
   }
 
-  @Nullable
-  @Override
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
-    return null;
-  }
-
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     return null;
@@ -362,11 +374,6 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
-  }
-
-  @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    return 0;
   }
 
   @Override
@@ -380,8 +387,8 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int minPipelineLimit(List<DatanodeDetails> dn) {
-    return 0;
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return 9;
   }
 
   @Override
@@ -440,4 +447,12 @@ public class SimpleMockNodeManager implements NodeManager {
     return false;
   }
 
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    int rollIntervalMs = 5 * 60 * 1000;
+    if (pendingContainerTracker == null) {
+      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024, rollIntervalMs, null);
+    }
+    return pendingContainerTracker;
+  }
 }

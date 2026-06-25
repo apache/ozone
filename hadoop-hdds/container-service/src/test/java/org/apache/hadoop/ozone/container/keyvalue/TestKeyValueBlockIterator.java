@@ -65,7 +65,6 @@ public class TestKeyValueBlockIterator {
 
   private static final long CONTAINER_ID = 105L;
 
-  private KeyValueContainer container;
   private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
@@ -73,14 +72,13 @@ public class TestKeyValueBlockIterator {
   private File testRoot;
   private DBHandle db;
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
   private void initTest(ContainerTestVersionInfo versionInfo,
       String keySeparator) throws Exception {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
@@ -116,7 +114,7 @@ public class TestKeyValueBlockIterator {
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     // Init the container.
-    container = new KeyValueContainer(containerData, conf);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         clusterID);
     db = BlockUtils.getDB(containerData, conf);

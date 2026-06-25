@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
@@ -114,10 +115,10 @@ public final class StringToSignProducer {
     strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
-    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
-    strToSign.append(credentialScope).append(NEWLINE);
+    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE)
+        .append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
         scheme,
@@ -175,25 +176,25 @@ public final class StringToSignProducer {
     StringBuilder canonicalHeaders = new StringBuilder();
 
     for (String header : StringUtils.split(signedHeaders, ';')) {
-      canonicalHeaders.append(header.toLowerCase());
-      canonicalHeaders.append(':');
+      canonicalHeaders.append(header.toLowerCase())
+          .append(':');
       if (headers.containsKey(header)) {
         String headerValue = headers.get(header);
-        canonicalHeaders.append(headerValue);
-        canonicalHeaders.append(NEWLINE);
+        canonicalHeaders.append(headerValue)
+            .append(NEWLINE);
 
         // Set for testing purpose only to skip date and host validation.
         try {
           validateSignedHeader(schema, header, headerValue);
         } catch (DateTimeParseException ex) {
           LOG.error("DateTime format invalid.", ex);
-          throw S3_AUTHINFO_CREATION_ERROR;
+          throw newError(S3_AUTHINFO_CREATION_ERROR);
         }
 
       } else {
         LOG.error("Header " + header + " not present in "
             + "request but requested to be signed.");
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
     }
 
@@ -225,7 +226,7 @@ public final class StringToSignProducer {
     if (contentSignatureHeaderValue == null) {
       LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
           + " header for signed payload");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
     // Simply return the header value of x-amz-content-sha256 as the payload hash
     // These are the possible cases:
@@ -306,10 +307,9 @@ public final class StringToSignProducer {
         if (result.length() > 0) {
           result.append('&');
         }
-        result.append(urlEncode(p));
-        result.append('=');
-
-        result.append(urlEncode(queryMap.get(p)));
+        result.append(urlEncode(p))
+            .append('=')
+            .append(urlEncode(queryMap.get(p)));
       }
     }
     return result.toString();
@@ -333,11 +333,11 @@ public final class StringToSignProducer {
         LOG.error("AWS date not in valid range. Request timestamp:{} should "
             + "not be older than {} seconds.",
             headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
       break;
     case X_AMZ_CONTENT_SHA256:
-      // TODO: Construct request payload and match HEX(SHA256(requestPayload))
+      // Validate x-amz-content-sha256 during upload, before committing the key.
       break;
     default:
       break;
@@ -362,15 +362,21 @@ public final class StringToSignProducer {
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
     for (String header : headers.keySet().stream()
         .filter(s -> s.startsWith("x-amz-"))
         .collect(Collectors.toSet())) {
       if (!(canonicalHeaders.contains(header + ":"))) {
+        // According to AWS Signature V4 documentation using Authorization Header
+        // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // The x-amz-content-sha256 header is not required for CanonicalHeaders
+        if (X_AMZ_CONTENT_SHA256.equals(header)) {
+          continue;
+        }
         LOG.error("The SignedHeaders list must include all "
             + "x-amz-* headers in the request");
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
     }
   }

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -60,8 +61,8 @@ public class TestOMVolumeRequest {
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
@@ -90,13 +91,17 @@ public class TestOMVolumeRequest {
    * @param volumeName
    * @param adminName
    * @param ownerName
+   * @param acl
    * @return OMRequest
    */
-  static OMRequest createVolumeRequest(String volumeName,
-      String adminName,
-      String ownerName) {
-    VolumeInfo volumeInfo = VolumeInfo.newBuilder().setVolume(volumeName)
-        .setAdminName(adminName).setOwnerName(ownerName).build();
+  static OMRequest createVolumeRequest(String volumeName, String adminName,
+      String ownerName, String acl) {
+    VolumeInfo volumeInfo = VolumeInfo.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName(adminName)
+        .setOwnerName(ownerName)
+        .addVolumeAcls(OzoneAcl.toProtobuf(OzoneAcl.parseAcl(acl)))
+        .build();
     CreateVolumeRequest createVolumeRequest =
         CreateVolumeRequest.newBuilder().setVolumeInfo(volumeInfo).build();
 

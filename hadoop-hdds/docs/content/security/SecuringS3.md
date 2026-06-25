@@ -37,16 +37,30 @@ The user needs to `kinit` first and once they have authenticated via kerberos
 
 ## Obtain Secrets
 
-* S3 clients can get the secret access id and user secret from OzoneManager.
+S3 clients can get the secret access id and user secret from OzoneManager.
 
+### Using the command line
+
+For a regular user to get their own secret:
 ```bash
 ozone s3 getsecret
 ```
 
-* Or by sending request to /secret S3 REST endpoint.
+An Ozone administrator can get a secret for a specific user by using the `-u` flag:
+```bash
+ozone s3 getsecret -u <username>
+```
 
+### Using the REST API
+
+A user can get their own secret by making a `PUT` request to the `/secret` endpoint:
 ```bash
 curl -X PUT --negotiate -u : https://localhost:9879/secret
+```
+
+An Ozone administrator can get a secret for a specific user by appending the username to the path:
+```bash
+curl -X PUT --negotiate -u : https://localhost:9879/secret/<username>
 ```
 
 This command will talk to ozone, validate the user via Kerberos and generate
@@ -114,3 +128,112 @@ curl -X DELETE --negotiate -u : -v "http://localhost:9879/secret?username=testus
 For a working example of these operations, refer to the [Secret Revoke Robot Test](https://raw.githubusercontent.com/apache/ozone/refs/heads/master/hadoop-ozone/dist/src/main/smoketest/s3/secretrevoke.robot). This test demonstrates both the default secret revocation and the revocation by username.
 
 > **Note:** Ensure your Kerberos authentication is correctly configured, as secret revocation is a privileged operation.
+
+## External S3 Secret Storage with HashiCorp Vault
+
+By default, S3 secrets are stored in the Ozone Manager's RocksDB. For enhanced security, Ozone can be configured to use HashiCorp Vault as an external secret storage backend.
+
+### Configuration
+
+To enable Vault integration, you need to configure the following properties in `ozone-site.xml`:
+
+| Property                                                 | Description                                                                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ozone.secret.s3.store.provider`                         | The S3 secret storage provider to use. Set this to `org.apache.hadoop.ozone.s3.remote.vault.VaultS3SecretStorageProvider` to enable Vault. |
+| `ozone.secret.s3.store.remote.vault.address`             | The address of the Vault server (e.g., `http://vault:8200`).                                                                             |
+| `ozone.secret.s3.store.remote.vault.namespace`           | The Vault namespace to use.                                                                                                              |
+| `ozone.secret.s3.store.remote.vault.enginever`           | The version of the Vault secrets engine (e.g., `2`).                                                                                     |
+| `ozone.secret.s3.store.remote.vault.secretpath`          | The path where the secrets are stored in Vault.                                                                                          |
+| `ozone.secret.s3.store.remote.vault.auth`                | The authentication method to use with Vault. Supported values are `TOKEN` and `APPROLE`.                                                 |
+| `ozone.secret.s3.store.remote.vault.auth.token`          | The Vault authentication token. Required if `ozone.secret.s3.store.remote.vault.auth` is set to `TOKEN`.                                   |
+| `ozone.secret.s3.store.remote.vault.auth.approle.id`     | The AppRole RoleID. Required if `ozone.secret.s3.store.remote.vault.auth` is set to `APPROLE`.                                            |
+| `ozone.secret.s3.store.remote.vault.auth.approle.secret` | The AppRole SecretID. Required if `ozone.secret.s3.store.remote.vault.auth` is set to `APPROLE`.                                           |
+| `ozone.secret.s3.store.remote.vault.auth.approle.path`   | The AppRole path. Required if `ozone.secret.s3.store.remote.vault.auth` is set to `APPROLE`.                                             |
+| `ozone.secret.s3.store.remote.vault.trust.store.type` | The type of the trust store (e.g., `JKS`). |
+| `ozone.secret.s3.store.remote.vault.trust.store.path` | The path to the trust store file.         |
+| `ozone.secret.s3.store.remote.vault.trust.store.password` | The password for the trust store.         |
+| `ozone.secret.s3.store.remote.vault.key.store.type`   | The type of the key store (e.g., `JKS`).   |
+| `ozone.secret.s3.store.remote.vault.key.store.path`   | The path to the key store file.           |
+| `ozone.secret.s3.store.remote.vault.key.store.password`   | The password for the key store.           |
+
+### Example
+
+Here is an example of how to configure Ozone to use Vault for S3 secret storage with token authentication:
+
+```xml
+<property>
+  <name>ozone.secret.s3.store.provider</name>
+  <value>org.apache.hadoop.ozone.s3.remote.vault.VaultS3SecretStorageProvider</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.address</name>
+  <value>http://localhost:8200</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.enginever</name>
+  <value>2</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.secretpath</name>
+  <value>secret</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.auth</name>
+  <value>TOKEN</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.auth.token</name>
+  <value>your-vault-token</value>
+</property>
+```
+
+### Example with SSL
+
+Here is an example of how to configure Ozone to use Vault for S3 secret storage with SSL:
+
+```xml
+<property>
+  <name>ozone.secret.s3.store.provider</name>
+  <value>org.apache.hadoop.ozone.s3.remote.vault.VaultS3SecretStorageProvider</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.address</name>
+  <value>https://localhost:8200</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.enginever</name>
+  <value>2</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.secretpath</name>
+  <value>secret</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.auth</name>
+  <value>TOKEN</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.auth.token</name>
+  <value>your-vault-token</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.trust.store.path</name>
+  <value>/path/to/truststore.jks</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.trust.store.password</name>
+  <value>truststore-password</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.key.store.path</name>
+  <value>/path/to/keystore.jks</value>
+</property>
+<property>
+  <name>ozone.secret.s3.store.remote.vault.key.store.password</name>
+  <value>keystore-password</value>
+</property>
+```
+
+### References
+
+*   [HashiCorp Vault Documentation](https://developer.hashicorp.com/vault/docs)

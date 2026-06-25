@@ -33,10 +33,12 @@ OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
 
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 OZONE-SITE.XML_ozone.client.hbase.enhancements.allowed=true
 OZONE-SITE.XML_ozone.fs.hsync.enabled=true
@@ -59,6 +61,7 @@ OZONE-SITE.XML_ozone.scm.pipeline.allocated.timeout=2m
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 
 no_proxy=om1,om2,om3,scm1,scm2,scm3,s3g,kdc,localhost,127.0.0.1

@@ -21,12 +21,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -83,7 +84,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     AllocateBlockRequest allocateBlockRequest =
         super.preExecute(ozoneManager).getAllocateBlockRequest();
 
-    Preconditions.checkNotNull(allocateBlockRequest);
+    Objects.requireNonNull(allocateBlockRequest, "allocateBlockRequest == null");
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
@@ -147,7 +148,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+  public final OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
@@ -158,7 +159,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyLocation blockLocation =
         allocateBlockRequest.getKeyLocation();
-    Preconditions.checkNotNull(blockLocation);
+    Objects.requireNonNull(blockLocation, "blockLocation == null");
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -190,12 +191,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           bucketName);
 
       // Here we don't acquire bucket/volume lock because for a single client
-      // allocateBlock is called in serial fashion.
+      // allocateBlock is called in serial fashion. With this approach, it
+      // won't make 'fail-fast' during race condition case on delete/rename op,
+      // assuming that later it will fail at the key commit operation.
 
-      openKeyName = omMetadataManager
-          .getOpenKey(volumeName, bucketName, keyName, clientID);
+      openKeyName =
+          getOpenKeyName(volumeName, bucketName, keyName, clientID, omMetadataManager);
       openKeyInfo =
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
+          getOpenKeyInfo(omMetadataManager, openKeyName, keyName);
+
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);
@@ -236,25 +240,25 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex);
+      openKeyInfo = openKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Add to cache.
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(openKeyName),
-          CacheValue.get(trxnLogIndex, openKeyInfo));
+      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager,
+          openKeyName, keyName, openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
-      omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, getBucketLayout());
+      omClientResponse = getOmClientResponse(clientID, omResponse, openKeyInfo,
+          omBucketInfo, omMetadataManager);
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
     } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
-      omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception), getBucketLayout());
+      omClientResponse = getOmClientErrorResponse(omResponse, exception);
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
           "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
@@ -272,6 +276,41 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
+  }
+
+  protected OmKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager,
+      String openKeyName, String keyName) throws IOException {
+    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
+  }
+
+  protected String getOpenKeyName(String volumeName, String bucketName,
+      String keyName, long clientID, OMMetadataManager omMetadataManager)
+          throws IOException {
+    return omMetadataManager.getOpenKey(volumeName, bucketName, keyName, clientID);
+  }
+
+  protected void addOpenTableCacheEntry(long trxnLogIndex,
+      OMMetadataManager omMetadataManager, String openKeyName, String keyName,
+      OmKeyInfo openKeyInfo) {
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+        new CacheKey<>(openKeyName),
+        CacheValue.get(trxnLogIndex, openKeyInfo));
+  }
+
+  @Nonnull
+  protected OMClientResponse getOmClientResponse(long clientID,
+      OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
+      OmBucketInfo omBucketInfo, OMMetadataManager omMetadataManager)
+          throws IOException {
+    return new OMAllocateBlockResponse(omResponse.build(),
+        openKeyInfo, clientID, getBucketLayout());
+  }
+
+  @Nonnull
+  protected OMClientResponse getOmClientErrorResponse(
+      OMResponse.Builder omResponse, Exception exception) {
+    return new OMAllocateBlockResponse(createErrorOMResponse(
+        omResponse, exception), getBucketLayout());
   }
 
   @RequestFeatureValidator(

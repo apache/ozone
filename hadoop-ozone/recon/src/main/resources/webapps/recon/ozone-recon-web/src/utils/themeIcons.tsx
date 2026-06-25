@@ -98,3 +98,30 @@ export class ReplicationIcon extends React.PureComponent<IReplicationIconProps> 
     return icon;
   }
 }
+
+interface IGraphLegendIconProps {
+  color: string;
+  height?: number;
+};
+export class GraphLegendIcon extends React.PureComponent<IGraphLegendIconProps> {
+  render() {
+    const { color, height = 14 } = this.props;
+
+    return (
+      <svg
+      width="18"
+      height={height}
+      viewBox={`0 0 18 ${height}`}
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }} // Optional: helps with alignment
+    >
+      <circle
+        cx="6"
+        cy="6"
+        r="6" 
+        fill={color} // Use the color prop for the fill
+      />
+    </svg>
+    )
+  }
+};

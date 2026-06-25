@@ -106,8 +106,8 @@ class TestOzoneManagerDoubleBuffer {
 
   @BeforeEach
   public void setup() throws IOException {
-    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OMMetrics omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.getAbsolutePath());
 

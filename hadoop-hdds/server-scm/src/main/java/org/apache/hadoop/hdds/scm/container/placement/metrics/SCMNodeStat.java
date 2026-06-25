@@ -29,18 +29,19 @@ public class SCMNodeStat implements NodeStat {
   private LongMetric remaining;
   private LongMetric committed;
   private LongMetric freeSpaceToSpare;
+  private LongMetric reserved;
 
   public SCMNodeStat() {
-    this(0L, 0L, 0L, 0L, 0L);
+    this(0L, 0L, 0L, 0L, 0L, 0L);
   }
 
   public SCMNodeStat(SCMNodeStat other) {
     this(other.capacity.get(), other.scmUsed.get(), other.remaining.get(),
-        other.committed.get(), other.freeSpaceToSpare.get());
+        other.committed.get(), other.freeSpaceToSpare.get(), other.reserved.get());
   }
 
   public SCMNodeStat(long capacity, long used, long remaining, long committed,
-                     long freeSpaceToSpare) {
+                     long freeSpaceToSpare, long reserved) {
     Preconditions.checkArgument(capacity >= 0, "Capacity cannot be " +
         "negative.");
     Preconditions.checkArgument(used >= 0, "used space cannot be " +
@@ -52,6 +53,7 @@ public class SCMNodeStat implements NodeStat {
     this.remaining = new LongMetric(remaining);
     this.committed = new LongMetric(committed);
     this.freeSpaceToSpare = new LongMetric(freeSpaceToSpare);
+    this.reserved = new LongMetric(reserved);
   }
 
   /**
@@ -97,6 +99,15 @@ public class SCMNodeStat implements NodeStat {
   }
 
   /**
+   * Get the reserved space on the node.
+   * @return the reserved space on the node
+   */
+  @Override
+  public LongMetric getReserved() {
+    return reserved;
+  }
+
+  /**
    * Set the capacity, used and remaining space on a datanode.
    *
    * @param newCapacity in bytes
@@ -106,7 +117,7 @@ public class SCMNodeStat implements NodeStat {
   @Override
   @VisibleForTesting
   public void set(long newCapacity, long newUsed, long newRemaining,
-                  long newCommitted, long newFreeSpaceToSpare) {
+                  long newCommitted, long newFreeSpaceToSpare, long newReserved) {
     Preconditions.checkArgument(newCapacity >= 0, "Capacity cannot be " +
         "negative.");
     Preconditions.checkArgument(newUsed >= 0, "used space cannot be " +
@@ -119,6 +130,7 @@ public class SCMNodeStat implements NodeStat {
     this.remaining = new LongMetric(newRemaining);
     this.committed = new LongMetric(newCommitted);
     this.freeSpaceToSpare = new LongMetric(newFreeSpaceToSpare);
+    this.reserved = new LongMetric(newReserved);
   }
 
   /**
@@ -133,8 +145,8 @@ public class SCMNodeStat implements NodeStat {
     this.scmUsed.set(this.getScmUsed().get() + stat.getScmUsed().get());
     this.remaining.set(this.getRemaining().get() + stat.getRemaining().get());
     this.committed.set(this.getCommitted().get() + stat.getCommitted().get());
-    this.freeSpaceToSpare.set(this.freeSpaceToSpare.get() +
-        stat.getFreeSpaceToSpare().get());
+    this.freeSpaceToSpare.set(this.freeSpaceToSpare.get() + stat.getFreeSpaceToSpare().get());
+    this.reserved.set(this.reserved.get() + stat.getReserved().get());
     return this;
   }
 
@@ -150,8 +162,8 @@ public class SCMNodeStat implements NodeStat {
     this.scmUsed.set(this.getScmUsed().get() - stat.getScmUsed().get());
     this.remaining.set(this.getRemaining().get() - stat.getRemaining().get());
     this.committed.set(this.getCommitted().get() - stat.getCommitted().get());
-    this.freeSpaceToSpare.set(freeSpaceToSpare.get() -
-        stat.getFreeSpaceToSpare().get());
+    this.freeSpaceToSpare.set(freeSpaceToSpare.get() - stat.getFreeSpaceToSpare().get());
+    this.reserved.set(reserved.get() - stat.getReserved().get());
     return this;
   }
 
@@ -163,7 +175,8 @@ public class SCMNodeStat implements NodeStat {
           scmUsed.isEqual(tempStat.getScmUsed().get()) &&
           remaining.isEqual(tempStat.getRemaining().get()) &&
           committed.isEqual(tempStat.getCommitted().get()) &&
-          freeSpaceToSpare.isEqual(tempStat.freeSpaceToSpare.get());
+          freeSpaceToSpare.isEqual(tempStat.freeSpaceToSpare.get()) &&
+          reserved.isEqual(tempStat.reserved.get());
     }
     return false;
   }
@@ -171,7 +184,7 @@ public class SCMNodeStat implements NodeStat {
   @Override
   public int hashCode() {
     return Long.hashCode(capacity.get() ^ scmUsed.get() ^ remaining.get() ^
-        committed.get() ^ freeSpaceToSpare.get());
+        committed.get() ^ freeSpaceToSpare.get() ^ reserved.get());
   }
 
   @Override
@@ -180,6 +193,9 @@ public class SCMNodeStat implements NodeStat {
         "capacity=" + capacity.get() +
         ", scmUsed=" + scmUsed.get() +
         ", remaining=" + remaining.get() +
+        ", committed=" + committed.get() +
+        ", freeSpaceToSpare=" + freeSpaceToSpare.get() +
+        ", reserved=" + reserved.get() +
         '}';
   }
 }

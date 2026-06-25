@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
@@ -128,9 +130,9 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    KeyOutputStream keyOutputStream = getKeyOutputStream();
-    if (keyOutputStream != null) {
-      return keyOutputStream.getCommitUploadPartInfo();
+    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    if (keyCommitOutput != null) {
+      return keyCommitOutput.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
@@ -141,34 +143,42 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public KeyOutputStream getKeyOutputStream() {
-    if (outputStream instanceof KeyOutputStream) {
-      return ((KeyOutputStream) outputStream);
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream) wrappedStream);
-      }
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      OutputStream wrappedStream =
-          ((CipherOutputStreamOzone) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream)wrappedStream);
-      }
+    OutputStream base = unwrap(outputStream);
+    return base instanceof KeyOutputStream ? (KeyOutputStream) base : null;
+  }
+
+  public void setPreCommits(List<CheckedRunnable<IOException>> preCommits) {
+    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    if (keyCommitOutput != null) {
+      keyCommitOutput.setPreCommits(preCommits);
+      return;
     }
-    // Otherwise return null.
-    return null;
+    throw new IllegalStateException(
+        "Output stream is not backed by KeyCommitOutput: " +
+            outputStream.getClass());
   }
 
   @Override
   public Map<String, String> getMetadata() {
-    if (outputStream instanceof CryptoOutputStream) {
-      return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
-          .getWrappedStream()).getMetadata();
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      return ((KeyMetadataAware)((CipherOutputStreamOzone) outputStream)
-          .getWrappedStream()).getMetadata();
+    OutputStream base = unwrap(outputStream);
+    if (base instanceof KeyMetadataAware) {
+      return ((KeyMetadataAware) base).getMetadata();
     }
-    return ((KeyMetadataAware) outputStream).getMetadata();
+    throw new IllegalStateException(
+        "OutputStream is not KeyMetadataAware: " + base.getClass());
+  }
+
+  private KeyCommitOutput getKeyCommitOutput() {
+    OutputStream base = unwrap(outputStream);
+    return base instanceof KeyCommitOutput ? (KeyCommitOutput) base : null;
+  }
+
+  private static OutputStream unwrap(OutputStream out) {
+    if (out instanceof CryptoOutputStream) {
+      return ((CryptoOutputStream) out).getWrappedStream();
+    } else if (out instanceof CipherOutputStreamOzone) {
+      return ((CipherOutputStreamOzone) out).getWrappedStream();
+    }
+    return out;
   }
 }

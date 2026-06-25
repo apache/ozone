@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   default as ReactSelect,
   Props as ReactSelectProps,
@@ -28,28 +28,30 @@ import {
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
+import MultiSelectMenuList, { MultiSelectInput, Option } from './multiSelectMenuList';
 
+export type { Option };
 
 // ------------- Types -------------- //
-export type Option = {
-  label: string;
-  value: string;
-}
 
 interface MultiSelectProps extends ReactSelectProps<Option, true> {
   options: Option[];
   selected: Option[];
   placeholder: string;
-  fixedColumn: string;
+  // Accept a single key or an array of keys for columns that are always
+  // selected, hidden from the dropdown, and preserved through Unselect All.
+  fixedColumn: string | string[];
   columnLength: number;
   style?: StylesConfig<Option, true>;
+  showSearch?: boolean;
+  showSelectAll?: boolean;
   onChange: (arg0: ValueType<Option, true>) => void;
   onTagClose: (arg0: string) => void;
 }
 
-// ------------- Component -------------- //
+// ------------- Module-level sub-components -------------- //
 
-const Option: React.FC<OptionProps<Option, true>> = (props) => {
+const OptionComponent: React.FC<OptionProps<Option, true>> = (props) => {
   return (
     <div>
       <components.Option
@@ -66,9 +68,10 @@ const Option: React.FC<OptionProps<Option, true>> = (props) => {
         <label>{props.label}</label>
       </components.Option>
     </div>
-  )
-}
+  );
+};
 
+// ------------- Component -------------- //
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
@@ -80,14 +83,40 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   columnLength,
   tagRef,
   style,
-  onTagClose = () => { },  // Assign default value as a void function
-  onChange = () => { },  // Assign default value as a void function
+  showSearch = false,
+  showSelectAll = false,
+  onTagClose = () => { },
+  onChange = () => { },
   ...props
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, true>) => {
+  // True while the user's pointer/keyboard focus is inside the search wrapper.
+  // Passed via selectProps so MultiSelectInput and MultiSelectMenuList can
+  // suppress react-select's blur-driven close without a stale closure.
+  const searchInteracting = useRef(false);
+  // Ref to the outer container div — used to detect "focus left the widget".
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Normalise fixedColumn to an array of keys for uniform handling.
+  const fixedKeys: string[] = Array.isArray(fixedColumn)
+    ? fixedColumn.filter(Boolean)
+    : fixedColumn ? [fixedColumn] : [];
+
+  const fixedOptions = options.filter((opt) => fixedKeys.includes(opt.value));
+  const selectableOptions = options.filter((opt) => !fixedKeys.includes(opt.value));
+
+  const filteredOptions = useMemo(() => {
+    if (!showSearch || !searchTerm) return selectableOptions;
+    return selectableOptions.filter((opt) =>
+      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [options, searchTerm, showSearch]);
+
+  const ValueContainer = ({ children, ...vcProps }: ValueContainerProps<Option, true>) => {
     return (
-      <components.ValueContainer {...props}>
+      <components.ValueContainer {...vcProps}>
         {React.Children.map(children, (child) => (
           ((child as React.ReactElement<any, string
             | React.JSXElementConstructor<any>>
@@ -97,17 +126,59 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         )}
         {isDisabled
           ? placeholder
-          : `${placeholder}: ${selected.length} selected`
-}
+          : `${placeholder}: ${selected.filter((opt) => !fixedKeys.includes(opt.value)).length} selected`
+        }
       </components.ValueContainer>
     );
   };
 
-  const finalStyles = {...selectStyles, ...style ?? {}}
+  // Plain function — setters and refs are stable so no useCallback is needed.
+  // Guard against closing while the user is interacting with the search box.
+  // react-select fires onMenuClose when its DummyInput blurs, which also
+  // happens when we programmatically focus the search input (step in onClick).
+  // The searchInteracting ref blocks that false-positive close.
+  // For genuine outside clicks while the search box is focused, the race
+  // condition means this guard temporarily wins, but the 150ms onBlur
+  // fallback in MultiSelectMenuList closes the menu shortly after.
+  const handleMenuClose = () => {
+    if (!searchInteracting.current) {
+      setIsMenuOpen(false);
+      setSearchTerm('');
+    }
+  };
 
-  return (
+  const searchModeProps = showSearch
+    ? {
+      menuIsOpen: isMenuOpen,
+      onMenuOpen: () => setIsMenuOpen(true),
+      onMenuClose: handleMenuClose
+    }
+    : {};
+
+  const finalStyles = { ...selectStyles, ...style ?? {} };
+
+  // Extra data passed via selectProps so the module-level MultiSelectMenuList
+  // and MultiSelectInput components can read current state without closures.
+  // customOnChange is renamed to avoid shadowing react-select's own onChange.
+  const menuListProps = {
+    searchTerm,
+    setSearchTerm,
+    showSearch,
+    showSelectAll,
+    selected,
+    selectableOptions,
+    fixedOptions,
+    customOnChange: onChange,
+    searchInteracting,
+    setIsMenuOpen,
+    containerRef
+  };
+
+  const select = (
     <ReactSelect
       {...props}
+      {...(searchModeProps as any)}
+      {...(menuListProps as any)}
       isMulti={true}
       closeMenuOnSelect={false}
       hideSelectedOptions={false}
@@ -115,20 +186,31 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       isSearchable={false}
       controlShouldRenderValue={false}
       classNamePrefix='multi-select'
-      options={options.map((opt) => ({...opt, isDisabled: (opt.value === fixedColumn)}))}
+      options={filteredOptions}
       components={{
         ValueContainer,
-        Option
+        Option: OptionComponent,
+        MenuList: MultiSelectMenuList,
+        ...(showSearch ? { Input: MultiSelectInput } : {})
       }}
+      menuPortalTarget={document.body}
       placeholder={placeholder}
-      value={selected}
+      value={selected.filter((opt) => !fixedKeys.includes(opt.value))}
       isDisabled={isDisabled}
-      onChange={(selected: ValueType<Option, true>) => {
-        if (selected?.length === options.length) return onChange!(options);
-        return onChange!(selected);
+      onChange={(selectedValue: ValueType<Option, true>) => {
+        const selectedOpts = (selectedValue as Option[]) ?? [];
+        const withFixed = [...fixedOptions, ...selectedOpts];
+        if (selectedOpts.length === selectableOptions.length) return onChange!(options);
+        return onChange!(withFixed);
       }}
       styles={finalStyles} />
-  )
-}
+  );
+
+  // Wrap in a container div only when showSearch is active so we have a
+  // boundary for detecting "focus left the widget" in the search onBlur.
+  return showSearch
+    ? <div ref={containerRef}>{select}</div>
+    : select;
+};
 
 export default MultiSelect;

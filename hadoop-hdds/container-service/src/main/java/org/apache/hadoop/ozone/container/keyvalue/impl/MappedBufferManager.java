@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.util.concurrent.Striped;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -57,10 +58,14 @@ public class MappedBufferManager {
         CompletableFuture.runAsync(() -> {
           int p = 0;
           try {
-            for (String key : mappedBuffers.keySet()) {
-              ByteBuffer buf = mappedBuffers.get(key).get();
-              if (buf == null) {
-                mappedBuffers.remove(key);
+            // remove(key, value) only counts entries we observed cleared,
+            // so a concurrent put() that replaced the WeakReference is not
+            // miscounted as freed.
+            for (Map.Entry<String, WeakReference<ByteBuffer>> entry
+                : mappedBuffers.entrySet()) {
+              final WeakReference<ByteBuffer> ref = entry.getValue();
+              if (ref.get() == null
+                  && mappedBuffers.remove(entry.getKey(), ref)) {
                 p++;
               }
             }
@@ -93,14 +98,16 @@ public class MappedBufferManager {
     Lock fileLock = lock.get(key);
     fileLock.lock();
     try {
-      WeakReference<ByteBuffer> refer = mappedBuffers.get(key);
-      if (refer != null && refer.get() != null) {
-        // reuse the mapped buffer
+      // Hold a strong reference for the rest of this method so GC cannot
+      // clear the WeakReference between the null check and the return.
+      final WeakReference<ByteBuffer> refer = mappedBuffers.get(key);
+      final ByteBuffer cached = refer != null ? refer.get() : null;
+      if (cached != null) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("find buffer for key {}", key);
         }
         releaseQuota(1);
-        return refer.get();
+        return cached;
       }
 
       ByteBuffer buffer = supplier.get();

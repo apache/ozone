@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,18 +128,18 @@ public class OpenKeysInsightHandler implements OmTableHandler {
    * that are currently open in the backend.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
-      throws IOException {
+  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+      OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    if (iterator != null) {
+    Table<String, OmKeyInfo> table = (Table<String, OmKeyInfo>) omMetadataManager.getTable(tableName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
+          OmKeyInfo omKeyInfo = kv.getValue();
           unReplicatedSize += omKeyInfo.getDataSize();
           replicatedSize += omKeyInfo.getReplicatedSize();
           count++;

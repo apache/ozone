@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -35,11 +36,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -418,7 +420,7 @@ public class TestReplicationSupervisor {
     assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
     long minFreeSpace =
-        conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(vol1.getCurrentUsage().getCapacity());
+        conf.getObject(DatanodeConfiguration.class).getHardLimitMinFreeSpace(vol1.getCurrentUsage().getCapacity());
     long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerMaxSize * 3 - minFreeSpace;
     vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =
@@ -788,7 +790,7 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void testReconcileContainerCommandDeduplication() {
+  public void testReconcileContainerCommandDeduplication() throws Exception {
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
         .stateContext(context)
         .build();
@@ -799,14 +801,26 @@ public class TestReplicationSupervisor {
       // Create reconcile commands with the same container ID but different peers
       ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
           MockDatanodeDetails.randomDatanodeDetails()));
+      command1.setTerm(1);
       ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
           MockDatanodeDetails.randomDatanodeDetails()));
+      command2.setTerm(1);
       assertEquals(command1, command2);
+
+      // Create a controller that blocks the execution of reconciliation until the latch is counted down from the test.
+      ContainerController blockingController = mock(ContainerController.class);
+      CountDownLatch latch = new CountDownLatch(1);
+      doAnswer(arg -> {
+        latch.await();
+        return null;
+      }).when(blockingController).reconcileContainer(any(), anyLong(), any());
+
       ReconcileContainerTask task1 = new ReconcileContainerTask(
-          mock(ContainerController.class),
+          blockingController,
           mock(DNContainerOperationClient.class),
           command1);
       ReconcileContainerTask task2 = new ReconcileContainerTask(
+          // The second task should be discarded as a duplicate. It does not need to block.
           mock(ContainerController.class),
           mock(DNContainerOperationClient.class),
           command2);
@@ -820,6 +834,11 @@ public class TestReplicationSupervisor {
       supervisor.addTask(task2);
       assertEquals(1, supervisor.getTotalInFlightReplications());
       assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Now the task has been unblocked. The supervisor should finish execution of the one blocked task.
+      latch.countDown();
+      GenericTestUtils.waitFor(() ->
+          supervisor.getTotalInFlightReplications() == 0 && supervisor.getReplicationQueuedCount() == 0, 500, 5000);
     } finally {
       supervisor.stop();
     }
@@ -982,7 +1001,7 @@ public class TestReplicationSupervisor {
     List<DatanodeDetails> target = singletonList(
         MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(containerId, sources, target,
-        Proto2Utils.unsafeByteString(missingIndexes),
+        UnsafeByteOperations.unsafeWrap(missingIndexes),
         new ECReplicationConfig(3, 2));
     cmd.setTerm(CURRENT_TERM);
     return cmd;
@@ -1119,6 +1138,37 @@ public class TestReplicationSupervisor {
     } finally {
       subject.stop();
     }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void poolSizeCanBeUpdatedByReplicationStreamsLimitReconfiguration() {
+    final int replicationMaxStreams = 5;
+    ReplicationServer.ReplicationConfig repConf =
+        new ReplicationServer.ReplicationConfig();
+    repConf.setReplicationMaxStreams(replicationMaxStreams);
+
+    AtomicInteger threadPoolSize = new AtomicInteger();
+
+    ReplicationSupervisor rs = ReplicationSupervisor.newBuilder()
+        .executor(new DiscardingExecutorService())
+        .executorThreadUpdater(threadPoolSize::set)
+        .replicationConfig(repConf)
+        .build();
+
+    rs.nodeStateUpdated(IN_SERVICE);
+    assertEquals(replicationMaxStreams, threadPoolSize.get());
+
+    rs.setReplicationMaxStreams(7);
+    assertEquals(7, threadPoolSize.get());
+
+    rs.nodeStateUpdated(DECOMMISSIONING);
+    assertEquals(repConf.scaleOutOfServiceLimit(7), threadPoolSize.get());
+
+    rs.setReplicationMaxStreams(3);
+    assertEquals(repConf.scaleOutOfServiceLimit(3), threadPoolSize.get());
+
+    rs.nodeStateUpdated(IN_SERVICE);
+    assertEquals(3, threadPoolSize.get());
   }
 
   @ContainerLayoutTestInfo.ContainerTest

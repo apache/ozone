@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -45,7 +48,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
-  private final long dataChecksum;
+  private final ContainerChecksums checksums;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
@@ -57,7 +60,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.replicaIndex = b.replicaIndex;
     this.isEmpty = b.isEmpty;
     this.sequenceId = b.sequenceId;
-    this.dataChecksum = b.dataChecksum;
+    this.checksums = Objects.requireNonNull(b.checksums, "checksums == null");
   }
 
   public ContainerID getContainerID() {
@@ -122,8 +125,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return isEmpty;
   }
 
+  public ContainerChecksums getChecksums() {
+    return checksums;
+  }
+
   public long getDataChecksum() {
-    return dataChecksum;
+    return checksums.getDataChecksum();
   }
 
   @Override
@@ -161,6 +168,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .build();
   }
 
+  public static List<DatanodeDetails> toDatanodeDetailsList(Set<ContainerReplica> replicas) {
+    return replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+  }
+
   /**
    * Returns a new Builder to construct ContainerReplica.
    *
@@ -180,7 +193,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setOriginNodeId(originDatanodeId)
         .setReplicaIndex(replicaIndex)
         .setSequenceId(sequenceId)
-        .setEmpty(isEmpty);
+        .setEmpty(isEmpty)
+        .setChecksums(checksums);
   }
 
   @Override
@@ -194,7 +208,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", keyCount=" + keyCount
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
-        + ", dataChecksum=" + dataChecksum
+        + ", checksums=" + checksums
         + '}';
   }
 
@@ -212,7 +226,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
-    private long dataChecksum;
+    private ContainerChecksums checksums;
 
     /**
      * Set Container Id.
@@ -287,8 +301,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
-    public ContainerReplicaBuilder setDataChecksum(long dataChecksum) {
-      this.dataChecksum = dataChecksum;
+    public ContainerReplicaBuilder setChecksums(ContainerChecksums checksums) {
+      this.checksums = checksums;
       return this;
     }
 
@@ -298,6 +312,9 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
      * @return ContainerReplicaBuilder
      */
     public ContainerReplica build() {
+      if (this.checksums == null) {
+        this.checksums = ContainerChecksums.unknown();
+      }
       return new ContainerReplica(this);
     }
   }

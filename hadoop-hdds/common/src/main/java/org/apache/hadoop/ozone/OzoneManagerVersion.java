@@ -54,6 +54,13 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   S3_LIST_MULTIPART_UPLOADS_PAGINATION(11,
       "OzoneManager version that supports S3 list multipart uploads API with pagination"),
+
+  ATOMIC_CREATE_IF_NOT_EXISTS(12,
+      "OzoneManager version that supports explicit create-if-not-exists key semantics"),
+
+  S3_BUCKET_TAGGING_API(13,
+      "OzoneManager version that supports S3 bucket tagging APIs, such as "
+          + "PutBucketTagging, GetBucketTagging, and DeleteBucketTagging"),
     
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");

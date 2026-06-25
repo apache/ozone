@@ -23,12 +23,18 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -40,6 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
@@ -53,6 +60,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class used to test ContainerSet operations.
@@ -67,6 +75,33 @@ public class TestContainerSet {
 
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
+  }
+
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+    
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+    
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+    
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.remove(containerId);
+      return null;
+    }).when(volume).removeContainer(any(Long.class));
+    
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    when(volume.getContainerCount()).thenAnswer(inv -> (long) containerIds.size());
+    
+    return volume;
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -157,10 +192,8 @@ public class TestContainerSet {
   public void testIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol1 = mock(HddsVolume.class);
-    when(vol1.getStorageID()).thenReturn("uuid-1");
-    HddsVolume vol2 = mock(HddsVolume.class);
-    when(vol2.getStorageID()).thenReturn("uuid-2");
+    HddsVolume vol1 = mockHddsVolume("uuid-1");
+    HddsVolume vol2 = mockHddsVolume("uuid-2");
 
     ContainerSet containerSet = newContainerSet();
     for (int i = 0; i < 10; i++) {
@@ -202,8 +235,7 @@ public class TestContainerSet {
   public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol = mock(HddsVolume.class);
-    when(vol.getStorageID()).thenReturn("uuid-1");
+    HddsVolume vol = mockHddsVolume("uuid-1");
     Random random = new Random();
     ContainerSet containerSet = newContainerSet();
     int containerCount = 50;
@@ -345,6 +377,98 @@ public class TestContainerSet {
     assertEquals(1, invocationCount.get());
   }
 
+  // -------------------------------------------------------------------------
+  // getContainerWithWriteLock tests
+  // -------------------------------------------------------------------------
+
+  /**
+   * Happy path: container is in the map and the mapping is stable.
+   * Expect the locked container to be returned, with writeLock called and writeUnlock NOT yet called
+   */
+  @Test
+  public void testAcquireContainerLockStableMapping() throws StorageContainerException {
+    ContainerSet cs = spy(newContainerSet());
+    Container<?> c1 = mock(Container.class);
+    doAnswer(inv -> c1).when(cs).getContainer(1L);
+
+    Container<?> result = cs.getContainerWithWriteLock(1L);
+
+    assertSame(c1, result);
+    verify(c1).writeLock();
+    verify(c1, never()).writeUnlock();
+  }
+
+  /**
+   * Container is present when first fetched, but removed from the map after writeLock is acquired
+   * (second getContainer check returns null).
+   * Expect StorageContainerException(CONTAINER_NOT_FOUND), and the lock released before throwing (no lock leak).
+   */
+  @Test
+  public void testContainerRemovedAfterWriteLock() {
+    ContainerSet cs = spy(newContainerSet());
+    Container<?> c1 = mock(Container.class);
+    int[] callCount = {0};
+    // First call → candidate c1; second call (re-check after lock) → null (container removed)
+    doAnswer(inv -> callCount[0]++ == 0 ? c1 : null).when(cs).getContainer(1L);
+
+    assertThrows(StorageContainerException.class, () -> cs.getContainerWithWriteLock(1L));
+    verify(c1).writeLock();
+    verify(c1).writeUnlock();  // lock must be released before throwing
+  }
+
+  /**
+   * Mapping is swapped once (DiskBalancer moves container from C1 to C2) while the lock is being
+   * acquired. The first attempt detects the mismatch (current=C2 ≠ candidate=C1), releases C1's lock,
+   * and retries. The second attempt finds C2 stable and returns it locked.
+   */
+  @Test
+  public void testRetriesOnMappingSwapThenSucceeds()
+      throws StorageContainerException {
+    ContainerSet cs = spy(newContainerSet());
+    Container<?> c1 = mock(Container.class);
+    Container<?> c2 = mock(Container.class);
+    // Sequence: c1 (candidate retry-0), c2 (current retry-0 → mismatch),
+    // c2 (candidate retry-1), c2 (current retry-1 → match)
+    int[] n = {0};
+    Container<?>[] seq = {c1, c2, c2, c2};
+    doAnswer(inv -> seq[Math.min(n[0]++, seq.length - 1)]).when(cs).getContainer(1L);
+
+    Container<?> result = cs.getContainerWithWriteLock(1L);
+
+    assertSame(c2, result);
+    // c1 was locked then released during the retry
+    verify(c1).writeLock();
+    verify(c1).writeUnlock();
+    // c2 was locked and is held by the caller
+    verify(c2).writeLock();
+    verify(c2, never()).writeUnlock();
+  }
+
+  /**
+   * The mapping keeps changing on every retry. After {@link ContainerSet#maxContainerMapSwapRetries()}
+   * retries, null is returned. All intermediate locks on C1 must be released (no lock leak).
+   */
+  @Test
+  public void testExhaustsMaxRetriesReturnsNull()
+      throws StorageContainerException {
+    ContainerSet cs = spy(newContainerSet());
+    Container<?> c1 = mock(Container.class);
+    Container<?> c2 = mock(Container.class);
+    // Alternate: c1 as candidate, c2 as current → always mismatched → all retries fail
+    int[] n = {0};
+    doAnswer(inv -> n[0]++ % 2 == 0 ? c1 : c2).when(cs).getContainer(1L);
+
+    Container<?> result = cs.getContainerWithWriteLock(1L);
+
+    assertNull(result);
+    int maxRetries = ContainerSet.maxContainerMapSwapRetries();
+    // c1 is locked and released once per retry
+    verify(c1, times(maxRetries)).writeLock();
+    verify(c1, times(maxRetries)).writeUnlock();
+    // c2 is only ever seen as "current" — it is never locked
+    verify(c2, never()).writeLock();
+  }
+
   /**
    * Verify that {@code result} contains {@code count} containers
    * with IDs in increasing order starting at {@code startId}.
@@ -373,6 +497,104 @@ public class TestContainerSet {
       containerSet.addContainer(kv);
     }
     return containerSet;
+  }
+
+  /**
+   * Test that containerCount per volume returns correct count.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerCountPerVolume(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
+    HddsVolume vol1 = mockHddsVolume("uuid-1");
+    HddsVolume vol2 = mockHddsVolume("uuid-2");
+    HddsVolume vol3 = mockHddsVolume("uuid-3");
+
+    ContainerSet containerSet = newContainerSet();
+
+    // Add 100 containers to vol1, 50 to vol2, 0 to vol3
+    for (int i = 0; i < 100; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      kvData.setVolume(vol1);
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    for (int i = 100; i < 150; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      kvData.setVolume(vol2);
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    // Verify counts
+    assertEquals(100, containerSet.containerCount(vol1));
+    assertEquals(50, containerSet.containerCount(vol2));
+    assertEquals(0, containerSet.containerCount(vol3));
+
+    // Remove some containers and verify counts are updated
+    containerSet.removeContainer(0);
+    containerSet.removeContainer(1);
+    containerSet.removeContainer(100);
+    assertEquals(98, containerSet.containerCount(vol1));
+    assertEquals(49, containerSet.containerCount(vol2));
+  }
+
+  /**
+   * Test that per-volume iterator only returns containers from that volume.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerIteratorPerVolume(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
+    HddsVolume vol1 = mockHddsVolume("uuid-11");
+    HddsVolume vol2 = mockHddsVolume("uuid-12");
+
+    ContainerSet containerSet = newContainerSet();
+
+    // Add containers with specific IDs to each volume
+    List<Long> vol1Ids = new ArrayList<>();
+    List<Long> vol2Ids = new ArrayList<>();
+
+    for (int i = 0; i < 20; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      if (i % 2 == 0) {
+        kvData.setVolume(vol1);
+        vol1Ids.add((long) i);
+      } else {
+        kvData.setVolume(vol2);
+        vol2Ids.add((long) i);
+      }
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    // Verify iterator only returns containers from vol1
+    Iterator<Container<?>> iter1 = containerSet.getContainerIterator(vol1);
+    List<Long> foundVol1Ids = new ArrayList<>();
+    while (iter1.hasNext()) {
+      foundVol1Ids.add(iter1.next().getContainerData().getContainerID());
+    }
+    assertEquals(vol1Ids.size(), foundVol1Ids.size());
+    assertTrue(foundVol1Ids.containsAll(vol1Ids));
+
+    // Verify iterator only returns containers from vol2
+    Iterator<Container<?>> iter2 = containerSet.getContainerIterator(vol2);
+    List<Long> foundVol2Ids = new ArrayList<>();
+    while (iter2.hasNext()) {
+      foundVol2Ids.add(iter2.next().getContainerData().getContainerID());
+    }
+    assertEquals(vol2Ids.size(), foundVol2Ids.size());
+    assertTrue(foundVol2Ids.containsAll(vol2Ids));
   }
 
 }

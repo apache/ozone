@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -88,6 +89,10 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong kdsLastRunTimestamp;
   @Metric("Key Deleting Service current run timestamp in ms")
   private MutableGaugeLong kdsCurRunTimestamp;
+  @Metric("Directory Deleting Service last run start timestamp in ms")
+  private MutableGaugeLong ddsLastRunTimestamp;
+  @Metric("Directory Deleting Service current run start timestamp in ms")
+  private MutableGaugeLong ddsCurRunTimestamp;
 
   /*
    * Deletion service last run metrics.
@@ -108,6 +113,30 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong snapKeysIteratedLast;
   @Metric("Snapshot: No. of not reclaimable keys the last run")
   private MutableGaugeLong snapKeysNotReclaimableLast;
+
+  @Metric("AOS: deleted directories sent for purge in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsAosDirsSentForPurgeLast;
+  @Metric("AOS: sub-directories in the last DirectoryDeletingService run (mark/purge as applicable)")
+  private MutableGaugeLong ddsAosSubDirsLast;
+  @Metric("AOS: sub-files in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsAosSubFilesLast;
+  @Metric("Snapshot: deleted directories sent for purge in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsSnapDirsSentForPurgeLast;
+  @Metric("Snapshot: sub-directories in the last DirectoryDeletingService run (mark/purge as applicable)")
+  private MutableGaugeLong ddsSnapSubDirsLast;
+  @Metric("Snapshot: sub-files in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsSnapSubFilesLast;
+
+  /**
+   * Metric to track the term ID of the last key that was purged from the
+   * Active Object Store (AOS). This term ID represents the state of the
+   * most recent successful purge operation in the AOS. This value would be used ensure that a background
+   * KeyDeletingService/DirectoryDeletingService doesn't start the next run until the previous run has been flushed.
+   */
+  @Metric("Last Purge Key termIndex on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTermId;
+  @Metric("Last Purge Key transactionId on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTransactionId;
 
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -209,6 +238,26 @@ public final class DeletingServiceMetrics {
     this.kdsCurRunTimestamp.set(timestamp);
   }
 
+  public void setDdsLastRunTimestamp(long timestamp) {
+    this.ddsLastRunTimestamp.set(timestamp);
+  }
+
+  public void setDdsCurRunTimestamp(long timestamp) {
+    this.ddsCurRunTimestamp.set(timestamp);
+  }
+
+  public void updateAosDdsLastRunMetrics(long dirsSentForPurge, long subDirs, long subFiles) {
+    this.ddsAosDirsSentForPurgeLast.set(dirsSentForPurge);
+    this.ddsAosSubDirsLast.set(subDirs);
+    this.ddsAosSubFilesLast.set(subFiles);
+  }
+
+  public void updateSnapDdsLastRunMetrics(long dirsSentForPurge, long subDirs, long subFiles) {
+    this.ddsSnapDirsSentForPurgeLast.set(dirsSentForPurge);
+    this.ddsSnapSubDirsLast.set(subDirs);
+    this.ddsSnapSubFilesLast.set(subFiles);
+  }
+
   private void resetMetrics() {
     this.keysReclaimedInInterval.set(0);
     this.reclaimedSizeInInterval.set(0);
@@ -285,6 +334,18 @@ public final class DeletingServiceMetrics {
 
   public long getSnapKeysNotReclaimableLast() {
     return snapKeysNotReclaimableLast.value();
+  }
+
+  public synchronized TransactionInfo getLastAOSTransactionInfo() {
+    return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
+  }
+
+  public synchronized void setLastAOSTransactionInfo(TransactionInfo transactionInfo) {
+    TransactionInfo previousTransactionInfo = getLastAOSTransactionInfo();
+    if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
+      this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
+      this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
+    }
   }
 
   @VisibleForTesting

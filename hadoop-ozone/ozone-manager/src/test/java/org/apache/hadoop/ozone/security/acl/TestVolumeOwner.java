@@ -59,12 +59,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestVolumeOwner {
 
-  private static OzoneConfiguration ozoneConfig;
   private static OzoneNativeAuthorizer nativeAuthorizer;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static UserGroupInformation testUgi;
   private static OzoneManagerProtocol writeClient;
@@ -73,7 +68,7 @@ public class TestVolumeOwner {
 
   @BeforeAll
   static void setup() throws Exception {
-    ozoneConfig = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     ozoneConfig.set(OZONE_METADATA_DIRS, testDir.toString());
@@ -81,10 +76,10 @@ public class TestVolumeOwner {
     OmTestManagers omTestManagers =
         new OmTestManagers(ozoneConfig);
     metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    keyManager = omTestManagers.getKeyManager();
-    prefixManager = omTestManagers.getPrefixManager();
+    VolumeManager volumeManager = omTestManagers.getVolumeManager();
+    BucketManager bucketManager = omTestManagers.getBucketManager();
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    PrefixManager prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
@@ -250,9 +245,12 @@ public class TestVolumeOwner {
 
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName) {
-    return RequestContext.getBuilder(
-        UserGroupInformation.createRemoteUser(username), null, null,
-        type, ownerName).build();
+    return RequestContext.newBuilder()
+        .setClientUgi(UserGroupInformation.createRemoteUser(username))
+        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
+        .setAclRights(type)
+        .setOwnerName(ownerName)
+        .build();
   }
 
   private static String getTestVolumeName(int index) {

@@ -1,0 +1,915 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm.cli.datanode;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
+import picocli.CommandLine;
+
+/**
+ * Unit tests to validate all DiskBalancer subcommands.
+ */
+public class TestDiskBalancerSubCommands {
+
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+  private List<String> inServiceDatanodes;
+  private DiskBalancerProtocol mockProtocol;
+  private Random random = new Random();
+
+  @BeforeEach
+  public void setup() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+    
+    // Create shared list of in-service datanodes
+    inServiceDatanodes = new ArrayList<>();
+    inServiceDatanodes.add("host-1:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-2:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-3:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    
+    // Create shared mock protocol
+    mockProtocol = mock(DiskBalancerProtocol.class);
+  }
+  
+  /**
+   * Helper class to hold all mocks needed for DiskBalancer tests.
+   */
+  private static class DiskBalancerMocks implements AutoCloseable {
+    private final MockedConstruction<ContainerOperationClient> mockedClient;
+    private final MockedStatic<DiskBalancerSubCommandUtil> mockedUtil;
+    
+    DiskBalancerMocks(
+        MockedConstruction<ContainerOperationClient> mockedClient,
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil) {
+      this.mockedClient = mockedClient;
+      this.mockedUtil = mockedUtil;
+    }
+    
+    @Override
+    public void close() {
+      if (mockedClient != null) {
+        mockedClient.close();
+      }
+      if (mockedUtil != null) {
+        mockedUtil.close();
+      }
+    }
+  }
+  
+  /**
+   * Helper method to set up all mocks needed for DiskBalancer tests.
+   * Returns a DiskBalancerMocks object containing all three mocks.
+   */
+  private DiskBalancerMocks setupAllMocks() {
+    MockedConstruction<ContainerOperationClient> mockedClient = 
+        mockConstruction(ContainerOperationClient.class);
+    
+    MockedStatic<DiskBalancerSubCommandUtil> mockedUtil = 
+        mockStatic(DiskBalancerSubCommandUtil.class);
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
+    for (String addr : inServiceDatanodes) {
+      addressToDisplay.put(addr, addr);
+    }
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getAllOperableNodesClientRpcAddress(any()))
+        .thenReturn(addressToDisplay);
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(anyString()))
+        .thenReturn(mockProtocol);
+    // Mock getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto) to format the output
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getDatanodeHostAndIp(any(HddsProtos.DatanodeDetailsProto.class)))
+        .thenAnswer(invocation -> {
+          HddsProtos.DatanodeDetailsProto proto = invocation.getArgument(0);
+          return proto.getHostName() + " (" + proto.getIpAddress() + ":" +
+              HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")";
+        });
+    // Mock getDatanodeHostAndIp(String, String, int) to format the output
+    // Return value is used by Mockito internally for mock setup
+    mockedUtil.when(() -> {
+      @SuppressWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+      String ignored = DiskBalancerSubCommandUtil
+          .getDatanodeHostAndIp(any(DatanodeDetailsProto.class));
+      // Use the value to avoid "ignored return value" static analysis warnings.
+      System.out.println(ignored);
+    }).thenAnswer(invocation -> {
+      DatanodeDetailsProto proto = invocation.getArgument(0);
+      String hostname = proto.getHostName();
+      String ipAddress = proto.getIpAddress();
+      int port = proto.getPortsList().stream()
+          .filter(p -> p.getName().equals(
+              DatanodeDetails.Port.Name.CLIENT_RPC.name()))
+          .mapToInt(HddsProtos.Port::getValue)
+          .findFirst()
+          .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+      String addressPort = ipAddress + ":" + port;
+      if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
+        return hostname + " (" + addressPort + ")";
+      }
+      return addressPort;
+    });
+
+    return new DiskBalancerMocks(mockedClient, mockedUtil);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    outContent.reset();
+    errContent.reset();
+  }
+
+  // ========== DiskBalancerStartSubcommand Tests ==========
+
+  @Test
+  public void testStartDiskBalancerWithInServiceDatanodes() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    // Set up all required mocks
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--in-service-datanodes");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+
+      Pattern p = Pattern.compile("Started DiskBalancer on all IN_SERVICE and HEALTHY nodes\\.");
+      Matcher m = p.matcher(output);
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithConfiguration() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-t", "0.005", "-b", "100", "-p", "5", "-s", "false", "host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1\\]");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithMultipleNodes() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-2", "host-3");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2, host-3\\]");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithDuplicateHostnames() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-1", "host-2");
+      cmd.call();
+
+      // output should show each host only once
+      String output = outContent.toString(DEFAULT_ENCODING);
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2\\]");
+      Matcher m = p.matcher(output);
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithStdin() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    String input = "host-1\nhost-2\nhost-3\n";
+    System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2, host-3\\]");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithJson() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "-t", "0.005", "-b", "100", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\""));
+      assertTrue(output.contains("\"action\""));
+      assertTrue(output.contains("\"status\""));
+      assertTrue(output.contains("\"configuration\""));
+      assertTrue(output.contains("\"threshold\""));
+      assertTrue(output.contains("\"bandwidthInMB\""));
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerFailure() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doThrow(new IOException("Connection failed")).when(mockProtocol)
+        .startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Failed to start DiskBalancer on nodes: \\[host-1\\]");
+      Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  // ========== DiskBalancerStopSubcommand Tests ==========
+
+  @Test
+  public void testStopDiskBalancerWithInServiceDatanodes() throws Exception {
+    DiskBalancerStopSubcommand cmd = new DiskBalancerStopSubcommand();
+    doNothing().when(mockProtocol).stopDiskBalancer();
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--in-service-datanodes");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Stopped DiskBalancer on all IN_SERVICE and HEALTHY nodes\\.");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStopDiskBalancerWithJson() throws Exception {
+    DiskBalancerStopSubcommand cmd = new DiskBalancerStopSubcommand();
+    doNothing().when(mockProtocol).stopDiskBalancer();
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\""));
+      assertTrue(output.contains("\"action\""));
+      assertTrue(output.contains("\"stop\""));
+      assertTrue(output.contains("\"status\""));
+    }
+  }
+
+  @Test
+  public void testStopDiskBalancerFailure() throws Exception {
+    DiskBalancerStopSubcommand cmd = new DiskBalancerStopSubcommand();
+    doThrow(new IOException("Stop failed")).when(mockProtocol).stopDiskBalancer();
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Failed to stop DiskBalancer on nodes: \\[host-1\\]");
+      Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  // ========== DiskBalancerUpdateSubcommand Tests ==========
+
+  @Test
+  public void testUpdateDiskBalancerWithInServiceDatanodes() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doNothing().when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--in-service-datanodes", "-t", "0.005", "-b", "100");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Updated DiskBalancer configuration on all IN_SERVICE and HEALTHY nodes\\.");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testUpdateDiskBalancerWithAllParameters() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doNothing().when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-t", "0.005", "-b", "100", "-p", "5", "-s", "false", "host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Updated DiskBalancer configuration on nodes: \\[host-1\\]");
+      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testUpdateDiskBalancerWithJson() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doNothing().when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "-t", "0.005", "-b", "100", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\""));
+      assertTrue(output.contains("\"action\""));
+      assertTrue(output.contains("\"update\""));
+      assertTrue(output.contains("\"configuration\""));
+    }
+  }
+
+  @Test
+  public void testUpdateDiskBalancerFailure() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doThrow(new IOException("Update failed")).when(mockProtocol)
+        .updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-t", "0.005", "host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Failed to update DiskBalancer configuration on nodes: \\[host-1\\]");
+      Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testUpdateWithInvalidContainerStatesReportsError() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doThrow(new IllegalArgumentException(
+        "Invalid container state 'NOT_A_CONTAINER_STATE' in"))
+        .when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-c", "CLOSED,NOT_A_CONTAINER_STATE", "host-1");
+      cmd.call();
+
+      String err = errContent.toString(DEFAULT_ENCODING);
+      assertTrue(err.contains("Error on node"));
+      assertTrue(err.contains("Invalid container state"));
+    }
+  }
+
+  // ========== DiskBalancerStatusSubcommand Tests ==========
+
+  @Test
+  public void testStatusDiskBalancerWithInServiceDatanodes() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    
+    // Generate random status protos matching the in-service datanodes (host-1, host-2, host-3)
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto3 = generateRandomStatusProto("host-3");
+    
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(statusProto1, statusProto2, statusProto3);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--in-service-datanodes");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Status result"));
+      assertTrue(output.contains("host-1"));
+      assertTrue(output.contains("host-2"));
+      assertTrue(output.contains("host-3"));
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerWithJson() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    
+    DatanodeDiskBalancerInfoProto statusProto = generateRandomStatusProto("host-1");
+    
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(statusProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\""));
+      assertTrue(output.contains("\"status\""));
+      assertTrue(output.contains("\"threshold\""));
+      assertTrue(output.contains("\"bandwidthInMB\""));
+      assertTrue(output.contains("\"threads\""));
+      assertTrue(output.contains("\"stopAfterDiskEven\""));
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerWithMultipleNodes() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-1");
+    
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(statusProto1, statusProto2);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-2", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      int host2Index = output.indexOf("host-2");
+      int host1Index = output.indexOf("host-1");
+      assertThat(host2Index).isGreaterThanOrEqualTo(0);
+      assertThat(host1Index).isGreaterThan(host2Index);
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerFailure() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    
+    doThrow(new IOException("Status query failed")).when(mockProtocol)
+        .getDiskBalancerInfo();
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Failed to get DiskBalancer status from nodes: \\[host-1\\]");
+      Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerWithStdin() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
+    
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(statusProto1, statusProto2);
+
+    String input = "host-1\nhost-2\n";
+    System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Status result"));
+      int host1Index = output.indexOf("host-1");
+      int host2Index = output.indexOf("host-2");
+      assertThat(host1Index).isGreaterThanOrEqualTo(0);
+      assertThat(host2Index).isGreaterThan(host1Index);
+    }
+  }
+
+  // ========== DiskBalancerReportSubcommand Tests ==========
+
+  static Stream<Arguments> thresholdRangeReportCases() {
+    return Stream.of(
+        Arguments.of(0.08426521, 10.0, false,
+            "ThresholdRange: (0.00%, 18.43%)", "ThresholdRange: (-"),
+        Arguments.of(0.95, 10.0, false,
+            "ThresholdRange: (85.00%, 100.00%)", "105.00%"),
+        Arguments.of(0.95, 10.0, true,
+            "\"thresholdRange\" : \"(85.00%, 100.00%)\"", "105.00%"));
+  }
+
+  @ParameterizedTest(name = "idealUsage={0}, threshold={1}%, json={2}")
+  @MethodSource("thresholdRangeReportCases")
+  public void testReportThresholdRangeClamped(double idealUsage,
+      double thresholdPercent, boolean jsonOutput, String expectedRangeSubstring,
+      String mustNotContain) throws Exception {
+    outContent.reset();
+    errContent.reset();
+
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    DatanodeDiskBalancerInfoProto reportProto =
+        createReportProto("host-1", idealUsage, thresholdPercent);
+
+    when(mockProtocol.getDiskBalancerInfo()).thenReturn(reportProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      if (jsonOutput) {
+        c.parseArgs("--json", "host-1");
+      } else {
+        c.parseArgs("host-1");
+      }
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertThat(output).contains(expectedRangeSubstring);
+      assertThat(output).doesNotContain(mustNotContain);
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    
+    // Generate random report protos matching the in-service datanodes (host-1, host-2, host-3)
+    DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
+    DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
+    DatanodeDiskBalancerInfoProto reportProto3 = generateRandomReportProto("host-3");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto1, reportProto2, reportProto3);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--in-service-datanodes");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Report result"));
+      assertTrue(output.contains("host-1"));
+      assertTrue(output.contains("host-2"));
+      assertTrue(output.contains("host-3"));
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithJson() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    DatanodeDiskBalancerInfoProto reportProto = generateRandomReportProto("host-1");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\""));
+      assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"idealUsage\""));
+      assertTrue(output.contains("\"volumes\""));
+      assertTrue(output.contains("\"storageId\""));
+      assertTrue(output.contains("\"storagePath\""));
+      assertTrue(output.contains("\"ozoneCapacity\""));
+      assertTrue(output.contains("\"ozoneAvailable\""));
+      assertTrue(output.contains("\"ozoneUsed\""));
+      assertTrue(output.contains("\"effectiveUsedSpace\""));
+      assertTrue(output.contains("\"utilization\""));
+      assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"containerPreAllocatedSpace\""));
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithMultipleNodes() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
+    DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto1, reportProto2);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-2");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("host-1"));
+      assertTrue(output.contains("host-2"));
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithSameDensityKeepsInputOrder() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    DatanodeDiskBalancerInfoProto reportProto1 = createReportProto("host-1", 0.5, 10.0);
+    DatanodeDiskBalancerInfoProto reportProto2 = createReportProto("host-2", 0.5, 10.0);
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto2, reportProto1);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-2", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      int host2Index = output.indexOf("host-2");
+      int host1Index = output.indexOf("host-1");
+      assertThat(host2Index).isGreaterThanOrEqualTo(0);
+      assertThat(host1Index).isGreaterThan(host2Index);
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerWithStdin() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
+    DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto1, reportProto2);
+
+    String input = "host-1\nhost-2\n";
+    System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Report result"));
+      assertTrue(output.contains("host-1"));
+      assertTrue(output.contains("host-2"));
+    }
+  }
+
+  @Test
+  public void testReportDiskBalancerFailure() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    doThrow(new IOException("Report query failed")).when(mockProtocol)
+        .getDiskBalancerInfo();
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1");
+      cmd.call();
+
+      Pattern p = Pattern.compile("Failed to get DiskBalancer report from nodes: \\[host-1\\]");
+      Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private DatanodeDiskBalancerInfoProto createStatusProto(String hostname,
+      DiskBalancerRunningStatus status, double threshold, long bandwidthInMB,
+      int parallelThread, long successMove, long failureMove,
+      long bytesMoved, long bytesToMove) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, bandwidthInMB, parallelThread, true);
+
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.0)
+        .setRunningStatus(status)
+        .setDiskBalancerConf(configProto)
+        .setSuccessMoveCount(successMove)
+        .setFailureMoveCount(failureMove)
+        .setBytesMoved(bytesMoved)
+        .setBytesToMove(bytesToMove)
+        .build();
+  }
+
+  /**
+   * Generates a random status proto for a given hostname.
+   * @param hostname the hostname
+   * @return DatanodeDiskBalancerInfoProto with random status values
+   */
+  private DatanodeDiskBalancerInfoProto generateRandomStatusProto(String hostname) {
+    DiskBalancerRunningStatus[] statuses = DiskBalancerRunningStatus.values();
+    DiskBalancerRunningStatus status = statuses[random.nextInt(statuses.length)];
+    double threshold = 0.001 + random.nextDouble() * 0.1;
+    long bandwidthInMB = 10L + random.nextInt(990);
+    int parallelThread = 1 + random.nextInt(20);
+    long successMove = random.nextInt(1000);
+    long failureMove = random.nextInt(100);
+    long bytesMoved = random.nextLong() % (10L * 1024 * 1024 * 1024);
+    long bytesToMove = random.nextLong() % (10L * 1024 * 1024 * 1024);
+
+    return createStatusProto(hostname, status, threshold, bandwidthInMB,
+        parallelThread, successMove, failureMove, bytesMoved, bytesToMove);
+  }
+
+  /**
+   * Generates a random report proto for a given hostname.
+   * @param hostname the hostname
+   * @return DatanodeDiskBalancerInfoProto with random volume density and volume info
+   */
+  private DatanodeDiskBalancerInfoProto generateRandomReportProto(String hostname) {
+    double volumeDensity = random.nextDouble() * 0.1;
+    double idealUsage = 0.1 + random.nextDouble() * 0.3;
+    double threshold = 5.0 + random.nextDouble() * 10.0;
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, 100L, 5, true);
+
+    long committed1 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long committed2 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long capacity1 = 500L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    long capacity2 = 600L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    double util1 = idealUsage + random.nextDouble() * 0.1;
+    double util2 = idealUsage - random.nextDouble() * 0.1;
+    long used1 = (long) (capacity1 * util1);
+    long used2 = (long) (capacity2 * util2);
+    long available1 = capacity1 - used1;
+    long available2 = capacity2 - used2;
+    long effective1 = used1 + committed1;
+    long effective2 = used2 + committed2;
+    String path1 = "/data/hdds-" + hostname + "-1";
+    String path2 = "/data/hdds-" + hostname + "-2";
+    VolumeReportProto vol1 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol1")
+        .setStoragePath(path1)
+        .setUtilization(util1)
+        .setCommittedBytes(committed1)
+        .setTotalCapacity(capacity1)
+        .setOzoneAvailable(available1)
+        .setUsedSpace(used1)
+        .setEffectiveUsedSpace(effective1)
+        .build();
+    VolumeReportProto vol2 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol2")
+        .setStoragePath(path2)
+        .setUtilization(util2)
+        .setCommittedBytes(committed2)
+        .setTotalCapacity(capacity2)
+        .setOzoneAvailable(available2)
+        .setUsedSpace(used2)
+        .setEffectiveUsedSpace(effective2)
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(volumeDensity)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(configProto)
+        .addVolumeInfo(vol1)
+        .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DatanodeDiskBalancerInfoProto createReportProto(String hostname, double idealUsage,
+      double thresholdPercent) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.1408700123786014)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
+        .build();
+  }
+
+  private DiskBalancerConfigurationProto createConfigProto(double threshold, long bandwidthInMB, int parallelThread,
+      boolean stopAfterDiskEven) {
+    return DiskBalancerConfigurationProto.newBuilder()
+        .setThreshold(threshold)
+        .setDiskBandwidthInMB(bandwidthInMB)
+        .setParallelThread(parallelThread)
+        .setStopAfterDiskEven(stopAfterDiskEven)
+        .build();
+  }
+}

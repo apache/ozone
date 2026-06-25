@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 
@@ -104,9 +104,9 @@ public final class AclMetadata {
     }
 
     public AclMetadata build() {
-      Preconditions.checkNotNull(type);
-      Preconditions.checkNotNull(name);
-      Preconditions.checkNotNull(scope);
+      Objects.requireNonNull(type, "type == null");
+      Objects.requireNonNull(name, "name == null");
+      Objects.requireNonNull(scope, "scope == null");
 
       return new AclMetadata(this);
     }

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -70,8 +70,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Pipeline
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -89,6 +89,7 @@ public final class HddsTestUtils {
 
   public static final long CONTAINER_USED_BYTES_DEFAULT = 100L;
   public static final long CONTAINER_NUM_KEYS_DEFAULT = 2L;
+  public static final long ROLL_INTERVAL_MS_DEFAULT = 5 * 60 * 1000L; //TODO
 
   private HddsTestUtils() {
   }
@@ -163,7 +164,7 @@ public final class HddsTestUtils {
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
     DatanodeID nodeId = DatanodeID.randomID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getUuid(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
@@ -288,8 +289,8 @@ public final class HddsTestUtils {
   public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
       long capacity, long used, long remaining, StorageTypeProto type,
                                                        boolean failed) {
-    Preconditions.checkNotNull(nodeId);
-    Preconditions.checkNotNull(path);
+    Objects.requireNonNull(nodeId, "nodeId == null");
+    Objects.requireNonNull(path, "path == null");
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     srb.setStorageUuid(nodeId.toString())
         .setStorageLocation(path)
@@ -333,7 +334,7 @@ public final class HddsTestUtils {
   public static MetadataStorageReportProto createMetadataStorageReport(
       String path, long capacity, long used, long remaining,
       StorageTypeProto type, boolean failed) {
-    Preconditions.checkNotNull(path);
+    Objects.requireNonNull(path, "path == null");
     MetadataStorageReportProto.Builder srb = MetadataStorageReportProto
         .newBuilder();
     srb.setStorageLocation(path)

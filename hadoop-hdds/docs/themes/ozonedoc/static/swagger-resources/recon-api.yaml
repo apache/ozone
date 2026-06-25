@@ -17,6 +17,7 @@
 openapi: 3.0.0
 info:
   title: Ozone Recon REST API
+  version: v1
   license:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
     name: Apache 2.0 License
@@ -52,6 +53,18 @@ tags:
     externalDocs:
       description: Prometheus API docs
       url: https://prometheus.io/docs/prometheus/latest/querying/api/
+  - name: Container Export
+    description: Async export job lifecycle for unhealthy container metadata. **Admin Only**
+  - name: Storage Distribution
+    description: APIs to fetch data about storage distribution across datanodes. **Admin Only**
+  - name: Pending Deletion
+    description: APIs to fetch data about pending deletions by component (SCM, OM, or Datanodes). **Admin Only**
+  - name: Heat Map
+    description: APIs to fetch read-access heatmap data. **Admin Only**, feature-gated by HeatMapProvider service.
+  - name: Features
+    description: APIs to introspect Recon feature state. **Admin Only**
+  - name: Admin Utilities
+    description: Administrative actions such as triggering OM DB sync. **Admin Only**
 paths:
   /containers:
     get:
@@ -59,6 +72,24 @@ paths:
         - Containers
       summary: Get all Container Metadata information
       operationId: getContainerInfo
+      parameters:
+        - name: prevKey
+          in: query
+          description: |
+            Returns containers with ID greater than the given prevKey (the prevKey container itself is
+            skipped). Use 0 to start at the beginning.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: limit
+          in: query
+          description: Maximum number of containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
       responses:
         '200':
           description: Successful operation
@@ -66,12 +97,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContainerMetadata'
+        '406':
+          description: Invalid parameters (negative prevKey or limit).
   /containers/deleted:
     get:
       tags:
         - Containers
       summary: Return all DELETED containers in SCM
       operationId: getSCMDeletedContainers
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of DELETED containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+        - name: prevKey
+          in: query
+          description: Previous container ID to skip. Use 0 to start at the beginning.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         200:
           description: Successful operation
@@ -84,6 +133,8 @@ paths:
       tags:
         - Containers
       summary: Get the MissingContainerMetadata for all missing containers
+      description: Deprecated. Use `/containers/unhealthy/MISSING` instead.
+      deprecated: true
       operationId: getMissingContainers
       parameters:
         - name: limit
@@ -100,6 +151,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MissingContainerMetadata'
+  /containers/quasiClosed:
+    get:
+      tags:
+        - Containers
+      summary: List containers in QUASI_CLOSED state, paginated by container ID.
+      operationId: getQuasiClosedContainers
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+            minimum: 0
+        - name: minContainerId
+          in: query
+          description: Cursor; return containers with ID greater than this value, in ascending order.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuasiClosedContainersResponse'
+        '400':
+          description: '`limit` or `minContainerId` is negative.'
+          content:
+            text/plain:
+              schema:
+                type: string
   /containers/{id}/replicaHistory:
     get:
       tags:
@@ -129,19 +217,33 @@ paths:
       summary: Get UnhealthyContainerMetadata for all the unhealthy containers
       operationId: getUnhealthyContainers
       parameters:
-        - name: batchNum
-          in: query
-          description: Size of the batch for the result. It will give us results from **(limit + 1) to (2 * limit)**
-          required: false
-          schema:
-            type: integer
         - name: limit
           in: query
-          description: Limit of the number of results returned
+          description: Maximum number of unhealthy containers to return.
           required: false
           schema:
             type: integer
             default: 1000
+        - name: maxContainerId
+          in: query
+          description: |
+            Upper bound for container IDs to include (exclusive). When specified, returns containers
+            with IDs less than this value in descending order. Use for backward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: minContainerId
+          in: query
+          description: |
+            Lower bound for container IDs to include (exclusive). When `maxContainerId` is not specified,
+            returns containers with IDs greater than this value in ascending order. Use for forward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         '200':
           description: Successful operation
@@ -163,19 +265,33 @@ paths:
           schema:
             type: string
             example: MISSING
-        - name: batchNum
-          in: query
-          description: Size of the batch for the result. It will give us results from **(limit + 1) to (2 * limit)**
-          required: false
-          schema:
-            type: integer
         - name: limit
           in: query
-          description: Limit of the number of results returned
+          description: Maximum number of unhealthy containers to return.
           required: false
           schema:
             type: integer
             default: 1000
+        - name: maxContainerId
+          in: query
+          description: |
+            Upper bound for container IDs to include (exclusive). When specified, returns containers
+            with IDs less than this value in descending order. Use for backward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: minContainerId
+          in: query
+          description: |
+            Lower bound for container IDs to include (exclusive). When `maxContainerId` is not specified,
+            returns containers with IDs greater than this value in ascending order. Use for forward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         '200':
           description: Successful operation
@@ -183,6 +299,115 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnhealthyContainerMetadata'
+  /containers/unhealthy/export:
+    get:
+      tags:
+        - Container Export
+      summary: List all unhealthy-container export jobs (any status).
+      operationId: listUnhealthyExportJobs
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExportJob'
+    post:
+      tags:
+        - Container Export
+      summary: Start an async CSV export job for unhealthy containers in the given state.
+      operationId: startUnhealthyExport
+      parameters:
+        - name: state
+          in: query
+          required: true
+          description: One of **MISSING**, **MIS_REPLICATED**, **UNDER_REPLICATED**, **OVER_REPLICATED**.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job submitted; returns the ExportJob with assigned jobId.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '400':
+          description: Missing or invalid state parameter.
+        '429':
+          description: Too many concurrent export jobs; try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitedError'
+  /containers/unhealthy/export/{jobId}:
+    get:
+      tags:
+        - Container Export
+      summary: Get the current status of an export job.
+      operationId: getUnhealthyExportStatus
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job found; returns the ExportJob with current status and progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '404':
+          description: Job not found.
+    delete:
+      tags:
+        - Container Export
+      summary: Cancel a queued or running export job.
+      operationId: cancelUnhealthyExport
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancel request accepted (empty body).
+        '404':
+          description: Job not found or already in a terminal state.
+  /containers/unhealthy/export/{jobId}/download:
+    get:
+      tags:
+        - Container Export
+      summary: Download the TAR archive for a completed export job.
+      operationId: downloadUnhealthyExport
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TAR archive stream. Content-Disposition includes the export filename.
+          content:
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Job or export file not found.
+        '409':
+          description: Job has not reached COMPLETED status yet.
+        '429':
+          description: Maximum download limit for this job has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadLimitReachedError'
   /containers/mismatch:
     get:
       tags:
@@ -328,9 +553,10 @@ paths:
             default: 1000
         - name: startPrefix
           in: query
-          description: Will return keys matching this prefix
+          description: Will return keys matching this prefix. Must be at bucket level or deeper (e.g. /vol1/bucket1[/...]).
+          required: false
           schema:
-            type: integer
+            type: string
         - name: includeFso
           in: query
           description: Boolean value to determine whether to include FSO keys or not
@@ -365,6 +591,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpenKeysSummary'
+  /keys/open/mpu/summary:
+    get:
+      tags:
+        - Keys
+      summary: Returns the summary of all open multipart-upload keys
+      operationId: getOpenMPUKeySummary
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenMPUKeysSummary'
 
   /keys/deletePending:
     get:
@@ -454,6 +693,73 @@ paths:
                 properties:
                   totalDeletedDirectories:
                     type: integer
+  /keys/listKeys:
+    get:
+      tags:
+        - Keys
+      summary: List committed keys under a prefix with optional filters.
+      operationId: listKeys
+      parameters:
+        - name: startPrefix
+          in: query
+          required: false
+          description: |
+            Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`).
+            HTTP-level the parameter is optional (defaults to `/`), but the handler rejects
+            anything shallower than bucket level with `400 Bad Request`, so in practice
+            callers must supply one.
+          schema:
+            type: string
+            default: /
+        - name: replicationType
+          in: query
+          required: false
+          description: Filter by replication type (e.g. `RATIS`, `EC`).
+          schema:
+            type: string
+        - name: creationDate
+          in: query
+          required: false
+          description: Filter by creation date (only keys created on or after this date are returned).
+          schema:
+            type: string
+        - name: keySize
+          in: query
+          required: false
+          description: Filter to keys with data size at least this many bytes.
+          schema:
+            type: integer
+            default: 0
+        - name: prevKey
+          in: query
+          required: false
+          description: Pagination cursor. Pass back the `lastKey` from the previous response.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of keys to return.
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
+        '204':
+          description: No keys matched the given filters.
+        '400':
+          description: Missing or shallower-than-bucket `startPrefix`.
+        '503':
+          description: Recon is still bootstrapping OM DB; retry later. Response status is `INITIALIZING`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
   /containers/{id}/keys:
     get:
       tags:
@@ -811,13 +1117,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContainerUtilization'
-  /metrics/query:
+  /metrics/{api}:
     get:
       tags:
         - Metrics
       summary: This is a proxy endpoint for Prometheus, and helps to fetch different metrics for Ozone
       operationId: getMetricsResponse
       parameters:
+        - name: api
+          in: path
+          required: true
+          description: |
+            The Prometheus HTTP API endpoint to invoke (for example `query` or `query_range`).
+            On the Java side the segment falls back to `query` when absent, but in OpenAPI a path
+            parameter is always required, so callers must pass a value.
+          schema:
+            type: string
         - name: query
           in: query
           description: The query in a Prometheus query format for which to fetch results
@@ -833,6 +1148,266 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetricsQuery'
+  /heatmap/readaccess:
+    get:
+      tags:
+        - Heat Map
+      summary: Returns the top-N prefixes by read access as a tree of `EntityReadAccessHeatMap` nodes
+      operationId: getReadAccessHeatMap
+      description: |
+        Heatmap responses are feature-gated. If the HeatMap feature is disabled (see
+        `/features/disabledFeatures`), this route returns **404 Not Found**.
+      parameters:
+        - name: startDate
+          in: query
+          required: false
+          description: Look-back window for access aggregation. Default `24H`.
+          schema:
+            type: string
+            default: "24H"
+        - name: entityType
+          in: query
+          required: false
+          description: Entity granularity. Default `key`.
+          schema:
+            type: string
+            default: key
+        - name: path
+          in: query
+          required: false
+          description: Restrict heatmap to this path prefix.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityReadAccessHeatMap'
+        '404':
+          description: HeatMap feature is disabled.
+        '500':
+          description: HeatMap provider failure.
+  /heatmap/healthCheck:
+    get:
+      tags:
+        - Heat Map
+      summary: Health check for the configured HeatMap provider
+      operationId: getHeatMapHealthCheck
+      responses:
+        '200':
+          description: Health check result. Body depends on the provider implementation.
+          content:
+            application/json:
+              schema:
+                type: object
+  /features/disabledFeatures:
+    get:
+      tags:
+        - Features
+      summary: Lists Recon features that are currently disabled
+      operationId: getDisabledFeatures
+      description: |
+        Returned strings match the enum constant names from `FeatureProvider.Feature`
+        (currently the only candidate is `HEATMAP`).
+      responses:
+        '200':
+          description: Array of disabled feature names (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - HEATMAP
+  /triggerdbsync/om:
+    get:
+      tags:
+        - Admin Utilities
+      summary: Triggers an immediate OM DB sync from Recon
+      operationId: triggerOMDBSync
+      responses:
+        '200':
+          description: Boolean indicating whether the sync request was accepted.
+          content:
+            application/json:
+              schema:
+                type: boolean
+                example: true
+  /triggerdbsync/scm/snapshot:
+    post:
+      tags:
+        - Admin Utilities
+      summary: Trigger an SCM DB snapshot sync from SCM to Recon.
+      description: |
+        Starts a one-shot SCM DB snapshot sync in the background. Idempotent: if a sync is
+        already in progress the request is rejected with **409 Conflict**. The response body
+        carries the current `ScmDbSnapshotSyncStatus` so the caller can distinguish "accepted
+        and started" from "rejected because another sync is running".
+      operationId: triggerSCMDBSnapshotSync
+      responses:
+        '202':
+          description: Sync accepted and started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotTriggerResponse'
+        '409':
+          description: Another SCM DB sync is already running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotTriggerResponse'
+  /triggerdbsync/scm/snapshot/status:
+    get:
+      tags:
+        - Admin Utilities
+      summary: Get the current status of an SCM DB snapshot sync.
+      operationId: getSCMDBSnapshotSyncStatus
+      responses:
+        '200':
+          description: Current status (always returned, even when no sync is running).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotStatusResponse'
+  /triggerdbsync/scm/snapshot/cancel:
+    post:
+      tags:
+        - Admin Utilities
+      summary: Cancel an in-progress SCM DB snapshot sync.
+      description: |
+        Cancellation is only honored while the sync is `IN_PROGRESS` and still in a cancellable
+        phase (before `INITIALIZING_DB`). The response body's `cancelled` flag indicates whether
+        the cancel actually took effect.
+      operationId: cancelSCMDBSnapshotSync
+      responses:
+        '200':
+          description: Cancellation accepted; the sync has been cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotCancelResponse'
+        '409':
+          description: No sync is running, or the sync has passed the cancellable phase.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotCancelResponse'
+  /storageDistribution:
+    get:
+      tags:
+        - Storage Distribution
+      summary: Retrieves storage capacity distribution across datanodes including global storage, namespace, and used space breakdown
+      operationId: getStorageDistribution
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageCapacityDistributionResponse'
+        '500':
+          description: Internal server error while retrieving storage distribution
+          content:
+            text/plain:
+              schema:
+                type: string
+  /pendingDeletion:
+    get:
+      tags:
+        - Pending Deletion
+      summary: Returns pending deletion information for the specified component (scm, om, or dn)
+      operationId: getPendingDeletionByComponent
+      description: |
+        Returns pending deletion data for a specific component:
+        - **scm**: Returns block-level pending deletion stats from the Storage Container Manager.
+        - **om**: Returns a map of pending deletion sizes (pendingDirectorySize, pendingKeySize) from the Object Manager.
+        - **dn**: Triggers or polls a background metrics collection task across all datanodes. Returns **HTTP 202** if collection is in progress, or **HTTP 200** with per-datanode pending block sizes if finished.
+      parameters:
+        - name: component
+          in: query
+          description: Component to query. One of `scm`, `om`, or `dn`.
+          example: scm
+          required: true
+          schema:
+            type: string
+            enum:
+              - scm
+              - om
+              - dn
+        - name: limit
+          in: query
+          description: Maximum number of datanode results to return (only applicable when component=dn).
+          example: 10
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: |
+            Successful Operation. Response schema depends on the `component` parameter:
+            - **scm**: `ScmPendingDeletion`
+            - **om**: `OmPendingDeletion`
+            - **dn**: `DataNodeMetricsServiceResponse` (only when collection is FINISHED)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ScmPendingDeletion'
+                  - $ref: '#/components/schemas/OmPendingDeletion'
+                  - $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '202':
+          description: Datanode metrics collection is still in progress or not yet started (only for component=dn).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '204':
+          description: No SCM pending-deletion summary available (only for component=scm).
+        '400':
+          description: |
+            Missing/invalid `component` (must be one of `scm`, `om`, `dn`), or `limit` is less than 1 when `component=dn`.
+          content:
+            text/plain:
+              schema:
+                type: string
+  /storageDistribution/download:
+    get:
+      tags:
+        - Storage Distribution
+      summary: Downloads per-datanode storage and pending deletion statistics as a CSV file
+      operationId: downloadDataNodeStorageDistribution
+      description: |
+        Triggers or polls a background metrics collection task across all datanodes.
+        - If collection is **not yet finished**, returns **HTTP 202** with a JSON status response.
+        - If collection is **finished**, returns **HTTP 200** with a downloadable CSV file containing
+          per-datanode stats: HostName, Datanode UUID, Filesystem Capacity, Filesystem Used Space,
+          Filesystem Remaining Space, Ozone Capacity, Ozone Used Space, Ozone Remaining Space,
+          PreAllocated Container Space, Reserved Space, Minimum Free Space, Pending Block Size.
+      responses:
+        '200':
+          description: CSV file with storage and pending deletion statistics per datanode
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Metrics collection is still in progress or has not started; returns current collection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '500':
+          description: Internal server error, metrics data missing despite FINISHED collection status
+          content:
+            text/plain:
+              schema:
+                type: string
 components:
   schemas:
     Volumes:
@@ -972,7 +1547,7 @@ components:
         properties:
           containerId:
             type: integer
-          pipelineId:
+          pipelineID:
             type: object
             properties:
               id:
@@ -1117,6 +1692,17 @@ components:
         misReplicatedCount:
           type: integer
           example: 0
+        replicaMismatchCount:
+          type: integer
+          example: 0
+        firstKey:
+          type: integer
+          description: Smallest container ID present in this page. Use with `maxContainerId` for backward pagination.
+          example: 1
+        lastKey:
+          type: integer
+          description: Largest container ID present in this page. Use as `minContainerId` for the next forward page.
+          example: 42
         containers:
           type: array
           items:
@@ -1153,6 +1739,60 @@ components:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReplicaHistory"
+    QuasiClosedContainerMetadata:
+      type: object
+      properties:
+        containerID:
+          type: integer
+          format: int64
+          example: 42
+        pipelineID:
+          type: string
+          nullable: true
+          example: 88646d32-a1aa-4e1a-a8d5-aa1e7dd3f5cc
+        keys:
+          type: integer
+          format: int64
+          example: 17
+        stateEnterTime:
+          type: integer
+          format: int64
+          description: Epoch millis when the container entered QUASI_CLOSED per SCM.
+          example: 1718640123456
+        expectedReplicaCount:
+          type: integer
+          format: int64
+          example: 3
+        actualReplicaCount:
+          type: integer
+          format: int64
+          example: 2
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaHistory'
+    QuasiClosedContainersResponse:
+      type: object
+      properties:
+        quasiClosedCount:
+          type: integer
+          format: int64
+          description: Total number of containers in QUASI_CLOSED state across the cluster.
+          example: 42
+        firstKey:
+          type: integer
+          format: int64
+          description: Container ID of the first item in `containers`; equals `minContainerId` when the page is empty.
+          example: 100
+        lastKey:
+          type: integer
+          format: int64
+          description: Container ID of the last item in `containers`; pass as `minContainerId` to fetch the next page.
+          example: 199
+        containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuasiClosedContainerMetadata'
     MismatchedContainers:
       type: object
       properties:
@@ -1311,6 +1951,18 @@ components:
         totalReplicatedDataSize:
           type: integer
         totalOpenKeys:
+          type: integer
+    OpenMPUKeysSummary:
+      type: object
+      description: |
+        Note that the unreplicated total is reported as `totalDataSize` (not
+        `totalUnreplicatedDataSize`). This naming differs from `OpenKeysSummary`.
+      properties:
+        totalOpenMPUKeys:
+          type: integer
+        totalReplicatedDataSize:
+          type: integer
+        totalDataSize:
           type: integer
     OpenKeys:
       type: object
@@ -1530,6 +2182,66 @@ components:
             type: integer
           localID:
             type: integer
+    ListKeysResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: OK
+          description: One of `OK`, `INITIALIZING`. `INITIALIZING` accompanies a 503 response while Recon is still bootstrapping OM DB.
+        path:
+          type: string
+          description: The startPrefix that was queried.
+          example: /vol1/bucket1
+        replicatedDataSize:
+          type: integer
+          example: 600000
+        unReplicatedDataSize:
+          type: integer
+          example: 200000
+        lastKey:
+          type: string
+          description: Pagination cursor. Pass back as `prevKey` for the next page.
+          example: /vol1/bucket1/dir1/file42
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Internal table key (`/volumeId/bucketId/parentId/keyName` for FSO buckets).
+              path:
+                type: string
+                description: Human-readable full path.
+                example: /vol1/bucket1/dir1/file42
+              size:
+                type: integer
+                example: 1048576
+              replicatedSize:
+                type: integer
+                example: 3145728
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+                example: 1717000000000
+              modificationTime:
+                type: integer
+                example: 1717100000000
+              isKey:
+                type: boolean
+                example: true
     DeletePendingKeys:
       type: object
       properties:
@@ -1718,17 +2430,17 @@ components:
                 path: /vol1/bucket1/dir1-2
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": false
+                isKey: false
               - key: false
                 path: /vol1/bucket1/dir1-3
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": false
+                isKey: false
               - key: true
                 path: /vol1/bucket1/key1-1
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": true
+                isKey: true
         sizeDirectKey:
           type: number
           example: 10000
@@ -1764,7 +2476,43 @@ components:
             - 0
             - 100
             - 40
-    StorageReport:
+    DataNodeStorageReport:
+      type: object
+      properties:
+        datanodeUuid:
+          type: string
+          example: 841be80f-0454-47df-b676
+        hostName:
+          type: string
+          example: ozone-datanode-1
+        capacity:
+          type: number
+          example: 270429917184
+        used:
+          type: number
+          example: 358805504
+        remaining:
+          type: number
+          example: 270071111680
+        committed:
+          type: number
+          example: 27007111
+        minimumFreeSpace:
+          type: number
+          example: 20480
+        reserved:
+          type: number
+          example: 31457280
+        filesystemCapacity:
+          type: number
+          example: 270461374464
+        filesystemUsed:
+          type: number
+          example: 390262784
+        filesystemAvailable:
+          type: number
+          example: 270071111680
+    ClusterStorageReport:
       type: object
       properties:
         capacity:
@@ -1779,6 +2527,21 @@ components:
         committed:
           type: number
           example: 27007111
+        minimumFreeSpace:
+          type: number
+          example: 20480
+        reserved:
+          type: number
+          example: 31457280
+        filesystemCapacity:
+          type: number
+          example: 270461374464
+        filesystemUsed:
+          type: number
+          example: 390262784
+        filesystemAvailable:
+          type: number
+          example: 270071111680
     ClusterState:
       type: object
       properties:
@@ -1806,7 +2569,7 @@ components:
           type: integer
           example: 4
         storageReport:
-          $ref: "#/components/schemas/StorageReport"
+          $ref: "#/components/schemas/ClusterStorageReport"
         containers:
           type: integer
           example: 26
@@ -1830,8 +2593,6 @@ components:
           items:
             type: object
             properties:
-              buildDate:
-                type: string
               layoutVersion:
                 type: integer
               networkLocation:
@@ -1857,7 +2618,7 @@ components:
                 type: number
                 example: 1605738400544
               storageReport:
-                $ref: "#/components/schemas/StorageReport"
+                $ref: "#/components/schemas/DataNodeStorageReport"
               pipelines:
                 type: array
                 items:
@@ -1883,34 +2644,51 @@ components:
               containers:
                 type: integer
                 example: 17
+              openContainers:
+                type: integer
+                example: 4
               leaderCount:
                 type: integer
                 example: 1
     RemovedDatanodesResponse:
       type: object
+      description: |
+        Wraps the result of a remove-datanodes request. `datanodesResponseMap` is keyed by outcome
+        category: `removedDatanodes`, `failedDatanodes`, `notFoundDatanodes`. Categories with no
+        entries for this request are omitted (not empty arrays).
       properties:
         datanodesResponseMap:
           type: object
           properties:
             removedDatanodes:
-              type: object
-              properties:
-                totalCount:
-                  type: integer
-                datanodes:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      uuid:
-                        type: string
-                      hostname:
-                        type: string
-                      state:
-                        type: string
-                      pipelines:
-                        type: string
-                        nullable: true
+              $ref: '#/components/schemas/DatanodesResponseEntry'
+            failedDatanodes:
+              description: Pre-check failures. `datanodes` is empty; use `totalCount` and `errors`.
+              allOf:
+                - $ref: '#/components/schemas/DatanodesResponseEntry'
+            notFoundDatanodes:
+              $ref: '#/components/schemas/DatanodesResponseEntry'
+    DatanodesResponseEntry:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        datanodes:
+          type: array
+          items:
+            type: object
+            properties:
+              uuid:
+                type: string
+              hostname:
+                type: string
+              state:
+                type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Only present on `failedDatanodes`. Maps uuid to a human-readable failure reason.
     DatanodesDecommissionInfo:
       type: object
       properties:
@@ -2161,3 +2939,388 @@ components:
                     example:
                       - 1599159384.455
                       - "5"
+    ExportJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: 4f7a8b9c-1234-5678-9abc-def012345678
+        state:
+          type: string
+          description: The unhealthy-container state being exported (MISSING, MIS_REPLICATED, UNDER_REPLICATED, OVER_REPLICATED).
+          example: MISSING
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, COMPLETED, FAILED]
+          example: RUNNING
+        submittedAt:
+          type: integer
+          description: Epoch millis when the job was submitted.
+          example: 1718640123456
+        startedAt:
+          type: integer
+          description: Epoch millis when the worker started the job. 0 while still queued.
+          example: 1718640124000
+        completedAt:
+          type: integer
+          description: Epoch millis when the job reached COMPLETED or FAILED. 0 while not yet terminal.
+          example: 0
+        totalRecords:
+          type: integer
+          description: Records written so far.
+          example: 250
+        estimatedTotal:
+          type: integer
+          description: Estimated total records for progress reporting. `-1` when unknown.
+          example: 1000
+        fileName:
+          type: string
+          description: Name of the export TAR file (no path). Empty until COMPLETED.
+          example: unhealthy_MISSING_4f7a8b9c.tar
+        errorMessage:
+          type: string
+          nullable: true
+          description: Populated only when status is FAILED.
+        progressPercent:
+          type: integer
+          description: Derived from totalRecords / estimatedTotal. 0 when estimatedTotal is unknown.
+          example: 25
+        queuePosition:
+          type: integer
+          description: 0 for jobs that are not QUEUED. Otherwise 1-based position in the queue.
+          example: 0
+        downloadCount:
+          type: integer
+          example: 0
+        downloadsRemaining:
+          type: integer
+          example: 3
+        maxDownloads:
+          type: integer
+          description: Maximum number of times this export can be downloaded.
+          example: 3
+        downloadAllowed:
+          type: boolean
+          description: Whether the export currently has at least one download remaining.
+          example: true
+    RateLimitedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Too Many Requests
+        message:
+          type: string
+          example: Export queue is full; please retry later.
+    DownloadLimitReachedError:
+      type: object
+      description: |
+        Returned by `GET /containers/unhealthy/export/{jobId}/download` with HTTP 429 when the
+        per-job download limit has been reached. Same shape as `RateLimitedError` but with a
+        distinct `error` discriminator string so clients can branch on it.
+      properties:
+        error:
+          type: string
+          example: Download limit reached
+        message:
+          type: string
+          example: This export has reached its maximum download limit of 3.
+    StorageCapacityDistributionResponse:
+      type: object
+      description: Aggregated storage capacity distribution report for the cluster
+      properties:
+        globalStorage:
+          $ref: '#/components/schemas/GlobalStorageReport'
+        globalNamespace:
+          $ref: '#/components/schemas/GlobalNamespaceReport'
+        usedSpaceBreakdown:
+          $ref: '#/components/schemas/UsedSpaceBreakDown'
+        dataNodeUsage:
+          type: array
+          description: Per-datanode storage usage reports
+          items:
+            $ref: '#/components/schemas/DataNodeStorageReport'
+    GlobalStorageReport:
+      type: object
+      description: |
+        Aggregated storage metrics across all datanodes in the cluster.
+
+        **Storage Hierarchy:**
+        - `totalFileSystemCapacity` = `totalOzoneCapacity` + `totalReservedSpace`
+        - `totalOzoneCapacity` = `totalOzoneUsedSpace` + `totalOzoneFreeSpace`
+      properties:
+        totalFileSystemCapacity:
+          type: integer
+          format: int64
+          description: Total OS-reported filesystem capacity across all datanodes (bytes)
+          example: 270461374464
+        totalReservedSpace:
+          type: integer
+          format: int64
+          description: Space reserved and not available for Ozone allocation (bytes)
+          example: 31457280
+        totalOzoneCapacity:
+          type: integer
+          format: int64
+          description: Portion of filesystem capacity available for Ozone, equal to filesystem capacity minus reserved space (bytes)
+          example: 270429917184
+        totalOzoneUsedSpace:
+          type: integer
+          format: int64
+          description: Space currently consumed by Ozone data (bytes)
+          example: 358805504
+        totalOzoneFreeSpace:
+          type: integer
+          format: int64
+          description: Remaining allocatable space within Ozone capacity (bytes)
+          example: 270071111680
+        totalOzoneCommittedSpace:
+          type: integer
+          format: int64
+          description: Space pre-allocated for containers but not yet fully utilized (bytes)
+          example: 27007111
+        totalMinimumFreeSpace:
+          type: integer
+          format: int64
+          description: Minimum free space that must be maintained as per configuration (bytes)
+          example: 20480
+    GlobalNamespaceReport:
+      type: object
+      description: High-level metadata summary of the global namespace
+      properties:
+        totalUsedSpace:
+          type: integer
+          format: int64
+          description: |
+            Total space utilized in the namespace (bytes). Includes committed data,
+            open keys, and data pending deletion.
+          example: 500000000
+        totalKeys:
+          type: integer
+          format: int64
+          description: Total number of keys (files) in the namespace across all volumes and buckets
+          example: 10000
+    UsedSpaceBreakDown:
+      type: object
+      description: Breakdown of used storage space by lifecycle category
+      properties:
+        openKeyBytes:
+          $ref: '#/components/schemas/OpenKeyBytesInfo'
+        finalizedKeyBytes:
+          type: integer
+          format: int64
+          description: Space occupied by written (closed) keys with replica overhead (bytes)
+          example: 450000000
+    OpenKeyBytesInfo:
+      type: object
+      description: Breakdown of storage space occupied by open (uncommitted) keys
+      properties:
+        openKeyAndFileBytes:
+          type: integer
+          format: int64
+          description: Total replicated bytes for open non-multipart keys and files
+          example: 13824
+        multipartOpenKeyBytes:
+          type: integer
+          format: int64
+          description: Total replicated bytes for in-progress multipart upload keys
+          example: 4096
+        totalOpenKeyBytes:
+          type: integer
+          format: int64
+          description: Sum of openKeyAndFileBytes and multipartOpenKeyBytes
+          example: 17920
+    DataNodeMetricsServiceResponse:
+      type: object
+      description: Response from a background per-datanode metrics collection task
+      properties:
+        status:
+          type: string
+          enum:
+            - NOT_STARTED
+            - IN_PROGRESS
+            - FINISHED
+            - FAILED
+          description: Current status of the metric collection task
+          example: FINISHED
+        totalPendingDeletionSize:
+          type: integer
+          format: int64
+          description: Total size of blocks pending deletion across all queried datanodes (bytes)
+          example: 1048576
+        pendingDeletionPerDataNode:
+          type: array
+          nullable: true
+          description: Per-datanode pending deletion metrics; null if collection is not finished
+          items:
+            $ref: '#/components/schemas/DatanodePendingDeletionMetrics'
+        totalNodesQueried:
+          type: integer
+          description: Total number of datanodes queried during the collection task
+          example: 4
+        totalNodeQueriesFailed:
+          type: integer
+          format: int64
+          description: Number of datanode queries that failed during collection
+          example: 0
+    DatanodePendingDeletionMetrics:
+      type: object
+      description: Pending deletion block metrics for a single datanode
+      properties:
+        hostName:
+          type: string
+          description: Hostname of the datanode
+          example: ozone-datanode-1
+        datanodeUuid:
+          type: string
+          description: UUID of the datanode
+          example: 841be80f-0454-47df-b676-a1234567890a
+        pendingBlockSize:
+          type: integer
+          format: int64
+          description: Total size of blocks pending deletion on this datanode (bytes)
+          example: 262144
+    ScmPendingDeletion:
+      type: object
+      description: Block-level pending deletion statistics from the Storage Container Manager
+      properties:
+        totalBlocksize:
+          type: integer
+          format: int64
+          description: Total unreplicated size of all blocks pending deletion in SCM (bytes)
+          example: 10485760
+        totalReplicatedBlockSize:
+          type: integer
+          format: int64
+          description: Total replicated size of all blocks pending deletion in SCM (bytes)
+          example: 31457280
+        totalBlocksCount:
+          type: integer
+          format: int64
+          description: Total number of blocks pending deletion in SCM
+          example: 500
+    OmPendingDeletion:
+      type: object
+      description: |
+        Map of pending deletion sizes by category at the OM level (values in bytes).
+        Common keys: `pendingDirectorySize`, `pendingKeySize`.
+      additionalProperties:
+        type: integer
+        format: int64
+      example:
+        pendingDirectorySize: 204800
+        pendingKeySize: 1048576
+    EntityReadAccessHeatMap:
+      type: object
+      description: |
+        Nested tree node used by `/heatmap/readaccess`. The root has `label: "root"` and `path: "/"`;
+        children represent volumes, then buckets, then directories, then keys.
+      properties:
+        label:
+          type: string
+          example: vol1
+        path:
+          type: string
+          example: /vol1
+        size:
+          type: integer
+          format: int64
+          description: Aggregate size in bytes of this entity.
+        accessCount:
+          type: integer
+          format: int64
+          description: Access count for this entity within the queried time window.
+        minAccessCount:
+          type: integer
+          format: int64
+        maxAccessCount:
+          type: integer
+          format: int64
+        color:
+          type: number
+          format: double
+          description: Normalized color value (heatmap intensity).
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityReadAccessHeatMap'
+    ScmDbSnapshotSyncStatus:
+      type: string
+      description: Overall state of a triggered SCM DB snapshot sync.
+      enum:
+        - IDLE
+        - IN_PROGRESS
+        - SUCCESS
+        - FAILED
+        - CANCELLED
+    ScmDbSnapshotSyncPhase:
+      type: string
+      description: |
+        Sub-phase of the active sync. Used to decide whether cancellation is still possible
+        (cancellable up to and including `DOWNLOADING_CHECKPOINT`; not cancellable from
+        `INITIALIZING_DB` onwards).
+      enum:
+        - NONE
+        - DOWNLOADING_CHECKPOINT
+        - INITIALIZING_DB
+        - SWAPPING_DB
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+    ScmDbSnapshotTriggerResponse:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+          description: Whether the trigger request actually started a new sync.
+          example: true
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        message:
+          type: string
+          example: SCM DB snapshot sync started.
+    ScmDbSnapshotStatusResponse:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        phase:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncPhase'
+        startedAt:
+          type: integer
+          format: int64
+          description: Epoch millis when the current/last sync started; `0` if never run.
+          example: 1718640123456
+        finishedAt:
+          type: integer
+          format: int64
+          description: Epoch millis when the current/last sync ended; `0` while still running.
+          example: 0
+        durationMs:
+          type: integer
+          format: int64
+          description: Elapsed time in millis; for a running sync, computed against `now()`.
+          example: 12345
+        cancelAllowed:
+          type: boolean
+          description: True only while still in a cancellable phase.
+          example: true
+        lastError:
+          type: string
+          nullable: true
+          description: Failure message from the last sync, if any.
+          example: null
+    ScmDbSnapshotCancelResponse:
+      type: object
+      properties:
+        cancelled:
+          type: boolean
+          description: Whether the cancel actually took effect.
+          example: true
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        phase:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncPhase'
+        message:
+          type: string
+          example: SCM DB snapshot sync cancelled.

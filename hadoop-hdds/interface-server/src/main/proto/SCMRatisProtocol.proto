@@ -15,45 +15,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-syntax = "proto2";
+syntax = "proto3";
+
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "SCMRatisProtocol";
 option java_generate_equals_and_hash = true;
 
 enum RequestType {
-    PIPELINE = 1;
-    CONTAINER = 2;
-    BLOCK = 3;
-    SEQUENCE_ID = 4;
-    CERT_STORE = 5;
-    MOVE = 6;
-    STATEFUL_SERVICE_CONFIG = 7;
-    FINALIZE = 8;
-    SECRET_KEY = 9;
-    CERT_ROTATE = 10;
+  REQUEST_TYPE_UNSPECIFIED = 0;
+
+  PIPELINE = 1;
+  CONTAINER = 2;
+  BLOCK = 3;
+  SEQUENCE_ID = 4;
+  CERT_STORE = 5;
+  MOVE = 6;
+  STATEFUL_SERVICE_CONFIG = 7;
+  FINALIZE = 8;
+  SECRET_KEY = 9;
+  CERT_ROTATE = 10;
 }
 
 message Method {
-    required string name = 1;
-    repeated MethodArgument args = 2;
+  optional string name = 1;
+  repeated MethodArgument args = 2;
 }
 
 message MethodArgument {
-    required string type = 1;
-    required bytes value = 2;
+  optional string type = 1;
+  optional bytes value = 2;
 }
 
 message ListArgument {
-    required string type = 1;
-    repeated bytes value = 2;
+  optional string type = 1;
+  repeated bytes value = 2;
 }
 
 message SCMRatisRequestProto {
-    required RequestType type = 1;
-    required Method method = 2;
+  optional RequestType type = 1;
+  optional Method method = 2;
 }
 
 message SCMRatisResponseProto {
-    required string type = 2;
-    required bytes value = 3;
+  reserved 1;
+
+  optional string type = 2;
+  optional bytes value = 3;
 }

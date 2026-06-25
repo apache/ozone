@@ -176,6 +176,34 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
+   * Get the datanode info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeInfo of the specified datanode
+   */
+  @Nullable
+  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
+
+  /**
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
+   *
+   * @param datanodeInfo node info of the receiving the allocation
+   * @param containerID the container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
+   */
+  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
+   * Removes a pending container allocation from a datanode.
+   *
+   * @param datanodeInfo info about the datanode
+   * @param containerID the container to remove from pending
+   */
+  void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -361,9 +389,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /** @return the datanode of the given id if it exists; otherwise, return null. */
   @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
-  @Nullable
-  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails);
-
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
    * DatanodeDetails for the datanodes running at that address.
@@ -387,13 +412,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
-  int minHealthyVolumeNum(List <DatanodeDetails> dnList);
-
   int totalHealthyVolumeCount();
 
   int pipelineLimit(DatanodeDetails dn);
-
-  int minPipelineLimit(List<DatanodeDetails> dn);
 
   /**
    * Gets the peers in all the pipelines for the particular datnode.
@@ -418,4 +439,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
   }
+
+  int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * SCM-side tracker for container allocations not yet reported by datanodes.
+   */
+  PendingContainerTracker getPendingContainerTracker();
 }

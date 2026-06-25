@@ -790,26 +790,45 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
     try {
-      metrics.incNumWriteStateMachineOps();
-      long writeStateMachineStartTime = Time.monotonicNowNanos();
-      final Context context = (Context) trx.getStateMachineContext();
-      Objects.requireNonNull(context, "context == null");
-      final ContainerCommandRequestProto requestProto = context.getRequestProto();
-      final Type cmdType = requestProto.getCmdType();
-
-      // For only writeChunk, there will be writeStateMachineData call.
-      // CreateContainer will happen as a part of writeChunk only.
-      switch (cmdType) {
-      case WriteChunk:
-        return writeStateMachineData(requestProto, entry.getIndex(),
-            entry.getTerm(), writeStateMachineStartTime);
-      default:
-        throw new IllegalStateException("Cmd Type:" + cmdType
-            + " should not have state machine data");
-      }
-    } catch (Exception e) {
-      metrics.incNumWriteStateMachineFails();
+      return writeImpl(entry, trx).whenComplete((r, e) -> {
+        if (e != null) {
+          closeServer(e);
+        }
+      });
+    } catch (Throwable e) {
+      closeServer(e);
       return completeExceptionally(e);
+    }
+  }
+
+  private CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
+    metrics.incNumWriteStateMachineOps();
+    long writeStateMachineStartTime = Time.monotonicNowNanos();
+    final Context context = (Context) trx.getStateMachineContext();
+    Objects.requireNonNull(context, "context == null");
+    final ContainerCommandRequestProto requestProto = context.getRequestProto();
+    final Type cmdType = requestProto.getCmdType();
+
+    // For only writeChunk, there will be writeStateMachineData call.
+    // CreateContainer will happen as a part of writeChunk only.
+    switch (cmdType) {
+    case WriteChunk:
+      return writeStateMachineData(requestProto, entry.getIndex(),
+          entry.getTerm(), writeStateMachineStartTime);
+    default:
+      throw new IllegalStateException("Cmd Type:" + cmdType
+          + " should not have state machine data");
+    }
+  }
+
+  private void closeServer(Throwable e) {
+    metrics.incNumWriteStateMachineFails();
+    try {
+      LOG.error("{}: Failed to writeStateMachineData, close server", getId(), e);
+      getServer().get().getDivision(getGroupId()).close();
+    } catch (Throwable t) {
+      e.addSuppressed(t);
+      LOG.error("{}: Failed to close server", getId(), t);
     }
   }
 
@@ -876,9 +895,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     // assert that the response has data in it.
-    Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk: %s",
-            chunkInfo);
+    Objects.requireNonNull(data, () -> "data == null for " + TextFormat.shortDebugString(chunkInfo));
     Preconditions.checkState(data.size() == chunkInfo.getLen(),
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);
@@ -1230,7 +1247,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache.removeIf(k -> k <= index);
   }
 
-  private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
+  private static <T> CompletableFuture<T> completeExceptionally(Throwable e) {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;
@@ -1265,8 +1282,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLogFailed(Throwable t, LogEntryProto failedEntry) {
-    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry),
-        toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry()), t);
+    String stateMachineLogEntry = failedEntry == null
+        ? "null"
+        : toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry());
+    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry), stateMachineLogEntry, t);
     ratisServer.handleNodeLogFailure(getGroupId(), t);
   }
 
@@ -1328,13 +1347,13 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        builder.append(", container path=");
-        builder.append(location);
+        builder.append(", container path=")
+            .append(location);
       }
     } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
-      builder.append("smProtoToString failed with ");
-      builder.append(t.getMessage());
+      builder.append("smProtoToString failed with ")
+          .append(t.getMessage());
     }
     return builder.toString();
   }

@@ -22,11 +22,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -118,9 +118,16 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final boolean success = HAUtils.addSCM(ozoneConf,
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId())
-              .setRatisAddr(nodeDetails
-                  // TODO : Should we use IP instead of hostname??
-                  .getRatisHostPortStr()).build(), scm.getSCMNodeId());
+              // Pass the configured host:port string verbatim. Do NOT
+              // resolve it into an InetSocketAddress first -- that bakes
+              // a resolved IP into Ratis's peer address for the channel's
+              // lifetime. With the string passed through, gRPC's
+              // DnsNameResolver re-resolves hostname addresses on
+              // connection failure (peer pod restarts recover
+              // automatically), and IP-literal configs are still honored
+              // exactly as configured. See HDDS-15514.
+              .setRatisAddr(nodeDetails.getRatisHostPortStr())
+              .build(), scm.getSCMNodeId());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
       } else {
@@ -142,8 +149,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     SCMHATransactionBufferMonitorTask monitorTask
-        = new SCMHATransactionBufferMonitorTask(
-        transactionBuffer, ratisServer, interval);
+        = new SCMHATransactionBufferMonitorTask(transactionBuffer, interval);
     trxBufferMonitorService =
         new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
             .setScmContext(scm.getScmContext())
@@ -394,7 +400,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public void close() {
-    IOUtils.close(LOG, transactionBuffer);
+    IOUtils.close(LOG, transactionBuffer::close);
   }
 
   @Override
@@ -406,8 +412,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
               + " has cluster Id " + request.getClusterId()
               + " but leader SCM cluster id is " + clusterId);
     }
-    Preconditions.checkNotNull(
-        getRatisServer().getDivision().getGroup().getGroupId());
+    Objects.requireNonNull(
+        getRatisServer().getDivision().getGroup().getGroupId(), "GroupId == null");
     return getRatisServer().addSCM(request);
   }
 
@@ -424,7 +430,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
           " has cluster Id " + request.getClusterId() +
           " but leader SCM cluster id is " + clusterId);
     }
-    Preconditions.checkNotNull(ratisServer.getDivision().getGroup());
+    Objects.requireNonNull(ratisServer.getDivision().getGroup(), "Group == null");
     return ratisServer.removeSCM(request);
   }
 
@@ -445,7 +451,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
-        metadataStore.getDeletedBlocksTXTable());
+        metadataStore.getDeletedBlocksTXTable(), metadataStore.getStatefulServiceConfigTable());
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {

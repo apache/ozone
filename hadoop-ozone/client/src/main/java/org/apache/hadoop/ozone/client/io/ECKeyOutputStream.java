@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -46,6 +49,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,20 +74,19 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
-  /**
-   * Indicates if an atomic write is required. When set to true,
-   * the amount of data written must match the declared size during the commit.
-   * A mismatch will prevent the commit from succeeding.
-   * This is essential for operations like S3 put to ensure atomicity.
-   */
-  private boolean atomicKeyCreation;
-
   private volatile boolean closed;
   private volatile boolean closing;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
   private long writeOffset;
+
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   public void insertFlushCheckpoint(long version) throws IOException {
@@ -119,7 +122,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
       return flushStripeFromQueue();
     });
     this.flushCheckpoint = new AtomicLong(0);
-    this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
   @Override
@@ -394,7 +396,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private void handleException(BlockOutputStreamEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean containerExclusionException = checkIfContainerToExclude(t);
     if (containerExclusionException) {
       getBlockOutputStreamEntryPool().getExcludeList().addPipeline(streamEntry.getPipeline().getId());
@@ -478,11 +480,8 @@ public final class ECKeyOutputStream extends KeyOutputStream
         Preconditions.checkArgument(writeOffset == offset,
             "Expected writeOffset= " + writeOffset
                 + " Expected offset=" + offset);
-        if (atomicKeyCreation) {
-          long expectedSize = blockOutputStreamEntryPool.getDataSize();
-          Preconditions.checkState(expectedSize == offset, String.format(
-              "Expected: %d and actual %d write sizes do not match",
-                  expectedSize, offset));
+        for (CheckedRunnable<IOException> preCommit : preCommits) {
+          preCommit.run();
         }
         blockOutputStreamEntryPool.commitKey(offset);
       }

@@ -51,11 +51,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
-  private ContainerManager containerManager;
-  private ReconTaskConfig reconTaskConfig;
-  private ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager;
   private ContainerCountBySizeDao containerCountBySizeDao;
-  private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerSizeCountTask task;
   private DSLContext dslContext;
 
@@ -65,16 +61,15 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() {
-    utilizationSchemaDefinition =
-        getSchemaDefinition(UtilizationSchemaDefinition.class);
+    UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
-    reconTaskConfig = new ReconTaskConfig();
+    ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setContainerSizeCountTaskInterval(Duration.ofSeconds(1));
-    reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
         getDao(ReconTaskStatusDao.class), "mockedTask-" + System.currentTimeMillis()));
-    containerManager = mock(ContainerManager.class);
+    ContainerManager containerManager = mock(ContainerManager.class);
     task = new ContainerSizeCountTask(
         containerManager,
         reconTaskConfig,

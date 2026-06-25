@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWi
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
+import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,12 +30,12 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
-import javax.validation.constraints.NotNull;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
@@ -175,7 +176,7 @@ public class StorageContainerServiceProviderImpl
     return null;
   }
 
-  @NotNull
+  @Nonnull
   private RocksDBCheckpoint getRocksDBCheckpoint(String snapshotFileName, File targetFile) throws IOException {
     Path untarredDbDir = Paths.get(scmSnapshotDBParentDir.getAbsolutePath(),
         snapshotFileName);
@@ -185,10 +186,24 @@ public class StorageContainerServiceProviderImpl
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return scmClient.getListOfContainers(startContainerID, count, state);
+    return scmClient.getListOfContainerIDs(startContainerID, count, state);
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to {@code SCM.listContainer(startId, count, state)} which
+   * already has server-side pagination support. This reuses the existing RPC
+   * without requiring a new protobuf message definition.
+   */
+  @Override
+  public List<ContainerInfo> getListOfContainerInfos(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.listContainer(
+        startContainerID.getId(), count, state).getContainerInfoList();
+  }
 }

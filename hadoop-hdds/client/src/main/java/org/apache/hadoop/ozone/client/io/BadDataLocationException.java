@@ -33,7 +33,7 @@ public class BadDataLocationException extends IOException {
 
   /**
    * Required for Unwrapping {@code RemoteException}. Used by
-   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   * {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}
    */
   public BadDataLocationException(String message) {
     super(message);

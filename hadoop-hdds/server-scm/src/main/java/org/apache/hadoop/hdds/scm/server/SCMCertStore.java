@@ -19,19 +19,19 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.CertificateStoreInvoker;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -159,7 +159,7 @@ public final class SCMCertStore implements CertificateStore {
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count)
       throws IOException {
-    Preconditions.checkNotNull(startSerialID);
+    Objects.requireNonNull(startSerialID, "startSerialID == null");
 
     if (startSerialID.longValue() == 0) {
       startSerialID = null;
@@ -215,8 +215,7 @@ public final class SCMCertStore implements CertificateStore {
 
     public CertificateStore build() {
       final SCMCertStore scmCertStore = new SCMCertStore(metadataStore);
-      return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.CERT_STORE,
-         CertificateStore.class, scmCertStore);
+      return scmRatisServer.getProxyHandler(new CertificateStoreInvoker(scmCertStore, scmRatisServer));
     }
   }
 }

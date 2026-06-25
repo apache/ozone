@@ -33,10 +33,10 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
@@ -50,6 +50,7 @@ import org.mockito.Mockito;
 public class TestOpenContainerHandler {
 
   private ReplicationManager replicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private OpenContainerHandler openContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
@@ -60,6 +61,7 @@ public class TestOpenContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = mock(ReplicationManager.class);
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
     Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(true);
     openContainerHandler = new OpenContainerHandler(replicationManager);
   }
@@ -73,7 +75,7 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -90,7 +92,7 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.OPEN, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -107,13 +109,13 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -122,7 +124,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_UNHEALTHY));
   }
 
   @Test
@@ -135,13 +137,13 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.OPEN, 1, 2, 3, 4);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -150,7 +152,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_WITHOUT_PIPELINE));
   }
 
   @Test
@@ -162,7 +164,7 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -179,7 +181,7 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -196,13 +198,13 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -210,7 +212,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(request));
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_UNHEALTHY));
   }
 
   @Test
@@ -223,13 +225,13 @@ public class TestOpenContainerHandler {
             ContainerReplicaProto.State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -237,6 +239,6 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(request));
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_WITHOUT_PIPELINE));
   }
 }

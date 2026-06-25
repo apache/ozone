@@ -22,6 +22,8 @@ on:
     branches:
       - master
       - ozone-1.4
+      - ozone-2.0
+      - ozone-2.1
     paths:
       - 'pom.xml'
       - '**/pom.xml'
@@ -29,16 +31,27 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions: { }
+
+env:
+  # variables are duplicated from ci.yml, please keep in sync
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Restore cache for Maven dependencies
         id: restore-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -47,10 +60,10 @@ jobs:
 
       - name: Setup Java
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ env.TEST_JAVA_VERSION }}
 
       - name: Get NodeJS version
         id: nodejs-version
@@ -60,7 +73,7 @@ jobs:
       - name: Restore NodeJS tarballs
         id: restore-nodejs
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.m2/repository/com/github/eirslett/node
           key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
@@ -73,7 +86,18 @@ jobs:
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist -Drocks_tools_native clean verify
+        run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline clean verify
+
+      - name: Setup Java 8
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
+        with:
+          distribution: 'temurin'
+          java-version: 8
+
+      - name: Fetch dependencies for Java 8
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: mvn $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline -DskipRecon -DskipShade test-compile
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -85,7 +109,7 @@ jobs:
 
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.m2/repository/*/*/*

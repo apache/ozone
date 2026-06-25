@@ -16,8 +16,7 @@
 * limitations under the License.
 */
 
-import React from 'react';
-import { AxiosError } from 'axios';
+import React, { useState, useEffect } from 'react';
 import Table, {
   ColumnsType,
   TablePaginationConfig
@@ -27,9 +26,9 @@ import { ValueType } from 'react-select';
 import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import ExpandedPendingKeysTable from '@/v2/components/tables/insights/expandedPendingKeysTable';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
@@ -54,6 +53,10 @@ type DeletePendingKeysColumns = {
 type ExpandedDeletePendingKeys = {
   omKeyInfoList: DeletePendingKey[]
 }
+
+const DEFAULT_DELETE_PENDING_KEYS_RESPONSE: DeletePendingKeysResponse = {
+  deletedKeyInfo: []
+};
 
 //------Constants------
 const COLUMNS: ColumnsType<DeletePendingKeysColumns> = [
@@ -80,20 +83,63 @@ const COLUMNS: ColumnsType<DeletePendingKeysColumns> = [
   }
 ];
 
-let expandedDeletePendingKeys: ExpandedDeletePendingKeys[] = [];
-
 //-----Components------
 const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
   paginationConfig,
   limit,
   handleLimitChange
 }) => {
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [data, setData] = React.useState<DeletePendingKeysColumns[]>();
-  const [searchTerm, setSearchTerm] = React.useState<string>('');
+  const [data, setData] = useState<DeletePendingKeysColumns[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [expandedDeletePendingKeys, setExpandedDeletePendingKeys] = useState<ExpandedDeletePendingKeys[]>([]);
 
-  const cancelSignal = React.useRef<AbortController>();
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Use the modern hooks pattern
+  const deletePendingKeysData = useApiData<DeletePendingKeysResponse>(
+    `/api/v1/keys/deletePending?limit=${limit.value}`,
+    DEFAULT_DELETE_PENDING_KEYS_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  // Process data when it changes
+  useEffect(() => {
+    if (deletePendingKeysData.data && deletePendingKeysData.data.deletedKeyInfo) {
+      const deletePendingKeys = deletePendingKeysData.data;
+      let deletedKeyData: DeletePendingKeysColumns[] = [];
+      let expandedData: ExpandedDeletePendingKeys[] = [];
+
+      // Sum up the data size and organize related key information
+      deletedKeyData = deletePendingKeys.deletedKeyInfo?.flatMap((keyInfo) => {
+        expandedData.push(keyInfo);
+        let count = 0;
+        let item: DeletePendingKey = keyInfo.omKeyInfoList?.reduce((obj, curr) => {
+          count += 1;
+          return { ...curr, dataSize: obj.dataSize + curr.dataSize };
+        }, { ...keyInfo.omKeyInfoList[0], dataSize: 0 });
+
+        return {
+          dataSize: item.dataSize,
+          fileName: item.fileName,
+          keyName: item.keyName,
+          path: item.path,
+          keyCount: count
+        }
+      }) || [];
+
+      setData(deletedKeyData);
+      setExpandedDeletePendingKeys(expandedData);
+    }
+  }, [deletePendingKeysData.data]);
+
+  // Refetch when limit changes
+  useEffect(() => {
+    deletePendingKeysData.refetch();
+  }, [limit.value]);
 
   function filterData(data: DeletePendingKeysColumns[] | undefined) {
     return data?.filter(
@@ -111,51 +157,6 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
         paginationConfig={paginationConfig} />
     )
   }
-
-  function fetchDeletePendingKeys() {
-    setLoading(true);
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/keys/deletePending?limit=${limit.value}`,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const deletePendingKeys: DeletePendingKeysResponse = response?.data;
-      let deletedKeyData = [];
-      // Sum up the data size and organize related key information
-      deletedKeyData = deletePendingKeys?.deletedKeyInfo?.flatMap((keyInfo) => {
-        expandedDeletePendingKeys.push(keyInfo);
-        let count = 0;
-        let item: DeletePendingKey = keyInfo.omKeyInfoList?.reduce((obj, curr) => {
-          count += 1;
-          return { ...curr, dataSize: obj.dataSize + curr.dataSize };
-        }, { ...keyInfo.omKeyInfoList[0], dataSize: 0 });
-
-        return {
-          dataSize: item.dataSize,
-          fileName: item.fileName,
-          keyName: item.keyName,
-          path: item.path,
-          keyCount: count
-        }
-      });
-      setData(deletedKeyData);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    })
-  }
-
-  React.useEffect(() => {
-    fetchDeletePendingKeys();
-    expandedDeletePendingKeys = [];
-
-    return (() => {
-      cancelSignal.current && cancelSignal.current.abort();
-    })
-  }, [limit.value]);
 
   return (
     <>
@@ -182,7 +183,7 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
         }}
         dataSource={filterData(data)}
         columns={COLUMNS}
-        loading={loading}
+        loading={deletePendingKeysData.loading}
         pagination={paginationConfig}
         rowKey='keyName'
         locale={{ filterTitle: '' }}

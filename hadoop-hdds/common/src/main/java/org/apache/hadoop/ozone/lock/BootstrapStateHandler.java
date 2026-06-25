@@ -17,28 +17,33 @@
 
 package org.apache.hadoop.ozone.lock;
 
-import java.util.concurrent.Semaphore;
+import java.util.function.Function;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Bootstrap state handler interface. */
 public interface BootstrapStateHandler {
   Lock getBootstrapStateLock();
 
-  /** Bootstrap state handler lock implementation. */
-  class Lock implements AutoCloseable {
-    private final Semaphore semaphore = new Semaphore(1);
+  /** Bootstrap state handler lock implementation. Should be always acquired before opening any snapshot to avoid
+   * deadlocks*/
+  class Lock {
 
-    public Lock lock() throws InterruptedException {
-      semaphore.acquire();
-      return this;
+    private final Function<Boolean, UncheckedAutoCloseable> lockSupplier;
+
+    public Lock(Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
+      this.lockSupplier = lockSupplier;
     }
 
-    public void unlock() {
-      semaphore.release();
+    private UncheckedAutoCloseable lock(boolean readLock) {
+      return lockSupplier.apply(readLock);
     }
 
-    @Override
-    public void close() {
-      unlock();
+    public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
+      return lock(false);
+    }
+
+    public UncheckedAutoCloseable acquireReadLock() throws InterruptedException {
+      return lock(true);
     }
   }
 }

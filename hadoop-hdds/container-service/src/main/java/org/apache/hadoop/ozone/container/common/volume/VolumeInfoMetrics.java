@@ -44,15 +44,32 @@ public class VolumeInfoMetrics implements MetricsSource {
       VolumeInfoMetrics.class.getSimpleName();
 
   private static final MetricsInfo CAPACITY =
-      Interns.info("Capacity", "Capacity");
+      Interns.info("OzoneCapacity", "Ozone usable capacity (after reserved space adjustment)");
   private static final MetricsInfo AVAILABLE =
-      Interns.info("Available", "Available Space");
+      Interns.info("OzoneAvailable", "Ozone available space (after reserved space adjustment)");
   private static final MetricsInfo USED =
-      Interns.info("Used", "Used Space");
+      Interns.info("OzoneUsed", "Ozone used space");
   private static final MetricsInfo RESERVED =
       Interns.info("Reserved", "Reserved Space");
-  private static final MetricsInfo TOTAL_CAPACITY =
-      Interns.info("TotalCapacity", "Total Capacity");
+  private static final MetricsInfo FS_CAPACITY =
+      Interns.info("FilesystemCapacity", "Filesystem capacity as reported by the local filesystem");
+  private static final MetricsInfo FS_AVAILABLE =
+      Interns.info("FilesystemAvailable", "Filesystem available space as reported by the local filesystem");
+  private static final MetricsInfo FS_USED =
+      Interns.info("FilesystemUsed", "Filesystem used space (FilesystemCapacity - FilesystemAvailable)");
+  private static final MetricsInfo MIN_FREE_SPACE =
+      Interns.info("MinFreeSpace",
+          "Minimum free space threshold (soft limit) reported to SCM, " +
+          "derived from hdds.datanode.volume.min.free.space.percent / hdds.datanode.volume.min.free.space");
+  private static final MetricsInfo HARD_MIN_FREE_SPACE =
+      Interns.info("HardMinFreeSpace",
+          "Minimum free space threshold (hard limit) enforced locally for writes, " +
+          "derived from hdds.datanode.volume.min.free.space.hard.limit.percent " +
+          "/ hdds.datanode.volume.min.free.space");
+  private static final MetricsInfo NON_OZONE_USED =
+      Interns.info("NonOzoneUsed",
+          "Space on the filesystem consumed by non-Ozone workloads " +
+          "(FilesystemUsed - OzoneUsed)");
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
@@ -69,6 +86,18 @@ public class VolumeInfoMetrics implements MetricsSource {
 
   @Metric("Number of scans skipped for the volume")
   private MutableCounterLong numScansSkipped;
+
+  @Metric("Write requests allowed while usable space is between the reported (soft) and hard min-free-space thresholds")
+  private MutableCounterLong numWriteRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Write requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numWriteRequestsRejectedHardMinFreeSpace;
+  @Metric("Container create allowed while usable space is between the reported (soft) " +
+      "and hard min-free-space thresholds")
+  private MutableCounterLong numContainerCreateRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Container create requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numContainerCreateRequestsRejectedHardMinFreeSpace;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -179,19 +208,59 @@ public class VolumeInfoMetrics implements MetricsSource {
     numScansSkipped.incr();
   }
 
+  public long getNumWriteRequestsInSoftBandMinFreeSpace() {
+    return numWriteRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsInSoftBandMinFreeSpace() {
+    numWriteRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumWriteRequestsRejectedHardMinFreeSpace() {
+    return numWriteRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsRejectedHardMinFreeSpace() {
+    numWriteRequestsRejectedHardMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    return numContainerCreateRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    numContainerCreateRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    return numContainerCreateRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    numContainerCreateRequestsRejectedHardMinFreeSpace.incr();
+  }
+
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
     registry.snapshot(builder, all);
-    volume.getVolumeUsage().ifPresent(volumeUsage -> {
-      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
+    VolumeUsage volumeUsage = volume.getVolumeUsage();
+    if (volumeUsage != null) {
+      SpaceUsageSource.Fixed fsUsage = volumeUsage.realUsage();
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage(fsUsage);
       long reserved = volumeUsage.getReservedInBytes();
+      long ozoneCapacity = usage.getCapacity();
       builder
-          .addGauge(CAPACITY, usage.getCapacity())
+          .addGauge(CAPACITY, ozoneCapacity)
           .addGauge(AVAILABLE, usage.getAvailable())
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
-          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved);
-    });
+          .addGauge(FS_CAPACITY, fsUsage.getCapacity())
+          .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
+          .addGauge(FS_USED, fsUsage.getCapacity() - fsUsage.getAvailable())
+          .addGauge(MIN_FREE_SPACE, volume.getReportedFreeSpaceToSpare(ozoneCapacity))
+          .addGauge(HARD_MIN_FREE_SPACE, volume.getFreeSpaceToSpare(ozoneCapacity))
+          .addGauge(NON_OZONE_USED, VolumeUsage.getOtherUsed(fsUsage));
+    }
   }
 }

@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,7 +30,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -40,6 +47,7 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,95 +59,166 @@ public abstract class ContainerKeyMapperHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerKeyMapperHelper.class);
 
-  // Static lock to guard table truncation.
-  private static final Object TRUNCATE_LOCK = new Object();
+  // Single lock to guard all initialization operations (table truncation + map clearing)
+  private static final Object INITIALIZATION_LOCK = new Object();
 
   /**
-   * Ensures that the container key tables are truncated only once before reprocessing.
-   * Uses an AtomicBoolean to track if truncation has already been performed.
-   *
-   * @param reconContainerMetadataManager The metadata manager instance responsible for DB operations.
+   * Reference counter to track how many tasks are actively using the shared map.
+   * Initialized to 2 (FSO + OBS tasks) during initialization.
+   * Each task decrements on completion. Last task (count reaches 0) clears the shared map.
    */
-  public static void truncateTablesIfNeeded(ReconContainerMetadataManager reconContainerMetadataManager,
-                                            String taskName) {
-    synchronized (TRUNCATE_LOCK) {
-      if (ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.compareAndSet(false, true)) {
+  private static final AtomicInteger ACTIVE_TASK_COUNT = new AtomicInteger(0);
+
+  /**
+   * SHARED across all tasks (FSO + OBS) for cross-task synchronization.
+   * Maps: ContainerId -> AtomicLong (key count in that container)
+   * Purpose: Prevents data corruption when FSO and OBS tasks run concurrently
+   * and both write to the same container IDs. Both tasks accumulate into this
+   * single shared map, ensuring final DB write contains complete totals.
+   */
+  private static final Map<Long, AtomicLong> SHARED_CONTAINER_KEY_COUNT_MAP = new ConcurrentHashMap<>();
+
+  /**
+   * Performs one-time initialization for Container Key Mapper tasks.
+   * This includes:
+   * 1. Truncating container key tables in DB
+   * 2. Clearing the shared container count map
+   * 
+   * This method is called by both FSO and OBS tasks at the start of reprocess.
+   * Only the first task to call this will perform initialization.
+   * 
+   * @param reconContainerMetadataManager The metadata manager for DB operations
+   * @param taskName Name of the task calling this method (for logging)
+   * @throws RuntimeException if initialization fails
+   */
+  private static void initializeContainerKeyMapperIfNeeded(
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      String taskName) {
+    
+    synchronized (INITIALIZATION_LOCK) {
+      ACTIVE_TASK_COUNT.incrementAndGet();
+      // Check if already initialized by another task
+      if (ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.compareAndSet(false, true)) {
         try {
-          // Perform table truncation
+          // Step 1: Truncate tables
           reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
-          LOG.debug("Successfully truncated container key tables.");
+          
+          // Step 2: Clear shared map
+          SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+
         } catch (Exception e) {
-          // Reset the flag so truncation can be retried
-          ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.set(false);
-          LOG.error("Error while truncating container key tables for task {}. Resetting flag.", taskName, e);
-          throw new RuntimeException("Table truncation failed", e);
+          // CRITICAL: Decrement counter and reset flag so another task can retry
+          ACTIVE_TASK_COUNT.decrementAndGet();
+          ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+          LOG.error("{}: Container Key Mapper initialization failed. Resetting flag for retry.", taskName, e);
+          throw new RuntimeException("Container Key Mapper initialization failed", e);
         }
       } else {
-        LOG.debug("Container key tables already truncated by another task.");
+        LOG.debug("{}: Container Key Mapper already initialized by another task", taskName);
       }
     }
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static boolean reprocess(OMMetadataManager omMetadataManager,
                                                 ReconContainerMetadataManager reconContainerMetadataManager,
                                                 BucketLayout bucketLayout,
                                                 String taskName,
-                                                long containerKeyFlushToDBMaxThreshold) {
-    long omKeyCount = 0;
-    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
-    Map<Long, Long> containerKeyCountMap = new HashMap<>();
-
+                                                long containerKeyFlushToDBMaxThreshold,
+                                                int maxIterators,
+                                                int maxWorkers,
+                                                int maxKeysInMemory) {
     try {
-      LOG.debug("Starting a 'reprocess' run for {}.", taskName);
+      LOG.info("{}: Starting reprocess for bucket layout {}", taskName, bucketLayout);
       Instant start = Instant.now();
 
-      // Ensure the tables are truncated only once
-      truncateTablesIfNeeded(reconContainerMetadataManager, taskName);
+      // Perform one-time initialization (truncate tables + clear shared map)
+      initializeContainerKeyMapperIfNeeded(reconContainerMetadataManager, taskName);
 
-      // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
-      // Iterate through the table and process keys
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = omKeyInfoTable.iterator()) {
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-          handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyMap, containerKeyCountMap,
+      // Divide threshold by worker count so each worker flushes independently
+      final long perWorkerThreshold = Math.max(1, containerKeyFlushToDBMaxThreshold / maxWorkers);
+      
+      // Map thread IDs to worker-specific local maps for lockless updates
+      Map<Long, Map<ContainerKeyPrefix, Integer>> allLocalMaps = new ConcurrentHashMap<>();
+      
+      Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+        try {
+          // Get or create this worker's private local map using thread ID
+          Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap = allLocalMaps.computeIfAbsent(
+              Thread.currentThread().getId(), k -> new ConcurrentHashMap<>());
+          
+          handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyPrefixMap, SHARED_CONTAINER_KEY_COUNT_MAP,
               reconContainerMetadataManager);
-          omKeyCount++;
 
-          // Check and flush data if it reaches the batch threshold
-          if (!checkAndCallFlushToDB(containerKeyMap, containerKeyFlushToDBMaxThreshold,
+          // Flush this worker's map when it reaches threshold
+          if (containerKeyPrefixMap.size() >= perWorkerThreshold) {
+            if (!flushAndCommitContainerKeyInfoToDB(containerKeyPrefixMap, Collections.emptyMap(),
+                reconContainerMetadataManager)) {
+              throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
+            }
+          }
+          return null;
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      };
+      
+      try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
+               new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
+                   StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
+        keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
+      }
+
+      // Final flush: Write remaining entries from all worker local maps to DB
+      for (Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap : allLocalMaps.values()) {
+        if (!containerKeyPrefixMap.isEmpty()) {
+          if (!flushAndCommitContainerKeyInfoToDB(containerKeyPrefixMap, Collections.emptyMap(),
               reconContainerMetadataManager)) {
-            LOG.error("Failed to flush container key data for {}", taskName);
+            LOG.error("Failed to flush worker local map for {}", taskName);
             return false;
           }
         }
       }
 
-      // Final flush and commit
-      if (!flushAndCommitContainerKeyInfoToDB(containerKeyMap, containerKeyCountMap, reconContainerMetadataManager)) {
-        LOG.error("Failed to flush Container Key data to DB for {}", taskName);
-        return false;
+      // Decrement active task counter
+      int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
+      LOG.info("{}: Task completed. Remaining active tasks: {}", taskName, remainingTasks);
+
+      // Only last task flushes shared map and writes container count
+      if (remainingTasks == 0) {
+        synchronized (INITIALIZATION_LOCK) {
+          // Capture total container count from shared map
+          long totalContainers = SHARED_CONTAINER_KEY_COUNT_MAP.size();
+
+          // Flush shared container count map
+          if (!flushAndCommitContainerKeyInfoToDB(Collections.emptyMap(), SHARED_CONTAINER_KEY_COUNT_MAP, 
+              reconContainerMetadataManager)) {
+            LOG.error("Failed to flush shared container count map for {}", taskName);
+            return false;
+          }
+
+          // Write total container count once at the end
+          if (totalContainers > 0) {
+            reconContainerMetadataManager.incrementContainerCountBy(totalContainers);
+          }
+
+          // Clean up shared resources
+          SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+          ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+          LOG.info("{}: Last task completed. Cleared shared map and reset initialization flag.", taskName);
+        }
       }
 
       Instant end = Instant.now();
       long durationMillis = Duration.between(start, end).toMillis();
       double durationSeconds = (double) durationMillis / 1000.0;
-      LOG.debug("Completed 'reprocess' for {}. Processed {} keys in {} ms ({} seconds).",
-          taskName, omKeyCount, durationMillis, durationSeconds);
 
-    } catch (IOException ioEx) {
-      LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ioEx);
+      LOG.info("{}: Reprocess completed in {} sec", taskName, durationSeconds);
+    } catch (Exception ex) {
+      LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;
-    }
-    return true;
-  }
-
-  private static boolean checkAndCallFlushToDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,
-                                               long containerKeyFlushToDBMaxThreshold,
-                                               ReconContainerMetadataManager reconContainerMetadataManager) {
-    if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
-      return flushAndCommitContainerKeyInfoToDB(containerKeyMap, Collections.emptyMap(), reconContainerMetadataManager);
     }
     return true;
   }
@@ -152,14 +231,14 @@ public abstract class ContainerKeyMapperHelper {
     int eventCount = 0;
 
     // In-memory maps for fast look up and batch write
-    // (HDDS-8580) containerKeyMap map is allowed to be used
+    // (HDDS-8580) localContainerKeyMap map is allowed to be used
     // in "process" without batching since the maximum number of keys
     // is bounded by delta limit configurations
 
-    // (container, key) -> count
-    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
-    // containerId -> key count
-    Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    // Local map: (container, key) -> count (per event batch)
+    Map<ContainerKeyPrefix, Integer> localContainerKeyMap = new HashMap<>();
+    // Local map: containerId -> key count (per event batch)
+    Map<Long, Long> localContainerKeyCountMap = new HashMap<>();
     // List of the deleted (container, key) pair's
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
     long startTime = Time.monotonicNow();
@@ -175,25 +254,25 @@ public abstract class ContainerKeyMapperHelper {
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutOMKeyEvent(updatedKey, updatedKeyValue, containerKeyMap,
-              containerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
+          handlePutOMKeyEvent(updatedKey, updatedKeyValue, localContainerKeyMap,
+              localContainerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
           break;
 
         case DELETE:
-          handleDeleteOMKeyEvent(updatedKey, containerKeyMap,
-              containerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
+          handleDeleteOMKeyEvent(updatedKey, localContainerKeyMap,
+              localContainerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
           break;
 
         case UPDATE:
           if (omdbUpdateEvent.getOldValue() != null) {
             handleDeleteOMKeyEvent(
-                omdbUpdateEvent.getOldValue().getKeyName(), containerKeyMap,
-                containerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
+                omdbUpdateEvent.getOldValue().getKeyName(), localContainerKeyMap,
+                localContainerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
           } else {
             LOG.warn("Update event does not have the old Key Info for {}.", updatedKey);
           }
-          handlePutOMKeyEvent(updatedKey, updatedKeyValue, containerKeyMap,
-              containerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
+          handlePutOMKeyEvent(updatedKey, updatedKeyValue, localContainerKeyMap,
+              localContainerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
           break;
 
         default:
@@ -206,7 +285,11 @@ public abstract class ContainerKeyMapperHelper {
       }
     }
     try {
-      writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList, reconContainerMetadataManager);
+      // Convert local Long map to AtomicLong map for writeToTheDB compatibility
+      Map<Long, AtomicLong> localContainerKeyCountMapAtomic = new ConcurrentHashMap<>();
+      localContainerKeyCountMap.forEach((k, v) -> localContainerKeyCountMapAtomic.put(k, new AtomicLong(v)));
+      writeToTheDB(localContainerKeyMap, localContainerKeyCountMapAtomic, deletedKeyCountList,
+          reconContainerMetadataManager);
     } catch (IOException e) {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return false;
@@ -341,29 +424,30 @@ public abstract class ContainerKeyMapperHelper {
     }
   }
 
-  private static void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,
-                                   Map<Long, Long> containerKeyCountMap,
+  private static void writeToTheDB(Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
+                                   Map<Long, AtomicLong> containerKeyCountMap,
                                    List<ContainerKeyPrefix> deletedContainerKeyList,
                                    ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
 
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
 
-      // Write container key mappings
-      containerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {
+      // Write container key mappings (local per-task data)
+      localContainerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {
         try {
           reconContainerMetadataManager.batchStoreContainerKeyMapping(
-              rdbBatchOperation, key, containerKeyMap.get(key));
+              rdbBatchOperation, key, localContainerKeyMap.get(key));
         } catch (IOException e) {
           LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
         }
       });
 
-      // Write container key count mappings
+      // Write container key count mappings (can be local or shared depending on caller)
       containerKeyCountMap.keySet().forEach((Long key) -> {
         try {
+          long count = containerKeyCountMap.get(key).get();  // Get value from AtomicLong
           reconContainerMetadataManager.batchStoreContainerKeyCounts(
-              rdbBatchOperation, key, containerKeyCountMap.get(key));
+              rdbBatchOperation, key, count);
         } catch (IOException e) {
           LOG.error("Unable to write Container Key Count data in Recon DB.", e);
         }
@@ -390,22 +474,19 @@ public abstract class ContainerKeyMapperHelper {
    *
    * @param key key String
    * @param omKeyInfo omKeyInfo value
-   * @param containerKeyMap we keep the added containerKeys in this map
-   *                        to allow incremental batching to containerKeyTable
-   * @param containerKeyCountMap we keep the containerKey counts in this map
-   *                             to allow batching to containerKeyCountTable
-   *                             after reprocessing is done
+   * @param localContainerKeyMap Local per-task map for ContainerKeyPrefix mappings
+   *                             (cleared on flush, not shared between tasks)
+   * @param sharedContainerKeyCountMap Shared cross-task map for container counts
+   *                                   (FSO + OBS both update this, uses AtomicLong for thread safety)
    * @param reconContainerMetadataManager Recon metadata manager instance
    * @throws IOException if unable to write to recon DB.
    */
   public static void handleKeyReprocess(String key,
                                         OmKeyInfo omKeyInfo,
-                                        Map<ContainerKeyPrefix, Integer> containerKeyMap,
-                                        Map<Long, Long> containerKeyCountMap,
+                                        Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
+                                        Map<Long, AtomicLong> sharedContainerKeyCountMap,
                                         ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
-
-    long containerCountToIncrement = 0;
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
@@ -413,49 +494,52 @@ public abstract class ContainerKeyMapperHelper {
         long containerId = omKeyLocationInfo.getContainerID();
         ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
 
-        if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0
-            && !containerKeyMap.containsKey(containerKeyPrefix)) {
+        // During reprocess, tables are empty so skip DB lookup - just check in-memory map
+        if (!localContainerKeyMap.containsKey(containerKeyPrefix)) {
           // Save on writes. No need to save same container-key prefix mapping again.
-          containerKeyMap.put(containerKeyPrefix, 1);
+          localContainerKeyMap.put(containerKeyPrefix, 1);
 
-          // Check if container already exists; if not, increment the count
-          if (!reconContainerMetadataManager.doesContainerExists(containerId)
-              && !containerKeyCountMap.containsKey(containerId)) {
-            containerCountToIncrement++;
-          }
-
-          // Update the count of keys for the given containerID
-          long keyCount = containerKeyCountMap.getOrDefault(containerId,
-              reconContainerMetadataManager.getKeyCountForContainer(containerId));
-
-          containerKeyCountMap.put(containerId, keyCount + 1);
+          // Thread-safe increment using computeIfAbsent (cross-task safe: FSO + OBS)
+          sharedContainerKeyCountMap.computeIfAbsent(containerId, k -> new AtomicLong(0))
+              .incrementAndGet();
         }
       }
     }
-
-    if (containerCountToIncrement > 0) {
-      reconContainerMetadataManager.incrementContainerCountBy(containerCountToIncrement);
-    }
+    // Container count will be written once at the end of reprocess, not here (Derby optimization)
   }
 
   public static boolean flushAndCommitContainerKeyInfoToDB(
-      Map<ContainerKeyPrefix, Integer> containerKeyMap,
-      Map<Long, Long> containerKeyCountMap,
+      Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
+      Map<Long, AtomicLong> sharedContainerKeyCountMap,
       ReconContainerMetadataManager reconContainerMetadataManager) {
 
     try {
       // No deleted container list needed since "reprocess" only has put operations
-      writeToTheDB(containerKeyMap, containerKeyCountMap, Collections.emptyList(), reconContainerMetadataManager);
+      writeToTheDB(localContainerKeyMap, sharedContainerKeyCountMap, Collections.emptyList(),
+          reconContainerMetadataManager);
 
-      // Clear in-memory maps after successful commit
-      containerKeyMap.clear();
-      containerKeyCountMap.clear();
+      // Only clear localContainerKeyMap (per-task), keep sharedContainerKeyCountMap for other tasks
+      localContainerKeyMap.clear();
 
     } catch (IOException e) {
       LOG.error("Unable to write Container Key and Container Key Count data in Recon DB.", e);
       return false;
     }
     return true;
+  }
+
+  /**
+   * Clears the shared container count map and resets initialization flag.
+   * This method should be called by tests to ensure clean state between test runs.
+   */
+  @VisibleForTesting
+  public static void clearSharedContainerCountMap() {
+    synchronized (INITIALIZATION_LOCK) {
+      SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+      ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+      ACTIVE_TASK_COUNT.set(0);
+      LOG.debug("Cleared shared container count map, reset initialization flag, and reset task counter for tests");
+    }
   }
 
 }

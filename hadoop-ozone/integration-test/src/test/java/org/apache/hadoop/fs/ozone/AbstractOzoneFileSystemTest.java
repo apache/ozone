@@ -21,17 +21,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
-import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_CREATE;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_GET_FILE_STATUS;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_MKDIRS;
 import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPEN;
-import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
-import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -77,7 +73,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -134,7 +129,7 @@ import org.slf4j.event.Level;
  * Ozone file system tests that are not covered by contract tests.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class AbstractOzoneFileSystemTest {
+abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
@@ -157,8 +152,7 @@ abstract class AbstractOzoneFileSystemTest {
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private OzoneManagerProtocol writeClient;
-  private FileSystem fs;
-  private OzoneFileSystem o3fs;
+  private OzoneFileSystem fs;
   private OzoneFSStorageStatistics statistics;
   private OzoneBucket ozoneBucket;
   private String volumeName;
@@ -215,10 +209,9 @@ abstract class AbstractOzoneFileSystemTest {
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
 
-    fs = FileSystem.get(conf);
     trash = new Trash(conf);
-    o3fs = assertInstanceOf(OzoneFileSystem.class, fs);
-    statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
+    fs = assertInstanceOf(OzoneFileSystem.class, FileSystem.get(conf));
+    statistics = (OzoneFSStorageStatistics) fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
 
@@ -250,7 +243,8 @@ abstract class AbstractOzoneFileSystemTest {
     return cluster;
   }
 
-  public FileSystem getFs() {
+  @Override
+  public OzoneFileSystem getFs() {
     return fs;
   }
 
@@ -389,97 +383,36 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testCreateWithInvalidPaths() throws Exception {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
-
-    // Test for path with ..
-    Path parent = new Path("../../../../../d1/d2/");
-    Path file1 = new Path(parent, "key1");
-    checkInvalidPath(file1);
-
-    // Test for path with :
-    file1 = new Path("/:/:");
-    checkInvalidPath(file1);
-
-    // Test for path with scheme and authority.
-    file1 = new Path(fs.getUri() + "/:/:");
-    checkInvalidPath(file1);
-  }
-
-  private void checkInvalidPath(Path path) {
-    InvalidPathException pathException = GenericTestUtils.assertThrows(
-        InvalidPathException.class, () -> fs.create(path, false)
-    );
-    assertThat(pathException.getMessage()).contains("Invalid path Name");
-  }
-
-  @Test
-  public void testOzoneFsServiceLoader() throws IOException {
-    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
-
-    assertEquals(OzoneFileSystem.class,
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null));
+    createWithInvalidPaths();
   }
 
   @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path("/testCreateDoesNotAddParentDirKeys");
-    Path parent = new Path(grandparent, "parent");
-    Path child = new Path(parent, "child");
-    ContractTestUtils.touch(fs, child);
+    createDoesNotAddParentDirKeys(grandparent);
+  }
 
-    OzoneKeyDetails key = getKey(child, false);
-    assertEquals(key.getName(), o3fs.pathToKey(child));
-
-    // Creating a child should not add parent keys to the bucket
-    try {
-      getKey(parent, true);
-    } catch (OMException ome) {
-      assertEquals(KEY_NOT_FOUND, ome.getResult());
-    }
-
-    // List status on the parent should show the child file
-    assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
-    assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
+  @Override
+  String getChildKeyName(Path child) {
+    return fs.pathToKey(child);
   }
 
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path testKeyPath = new Path(root, "testKey");
-    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
-
-    OzoneKeyDetails key = getKey(testKeyPath, false);
-    assertEquals(HddsProtos.ReplicationType.EC,
-        key.getReplicationConfig().getReplicationType());
-    assertEquals("rs-3-2-1024k",
-        key.getReplicationConfig().getReplication());
+    createKeyWithECReplicationConfig(root, cluster.getConf());
   }
 
   @Test
   public void testDeleteCreatesFakeParentDir() throws Exception {
-    Path grandparent = new Path("/testDeleteCreatesFakeParentDir");
-    Path parent = new Path(grandparent, "parent");
-    Path child = new Path(parent, "child");
-    ContractTestUtils.touch(fs, child);
+    deleteCreatesFakeParentDir(ROOT);
+  }
 
-    // Verify that parent dir key does not exist
-    // Creating a child should not add parent keys to the bucket
-    try {
-      getKey(parent, true);
-    } catch (OMException ome) {
-      assertEquals(KEY_NOT_FOUND, ome.getResult());
-    }
-
-    // Delete the child key
-    assertTrue(fs.delete(child, false));
-
-    // Deleting the only child should create the parent dir key if it does
-    // not exist
-    FileStatus fileStatus = o3fs.getFileStatus(parent);
+  @Override
+  void verifyDeleteCreatesFakeParentDir(Path parent) throws IOException {
+    FileStatus fileStatus = fs.getFileStatus(parent);
     assertTrue(fileStatus.isDirectory());
     assertEquals(parent.toString(), fileStatus.getPath().toUri().getPath());
-
-    // Recursive delete with DeleteIterator
-    assertTrue(fs.delete(grandparent, true));
   }
 
   @Test
@@ -573,68 +506,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testFileDelete() throws Exception {
-    Path grandparent = new Path("/testBatchDelete");
-    Path parent = new Path(grandparent, "parent");
-    Path childFolder = new Path(parent, "childFolder");
-    // BatchSize is 5, so we're going to set a number that's not a
-    // multiple of 5. In order to test the final number of keys less than
-    // batchSize can also be deleted.
-    for (int i = 0; i < 8; i++) {
-      Path childFile = new Path(parent, "child" + i);
-      Path childFolderFile = new Path(childFolder, "child" + i);
-      ContractTestUtils.touch(fs, childFile);
-      ContractTestUtils.touch(fs, childFolderFile);
-    }
-
-    assertEquals(1, fs.listStatus(grandparent).length);
-    assertEquals(9, fs.listStatus(parent).length);
-    assertEquals(8, fs.listStatus(childFolder).length);
-
-    assertTrue(fs.delete(grandparent, true));
-    assertFalse(o3fs.exists(grandparent));
-    for (int i = 0; i < 8; i++) {
-      Path childFile = new Path(parent, "child" + i);
-      // Make sure all keys under testBatchDelete/parent should be deleted
-      assertFalse(o3fs.exists(childFile));
-
-      // Test to recursively delete child folder, make sure all keys under
-      // testBatchDelete/parent/childFolder should be deleted.
-      Path childFolderFile = new Path(childFolder, "child" + i);
-      assertFalse(o3fs.exists(childFolderFile));
-    }
-    // Will get: WARN  ozone.BasicOzoneFileSystem delete: Path does not exist.
-    // This will return false.
-    assertFalse(fs.delete(parent, true));
+    fileDelete(ROOT);
   }
 
   @Test
   public void testListStatus() throws Exception {
-    Path parent = new Path(ROOT, "/testListStatus");
-    Path file1 = new Path(parent, "key1");
-    Path file2 = new Path(parent, "key2");
-
-    FileStatus[] fileStatuses = o3fs.listStatus(ROOT, EXCLUDE_TRASH);
-    assertEquals(0, fileStatuses.length, "Should be empty");
-
-    ContractTestUtils.touch(fs, file1);
-    ContractTestUtils.touch(fs, file2);
-
-    fileStatuses = o3fs.listStatus(ROOT, EXCLUDE_TRASH);
-    assertEquals(1, fileStatuses.length, "Should have created parent");
-    assertEquals(fileStatuses[0].getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
-
-    // ListStatus on a directory should return all subdirs along with
-    // files, even if there exists a file and sub-dir with the same name.
-    fileStatuses = o3fs.listStatus(parent);
-    assertEquals(2, fileStatuses.length, "FileStatus did not return all children of the directory");
-
-    // ListStatus should return only the immediate children of a directory.
-    Path file3 = new Path(parent, "dir1/key3");
-    Path file4 = new Path(parent, "dir1/key4");
-    ContractTestUtils.touch(fs, file3);
-    ContractTestUtils.touch(fs, file4);
-    fileStatuses = o3fs.listStatus(parent);
-    assertEquals(3, fileStatuses.length, "FileStatus did not return all children of the directory");
+    verifyListStatus(ROOT, EXCLUDE_TRASH);
   }
 
   @Test
@@ -655,21 +532,21 @@ abstract class AbstractOzoneFileSystemTest {
       Path file1 = new Path(root, "file1");
       Path dir1 = new Path(root, "dir1");
       Path file2 = new Path(dir1, "file2");
-      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      FileStatus[] fileStatuses = fs.listStatus(root);
       assertEquals(0, fileStatuses.length);
 
       UserGroupInformation.setLoginUser(user1);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file1);
       UserGroupInformation.setLoginUser(user2);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       fs.mkdirs(dir1);
       UserGroupInformation.setLoginUser(user3);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file2);
 
-      assertEquals(2, o3fs.listStatus(root).length);
-      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(2, fs.listStatus(root).length);
+      assertEquals(1, fs.listStatus(dir1).length);
       assertEquals(user1.getShortUserName(),
           fs.getFileStatus(file1).getOwner());
       assertEquals(user2.getShortUserName(),
@@ -678,7 +555,7 @@ abstract class AbstractOzoneFileSystemTest {
           fs.getFileStatus(file2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
     }
   }
 
@@ -704,21 +581,21 @@ abstract class AbstractOzoneFileSystemTest {
           UserGroupInformation.createProxyUser("user2", proxyuser);
       UserGroupInformation user3ProxyUser =
           UserGroupInformation.createProxyUser("user3", proxyuser);
-      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      FileStatus[] fileStatuses = fs.listStatus(root);
       assertEquals(0, fileStatuses.length);
 
       UserGroupInformation.setLoginUser(user1ProxyUser);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file1);
       UserGroupInformation.setLoginUser(user2ProxyUser);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       fs.mkdirs(dir1);
       UserGroupInformation.setLoginUser(user3ProxyUser);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file2);
 
-      assertEquals(2, o3fs.listStatus(root).length);
-      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(2, fs.listStatus(root).length);
+      assertEquals(1, fs.listStatus(dir1).length);
       assertEquals(user1ProxyUser.getShortUserName(),
           fs.getFileStatus(file1).getOwner());
       assertEquals(user2ProxyUser.getShortUserName(),
@@ -727,7 +604,7 @@ abstract class AbstractOzoneFileSystemTest {
           fs.getFileStatus(file2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
-      fs = FileSystem.get(cluster.getConf());
+      fs = (OzoneFileSystem) FileSystem.get(cluster.getConf());
     }
   }
 
@@ -813,23 +690,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusOnRoot() throws Exception {
-    Path dir1 = new Path(ROOT, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(ROOT, "dir2");
-    fs.mkdirs(dir12);
-    fs.mkdirs(dir2);
-
-    // ListStatus on root should return dir1 (even though /dir1 key does not
-    // exist) and dir2 only. dir12 is not an immediate child of root and
-    // hence should not be listed.
-    FileStatus[] fileStatuses = o3fs.listStatus(ROOT, EXCLUDE_TRASH);
-    assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
-
-    // Verify that dir12 is not included in the result of the listStatus on root
-    String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
-    String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
-    assertNotEquals(fileStatus1, dir12.toString());
-    assertNotEquals(fileStatus2, dir12.toString());
+    listStatusOnRoot(ROOT, EXCLUDE_TRASH);
   }
 
   /**
@@ -848,7 +709,7 @@ abstract class AbstractOzoneFileSystemTest {
       paths.add(p.getName());
     }
 
-    FileStatus[] fileStatuses = o3fs.listStatus(ROOT, EXCLUDE_TRASH);
+    FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
     ArrayList<String> actualPathList = new ArrayList<>();
@@ -939,37 +800,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusOnSubDirs() throws Exception {
-    // Create the following key structure
-    //      /dir1/dir11/dir111
-    //      /dir1/dir12
-    //      /dir1/dir12/file121
-    //      /dir2
-    // ListStatus on /dir1 should return all its immediate subdirs only
-    // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
-    // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
-    // listStatus.
-    Path dir1 = new Path("/dir1");
-    Path dir11 = new Path(dir1, "dir11");
-    Path dir111 = new Path(dir11, "dir111");
-    Path dir12 = new Path(dir1, "dir12");
-    Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path("/dir2");
-    fs.mkdirs(dir111);
-    fs.mkdirs(dir12);
-    ContractTestUtils.touch(fs, file121);
-    fs.mkdirs(dir2);
-
-    FileStatus[] fileStatuses = o3fs.listStatus(dir1);
-    assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
-
-    // Verify that the two children of /dir1 returned by listStatus operation
-    // are /dir1/dir11 and /dir1/dir12.
-    String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
-    String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
-    assertTrue(fileStatus1.equals(dir11.toString()) ||
-        fileStatus1.equals(dir12.toString()));
-    assertTrue(fileStatus2.equals(dir11.toString()) ||
-        fileStatus2.equals(dir12.toString()));
+    listStatusOnSubDirs(ROOT);
   }
 
   /**
@@ -977,54 +808,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusIteratorWithDir() throws Exception {
-    Path parent = new Path(ROOT, "testListStatus");
-    Path file1 = new Path(parent, "key1");
-    Path file2 = new Path(parent, "key2");
-    try {
-      // Iterator should have no items when dir is empty
-      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(ROOT);
-      assertFalse(it.hasNext());
-
-      ContractTestUtils.touch(fs, file1);
-      ContractTestUtils.touch(fs, file2);
-      // Iterator should have an item when dir is not empty
-      it = o3fs.listStatusIterator(ROOT);
-      while (it.hasNext()) {
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertEquals(fileStatus.getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
-      }
-      // Iterator on a directory should return all subdirs along with
-      // files, even if there exists a file and sub-dir with the same name.
-      it = o3fs.listStatusIterator(parent);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(2, iCount, "Iterator did not return all the file status");
-      // Iterator should return file status for only the
-      // immediate children of a directory.
-      Path file3 = new Path(parent, "dir1/key3");
-      Path file4 = new Path(parent, "dir1/key4");
-      ContractTestUtils.touch(fs, file3);
-      ContractTestUtils.touch(fs, file4);
-      it = o3fs.listStatusIterator(parent);
-      iCount = 0;
-
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(3, iCount, "Iterator did not return file status " +
-          "of all the children of the directory");
-
-    } finally {
-      // Cleanup
-      fs.delete(parent, true);
-    }
+    listStatusIteratorWithDir(ROOT);
   }
 
   /**
@@ -1032,37 +816,12 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusIteratorOnRoot() throws Exception {
-    Path dir1 = new Path(ROOT, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(ROOT, "dir2");
-    try {
-      fs.mkdirs(dir12);
-      fs.mkdirs(dir2);
-
-      // ListStatusIterator on root should return dir1
-      // (even though /dir1 key does not exist)and dir2 only.
-      // dir12 is not an immediate child of root and hence should not be listed.
-      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(ROOT);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        // Verify that dir12 is not included in the result
-        // of the listStatusIterator on root.
-        assertNotEquals(fileStatus.getPath().toUri().getPath(), dir12.toString());
-      }
-      assertEquals(2, iCount, "FileStatus should return only the immediate children");
-    } finally {
-      // Cleanup
-      fs.delete(dir2, true);
-      fs.delete(dir1, true);
-    }
+    listStatusIteratorOnRoot(ROOT);
   }
 
   @Test
   public void testListStatusIteratorOnPageSize() throws Exception {
-    OzoneFileSystemTests.listStatusIteratorOnPageSize(cluster.getConf(),
+    listStatusIteratorOnPageSize(cluster.getConf(),
         "/" + volumeName + "/" + bucketName);
   }
 
@@ -1071,44 +830,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusIteratorOnSubDirs() throws Exception {
-    // Create the following key structure
-    //      /dir1/dir11/dir111
-    //      /dir1/dir12
-    //      /dir1/dir12/file121
-    //      /dir2
-    // ListStatusIterator on /dir1 should return file status for
-    // all its immediate subdirs only which are /dir1/dir11 and
-    // /dir1/dir12. Super child files/dirs (/dir1/dir12/file121
-    // and /dir1/dir11/dir111) should not be returned by
-    // listStatusIterator.
-    Path dir1 = new Path("/dir1");
-    Path dir11 = new Path(dir1, "dir11");
-    Path dir111 = new Path(dir11, "dir111");
-    Path dir12 = new Path(dir1, "dir12");
-    Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path("/dir2");
-    try {
-      fs.mkdirs(dir111);
-      fs.mkdirs(dir12);
-      ContractTestUtils.touch(fs, file121);
-      fs.mkdirs(dir2);
-
-      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(dir1);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertTrue(fileStatus.getPath().toUri().getPath().
-            equals(dir11.toString()) || fileStatus.getPath().toUri().getPath()
-            .equals(dir12.toString()));
-      }
-      assertEquals(2, iCount, "FileStatus should return only the immediate children");
-    } finally {
-      // Cleanup
-      fs.delete(dir2, true);
-      fs.delete(dir1, true);
-    }
+    listStatusIteratorOnSubDirs(ROOT);
   }
 
   @Test
@@ -1176,24 +898,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
       throws Exception {
-    Path source = new Path("/source");
-    Path interimPath = new Path(source, "interimPath");
-    Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path("/target");
-    Path leafInTarget = new Path(target, "leaf");
-
-    fs.mkdirs(source);
-    fs.mkdirs(target);
-    fs.mkdirs(leafInsideInterimPath);
-    assertTrue(fs.rename(leafInsideInterimPath, leafInTarget));
-
-    // after rename listStatus for interimPath should succeed and
-    // interimPath should have no children
-    FileStatus[] statuses = fs.listStatus(interimPath);
-    assertNotNull(statuses, "liststatus returns a null array");
-    assertEquals(0, statuses.length, "Statuses array is not empty");
-    FileStatus fileStatus = fs.getFileStatus(interimPath);
-    assertEquals(interimPath.getName(), fileStatus.getPath().getName(), "FileStatus does not point to interimPath");
+    nonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved(ROOT);
   }
 
   /**
@@ -1204,8 +909,8 @@ abstract class AbstractOzoneFileSystemTest {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = root + "/dir2";
-    final Path source = new Path(fs.getUri().toString() + dir1);
-    final Path destin = new Path(fs.getUri().toString() + dir2);
+    final Path source = pathUnderFsRoot(dir1);
+    final Path destin = pathUnderFsRoot(dir2);
 
     // creates destin
     fs.mkdirs(destin);
@@ -1220,23 +925,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
-    final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final Path dir1Path = new Path(fs.getUri().toString() + dir1);
-    // Add a sub-dir1 to the directory to be moved.
-    final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    fs.mkdirs(subDir1);
-    LOG.info("Created dir1 {}", subDir1);
-
-    final Path sourceRoot = new Path(fs.getUri().toString() + root);
-    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    try {
-      fs.rename(sourceRoot, subDir1);
-      fail("Should throw exception : Cannot rename a directory to" +
-              " its own subdirectory");
-    } catch (IllegalArgumentException iae) {
-      // expected
-    }
+    renameDirToItsOwnSubDir();
   }
 
   /**
@@ -1247,11 +936,11 @@ abstract class AbstractOzoneFileSystemTest {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
-    final Path dir2Path = new Path(fs.getUri().toString() + dir2);
+    final Path dir2Path = pathUnderFsRoot(dir2);
     fs.mkdirs(dir2Path);
 
     // File rename
-    Path file1 = new Path(fs.getUri().toString() + dir2 + "/file1");
+    Path file1 = pathUnderFsRoot(dir2 + "/file1");
     ContractTestUtils.touch(fs, file1);
 
     assertTrue(fs.rename(file1, file1));
@@ -1266,23 +955,23 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testRenameToExistingDir() throws Exception {
     // created /a
-    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    final Path aSourcePath = pathUnderFsRoot("/a");
     fs.mkdirs(aSourcePath);
 
     // created /b
-    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    final Path bDestinPath = pathUnderFsRoot("/b");
     fs.mkdirs(bDestinPath);
 
     // Add a sub-directory '/a/c' to '/a'. This is to verify that after
     // rename sub-directory also be moved.
-    final Path acPath = new Path(fs.getUri().toString() + "/a/c");
+    final Path acPath = pathUnderFsRoot("/a/c");
     fs.mkdirs(acPath);
 
     // Rename from /a to /b.
     assertTrue(fs.rename(aSourcePath, bDestinPath), "Rename failed");
 
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
-    final Path bacPath = new Path(fs.getUri().toString() + "/b/a/c");
+    final Path baPath = pathUnderFsRoot("/b/a");
+    final Path bacPath = pathUnderFsRoot("/b/a/c");
     assertTrue(fs.exists(baPath), "Rename failed");
     assertTrue(fs.exists(bacPath), "Rename failed");
   }
@@ -1298,31 +987,31 @@ abstract class AbstractOzoneFileSystemTest {
   public void testRenameToNewSubDirShouldNotExist() throws Exception {
     // Case-5.a) Rename directory from /a to /b.
     // created /a
-    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    final Path aSourcePath = pathUnderFsRoot("/a");
     fs.mkdirs(aSourcePath);
 
     // created /b
-    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    final Path bDestinPath = pathUnderFsRoot("/b");
     fs.mkdirs(bDestinPath);
 
     // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
     // throws exception as new destin /b/a already exists.
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a/c");
+    final Path baPath = pathUnderFsRoot("/b/a/c");
     fs.mkdirs(baPath);
 
     assertFalse(fs.rename(aSourcePath, bDestinPath), "New destin sub-path /b/a already exists");
 
     // Case-5.b) Rename file from /a/b/c/file1 to /a.
     // Should be failed since /a/file1 exists.
-    final Path abcPath = new Path(fs.getUri().toString() + "/a/b/c");
+    final Path abcPath = pathUnderFsRoot("/a/b/c");
     fs.mkdirs(abcPath);
     Path abcFile1 = new Path(abcPath, "/file1");
     ContractTestUtils.touch(fs, abcFile1);
 
-    final Path aFile1 = new Path(fs.getUri().toString() + "/a/file1");
+    final Path aFile1 = pathUnderFsRoot("/a/file1");
     ContractTestUtils.touch(fs, aFile1);
 
-    final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
+    final Path aDestinPath = pathUnderFsRoot("/a");
 
     assertFalse(fs.rename(abcFile1, aDestinPath), "New destin sub-path /b/a already exists");
   }
@@ -1333,12 +1022,12 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testRenameDirToFile() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
+    Path rootPath = pathUnderFsRoot(root);
     fs.mkdirs(rootPath);
 
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    Path file1Destin = pathUnderFsRoot(root + "/file1");
     ContractTestUtils.touch(fs, file1Destin);
-    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    Path abcRootPath = pathUnderFsRoot("/a/b/c");
     fs.mkdirs(abcRootPath);
     assertFalse(fs.rename(abcRootPath, file1Destin), "key already exists /root_dir/file1");
   }
@@ -1349,25 +1038,20 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testRenameFile() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
-    fs.mkdirs(rootPath);
+    renameFile(root);
+  }
 
-    Path file1Source = new Path(fs.getUri().toString() + root
-            + "/file1_Copy");
-    ContractTestUtils.touch(fs, file1Source);
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
-    assertTrue(fs.rename(file1Source, file1Destin), "Renamed failed");
-    assertTrue(fs.exists(file1Destin), "Renamed failed: /root/file1");
-
+  @Override
+  public void verifyRenameFile(Path workDir, Path expectedDest) throws IOException {
     /*
      * Reading several times, this is to verify that OmKeyInfo#keyName cached
      * entry is not modified. While reading back, OmKeyInfo#keyName will be
      * prepared and assigned to fullkeyPath name.
      */
     for (int i = 0; i < 10; i++) {
-      FileStatus[] fStatus = fs.listStatus(rootPath);
+      FileStatus[] fStatus = fs.listStatus(workDir);
       assertEquals(1, fStatus.length, "Renamed failed");
-      assertEquals(file1Destin, fStatus[0].getPath(), "Wrong path name!");
+      assertEquals(expectedDest, fStatus[0].getPath(), "Wrong path name!");
     }
   }
 
@@ -1377,16 +1061,12 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testRenameFileToDir() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
-    fs.mkdirs(rootPath);
+    renameFileToDir(root);
+  }
 
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, file1Destin);
-    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
-    fs.mkdirs(abcRootPath);
-    assertTrue(fs.rename(file1Destin, abcRootPath), "Renamed failed");
-    assertTrue(fs.exists(new Path(abcRootPath,
-            "file1")), "Renamed filed: /a/b/c/file1");
+  @Override
+  protected Path pathUnderFsRoot(String relativePath) {
+    return new Path(getFs().getUri().toString() + relativePath);
   }
 
   @Test
@@ -1397,8 +1077,8 @@ abstract class AbstractOzoneFileSystemTest {
     String targetKeyName = fakeParentKey +  "/key2";
     TestDataUtil.createKey(ozoneBucket, sourceKeyName, new byte[0]);
 
-    Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
-    Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
+    Path sourcePath = pathUnderFsRoot("/" + sourceKeyName);
+    Path targetPath = pathUnderFsRoot("/" + targetKeyName);
     assertTrue(fs.rename(sourcePath, targetPath));
     assertFalse(fs.exists(sourcePath));
     assertTrue(fs.exists(targetPath));
@@ -1413,32 +1093,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
-    fs.mkdirs(dir2SourcePath);
-
-    // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(fs.getUri().toString() + root + "/b/c");
-    try {
-      fs.rename(dir2SourcePath, destinPath);
-      fail("Should fail as parent of dst does not exist!");
-    } catch (FileNotFoundException fnfe) {
-      // expected
-    }
-
-    // (b) parent of dst is a file. /root_dir/file1/c
-    Path filePath = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, filePath);
-
-    Path newDestinPath = new Path(filePath, "c");
-    try {
-      fs.rename(dir2SourcePath, newDestinPath);
-      fail("Should fail as parent of dst is a file!");
-    } catch (IOException ioe) {
-      // expected
-    }
+    renameDestinationParentDoesNotExist();
   }
 
   /**
@@ -1451,33 +1106,13 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testRenameToParentDir() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
-    fs.mkdirs(dir2SourcePath);
-    final Path destRootPath = new Path(fs.getUri().toString() + root);
-
-    Path file1Source = new Path(fs.getUri().toString() + dir1 + "/file2");
-    ContractTestUtils.touch(fs, file1Source);
-
-    // rename source directory to its parent directory(destination).
-    assertTrue(fs.rename(dir2SourcePath, destRootPath), "Rename failed");
-    final Path expectedPathAfterRename =
-            new Path(fs.getUri().toString() + root + "/dir2");
-    assertTrue(fs.exists(expectedPathAfterRename), "Rename failed");
-
-    // rename source file to its parent directory(destination).
-    assertTrue(fs.rename(file1Source, destRootPath), "Rename failed");
-    final Path expectedFilePathAfterRename =
-            new Path(fs.getUri().toString() + root + "/file2");
-    assertTrue(fs.exists(expectedFilePathAfterRename), "Rename failed");
+    renameToParentDir();
   }
 
   @Test
   public void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
-    final Path source = new Path(fs.getUri().toString() + dir);
+    final Path source = pathUnderFsRoot(dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
     final Path subdir = new Path(source, "sub_dir1");
@@ -1493,13 +1128,14 @@ abstract class AbstractOzoneFileSystemTest {
     // Test if one path belongs to other FileSystem.
     IllegalArgumentException exception = assertThrows(
         IllegalArgumentException.class,
-        () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+        () -> fs.rename(pathUnderFsRoot("fake" + dir), dest));
     assertThat(exception.getMessage()).contains("Wrong FS");
   }
 
-  private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
+  @Override
+  protected OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {
-    String key = o3fs.pathToKey(keyPath);
+    String key = fs.pathToKey(keyPath);
     if (isDirectory) {
       key = key + "/";
     }
@@ -1518,7 +1154,7 @@ abstract class AbstractOzoneFileSystemTest {
     fs.mkdirs(mdir111);
 
     // Case 1: Dir key exist on server
-    FileStatus[] fileStatuses = o3fs.listStatus(mdir11);
+    FileStatus[] fileStatuses = fs.listStatus(mdir11);
     // Above listStatus result should only have one entry: mdir111
     assertEquals(1, fileStatuses.length);
     assertEquals(mdir111.toString(), fileStatuses[0].getPath().toUri().getPath());
@@ -1529,12 +1165,12 @@ abstract class AbstractOzoneFileSystemTest {
     // Check modification time in a small loop, it should always be the same
     for (int i = 0; i < 5; i++) {
       Thread.sleep(10);
-      fileStatuses = o3fs.listStatus(mdir11);
+      fileStatuses = fs.listStatus(mdir11);
       assertEquals(modificationTime, fileStatuses[0].getModificationTime());
     }
 
     // Case 2: Dir key doesn't exist on server
-    fileStatuses = o3fs.listStatus(mdir1);
+    fileStatuses = fs.listStatus(mdir1);
     // Above listStatus result should only have one entry: mdir11
     assertEquals(1, fileStatuses.length);
     assertEquals(mdir11.toString(), fileStatuses[0].getPath().toUri().getPath());
@@ -1546,7 +1182,7 @@ abstract class AbstractOzoneFileSystemTest {
     // each time
     for (int i = 0; i < 5; i++) {
       Thread.sleep(10);
-      fileStatuses = o3fs.listStatus(mdir1);
+      fileStatuses = fs.listStatus(mdir1);
       assertThat(modificationTime).isLessThanOrEqualTo(fileStatuses[0].getModificationTime());
     }
   }
@@ -1557,8 +1193,8 @@ abstract class AbstractOzoneFileSystemTest {
     // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
-    Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = o3fs.makeQualified(new Path(TRASH_ROOT, username));
+    Path outPath1 = fs.getTrashRoot(inPath1);
+    Path expectedOutPath1 = fs.makeQualified(new Path(TRASH_ROOT, username));
     assertEquals(expectedOutPath1, outPath1);
   }
 
@@ -1628,15 +1264,15 @@ abstract class AbstractOzoneFileSystemTest {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path userTrash = new Path(TRASH_ROOT, username);
 
-    Collection<FileStatus> res = o3fs.getTrashRoots(false);
+    Collection<FileStatus> res = fs.getTrashRoots(false);
     assertEquals(0, res.size());
 
     fs.mkdirs(userTrash);
-    res = o3fs.getTrashRoots(false);
+    res = fs.getTrashRoots(false);
     assertEquals(1, res.size());
     res.forEach(e -> assertEquals(userTrash.toString(), e.getPath().toUri().getPath()));
     // Only have one user trash for now
-    res = o3fs.getTrashRoots(true);
+    res = fs.getTrashRoots(true);
     assertEquals(1, res.size());
 
     // Create a few more random user trash dir
@@ -1649,11 +1285,11 @@ abstract class AbstractOzoneFileSystemTest {
     fs.create(new Path(TRASH_ROOT, "trashuser99"));
 
     // allUsers = false should still return current user trash
-    res = o3fs.getTrashRoots(false);
+    res = fs.getTrashRoots(false);
     assertEquals(1, res.size());
     res.forEach(e -> assertEquals(userTrash.toString(), e.getPath().toUri().getPath()));
     // allUsers = true should return all user trash
-    res = o3fs.getTrashRoots(true);
+    res = fs.getTrashRoots(true);
     assertEquals(6, res.size());
   }
 
@@ -1693,19 +1329,19 @@ abstract class AbstractOzoneFileSystemTest {
     Path userTrash = new Path(TRASH_ROOT, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
     Path trashPath = new Path(userTrashCurrent, testKeyName);
-    assertFalse(o3fs.exists(userTrash));
+    assertFalse(fs.exists(userTrash));
 
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
-    assertTrue(o3fs.exists(userTrash));
-    assertTrue(o3fs.exists(trashPath) || o3fs.listStatus(
-        o3fs.listStatus(userTrash)[0].getPath()).length > 0);
+    assertTrue(fs.exists(userTrash));
+    assertTrue(fs.exists(trashPath) || fs.listStatus(
+        fs.listStatus(userTrash)[0].getPath()).length > 0);
 
     // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(() -> {
       try {
-        return !o3fs.exists(trashPath);
+        return !fs.exists(trashPath);
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed");
         fail("Delete from Trash Failed");
@@ -1716,7 +1352,7 @@ abstract class AbstractOzoneFileSystemTest {
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(() -> {
       try {
-        return o3fs.listStatus(userTrash).length == 0;
+        return fs.listStatus(userTrash).length == 0;
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed", e);
         fail("Delete from Trash Failed");
@@ -1778,33 +1414,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testFileSystemDeclaresCapability() throws Throwable {
-    Path root = new Path(OZONE_URI_DELIMITER);
-    assertHasPathCapabilities(fs, root, FS_ACLS);
-    assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
+    fileSystemDeclaresCapability(new Path(OZONE_URI_DELIMITER));
   }
 
   @Test
   public void testSetTimes() throws Exception {
-    // Create a file
-    String testKeyName = "testKey1";
-    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
-      stream.write(1);
-    }
-
-    long mtime = 1000;
-    fs.setTimes(path, mtime, 2000);
-
-    FileStatus fileStatus = fs.getFileStatus(path);
-    // verify that mtime is updated as expected.
-    assertEquals(mtime, fileStatus.getModificationTime());
-
-    long mtimeDontUpdate = -1;
-    fs.setTimes(path, mtimeDontUpdate, 2000);
-
-    fileStatus = fs.getFileStatus(path);
-    // verify that mtime is NOT updated as expected.
-    assertEquals(mtime, fileStatus.getModificationTime());
+    setTimes(ROOT);
   }
 
   @Test
@@ -1888,7 +1503,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
-        "org.apache.hadoop.ipc.ProcessingDetails");
+        "org.apache.hadoop.ipc_.ProcessingDetails");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
@@ -1921,18 +1536,18 @@ abstract class AbstractOzoneFileSystemTest {
     String lev1dir = "l1dir";
     Path lev1path = createPath("/" + lev1dir);
     String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(lev1path));
+        fs.pathToKey(lev1path));
     String lev2dir = "l2dir";
     Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
     String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(lev2path));
+        fs.pathToKey(lev2path));
 
     String data = RandomStringUtils.secure().nextAlphanumeric(stringLen);
     String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
 
     Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
     String fileKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(path));
+        fs.pathToKey(path));
 
     // verify prefix directories and the file, do not already exist
     assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
@@ -2030,15 +1645,15 @@ abstract class AbstractOzoneFileSystemTest {
     String lev1dir = "abc";
     Path lev1path = createPath("/" + lev1dir);
     String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(lev1path));
+        fs.pathToKey(lev1path));
     String lev2dir = "def";
     Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
     String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(lev2path));
+        fs.pathToKey(lev2path));
 
     Path leaf = createPath("/" + lev1dir + "/" + lev2dir + "/" + leafName);
     String leafKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
-        o3fs.pathToKey(leaf));
+        fs.pathToKey(leaf));
 
     // verify prefix directories and the leaf, do not already exist
     assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
@@ -2144,6 +1759,15 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testOzoneManagerListLocatedStatusForZeroByteFile() throws IOException {
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+
+    listLocatedStatusForZeroByteFile(fs, path);
+  }
+
+  @Test
   void testOzoneManagerFileSystemInterface() throws IOException {
     String dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
 
@@ -2164,7 +1788,7 @@ abstract class AbstractOzoneFileSystemTest {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(o3fs.pathToKey(path))
+        .setKeyName(fs.pathToKey(path))
         .build();
     OzoneFileStatus omStatus =
         cluster.getOzoneManager().getFileStatus(keyArgs);
@@ -2179,7 +1803,7 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(0, omStatus.getKeyInfo().getDataSize());
     assertThat(omStatus.getKeyInfo().getModificationTime()).isLessThanOrEqualTo(currentTime);
     assertEquals(new Path(omStatus.getPath()).getName(),
-        o3fs.pathToKey(path));
+        fs.pathToKey(path));
   }
 
   @Test
@@ -2231,13 +1855,13 @@ abstract class AbstractOzoneFileSystemTest {
   void testPathToKey() {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
-    assertEquals("a/b/1", o3fs.pathToKey(new Path("/a/b/1")));
+    assertEquals("a/b/1", fs.pathToKey(new Path("/a/b/1")));
 
     assertEquals("user/" + getCurrentUser() + "/key1/key2",
-        o3fs.pathToKey(new Path("key1/key2")));
+        fs.pathToKey(new Path("key1/key2")));
 
     assertEquals("key1/key2",
-        o3fs.pathToKey(new Path("o3fs://test1/key1/key2")));
+        fs.pathToKey(new Path("o3fs://test1/key1/key2")));
   }
 
 
@@ -2276,10 +1900,9 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testGetFileChecksumWithInvalidCombineMode() throws IOException {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
+    Path rootPath = pathUnderFsRoot(root);
     fs.mkdirs(rootPath);
-    Path file = new Path(fs.getUri().toString() + root
-        + "/dummy");
+    Path file = pathUnderFsRoot(root + "/dummy");
     ContractTestUtils.touch(fs, file);
     OzoneClientConfig clientConfig = cluster.getConf().getObject(OzoneClientConfig.class);
     clientConfig.setChecksumCombineMode("NONE");

@@ -18,17 +18,29 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.MockOmTransport;
+import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.event.Level;
 
 /**
  * Run RPC Client tests.
@@ -214,5 +226,42 @@ public class TestRpcClient {
     assertThrows(
         IllegalArgumentException.class,
         () -> validateOmVersion(OzoneManagerVersion.FUTURE_VERSION, null));
+  }
+
+  @Test
+  public void testCloseTwiceDoesNotWarn() throws IOException {
+    RpcClient rpcClient = createRpcClient();
+    GenericTestUtils.setLogLevel(RpcClient.class, Level.DEBUG);
+    LogCapturer logs = LogCapturer.captureLogs(RpcClient.class);
+    logs.clearOutput();
+
+    try {
+      assertDoesNotThrow(() -> {
+        rpcClient.close();
+        rpcClient.close();
+      });
+
+      assertThat(logs.getOutput())
+          .doesNotContain("WARN")
+          .doesNotContain("This metrics class is not used.");
+    } finally {
+      logs.stopCapturing();
+    }
+  }
+
+  private static RpcClient createRpcClient() throws IOException {
+    OzoneConfiguration config = new OzoneConfiguration();
+    return new RpcClient(config, null) {
+      @Override
+      protected OmTransport createOmTransport(String omServiceId) {
+        return new MockOmTransport();
+      }
+
+      @Override
+      protected XceiverClientFactory createXceiverClientFactory(
+          ServiceInfoEx serviceInfo) {
+        return new MockXceiverClientFactory();
+      }
+    };
   }
 }

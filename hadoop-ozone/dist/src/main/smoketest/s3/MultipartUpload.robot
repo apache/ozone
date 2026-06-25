@@ -405,3 +405,55 @@ Check Bucket Ownership Verification
     ${uploadID}=    Execute and checkrc                                            echo '${uploadID}' | jq -r '.UploadId'    0
 
     Execute AWSS3APICli with bucket owner check                                    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest --upload-id ${uploadID}  ${correct_owner}
+
+Test Multipart Upload Part with Content-MD5 header
+    # Create test file for multipart upload
+                                Execute                    echo "Multipart Upload Part Test" > /tmp/mpu_md5testfile
+    ${md5_hash} =               Execute                    md5sum /tmp/mpu_md5testfile | awk '{print $1}'
+    ${md5_base64} =             Execute                    openssl dgst -md5 -binary /tmp/mpu_md5testfile | base64
+
+    # Initialize multipart upload
+    ${uploadID} =               Initiate MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key1
+
+    # Upload part with correct Content-MD5 header
+    ${result} =                 Execute AWSS3APICli        upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 --part-number 1 --body /tmp/mpu_md5testfile --upload-id ${uploadID} --content-md5 ${md5_base64}
+                                Should contain             ${result}    ETag
+    ${eTag1} =                  Execute and checkrc        echo '${result}' | jq -r '.ETag' | tr -d '"'    0
+                                Should Be Equal            ${eTag1}     ${md5_hash}
+
+    # List parts to verify upload
+    ${result} =                 Execute AWSS3APICli        list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 --upload-id ${uploadID}
+    ${part_etag} =              Execute and checkrc        echo '${result}' | jq -r '.Parts[0].ETag' | tr -d '"'    0
+                                Should Be Equal            ${part_etag}    ${md5_hash}
+
+    # Complete the multipart upload
+    ${parts} =                  Set Variable               {ETag=\"${eTag1}\",PartNumber=1}
+                                Complete MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key1    ${uploadID}    ${parts}
+
+    # Verify the final object
+    ${result} =                 Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 /tmp/mpu_md5testfile.result
+    Compare files               /tmp/mpu_md5testfile       /tmp/mpu_md5testfile.result
+
+Test Multipart Upload Part with wrong Content-MD5 header
+    # Create test file for multipart upload
+                                Execute                    echo "Multipart Upload Part Wrong MD5 Test" > /tmp/mpu_md5testfile2
+
+    # Calculate wrong MD5 (from different content)
+    ${wrong_md5_hash} =         Execute                    echo -n "wrong content for mpu" | md5sum | awk '{print $1}'
+    ${wrong_md5_base64} =       Execute                    echo -n "wrong content for mpu" | openssl dgst -md5 -binary | base64
+
+    # Initialize multipart upload
+    ${uploadID} =               Initiate MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key2
+
+    # Upload part with wrong Content-MD5 header - should fail
+    ${result} =                 Execute AWSS3APICli and checkrc    upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key2 --part-number 1 --body /tmp/mpu_md5testfile2 --upload-id ${uploadID} --content-md5 ${wrong_md5_base64}    255
+                                Should contain             ${result}    BadDigest
+
+    # Verify no parts were uploaded
+    ${result} =                 Execute AWSS3APICli        list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key2 --upload-id ${uploadID}
+    ${parts_count} =            Execute and checkrc        echo '${result}' | jq -r '.Parts | length'    0
+                                Should Be Equal            ${parts_count}    0
+
+    # Abort the multipart upload (cleanup)
+                                Abort MPU                  ${BUCKET}    ${PREFIX}/mpu/md5test/key2    ${uploadID}
+

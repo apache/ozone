@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,20 +48,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(
-      names = {"--service-id", "--om-service-id"},
-      description = "Ozone Manager Service ID",
-      required = false
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use --service-id instead. "
-          + "If you must use --service-host with OM HA, this must point directly to the leader OM. "
-          + "This option is required when --service-id is not provided or when HA is not enabled."
-  )
-  private String omHost;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -97,7 +84,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @CommandLine.Option(
       names = {"-s", "--start"},
-      description = "The item to start the listing from.\n" +
+      description = "The item to start the listing from.%n" +
           "i.e. continuation token. " +
           "This will be excluded from the result.",
       defaultValue = ""
@@ -106,20 +93,20 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-
-    if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify --service-id or --service-host");
-      return null;
+    try (OzoneManagerProtocol omClient = omAddressOptions.newClient()) {
+      execute(omClient);
     }
 
-    OzoneManagerProtocol ozoneManagerClient =
-        parent.createOmClient(omServiceId, omHost, false);
+    return null;
+  }
+
+  private void execute(OzoneManagerProtocol ozoneManagerClient) throws IOException {
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     final OzoneManagerVersion omVersion = RpcClient.getOmVersion(serviceInfoEx);
     if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
       System.err.println("Error: This command requires OzoneManager version "
           + OzoneManagerVersion.HBASE_SUPPORT.name() + " or later.");
-      return null;
+      return;
     }
 
     ListOpenFilesResult res =
@@ -138,8 +125,6 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       // Human friendly output
       printOpenKeysList(res);
     }
-
-    return null;
   }
 
   private void printOpenKeysListAsJson(ListOpenFilesResult res)
@@ -151,91 +136,113 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     List<OpenKeySession> openFileList = res.getOpenKeys();
 
-    String msg = res.getTotalOpenKeyCount() +
-        " total open files (est.). Showing " + openFileList.size() +
-        " open files (limit " + limit + ") under path prefix:\n  " + pathPrefix;
-
-    if (startItem != null && !startItem.isEmpty()) {
-      msg += "\nafter continuation token:\n  " + startItem;
-    }
-    msg += "\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t";
-    msg += showDeleted ? "Deleted\t" : "";
-    msg += showOverwritten ? "Overwritten\t" : "";
-    msg += "Open File Path";
+    String msg = getMessageString(res, openFileList);
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
       long clientId = e.getId();
       OmKeyInfo omKeyInfo = e.getKeyInfo();
-      String line = clientId + "\t" + Instant.ofEpochMilli(omKeyInfo.getCreationTime()) + "\t";
+      StringBuilder line = new StringBuilder()
+          .append(clientId).append('\t')
+          .append(Instant.ofEpochMilli(omKeyInfo.getCreationTime())).append('\t');
 
       if (omKeyInfo.isHsync()) {
         String hsyncClientIdStr =
             omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
         long hsyncClientId = Long.parseLong(hsyncClientIdStr);
         if (clientId == hsyncClientId) {
-          line += "Yes\t\t";
+          line.append("Yes\t\t");
         } else {
           // last hsync'ed with a different client ID than the client that
           // initially opens the file (!)
-          line += "Yes w/ cid " + hsyncClientIdStr + "\t";
+          line.append("Yes w/ cid ").append(hsyncClientIdStr).append('\t');
         }
 
         if (showDeleted) {
           if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
-            line += "Yes\t\t";
+            line.append("Yes\t\t");
           } else {
-            line += "No\t\t";
+            line.append("No\t\t");
           }
         }
         if (showOverwritten) {
           if (omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
-            line += "Yes\t";
+            line.append("Yes\t");
           } else {
-            line += "No\t";
+            line.append("No\t");
           }
         }
       } else {
-        line += showDeleted ? "No\t\tNo\t\t" : "No\t\t";
-        line += showOverwritten ? "No\t" : "";
+        line.append(showDeleted ? "No\t\tNo\t\t" : "No\t\t")
+            .append(showOverwritten ? "No\t" : "");
       }
 
-      line += getFullPathFromKeyInfo(omKeyInfo);
+      line.append(getFullPathFromKeyInfo(omKeyInfo));
 
       System.out.println(line);
     }
+
+    System.out.println();
 
     // Compose next batch's command
     if (res.hasMore()) {
       String nextBatchCmd = getCmdForNextBatch(res.getContinuationToken());
 
-      System.out.println("\n" +
-          "To get the next batch of open keys, run:\n  " + nextBatchCmd);
+      System.out.println("To get the next batch of open keys, run:");
+      System.out.println("  " + nextBatchCmd);
     } else {
-      System.out.println("\nReached the end of the list.");
+      System.out.println("Reached the end of the list.");
     }
+  }
+
+  /**
+   * @return formatted output message for the command.
+   */
+  private String getMessageString(ListOpenFilesResult res, List<OpenKeySession> openFileList) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(res.getTotalOpenKeyCount())
+        .append(" total open files. Showing ")
+        .append(openFileList.size())
+        .append(" open files (limit ")
+        .append(limit)
+        .append(") under path prefix:")
+        .append(System.lineSeparator())
+        .append("  ")
+        .append(pathPrefix);
+    if (startItem != null && !startItem.isEmpty()) {
+      sb.append(System.lineSeparator())
+          .append("after continuation token:")
+          .append(System.lineSeparator())
+          .append("  ")
+          .append(startItem);
+    }
+    sb.append(System.lineSeparator())
+        .append(System.lineSeparator())
+        .append("Client ID\t\t\tCreation time\t\tHsync'ed\t");
+    if (showDeleted) {
+      sb.append("Deleted\t");
+    }
+    if (showOverwritten) {
+      sb.append("Overwritten\t");
+    }
+    sb.append("Open File Path");
+    return sb.toString();
   }
 
   /**
    * @return the command to get the next batch of open keys
    */
   private String getCmdForNextBatch(String lastElementFullPath) {
-    String nextBatchCmd = "ozone admin om lof";
-    if (omServiceId != null && !omServiceId.isEmpty()) {
-      nextBatchCmd += " -id=" + omServiceId;
-    }
-    if (omHost != null && !omHost.isEmpty()) {
-      nextBatchCmd += " -host=" + omHost;
-    }
+    StringBuilder nextBatchCmd = new StringBuilder("ozone admin om lof ").append(omAddressOptions);
     if (json) {
-      nextBatchCmd += " --json";
+      nextBatchCmd.append(" --json");
     }
-    nextBatchCmd += " --length=" + limit;
+    nextBatchCmd.append(" --length=").append(limit);
     if (pathPrefix != null && !pathPrefix.isEmpty()) {
-      nextBatchCmd += " --prefix=" + pathPrefix;
+      nextBatchCmd.append(" --prefix=").append(pathPrefix);
     }
-    nextBatchCmd += " --start=" + lastElementFullPath;
-    return nextBatchCmd;
+    nextBatchCmd.append(" --start=").append(lastElementFullPath);
+    return nextBatchCmd.toString();
   }
 
   private String getFullPathFromKeyInfo(OmKeyInfo oki) {

@@ -55,9 +55,19 @@ public class ContainerKeyMapperTaskFSO implements ReconOmTask {
     long containerKeyFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         ReconServerConfigKeys.OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD,
         ReconServerConfigKeys.OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    int maxKeysInMemory = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    int maxIterators = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    int maxWorkers = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
     boolean result = ContainerKeyMapperHelper.reprocess(
         omMetadataManager, reconContainerMetadataManager,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED, getTaskName(), containerKeyFlushToDBMaxThreshold);
+        BucketLayout.FILE_SYSTEM_OPTIMIZED, getTaskName(), containerKeyFlushToDBMaxThreshold,
+        maxIterators, maxWorkers, maxKeysInMemory);
     return buildTaskResult(result);
   }
 

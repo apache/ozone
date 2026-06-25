@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Wrapper class to hold multiple OM DB update events.
  */
-public class OMUpdateEventBatch {
+public class OMUpdateEventBatch implements ReconEvent {
 
   private final List<OMDBUpdateEvent> events;
   private final long batchSequenceNumber;
@@ -59,5 +59,15 @@ public class OMUpdateEventBatch {
 
   public List<OMDBUpdateEvent> getEvents() {
     return events;
+  }
+  
+  @Override
+  public EventType getEventType() {
+    return EventType.OM_UPDATE_BATCH;
+  }
+  
+  @Override
+  public int getEventCount() {
+    return events.size();
   }
 }

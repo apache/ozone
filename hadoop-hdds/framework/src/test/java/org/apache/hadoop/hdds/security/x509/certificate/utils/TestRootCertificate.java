@@ -33,8 +33,7 @@ import java.security.KeyPair;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -62,8 +61,8 @@ public class TestRootCertificate {
 
   @Test
   public void testAllFieldsAreExpected() throws Exception {
-    LocalDateTime notBefore = LocalDateTime.now();
-    LocalDateTime notAfter = notBefore.plusYears(1);
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -88,13 +87,11 @@ public class TestRootCertificate {
 
 
     // Make sure that NotBefore is before the current Date
-    Date invalidDate = Date.from(
-        notBefore.minusDays(1).atZone(ZoneId.systemDefault()).toInstant());
+    Date invalidDate = Date.from(notBefore.minusDays(1).toInstant());
     assertFalse(certificate.getNotBefore().before(invalidDate));
 
     //Make sure the end date is honored.
-    invalidDate = Date.from(
-        notAfter.plusDays(1).atZone(ZoneId.systemDefault()).toInstant());
+    invalidDate = Date.from(notAfter.plusDays(1).toInstant());
     assertFalse(certificate.getNotAfter().after(invalidDate));
 
     // Check the Subject Name and Issuer Name is in the expected format.
@@ -113,8 +110,8 @@ public class TestRootCertificate {
 
   @Test
   public void testCACert(@TempDir Path basePath) throws Exception {
-    LocalDateTime notBefore = LocalDateTime.now();
-    LocalDateTime notAfter = notBefore.plusYears(1);
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -156,8 +153,8 @@ public class TestRootCertificate {
 
   @Test
   public void testInvalidParamFails() throws Exception {
-    LocalDateTime notBefore = LocalDateTime.now();
-    LocalDateTime notAfter = notBefore.plusYears(1);
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";

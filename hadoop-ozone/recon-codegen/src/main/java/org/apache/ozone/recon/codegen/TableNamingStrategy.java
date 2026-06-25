@@ -30,17 +30,13 @@ public class TableNamingStrategy extends DefaultGeneratorStrategy {
   @Override
   public String getJavaClassName(Definition definition, Mode mode) {
     if (definition instanceof TableDefinition && mode == Mode.DEFAULT) {
-      StringBuilder result = new StringBuilder();
-
-      result.append(StringUtils.toCamelCase(
+      return new StringBuilder().append(StringUtils.toCamelCase(
           definition.getOutputName()
               .replace(' ', '_')
               .replace('-', '_')
-              .replace('.', '_')
-      ));
-
-      result.append("Table");
-      return result.toString();
+              .replace('.', '_')))
+          .append("Table")
+          .toString();
     } else {
       return super.getJavaClassName(definition, mode);
     }

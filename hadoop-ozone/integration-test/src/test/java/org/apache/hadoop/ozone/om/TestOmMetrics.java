@@ -106,9 +106,6 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
 
   @BeforeAll
   public void setup() throws Exception {
@@ -119,6 +116,7 @@ public class TestOmMetrics {
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     // For testing fs operations with legacy buckets.
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
     clusterBuilder = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5);
     startCluster();
   }
@@ -132,9 +130,6 @@ public class TestOmMetrics {
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -972,9 +967,11 @@ public class TestOmMetrics {
 
   private OmKeyArgs createKeyArgs(String volumeName, String bucketName,
       ReplicationConfig repConfig) throws IOException {
+    int dataLength = 10;
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
+        .setLength(dataLength)
         .build();
     keyLocationInfo.setCreateVersion(0);
 
@@ -986,6 +983,7 @@ public class TestOmMetrics {
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .setReplicationConfig(repConfig)
+        .setDataSize(dataLength)
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
   }

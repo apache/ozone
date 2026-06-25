@@ -100,7 +100,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
-  private OzoneConfiguration configuration;
   private OMMetadataManager metadataManager;
   private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
@@ -114,7 +113,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @BeforeAll
   void setup(@TempDir Path testDir) throws Exception {
     ExitUtils.disableSystemExit();
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
@@ -438,7 +437,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setBucketName(bucket)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
-        .setAcls(new ArrayList<>())
         .build();
     OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }

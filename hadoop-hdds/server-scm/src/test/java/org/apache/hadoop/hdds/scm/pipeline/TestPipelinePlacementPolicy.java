@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -49,6 +48,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -189,7 +189,7 @@ public class TestPipelinePlacementPolicy {
     //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
     assertThat(excludedNodes).doesNotContain(nextNode);
     // next node should not be the same as anchor.
-    assertNotSame(anchor.getUuid(), nextNode.getUuid());
+    assertNotSame(anchor.getID(), nextNode.getID());
     // next node should be on the same rack based on topology.
     assertEquals(anchor.getNetworkLocation(), nextNode.getNetworkLocation());
   }
@@ -203,7 +203,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -240,7 +240,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -388,15 +388,14 @@ public class TestPipelinePlacementPolicy {
 
   private DatanodeDetails overwriteLocationInNode(
       DatanodeDetails datanode, Node node) {
-    DatanodeDetails result = DatanodeDetails.newBuilder()
-        .setUuid(datanode.getUuid())
+    return DatanodeDetails.newBuilder()
+        .setID(datanode.getID())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
         .addPort(datanode.getStandalonePort())
         .addPort(datanode.getRatisPort())
         .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
-    return result;
   }
 
   private List<DatanodeDetails> overWriteLocationInNodes(
@@ -427,7 +426,7 @@ public class TestPipelinePlacementPolicy {
     // NODES should be sufficient.
     assertEquals(nodesRequired, pickedNodes1.size());
     // make sure pipeline placement policy won't select duplicated NODES.
-    assertTrue(checkDuplicateNodesUUID(pickedNodes1));
+    assertTrue(checkDuplicateNodesID(pickedNodes1));
 
     // majority of healthy NODES are heavily engaged in pipelines.
     int majorityHeavy = healthyNodes.size() / 2 + 2;
@@ -459,7 +458,6 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicyOK() {
-    cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
@@ -512,8 +510,9 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
-    cluster = initTopology();
-    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
+    NetworkTopologyImpl localCluster = initTopology();
+
+    nodeManager = new MockNodeManager(localCluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
@@ -526,7 +525,7 @@ public class TestPipelinePlacementPolicy {
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host3", "/rack1"));
     for (DatanodeDetails dn : dns) {
-      cluster.add(dn);
+      localCluster.add(dn);
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
@@ -591,8 +590,6 @@ public class TestPipelinePlacementPolicy {
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
-    cluster = initTopology();
-
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host1", "/rack1"));
@@ -610,11 +607,11 @@ public class TestPipelinePlacementPolicy {
     return dns;
   }
 
-  private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {
-    HashSet<UUID> uuids = nodes.stream().
-        map(DatanodeDetails::getUuid).
+  private boolean checkDuplicateNodesID(List<DatanodeDetails> nodes) {
+    HashSet<DatanodeID> ids = nodes.stream().
+        map(DatanodeDetails::getID).
         collect(Collectors.toCollection(HashSet::new));
-    return uuids.size() == nodes.size();
+    return ids.size() == nodes.size();
   }
 
   private void insertHeavyNodesIntoNodeManager(
@@ -722,6 +719,60 @@ public class TestPipelinePlacementPolicy {
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(1));
     assertEquals(pipelineCount, 2);
+  }
+
+  @Test
+  public void testPipelinePlacementPolicyDefaultLimitFiltersNodeAtLimit()
+      throws IOException, TimeoutException {
+
+    // 1) Creates policy with config without limit set
+    OzoneConfiguration localConf = new OzoneConfiguration(conf);
+    localConf.unset(OZONE_DATANODE_PIPELINE_LIMIT);
+
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
+        getNodesWithRackAwareness(), false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+
+    // Ensure NodeManager uses default limit (=2) when limit is not set in conf
+    localNodeManager.setNumPipelinePerDatanode(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+
+    PipelineStateManager localStateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(localNodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+    PipelinePlacementPolicy localPolicy = new PipelinePlacementPolicy(
+        localNodeManager, localStateManager, localConf);
+
+    List<DatanodeDetails> healthy =
+        localNodeManager.getNodes(NodeStatus.inServiceHealthy());
+    DatanodeDetails target = healthy.get(0);
+
+    // 2) Adds exactly 2 pipelines to test node (default limit)
+    List<DatanodeDetails> p1Dns = new ArrayList<>();
+    p1Dns.add(target);
+    p1Dns.add(healthy.get(1));
+    p1Dns.add(healthy.get(2));
+    createPipelineWithReplicationConfig(p1Dns, RATIS, THREE);
+
+    List<DatanodeDetails> p2Dns = new ArrayList<>();
+    p2Dns.add(target);
+    p2Dns.add(healthy.get(3));
+    p2Dns.add(healthy.get(4));
+    createPipelineWithReplicationConfig(p2Dns, RATIS, THREE);
+
+    assertEquals(2, PipelinePlacementPolicy.currentRatisThreePipelineCount(
+        localNodeManager, localStateManager, target));
+
+    // 3) Verifies node is filtered out when choosing nodes for new pipeline
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+    List<DatanodeDetails> chosen = localPolicy.chooseDatanodes(
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
+
+    assertEquals(nodesRequired, chosen.size());
+    assertThat(chosen).doesNotContain(target);
   }
 
   private void createPipelineWithReplicationConfig(List<DatanodeDetails> dnList,

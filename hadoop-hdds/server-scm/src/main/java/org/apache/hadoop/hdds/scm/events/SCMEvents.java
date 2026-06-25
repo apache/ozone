@@ -224,6 +224,11 @@ public final class SCMEvents {
       RECONCILE_CONTAINER = new TypedEvent<>(ContainerID.class, "Reconcile_Container");
 
   /**
+   * This event will be triggered from SCM State Machine when ready.
+   */
+  public static final TypedEvent<Boolean> STATEMACHINE_READY = new TypedEvent<>(Boolean.class, "STATEMACHINE_READY");
+
+  /**
    * Private Ctor. Never Constructed.
    */
   private SCMEvents() {

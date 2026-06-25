@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
@@ -67,7 +67,7 @@ public class CloseContainerCommand
 
   public static CloseContainerCommand getFromProtobuf(
       CloseContainerCommandProto closeContainerProto) {
-    Preconditions.checkNotNull(closeContainerProto);
+    Objects.requireNonNull(closeContainerProto, "closeContainerProto == null");
     return new CloseContainerCommand(closeContainerProto.getCmdId(),
         PipelineID.getFromProtobuf(closeContainerProto.getPipelineID()),
         closeContainerProto.getForce());

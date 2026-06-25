@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -368,7 +369,7 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
-   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   * @param existingKeyGeneration The positive generation of the existing key which is checked for changes at key create
    *                              and commit time.
    * @param replicationConfig The replication configuration for the key to be rewritten.
    * @param metadata custom key value metadata
@@ -378,6 +379,44 @@ public interface ClientProtocol {
   OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
        Map<String, String> metadata) throws IOException;
+
+  /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneOutputStream}
+   * @throws OMException with KEY_ALREADY_EXISTS if key exists
+   */
+  OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException;
+
+  /**
+   * Rewrites a key only if its ETag matches (S3 If-Match semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneOutputStream}
+   * @throws OMException with ETAG_MISMATCH, ETAG_NOT_AVAILABLE, or KEY_NOT_FOUND
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException;
 
   /**
    * Writes a key in an existing bucket.
@@ -425,6 +464,46 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags)
       throws IOException;
+
+  /**
+   * Writes a key in an existing bucket only if it does not already exist
+   * (S3 If-None-Match: * semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneDataStreamOutput}
+   * @throws OMException with KEY_ALREADY_EXISTS if key exists
+   */
+  OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException;
+
+  /**
+   * Writes a key in an existing bucket only if its ETag matches
+   * (S3 If-Match semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneDataStreamOutput}
+   * @throws OMException with ETAG_MISMATCH, ETAG_NOT_AVAILABLE, or KEY_NOT_FOUND
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException;
 
   /**
    * Reads a key from an existing bucket.
@@ -647,6 +726,27 @@ public interface ClientProtocol {
   OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap) throws IOException;
+
+  /**
+   * Complete Multipart upload with conditional write support.
+   * This will combine all the parts and make the key visible in ozone,
+   * but only if the specified preconditions are met.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param keyName key name
+   * @param uploadID multipart upload ID
+   * @param partsMap map of part numbers to ETags
+   * @param expectedDataGeneration expected data generation for conditional write
+   *        (use OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS for If-None-Match: *)
+   * @param expectedETag expected ETag for conditional write (for If-Match)
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException if precondition fails or other I/O error occurs
+   */
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName,
+      String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException;
 
   /**
    * Abort Multipart upload request for the given key with given uploadID.
@@ -1124,8 +1224,6 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
-  void setIsS3Request(boolean isS3Request);
-
   /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
@@ -1246,15 +1344,51 @@ public interface ClientProtocol {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param disableNativeDiff request to force diff to perform diffs without native lib
    * @return the difference report between two snapshots
+   * @deprecated Use {@link #snapshotDiff(String, String, String, String, String, int)}
+   * instead to submit a new snapshot diff job or just return the existing job result.
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @Deprecated
   @SuppressWarnings("parameternumber")
   SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
                                     boolean forceFullDiff,
                                     boolean disableNativeDiff)
+      throws IOException;
+
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
+                                    String fromSnapshot, String toSnapshot,
+                                    String token, int pageSize)
+      throws IOException;
+
+  /**
+   * Submit snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @return the result of submitting snapshot diff job.
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName,
+                                                String fromSnapshot, String toSnapshot,
+                                                boolean forceFullDiff, boolean disableNativeDiff)
       throws IOException;
 
   /**

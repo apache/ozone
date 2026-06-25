@@ -205,7 +205,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       this.setState({
         activeLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

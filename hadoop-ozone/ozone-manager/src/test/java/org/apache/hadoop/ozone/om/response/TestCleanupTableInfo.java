@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -98,6 +98,9 @@ public class TestCleanupTableInfo {
 
   @Mock
   private OMMetrics omMetrics;
+
+  @Mock
+  private OMPerformanceMetrics perfMetrics;
 
   @Mock
   private OzoneManager om;
@@ -184,6 +187,7 @@ public class TestCleanupTableInfo {
     when(om.getEnableFileSystemPaths()).thenReturn(true);
     when(om.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(false, false));
+    when(om.getPerfMetrics()).thenReturn(perfMetrics);
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
@@ -298,7 +302,6 @@ public class TestCleanupTableInfo {
     return OmBucketInfo.newBuilder()
         .setVolumeName(TEST_VOLUME_NAME)
         .setBucketName(TEST_BUCKET_NAME)
-        .setAcls(Collections.emptyList())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.DEFAULT)
         .build();

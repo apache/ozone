@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.FinalizationStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -323,12 +323,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     public FinalizationStateManager build() throws IOException {
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(upgradeFinalizer);
+      Objects.requireNonNull(finalizationStore, "finalizationStore == null");
+      Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
+      Objects.requireNonNull(upgradeFinalizer, "upgradeFinalizer == null");
 
-      return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.FINALIZE,
-        FinalizationStateManager.class, new FinalizationStateManagerImpl(this));
+      final FinalizationStateManager impl = new FinalizationStateManagerImpl(this);
+      return scmRatisServer.getProxyHandler(new FinalizationStateManagerInvoker(impl, scmRatisServer));
     }
   }
 }

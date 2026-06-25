@@ -230,7 +230,7 @@
         </select>
     </div>
     <div class="col-md-6 text-right">
-        <label>Search: </label> <input type="text" ng-model="search">
+        <label>Search: </label> <input type="text" ng-model="search" ng-change="applyGlobalSearch()" ng-model-options="{ debounce: 300 }">
     </div>
 </div>
 <table class="table table-bordered table-striped col-md-6">
@@ -255,7 +255,7 @@
         </tr>
     </thead>
     <tbody>
-        <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
+        <tr ng-repeat="typestat in nodeStatus|orderBy:columnName:reverse">
             <td ng-switch="typestat.port > 0">
                 <span ng-switch-when="true">
                     <a href="{{typestat.protocol}}://{{typestat.hostname}}:{{typestat.port}}" target="_blank">{{typestat.hostname}}</a>

@@ -92,11 +92,13 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isOwner(ugi, bucketOwner)) {
-      throw new OMException(
-          "Only bucket owners and Ozone admins can delete snapshots",
-          OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Only bucket owners and Ozone admins can delete snapshots",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
 
     // Set deletion time here so OM leader and follower would have the
@@ -226,12 +228,12 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (exception == null) {
       omMetrics.decNumSnapshotActive();
       omMetrics.incNumSnapshotDeleted();
-      LOG.info("Deleted snapshot '{}' under path '{}'",
-          snapshotName, snapshotPath);
+      LOG.info("Deleted snapshot '{}' (snapshotId='{}') under path '{}'",
+          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     } else {
       omMetrics.incNumSnapshotDeleteFails();
-      LOG.error("Failed to delete snapshot '{}' under path '{}'",
-          snapshotName, snapshotPath);
+      LOG.error("Failed to delete snapshot '{}' (snapshotId='{}') under path '{}'",
+          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     }
     return omClientResponse;
   }

@@ -33,8 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -48,6 +48,8 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -275,9 +277,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+            bucket, args.getKeyName());
+      }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       audit.logReadFailure(
@@ -465,6 +471,44 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
 
       perfMetrics.addGetObjectTaggingLatencyNs(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getGetBucketTaggingResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(Pair.of(
+            args.getVolumeName(), args.getBucketName())));
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetBucketTaggingAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+                ACLType.READ, bucket, null));
+      }
+      metrics.incNumGetBucketTagging();
+
+      OmBucketInfo info =
+          bucketManager.getBucketInfo(bucket.realVolume(), bucket.realBucket());
+      return info.getTags();
+    } catch (Exception ex) {
+      metrics.incNumGetBucketTaggingFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(
+          OMAction.GET_BUCKET_TAGGING, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.GET_BUCKET_TAGGING, auditMap));
+      }
+      perfMetrics.addGetBucketTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 

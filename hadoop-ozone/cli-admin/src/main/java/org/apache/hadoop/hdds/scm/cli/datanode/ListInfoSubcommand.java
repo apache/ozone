@@ -65,6 +65,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
        defaultValue = "false")
   private boolean json;
 
+  @CommandLine.Option(names = {"--nodes-with-failed-volumes"},
+      description = "Only show datanodes that have at least one failed volume.",
+      defaultValue = "false")
+  private boolean nodeWithFailedVolumes;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private ExclusiveNodeOptions exclusiveNodeOptions;
 
@@ -85,11 +93,16 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (nodeWithFailedVolumes && exclusiveNodeOptions != null
+        && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "--nodes-with-failed-volumes cannot be used with --id/--node-id. "
+          + "Use them separately.");
+    }
     pipelines = scmClient.listPipelines();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
-      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo(DatanodeDetails.getFromProtoBuf(node.getNodeID()),
-          node.getNodeOperationalStates(0), node.getNodeStates(0));
+      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo.Builder(node).build();
       if (json) {
         List<BasicDatanodeInfo> dtoList = Collections.singletonList(singleNodeInfo);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
@@ -114,6 +127,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
     if (!Strings.isNullOrEmpty(nodeState)) {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
+    }
+    if (nodeWithFailedVolumes) {
+      allNodes = allNodes.filter(p ->
+          p.getFailedVolumes() != null && !p.getFailedVolumes().isEmpty());
     }
 
     if (!listLimitOptions.isAll()) {
@@ -151,13 +168,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
               long capacity = p.getCapacity();
               long used = capacity - p.getRemaining();
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
-              return new BasicDatanodeInfo(
-                  DatanodeDetails.getFromProtoBuf(node.getNodeID()),
-                  node.getNodeOperationalStates(0),
-                  node.getNodeStates(0),
-                  used,
-                  capacity,
-                  percentUsed);
+              return new BasicDatanodeInfo.Builder(node)
+                  .withUsageInfo(used, capacity, percentUsed)
+                  .build();
             } catch (Exception e) {
               String reason = "Could not process info for an unknown datanode";
               if (p != null && p.getNode() != null && !Strings.isNullOrEmpty(p.getNode().getUuid())) {
@@ -174,9 +187,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
-    return nodes.stream().map(p -> new BasicDatanodeInfo(
-            DatanodeDetails.getFromProtoBuf(p.getNodeID()),
-            p.getNodeOperationalStates(0), p.getNodeStates(0)))
+    return nodes.stream().map(p -> new BasicDatanodeInfo.Builder(p).build())
         .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
         .collect(Collectors.toList());
   }
@@ -189,8 +200,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
       List<Pipeline> relatedPipelines = pipelines.stream().filter(
           p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
       if (relatedPipelines.isEmpty()) {
-        pipelineListInfo.append("No related pipelines" +
-            " or the node is not in Healthy state.\n");
+        pipelineListInfo.append("No related pipelines or the node is not in Healthy state.")
+            .append(System.lineSeparator());
       } else {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
@@ -200,18 +211,31 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append('/').append(p.getPipelineState().toString()).append('/')
                 .append(datanode.getID().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
-                .append(System.getProperty("line.separator")));
+                .append(System.lineSeparator()));
       }
     } else {
-      pipelineListInfo.append("No pipelines in cluster.");
+      pipelineListInfo
+          .append("No pipelines in cluster.")
+          .append(System.lineSeparator());
     }
-    System.out.println("Datanode: " + datanode.getUuid().toString() +
+    System.out.println("Datanode: " + datanode.getID() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
     System.out.println("Operational State: " + dn.getOpState());
     System.out.println("Health State: " + dn.getHealthState());
-    System.out.println("Related pipelines:\n" + pipelineListInfo);
+    if (dn.getTotalVolumeCount() != null && dn.getHealthyVolumeCount() != null) {
+      System.out.println("Total volume count: " + dn.getTotalVolumeCount());
+      System.out.println("Healthy volume count: " + dn.getHealthyVolumeCount());
+    }
+    if (dn.getFailedVolumes() != null && !dn.getFailedVolumes().isEmpty()) {
+      System.out.println("Failed volumes:");
+      for (String vol : dn.getFailedVolumes()) {
+        System.out.println("  " + vol);
+      }
+    }
+    System.out.println("Related pipelines:");
+    System.out.println(pipelineListInfo);
 
     if (dn.getUsed() != null && dn.getCapacity() != null && dn.getUsed() >= 0 && dn.getCapacity() > 0) {
       System.out.println("Capacity: " + dn.getCapacity());

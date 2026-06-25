@@ -67,6 +67,27 @@ public final class QuotaUtil {
   }
 
   /**
+   * Calculate the physical bytes stored on a single DataNode for one block.
+   * For RATIS each DN holds a full copy, so the per-replica size equals the
+   * logical block size. For EC each DN holds one chunk per stripe, so the
+   * per-replica size is {@code replicatedSize / requiredNodes}.
+   *
+   * @param dataSize  logical (unreplicated) block size in bytes
+   * @param repConfig replication configuration
+   * @return bytes stored on a single DN for this block
+   */
+  public static long getSizePerReplica(long dataSize, ReplicationConfig repConfig) {
+    if (repConfig.getReplicationType() == RATIS) {
+      return dataSize;
+    }
+    int requiredNodes = repConfig.getRequiredNodes();
+    if (requiredNodes <= 0) {
+      return dataSize;
+    }
+    return getReplicatedSize(dataSize, repConfig) / requiredNodes;
+  }
+
+  /**
    * Get an estimated data size (before replication) from the replicated size.
    * An (inaccurate) reverse of getReplicatedSize().
    * @param replicatedSize size after replication.

@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -43,12 +45,52 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
+  // Cache OmBucketInfo lookups across process() calls so the Legacy and OBS
+  // sub-tasks don't pay a RocksDB point read per event. A bucket's objectID and
+  // layout are stable while the bucket exists, but a bucket can be deleted and
+  // recreated under the same volume/bucket name with a new objectID (same DB
+  // key, different identity). A recreate is always preceded by a delete, so the
+  // sub-tasks call invalidateBucketCache() when they observe a bucketTable
+  // delete event; a recreated bucket is then re-read instead of served stale.
+  //
+  // Single-thread access only (each sub-task runs on its own thread and owns
+  // its own cache instance). HashMap is fine.
+  private final Map<String, OmBucketInfo> bucketInfoCache = new HashMap<>();
+
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
                                      reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+  }
+
+  /** Look up an {@link OmBucketInfo} via {@code getBucketTable().getSkipCache}
+   *  and cache the result. Bucket layout/object-id are stable while a bucket
+   *  exists, so a field-level cache avoids one RocksDB point read per event in
+   *  the per-event sub-task loops. Entries are dropped via
+   *  {@link #invalidateBucketCache(String)} when a bucketTable delete event is
+   *  seen, so a bucket deleted and recreated under the same name is not served
+   *  stale. */
+  protected OmBucketInfo lookupBucketCached(String bucketDBKey) throws IOException {
+    OmBucketInfo cached = bucketInfoCache.get(bucketDBKey);
+    if (cached != null) {
+      return cached;
+    }
+    OmBucketInfo info = reconOMMetadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    if (info != null) {
+      bucketInfoCache.put(bucketDBKey, info);
+    }
+    return info;
+  }
+
+  /** Drop the cached {@link OmBucketInfo} for the given bucket DB key. Invoked
+   *  when a bucketTable delete event is observed so the next key event re-reads
+   *  the current bucket info. This matters when a bucket is deleted and
+   *  recreated under the same volume/bucket name, which assigns a new objectID;
+   *  the recreate always follows the delete, so invalidating on delete suffices. */
+  protected void invalidateBucketCache(String bucketDBKey) {
+    bucketInfoCache.remove(bucketDBKey);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -61,7 +103,7 @@ public class NSSummaryTaskDbEventHandler {
 
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
@@ -84,8 +126,7 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap) throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -98,10 +139,18 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
-    
-    // Update immediate parent's totals (these fields now represent totals)
+
+    // Update immediate parent's totals (includes all descendant files)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     ++fileBucket[binIndex];
@@ -109,7 +158,40 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), 1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
+  }
+
+  /**
+   * Handle PUT key event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
+
+    // Get from local thread map only, no DB reads during reprocess
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+    if (nsSummary == null) {
+      // Create new instance if not found
+      nsSummary = new NSSummary();
+    }
+    int[] fileBucket = nsSummary.getFileSizeBucket();
+
+    // Update immediate parent's totals (includes all descendant files)
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
+
+    ++fileBucket[binIndex];
+    nsSummary.setFileSizeBucket(fileBucket);
+    nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -119,7 +201,8 @@ public class NSSummaryTaskDbEventHandler {
     long objectId = directoryInfo.getObjectID();
     // write the dir name to the current directory
     String dirName = directoryInfo.getName();
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+
+    // Get or create the directory's NSSummary
     NSSummary curNSSummary = nsSummaryMap.get(objectId);
     if (curNSSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
@@ -130,42 +213,90 @@ public class NSSummaryTaskDbEventHandler {
     boolean directoryAlreadyExists = (curNSSummary != null);
     long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
     int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
+    long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
 
-    if (curNSSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
+    if (!directoryAlreadyExists) {
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
-    // Set the parent directory ID
     curNSSummary.setParentId(parentObjectId);
     nsSummaryMap.put(objectId, curNSSummary);
 
-    // Write the child dir list to the parent directory
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
-    if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    // Get or create the parent's NSSummary
+    NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNSSummary == null) {
+      parentNSSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
-    if (nsSummary == null) {
+    if (parentNSSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
-      nsSummary = new NSSummary();
+      parentNSSummary = new NSSummary();
     }
-    nsSummary.addChildDir(objectId);
-    nsSummaryMap.put(parentObjectId, nsSummary);
 
-    // If the directory already existed with content, propagate its totals upward
+    // Add child directory to parent
+    parentNSSummary.addChildDir(objectId);
+
+    // If the directory already existed with content, update immediate parent's stats
     if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
-      propagateSizeUpwards(parentObjectId, existingSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+      parentNSSummary.setNumOfFiles(parentNSSummary.getNumOfFiles() + existingNumOfFiles);
+      parentNSSummary.setSizeOfFiles(parentNSSummary.getSizeOfFiles() + existingSizeOfFiles);
+
+      long parentReplSize = parentNSSummary.getReplicatedSizeOfFiles();
+      if (parentReplSize < 0) {
+        parentReplSize = 0;
+      }
+      parentNSSummary.setReplicatedSizeOfFiles(parentReplSize + existingReplicatedSizeOfFiles);
+      nsSummaryMap.put(parentObjectId, parentNSSummary);
+
+      // Propagate to grandparents and beyond
+      propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
+          existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+    } else {
+      nsSummaryMap.put(parentObjectId, parentNSSummary);
     }
   }
 
-  protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
-                                      Map<Long, NSSummary> nsSummaryMap)
+  /**
+   * Handle PUT directory event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutDirEventReprocess(OmDirectoryInfo directoryInfo,
+                                            Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+    long parentObjectId = directoryInfo.getParentObjectID();
+    long objectId = directoryInfo.getObjectID();
+    // write the dir name to the current directory
+    String dirName = directoryInfo.getName();
+
+    // Get or create the directory's NSSummary (no DB reads during reprocess)
+    NSSummary curNSSummary = nsSummaryMap.get(objectId);
+    if (curNSSummary == null) {
+      curNSSummary = new NSSummary();
+    }
+
+    curNSSummary.setDirName(dirName);
+    curNSSummary.setParentId(parentObjectId);
+    nsSummaryMap.put(objectId, curNSSummary);
+
+    // Get or create the parent's NSSummary (no DB reads during reprocess)
+    NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNSSummary == null) {
+      // Create new instance if not found
+      parentNSSummary = new NSSummary();
+    }
+
+    // Add child directory to parent
+    parentNSSummary.addChildDir(objectId);
+
+    // If the directory already existed with content, update immediate parent's stats
+    nsSummaryMap.put(parentObjectId, parentNSSummary);
+  }
+
+  protected void handleDeleteKeyEvent(
+      OmKeyInfo keyInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      long parentObjectId
+  ) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -185,12 +316,18 @@ public class NSSummaryTaskDbEventHandler {
     // Decrement immediate parent's totals (these fields now represent totals)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    long keyReplSize = keyInfo.getReplicatedSize();
+    if (currentReplSize >= 0 && keyReplSize >= 0) {
+      nsSummary.setReplicatedSizeOfFiles(currentReplSize - keyReplSize);
+    }
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(),
+        -keyInfo.getReplicatedSize(), -1, nsSummaryMap);
   }
 
   protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
@@ -217,24 +354,36 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    // If deleted directory exists, decrement its totals from parent and propagate
+    // Remove the deleted directory ID from parent's childDir set
+    parentNsSummary.removeChildDir(deletedDirObjectId);
+
+    // If deleted directory exists with content, update immediate parent's stats
     if (deletedDirSummary != null) {
-      // Decrement parent's totals by the deleted directory's totals
-      parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
-      parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
-      
-      // Propagate the decrements upwards to all ancestors
-      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(), 
-                          -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
+      long deletedSize = deletedDirSummary.getSizeOfFiles();
+      int deletedNumFiles = deletedDirSummary.getNumOfFiles();
+      long deletedReplSize = deletedDirSummary.getReplicatedSizeOfFiles();
+      if (deletedReplSize < 0) {
+        deletedReplSize = 0;
+      }
+
+      // Decrement immediate parent's totals
+      parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedNumFiles);
+      parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedSize);
+      long parentReplSize = parentNsSummary.getReplicatedSizeOfFiles();
+      if (parentReplSize >= 0) {
+        parentNsSummary.setReplicatedSizeOfFiles(parentReplSize - deletedReplSize);
+      }
+      nsSummaryMap.put(parentObjectId, parentNsSummary);
+
+      // Propagate to grandparents and beyond
+      propagateSizeUpwards(parentObjectId, -deletedSize, -deletedReplSize, -deletedNumFiles, nsSummaryMap);
       
       // Set the deleted directory's parentId to 0 (unlink it)
       deletedDirSummary.setParentId(0);
       nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+    } else {
+      nsSummaryMap.put(parentObjectId, parentNsSummary);
     }
-
-    // Remove the deleted directory ID from parent's childDir set
-    parentNsSummary.removeChildDir(deletedDirObjectId);
-    nsSummaryMap.put(parentObjectId, parentNsSummary);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
@@ -261,7 +410,7 @@ public class NSSummaryTaskDbEventHandler {
     try {
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
     } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
       return false;
     } finally {
       nsSummaryMap.clear();
@@ -274,7 +423,7 @@ public class NSSummaryTaskDbEventHandler {
    * This ensures that when files are added/deleted, all ancestor directories
    * reflect the total changes in their sizeOfFiles and numOfFiles fields.
    */
-  protected void propagateSizeUpwards(long objectId, long sizeChange,
+  protected void propagateSizeUpwards(long objectId, long sizeChange, long replicatedSizeChange,
                                        int countChange, Map<Long, NSSummary> nsSummaryMap) 
                                        throws IOException {
     // Get the current directory's NSSummary
@@ -297,11 +446,16 @@ public class NSSummaryTaskDbEventHandler {
       if (parentSummary != null) {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
+        long parentReplSize = parentSummary.getReplicatedSizeOfFiles();
+        if (parentReplSize < 0) {
+          parentReplSize = 0;
+        }
+        parentSummary.setReplicatedSizeOfFiles(parentReplSize + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
-        
+
         // Recursively propagate to grandparents
-        propagateSizeUpwards(parentId, sizeChange, countChange, nsSummaryMap);
+        propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }
     }
   }

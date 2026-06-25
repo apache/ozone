@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -243,7 +245,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -254,7 +256,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -621,6 +623,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
               .getLocalNodeDetails(), conf);
 
+      // Create Ratis snapshot directory for test environment
+      String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+      HddsUtils.createDir(snapshotDir);
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -705,6 +710,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
           localhostWithFreePort());
+      // Bind SCM servers to 127.0.0.1 instead of the default 0.0.0.0.
+      // Without this, the bind address (0.0.0.0) leaks into OZONE_SCM_NAMES
+      // via updateListenAddress/getSCMAddresses, causing DataNodes to connect
+      // to 0.0.0.0 which gets routed to unreachable addresses on VPN.
+      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "127.0.0.1");
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());

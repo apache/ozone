@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPA
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.Collections;
@@ -519,7 +518,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         final OmDBTenantState dbTenantState = tableKeyValue.getValue();
         final String tenantId = dbTenantState.getTenantId();
         final String volumeName = dbTenantState.getBucketNamespaceName();
-        Preconditions.checkNotNull(volumeName);
+        Objects.requireNonNull(volumeName, "volumeName == null");
 
         mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName(),
             new PolicyInfo(tenantId, PolicyType.BUCKET_NAMESPACE_POLICY));

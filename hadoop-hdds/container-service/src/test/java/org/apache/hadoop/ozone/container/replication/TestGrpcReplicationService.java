@@ -150,7 +150,7 @@ class TestGrpcReplicationService {
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
-    when(importer.chooseNextVolume()).thenReturn(new HddsVolume.Builder(
+    when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
 
@@ -193,7 +193,7 @@ class TestGrpcReplicationService {
     ContainerReplicationSource source =
         new OnDemandContainerReplicationSource(containerController);
 
-    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null);
+    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null, containerController);
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 

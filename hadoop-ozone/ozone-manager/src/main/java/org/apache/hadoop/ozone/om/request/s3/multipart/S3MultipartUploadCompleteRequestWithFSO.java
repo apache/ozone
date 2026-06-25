@@ -94,7 +94,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        multipartOpenKey, omKeyInfo,
         keyName, transactionLogIndex);
 
   }
@@ -121,14 +121,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
         omKeyInfo.getFileName(), transactionLogIndex);
-  }
-
-  @Override
-  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
-                                     OmKeyInfo.Builder builder) {
-    // updates parentID and fileName
-    builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
-    builder.setFileName(dbOpenKeyInfo.getFileName());
   }
 
   @Override

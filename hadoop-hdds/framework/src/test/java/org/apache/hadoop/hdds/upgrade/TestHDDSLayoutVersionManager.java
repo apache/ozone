@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.upgrade;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,9 +52,9 @@ public class TestHDDSLayoutVersionManager {
     lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     //Cluster is finalized, hence should not register.
-    Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction(ON_FINALIZE);
+    Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction();
     assertFalse(action.isPresent());
-    action = DATANODE_SCHEMA_V2.datanodeAction(ON_FIRST_UPGRADE_START);
+    action = DATANODE_SCHEMA_V2.datanodeAction();
     assertFalse(action.isPresent());
 
     // Start from an unfinalized version manager.
@@ -66,19 +64,19 @@ public class TestHDDSLayoutVersionManager {
     doCallRealMethod().when(lvm).registerUpgradeActions(any());
     lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
-    action = INITIAL_VERSION.scmAction(ON_FINALIZE);
+    action = INITIAL_VERSION.scmAction();
     assertTrue(action.isPresent());
     assertEquals(MockScmUpgradeAction.class, action.get().getClass());
-    assertFalse(INITIAL_VERSION.datanodeAction(ON_FINALIZE).isPresent());
+    assertFalse(INITIAL_VERSION.datanodeAction().isPresent());
     MockComponent mockObj = mock(MockComponent.class);
     action.get().execute(mockObj);
     verify(mockObj, times(1)).mockMethodScm();
     verify(mockObj, times(0)).mockMethodDn();
 
-    action = DATANODE_SCHEMA_V2.datanodeAction(ON_FIRST_UPGRADE_START);
+    action = DATANODE_SCHEMA_V2.datanodeAction();
     assertTrue(action.isPresent());
     assertEquals(MockDnUpgradeAction.class, action.get().getClass());
-    assertFalse(DATANODE_SCHEMA_V2.scmAction(ON_FIRST_UPGRADE_START).isPresent());
+    assertFalse(DATANODE_SCHEMA_V2.scmAction().isPresent());
     mockObj = mock(MockComponent.class);
     action.get().execute(mockObj);
     verify(mockObj, times(0)).mockMethodScm();

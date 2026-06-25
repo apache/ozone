@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
@@ -24,17 +28,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,9 +49,6 @@ public final class OzoneSecurityUtil {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneSecurityUtil.class);
-  // List of ip's not recommended to be added to CSR.
-  private static final Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
-      "0.0.0.0", "127.0.0.1"));
 
   private OzoneSecurityUtil() {
   }
@@ -71,6 +65,23 @@ public final class OzoneSecurityUtil {
   }
 
   /**
+   * Check if authorization checks should be performed in Ozone.
+   * Authorization is only effective when security is enabled, unless test mode is enabled.
+   * This controls both admin privilege checks and ACL checks.
+   *
+   * @param conf Configuration source
+   * @return true if authorization checks should be performed
+   */
+  public static boolean isAuthorizationEnabled(ConfigurationSource conf) {
+    // Check if test mode is enabled (allows authorization without full security)
+    boolean testAuthorizationEnabled = conf.getBoolean(OZONE_TEST_AUTHORIZATION_ENABLED,
+        OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT);
+    return (isSecurityEnabled(conf) || testAuthorizationEnabled) &&
+        conf.getBoolean(OZONE_AUTHORIZATION_ENABLED,
+            OZONE_AUTHORIZATION_ENABLED_DEFAULT);
+  }
+
+  /**
    * Returns Keys status.
    *
    * @return True if the key files exist.
@@ -79,47 +90,6 @@ public final class OzoneSecurityUtil {
     File dir = path.toFile();
     return dir.exists()
         && new File(dir, fileName).exists();
-  }
-
-  /**
-   * Iterates through network interfaces and return all valid ip's not
-   * listed in CertificateSignRequest#INVALID_IPS.
-   *
-   * @return List<InetAddress>
-   * @throws IOException if no network interface are found or if an error
-   * occurs.
-   */
-  public static List<InetAddress> getValidInetsForCurrentHost()
-      throws IOException {
-    List<InetAddress> hostIps = new ArrayList<>();
-    InetAddressValidator ipValidator = InetAddressValidator.getInstance();
-
-    Enumeration<NetworkInterface> enumNI =
-        NetworkInterface.getNetworkInterfaces();
-    if (enumNI == null) {
-      throw new IOException("Unable to get network interfaces.");
-    }
-
-    while (enumNI.hasMoreElements()) {
-      NetworkInterface ifc = enumNI.nextElement();
-      if (ifc.isUp()) {
-        Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
-        while (enumAdds.hasMoreElements()) {
-          InetAddress addr = enumAdds.nextElement();
-
-          String hostAddress = addr.getHostAddress();
-          if (!INVALID_IPS.contains(hostAddress)
-              && ipValidator.isValid(hostAddress)) {
-            LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
-            hostIps.add(addr);
-          } else {
-            LOG.info("ip:{} not returned.", hostAddress);
-          }
-        }
-      }
-    }
-
-    return hostIps;
   }
 
   /**

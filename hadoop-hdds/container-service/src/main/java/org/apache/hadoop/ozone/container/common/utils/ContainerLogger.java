@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -177,17 +178,40 @@ public final class ContainerLogger {
     }
   }
 
-  private static String getMessage(ContainerData containerData,
-                                   String message) {
+  /**
+   * Logged when a container is successfully moved from one data volume to another.
+   *
+   * @param containerData The container after it has been moved to the destination volume.
+   * @param sourceVolume The source volume path.
+   * @param destinationVolume The destination volume path.
+   * @param containerSize The size of data moved from container in bytes.
+   * @param timeTaken The time taken for the move in milliseconds.
+   */
+  public static void logMoveSuccess(ContainerData containerData, StorageVolume sourceVolume,
+      StorageVolume destinationVolume, long containerSize, long timeTaken) {
+    LOG.info(getMessage(containerData,
+        "SrcVolume=" + sourceVolume,
+        "DestVolume=" + destinationVolume,
+        "Size=" + containerSize + " bytes",
+        "TimeTaken=" + timeTaken + " ms",
+        "Container is moved from SrcVolume to DestVolume"));
+  }
+
+  private static String getMessage(ContainerData containerData, String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);
   }
 
-  private static String getMessage(ContainerData containerData) {
+  private static String getMessage(ContainerData containerData, String... fields) {
     return String.join(FIELD_SEPARATOR,
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
         "State=" + containerData.getState(),
+        String.join(FIELD_SEPARATOR, fields));
+  }
+
+  private static String getMessage(ContainerData containerData) {
+    return getMessage(containerData,
         "Volume=" + containerData.getVolume(),
         "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }

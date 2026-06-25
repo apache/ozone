@@ -37,18 +37,15 @@ import org.junit.jupiter.api.io.TempDir;
  * Tests StatefulServiceStateManagerImpl.
  */
 public class TestStatefulServiceStateManagerImpl {
-  private OzoneConfiguration conf;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
-  private Table<String, ByteString> statefulServiceConfig;
   private StatefulServiceStateManager stateManager;
 
   @BeforeEach
   void setup(@TempDir File testDir) throws IOException {
-    conf = SCMTestUtils.getConf(testDir);
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    statefulServiceConfig =
-        SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(dbStore);
+    Table<String, ByteString> statefulServiceConfig = SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(dbStore);
     scmhaManager = SCMHAManagerStub.getInstance(true, dbStore);
     stateManager =
         StatefulServiceStateManagerImpl.newBuilder()

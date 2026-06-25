@@ -16,6 +16,10 @@
 
 set -u -o pipefail
 
+# Handle cancellation signals
+cancelled=false
+trap 'cancelled=true; echo "Caught cancellation signal, exiting..."; exit 130' SIGINT SIGTERM
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -31,7 +35,7 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
-MAVEN_OPTIONS="-B -V -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
+MAVEN_OPTIONS="-B -V -DskipDocs -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -62,6 +66,11 @@ mkdir -p "$REPORT_DIR"
 
 rc=0
 for i in $(seq 1 ${ITERATIONS}); do
+  if [[ "${cancelled}" == "true" ]]; then
+    echo "Cancellation detected, stopping test iterations"
+    break
+  fi
+
   if [[ ${ITERATIONS} -gt 1 ]]; then
     original_report_dir="${REPORT_DIR}"
     REPORT_DIR="${original_report_dir}/iteration${i}"

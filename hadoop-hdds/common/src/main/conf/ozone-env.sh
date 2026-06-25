@@ -17,8 +17,23 @@
 
 # Set Ozone-specific environment variables here.
 
-# Enable core dump when crash in C++
-ulimit -c unlimited
+# Enable core dump when crash in C++.
+# Ozone may invoke native components (e.g., RocksDB, JNI, or C++ libraries).
+# When a native crash occurs, enabling core dumps can help debugging.
+#
+# However, raising the core file size limit is not always allowed.
+# - 'ulimit -Hc' returns the hard limit for core size.
+#   If the hard limit is 0, core dumps are explicitly forbidden
+#   (common for non-root users or Docker containers started with
+#   '--ulimit core=0'). In such environments, attempting
+#   'ulimit -c unlimited' would always fail and print a warning.
+#
+# To avoid noisy warnings during CLI execution (e.g., ozone version),
+# we only attempt to raise the limit when the hard limit is non-zero,
+# and we silence any possible error for safety.
+if [ "$(ulimit -Hc 2>/dev/null || echo 0)" != 0 ]; then
+  ulimit -c unlimited 2>/dev/null || true
+fi
 
 # Many of the options here are built from the perspective that users
 # may want to provide OVERWRITING values on the command line.
@@ -139,6 +154,10 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # helper scripts # such as workers.sh, start-ozone.sh, etc.
 # export OZONE_WORKERS="${OZONE_CONF_DIR}/workers"
 
+# A space-separated list of worker host names, used as an alternative to the
+# OZONE_WORKERS file.  Only one of OZONE_WORKERS or OZONE_WORKER_NAMES may be set.
+# export OZONE_WORKER_NAMES=""
+
 ###
 # Options for all daemons
 ###
@@ -152,6 +171,15 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # or set differently in certain contexts (e.g., secure vs
 # non-secure)
 #
+
+# Extra Java runtime options for all Ozone server daemons (OM, SCM, DataNode,
+# S3 Gateway, Recon, HttpFS, CSI).  These get appended to OZONE_OPTS for such
+# daemons and are a convenient way to apply common options to all of them.
+# export OZONE_SERVER_OPTS=""
+
+# Simple override of the default log level used to build OZONE_ROOT_LOGGER and
+# OZONE_DAEMON_ROOT_LOGGER.  Defaults to INFO.
+# export OZONE_LOGLEVEL=INFO
 
 # Where (primarily) daemon log files are stored.
 # ${OZONE_HOME}/logs by default.
@@ -178,6 +206,15 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Java property: hadoop.root.logger
 # export OZONE_DAEMON_ROOT_LOGGER=INFO,RFA
 
+# Default log4j setting for the HTTP request log of interactive commands
+# Java property: ozone.http.request.logger
+# export OZONE_HTTP_REQUEST_LOGGER=INFO,console
+
+# Default log4j setting for the HTTP request log of daemons spawned explicitly by
+# --daemon option of ozone command.
+# Java property: ozone.http.request.logger
+# export OZONE_DAEMON_HTTP_REQUEST_LOGGER=INFO,HttpAccess
+
 # Default log level and output location for security-related messages.
 # You will almost certainly want to change this on a per-daemon basis via
 # the Java property (i.e., -Dhadoop.security.logger=foo).
@@ -191,16 +228,6 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Default name for the service level authorization file
 # Java property: hadoop.policy.file
 # export OZONE_POLICYFILE="hadoop-policy.xml"
-
-#
-# NOTE: this is not used by default!  <-----
-# You can define variables right here and then re-use them later on.
-# For example, it is common to use the same garbage collection settings
-# for all the daemons.  So one could define:
-#
-# export OZONE_GC_SETTINGS="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps"
-#
-# .. and then use it when setting OZONE_OM_OPTS, etc. below
 
 ###
 # Secure/privileged execution
@@ -218,6 +245,9 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # data transfer protocol using non-privileged ports.
 # export JSVC_HOME=/usr/bin
 
+# Extra arguments to pass to jsvc when launching secure/privileged daemons.
+# export OZONE_DAEMON_JSVC_EXTRA_OPTS=""
+
 #
 # This directory contains pids for secure and privileged processes.
 #export OZONE_SECURE_PID_DIR=${OZONE_PID_DIR}
@@ -225,14 +255,22 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 # This directory contains the logs for secure and privileged processes.
 # Java property: hadoop.log.dir
-# export OZONE_SECURE_LOG=${OZONE_LOG_DIR}
+# export OZONE_SECURE_LOG_DIR=${OZONE_LOG_DIR}
 
+###
+# Netty native (direct) memory caps (HDDS-11234)
+###
+# Both unshaded io.netty and the Ratis-shaded copy default their pooled
+# direct-memory ceiling to MaxDirectMemorySize (≈ -Xmx) per JVM, which
+# can let the resident size of a busy DataNode or S3 Gateway grow well
+# beyond the heap. To put a hard cap on each pool, export one or both
+# of the following before starting Ozone daemons. Values are raw byte
+# counts (suffixes like "m" or "g" are NOT supported by Netty's
+# property parser); for example, 536870912 = 512 MiB.
 #
-# When running a secure daemon, the default value of OZONE_IDENT_STRING
-# ends up being a bit bogus.  Therefore, by default, the code will
-# replace OZONE_IDENT_STRING with OZONE_xx_SECURE_USER.  If one wants
-# to keep OZONE_IDENT_STRING untouched, then uncomment this line.
-# export OZONE_SECURE_IDENT_PRESERVE="true"
+# For example, to cap each pool at 4 GiB on a DataNode with -Xmx16g:
+# export OZONE_NETTY_MAX_DIRECT_MEMORY=4294967296
+# export OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY=4294967296
 
 ###
 # Ozone Manager specific parameters
@@ -260,6 +298,57 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # and therefore may override any similar flags set in OZONE_OPTS
 #
 # export OZONE_SCM_OPTS=""
+
+###
+# S3 Gateway specific parameters
+###
+# Specify the JVM options to be used when starting the S3 Gateway.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_S3G_OPTS=""
+
+###
+# Recon specific parameters
+###
+# Specify the JVM options to be used when starting Recon.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_RECON_OPTS=""
+
+###
+# HttpFS Gateway specific parameters
+###
+# Specify the JVM options to be used when starting the HttpFS Gateway.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_HTTPFS_OPTS=""
+
+###
+# CSI server specific parameters
+###
+# Specify the JVM options to be used when starting the CSI server.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_CSI_OPTS=""
+
+###
+# Client and tool command specific parameters
+###
+# Specify the JVM options to be used when running the corresponding command
+# (ozone sh, fs, admin, debug, freon, vapor).  These options will be appended
+# to the options specified as OZONE_OPTS and therefore may override any
+# similar flags set in OZONE_OPTS
+#
+# export OZONE_SH_OPTS=""
+# export OZONE_FS_OPTS=""
+# export OZONE_ADMIN_OPTS=""
+# export OZONE_DEBUG_OPTS=""
+# export OZONE_FREON_OPTS=""
+# export OZONE_VAPOR_OPTS=""
 
 ###
 # Advanced Users Only!

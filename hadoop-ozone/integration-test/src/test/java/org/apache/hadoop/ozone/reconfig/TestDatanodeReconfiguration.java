@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
@@ -54,6 +55,7 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
         .add(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT)
         .add(REPLICATION_STREAMS_LIMIT_KEY)
         .addAll(new DatanodeConfiguration().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
@@ -61,9 +63,8 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
 
   @Test
   void blockDeletingLimitPerInterval() throws ReconfigurationException {
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         "hdds.datanode.block.deleting.limit.per.interval", "1");
-
     assertEquals(1, getFirstDatanode().getDatanodeStateMachine().getContainer()
         .getBlockDeletingService().getBlockLimitPerInterval());
   }
@@ -76,8 +77,9 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
             .getDeleteBlocksCommandHandler()).getExecutor();
     int newValue = executor.getMaximumPoolSize() + delta;
 
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, String.valueOf(newValue));
+
     assertEquals(newValue, executor.getMaximumPoolSize());
     assertEquals(newValue, executor.getCorePoolSize());
   }
@@ -90,7 +92,7 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
             .getReplicationServer().getExecutor();
     int newValue = executor.getCorePoolSize() + delta;
 
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         REPLICATION_STREAMS_LIMIT_KEY, String.valueOf(newValue));
     assertEquals(newValue, executor.getMaximumPoolSize());
     assertEquals(newValue, executor.getCorePoolSize());

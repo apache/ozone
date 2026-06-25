@@ -20,8 +20,16 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.security.MessageDigest;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ozone.test.InputSubstream;
 
@@ -29,6 +37,8 @@ import org.apache.ozone.test.InputSubstream;
  * Utilities for S3 SDK tests.
  */
 public final class S3SDKTestUtils {
+
+  public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
 
   private S3SDKTestUtils() {
   }
@@ -75,5 +85,47 @@ public final class S3SDKTestUtils {
 
     file.getFD().sync();
     file.close();
+  }
+
+  /**
+   * Extract the UploadId from XML string.
+   *
+   * @param xml The XML string.
+   * @return The UploadId, or null if not found.
+   */
+  public static String extractUploadId(String xml) {
+    Matcher matcher = UPLOAD_ID_PATTERN.matcher(xml);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+
+  /**
+   * Open an HttpURLConnection with the given parameters.
+   *
+   * @param url        The URL to connect to.
+   * @param httpMethod The HTTP method to use (e.g., "GET", "PUT", "POST", etc.).
+   * @param headers    A map of request headers to set. Can be null.
+   * @param body       The request body as a byte array. Can be null.
+   * @return An open HttpURLConnection.
+   * @throws IOException If an I/O error occurs.
+   */
+  public static HttpURLConnection openHttpURLConnection(URL url, String httpMethod, Map<String, List<String>> headers,
+                                                        byte[] body) throws IOException {
+    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    connection.setRequestMethod(httpMethod);
+    if (headers != null) {
+      headers.forEach((key, values) -> values.forEach(value -> connection.addRequestProperty(key, value)));
+    }
+
+    if (body != null) {
+      connection.setDoOutput(true);
+      try (OutputStream os = connection.getOutputStream()) {
+        IOUtils.write(body, os);
+        os.flush();
+      }
+    }
+    return connection;
   }
 }

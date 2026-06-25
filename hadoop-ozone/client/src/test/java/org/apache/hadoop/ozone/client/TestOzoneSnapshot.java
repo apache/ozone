@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
@@ -40,7 +41,7 @@ public class TestOzoneSnapshot {
     when(snapshotInfo.getSnapshotStatus()).thenReturn(SNAPSHOT_ACTIVE);
     when(snapshotInfo.getSnapshotId()).thenReturn(snapshotId);
     when(snapshotInfo.getSnapshotPath()).thenReturn("volume/bucket");
-    when(snapshotInfo.getCheckpointDir()).thenReturn("checkpointDir");
+    when(snapshotInfo.getCheckpointDirName(eq(0))).thenReturn("checkpointDir");
     when(snapshotInfo.getReferencedSize()).thenReturn(1000L);
     when(snapshotInfo.getReferencedReplicatedSize()).thenReturn(3000L);
     when(snapshotInfo.getExclusiveSize()).thenReturn(4000L);

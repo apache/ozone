@@ -51,6 +51,9 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of blocks pending for processing.")
   private MutableGaugeLong totalPendingBlockCount;
 
+  @Metric(about = "The total bytes used by blocks pending for deletion.")
+  private MutableGaugeLong totalPendingBlockBytes;
+
   @Metric(about = "The total number of DeleteBlockTransaction received")
   private MutableCounterLong receivedTransactionCount;
 
@@ -84,7 +87,7 @@ public final class BlockDeletingServiceMetrics {
   private BlockDeletingServiceMetrics() {
   }
 
-  public static BlockDeletingServiceMetrics create() {
+  public static synchronized BlockDeletingServiceMetrics create() {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "BlockDeletingService",
@@ -97,7 +100,7 @@ public final class BlockDeletingServiceMetrics {
   /**
    * Unregister the metrics instance.
    */
-  public static void unRegister() {
+  public static synchronized void unRegister() {
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
@@ -155,6 +158,10 @@ public final class BlockDeletingServiceMetrics {
     this.totalPendingBlockCount.set(count);
   }
 
+  public void setTotalPendingBlockBytes(long bytes) {
+    this.totalPendingBlockBytes.set(bytes);
+  }
+
   public void incrTotalLockTimeoutTransactionCount() {
     totalLockTimeoutTransactionCount.incr();
   }
@@ -181,6 +188,10 @@ public final class BlockDeletingServiceMetrics {
 
   public long getTotalPendingBlockCount() {
     return totalPendingBlockCount.value();
+  }
+
+  public long getTotalPendingBlockBytes() {
+    return totalPendingBlockBytes.value();
   }
 
   public long getTotalBlockChosenCount() {
@@ -212,6 +223,7 @@ public final class BlockDeletingServiceMetrics {
         .append("outOfOrderDeleteBlockTransactionCount = ")
         .append(outOfOrderDeleteBlockTransactionCount.value()).append('\t')
         .append("totalPendingBlockCount = ").append(totalPendingBlockCount.value()).append('\t')
+        .append("totalPendingBlockBytes = ").append(totalPendingBlockBytes.value()).append('\t')
         .append("totalBlockChosenCount = ").append(totalBlockChosenCount.value()).append('\t')
         .append("totalContainerChosenCount = ").append(totalContainerChosenCount.value()).append('\t')
         .append("receivedTransactionCount = ").append(receivedTransactionCount.value()).append('\t')

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -76,7 +75,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
 
   private final OzoneProtocolMessageDispatcher<SCMBlockLocationRequest,
-      SCMBlockLocationResponse, ProtocolMessageEnum>
+      SCMBlockLocationResponse, ScmBlockLocationProtocolProtos.Type>
       dispatcher;
 
   /**
@@ -87,7 +86,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public ScmBlockLocationProtocolServerSideTranslatorPB(
       ScmBlockLocationProtocol impl,
       StorageContainerManager scm,
-      ProtocolMessageMetrics<ProtocolMessageEnum> metrics)
+      ProtocolMessageMetrics<ScmBlockLocationProtocolProtos.Type> metrics)
       throws IOException {
     this.impl = impl;
     this.scm = scm;

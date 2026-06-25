@@ -38,10 +38,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.io_.retry.RetryPolicies;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -227,15 +227,16 @@ public class SCMConnectionManager
   public void removeSCMServer(InetSocketAddress address) throws IOException {
     writeLock();
     try {
-      if (!scmMachines.containsKey(address)) {
+      EndpointStateMachine endPoint = scmMachines.remove(address);
+      if (endPoint == null) {
         LOG.warn("Trying to remove a non-existent SCM machine. " +
             "Ignoring the request.");
         return;
       }
-
-      EndpointStateMachine endPoint = scmMachines.get(address);
+      // This is a normal reconfiguration removal. Do not set the endpoint to
+      // SHUTDOWN, as an in-flight task may report that state as a DN fatal
+      // shutdown.
       endPoint.close();
-      scmMachines.remove(address);
     } finally {
       writeUnlock();
     }
@@ -270,6 +271,18 @@ public class SCMConnectionManager
     readLock();
     try {
       return unmodifiableList(new ArrayList<>(scmMachines.values()));
+    } finally {
+      readUnlock();
+    }
+  }
+
+  /**
+   * @return the number of connections (both SCM and Recon)
+   */
+  public int getNumOfConnections() {
+    readLock();
+    try {
+      return scmMachines.size();
     } finally {
       readUnlock();
     }

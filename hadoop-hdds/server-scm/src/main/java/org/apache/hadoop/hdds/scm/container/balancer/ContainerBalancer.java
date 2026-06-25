@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer extends StatefulService {
+public class ContainerBalancer extends StatefulService<ContainerBalancerConfigurationProto> {
 
   private static final AtomicInteger ID = new AtomicInteger();
 
@@ -64,7 +65,8 @@ public class ContainerBalancer extends StatefulService {
    * @param scm the storage container manager
    */
   public ContainerBalancer(StorageContainerManager scm) {
-    super(scm.getStatefulServiceStateManager());
+    super(scm.getStatefulServiceStateManager(),
+        ContainerBalancerConfigurationProto.getDefaultInstance().getParserForType());
     this.scm = scm;
     this.ozoneConfiguration = scm.getConfiguration();
     this.config = ozoneConfiguration.getObject(
@@ -130,8 +132,7 @@ public class ContainerBalancer extends StatefulService {
   @Override
   public boolean shouldRun() {
     try {
-      ContainerBalancerConfigurationProto proto =
-          readConfiguration(ContainerBalancerConfigurationProto.class);
+      final ContainerBalancerConfigurationProto proto = readConfiguration();
       if (proto == null) {
         LOG.warn("Could not find persisted configuration for {} when checking" +
             " if ContainerBalancer should run. ContainerBalancer should not " +
@@ -208,14 +209,6 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * @return Name of this service.
-   */
-  @Override
-  public String getServiceName() {
-    return ContainerBalancer.class.getSimpleName();
-  }
-
-  /**
    * Starts ContainerBalancer as an SCMService. Validates state, reads and
    * validates persisted configuration, and then starts the balancing
    * thread.
@@ -232,9 +225,9 @@ public class ContainerBalancer extends StatefulService {
     try {
       // should be leader-ready, out of safe mode, and not running already
       validateState(false);
-      ContainerBalancerConfigurationProto proto;
+      final ContainerBalancerConfigurationProto proto;
       try {
-        proto = readConfiguration(ContainerBalancerConfigurationProto.class);
+        proto = readConfiguration();
       } catch (IOException e) {
         throw new InvalidContainerBalancerConfigurationException("Could not " +
             "retrieve persisted configuration while starting " +
@@ -308,16 +301,13 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Validates balancer's state based on the specified expectedRunning.
+   * Validates balancer's eligibility based on SCM state.
    * Confirms SCM is leader-ready and out of safe mode.
    *
-   * @param expectedRunning true if ContainerBalancer is expected to be
-   *                        running, else false
    * @throws IllegalContainerBalancerStateException if SCM is not
-   * leader-ready, is in safe mode, or state does not match the specified
-   * expected state
+   * leader-ready or is in safe mode
    */
-  private void validateState(boolean expectedRunning)
+  private void validateEligibility()
       throws IllegalContainerBalancerStateException {
     if (!scmContext.isLeaderReady()) {
       LOG.warn("SCM is not leader ready");
@@ -328,6 +318,19 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn("SCM is in safe mode");
       throw new IllegalContainerBalancerStateException("SCM is in safe mode");
     }
+  }
+
+  /**
+   * Validates balancer's state based on the specified expectedRunning.
+   *
+   * @param expectedRunning true if ContainerBalancer is expected to be
+   *                        running, else false
+   * @throws IllegalContainerBalancerStateException if state does not
+   * match the specified expected state
+   */
+  private void validateState(boolean expectedRunning)
+      throws IllegalContainerBalancerStateException {
+    validateEligibility();
     if (!expectedRunning && !canBalancerStart()) {
       throw new IllegalContainerBalancerStateException(
           "Expect ContainerBalancer as not running state" +
@@ -387,18 +390,22 @@ public class ContainerBalancer extends StatefulService {
    */
   public void stopBalancer()
       throws IOException, IllegalContainerBalancerStateException {
-    Thread balancingThread;
+    Thread balancingThread = null;
     lock.lock();
     try {
-      validateState(true);
+      validateEligibility();
       saveConfiguration(config, false, 0);
-      LOG.info("Trying to stop ContainerBalancer service.");
-      task.stop();
-      balancingThread = currentBalancingThread;
+      if (isBalancerRunning()) {
+        LOG.info("Trying to stop ContainerBalancer service.");
+        task.stop();
+        balancingThread = currentBalancingThread;
+      }
     } finally {
       lock.unlock();
     }
-    blockTillTaskStop(balancingThread);
+    if (balancingThread != null) {
+      blockTillTaskStop(balancingThread);
+    }
   }
 
   public void saveConfiguration(ContainerBalancerConfiguration configuration,
@@ -478,6 +485,9 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn(msg);
       throw new InvalidContainerBalancerConfigurationException(msg);
     }
+
+    validateNodeList(conf.getIncludeNodes(), "included");
+    validateNodeList(conf.getExcludeNodes(), "excluded");
   }
 
   public ContainerBalancerMetrics getMetrics() {
@@ -495,5 +505,30 @@ public class ContainerBalancer extends StatefulService {
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
+  }
+
+  /**
+   * Validates if the provided datanodes are known by SCM.
+   *
+   * @param nodes set of datanode hostnames or IP addresses
+   * @param type context label for the error message
+   * @throws InvalidContainerBalancerConfigurationException if a node is unknown
+   */
+  private void validateNodeList(Set<String> nodes, String type)
+      throws InvalidContainerBalancerConfigurationException {
+    if (nodes == null || nodes.isEmpty()) {
+      return;
+    }
+
+    for (String node : nodes) {
+      // Check if SCM knows about this node by hostname or IP
+      if (scm.getScmNodeManager().getNodesByAddress(node).isEmpty()) {
+        String errorMessage = String.format("Invalid configuration: The %s datanode '%s' " +
+                "does not exist or is not registered with SCM. Please check the hostname/IP.",
+            type, node);
+        LOG.warn(errorMessage);
+        throw new InvalidContainerBalancerConfigurationException(errorMessage);
+      }
+    }
   }
 }

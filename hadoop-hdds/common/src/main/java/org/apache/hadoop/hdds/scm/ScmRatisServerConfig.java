@@ -34,7 +34,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
     + "." + RaftServerConfigKeys.PREFIX)
 public class ScmRatisServerConfig {
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
-  @Config(key = "log.appender.wait-time.min",
+  @Config(key = "ozone.scm.ha.raft.server.log.appender.wait-time.min",
       defaultValue = "0ms",
       type = ConfigType.TIME,
       tags = {OZONE, SCM, RATIS, PERFORMANCE},

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -485,5 +488,29 @@ public final class TestHelper {
         return false;
       }
     }, 2000, 20000);
+  }
+
+  /**
+   * Defines the replication configs and required DN counts for different replication types (such as RATIS and EC).
+   */
+  public enum ReplicationInput {
+    RATIS(3, RatisReplicationConfig.getInstance(THREE)),
+    EC(5, new ECReplicationConfig(3, 2));
+
+    private final int numDatanodes;
+    private final ReplicationConfig replicationConfig;
+
+    ReplicationInput(int numDatanodes, ReplicationConfig replicationConfig) {
+      this.numDatanodes = numDatanodes;
+      this.replicationConfig = replicationConfig;
+    }
+
+    int getNumDatanodes() {
+      return numDatanodes;
+    }
+
+    ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
   }
 }

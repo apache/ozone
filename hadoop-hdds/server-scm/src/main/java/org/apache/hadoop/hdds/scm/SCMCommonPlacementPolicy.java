@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -272,7 +273,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -297,8 +298,7 @@ public abstract class SCMCommonPlacementPolicy implements
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
-                                       long dataSizeRequired,
-                                       ConfigurationSource conf) {
+                                       long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForData = false;
@@ -411,6 +411,18 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return The max number of replicas per rack
    */
   protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks <= 0) {
+      // No rack information means there is no per-rack constraint to
+      // enforce. Callers are expected to short-circuit before reaching
+      // here, but guard the divide site against transient empty-topology
+      // windows (HDDS-15350). The WARN makes the silent path observable;
+      // configure log4j appender-side filtering if it floods.
+      LOG.warn("Empty rack topology in placement validation: numReplicas={} "
+          + "numberOfRacks={}; returning numReplicas to avoid divide-by-zero "
+          + "(HDDS-15350).",
+          numReplicas, numberOfRacks);
+      return numReplicas;
+    }
     return numReplicas / numberOfRacks
             + Math.min(numReplicas % numberOfRacks, 1);
   }
@@ -436,7 +448,16 @@ public abstract class SCMCommonPlacementPolicy implements
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
-    if (topology == null || replicas == 1 || requiredRacks == 1) {
+    // The leaf nodes are all at max level, so the number of nodes at
+    // maxLevel - 1 is the rack count. Compute up front so we can
+    // short-circuit when the topology has no rack information, which
+    // would otherwise reach getMaxReplicasPerRack with numberOfRacks
+    // == 0 (HDDS-15350: transient empty-topology window during a DN
+    // decommission crashed the ReplicationMonitor with "/ by zero").
+    final int numRacks = topology == null ? 0
+        : topology.getNumOfNodes(topology.getMaxLevel() - 1);
+    if (topology == null || replicas == 1 || requiredRacks <= 1
+        || numRacks <= 0) {
       if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
@@ -445,16 +466,32 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .map(this::getPlacementGroup)
+        .map(dn -> {
+          Node rack = getPlacementGroup(dn);
+          if (rack == null) {
+            try {
+              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+              if (nodeStatus.isDead() && nodeStatus.isMaintenance()) {
+                LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.", dn.getNetworkLocation(), dn);
+                return dn.getNetworkLocation();
+              }
+              return null;
+            } catch (NodeNotFoundException e) {
+              LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
+              return null;
+            }
+          }
+          /*
+          data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
+          the network full path of rack1.
+          */
+          return rack.getNetworkFullPath();
+        })
         .filter(Objects::nonNull)
         .collect(Collectors.groupingBy(
             Function.identity(),
             Collectors.reducing(0, e -> 1, Integer::sum)))
         .values());
-    final int maxLevel = topology.getMaxLevel();
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
@@ -502,9 +539,7 @@ public abstract class SCMCommonPlacementPolicy implements
       return false;
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
-    if (nodeStatus.isNodeWritable() &&
-        (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-            dataSizeRequired, conf))) {
+    if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo, metadataSizeRequired, dataSizeRequired))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -28,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -74,7 +74,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
     KeyArgs keyArgs =
         multipartInfoInitiateRequest.getKeyArgs();
 
-    Preconditions.checkNotNull(keyArgs.getMultipartUploadID());
+    Objects.requireNonNull(keyArgs.getMultipartUploadID(), "multipartUploadID == null");
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());
@@ -204,7 +204,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(), keyName,
+          multipartOpenKey, omKeyInfo, keyName,
               transactionLogIndex);
 
       // Add to cache

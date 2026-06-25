@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -56,10 +57,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
@@ -103,6 +104,16 @@ import org.slf4j.event.Level;
 class TestReconAndAdminContainerCLI {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
+
+  /** Pause between SCM/Recon checks while waiting for matching reports. */
+  private static final int RM_RECON_COMPARE_POLL_INTERVAL_MS = 1000;
+  /** Max wait (Recon can trail SCM briefly). */
+  private static final int RM_RECON_COMPARE_WAIT_MS = 90_000;
+  /**
+   * Two matches in a row on purpose. A single agreeing poll can be luck while RM and Recon counts
+   * are still drifting past each other (HDDS-15223).
+   */
+  private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -202,7 +213,7 @@ class TestReconAndAdminContainerCLI {
     GenericTestUtils.waitFor(() -> {
       try {
         return scmClient.getReplicationManagerReport()
-                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 1;
+                   .getStat(ContainerHealthState.MISSING) == 1;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -310,18 +321,22 @@ class TestReconAndAdminContainerCLI {
   }
 
   /**
-   * The purpose of this method, isn't to validate the numbers
-   * but to make sure that they are consistent between
-   * Recon and the ReplicationManager.
+   * Checks that SCM's replication manager and Recon show the same unhealthy stats
+   * (counts and RM sample IDs in Recon's list). Waits until that lines up for a short
+   * stretch of time so a one-off tick does not hide a real mismatch (HDDS-15223).
    */
   private static void compareRMReportToReconResponse(UnHealthyContainerStates containerState)
       throws Exception {
     assertNotNull(containerState);
 
-    // Both threads are running every 1 second.
-    // Wait until all values are equal.
-    GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
-        1000, 40000);
+    AtomicInteger stablePolls = new AtomicInteger(0);
+    GenericTestUtils.waitFor(() -> {
+      if (assertReportsMatch(containerState)) {
+        return stablePolls.incrementAndGet() >= RM_RECON_COMPARE_STABLE_POLLS;
+      }
+      stablePolls.set(0);
+      return false;
+    }, RM_RECON_COMPARE_POLL_INTERVAL_MS, RM_RECON_COMPARE_WAIT_MS);
   }
 
   private static boolean assertReportsMatch(UnHealthyContainerStates state) {
@@ -333,10 +348,10 @@ class TestReconAndAdminContainerCLI {
       reconResponse = TestReconEndpointUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
-      assertEquals(rmReport.getStat(HealthState.MISSING), reconResponse.getMissingCount());
-      assertEquals(rmReport.getStat(HealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
-      assertEquals(rmReport.getStat(HealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
-      assertEquals(rmReport.getStat(HealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
     } catch (IOException e) {
       LOG.info("Error getting report", e);
       return false;
@@ -348,20 +363,20 @@ class TestReconAndAdminContainerCLI {
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
     // found in Recon's list of containers for a particular state.
-    HealthState rmState = HealthState.UNHEALTHY;
+    ContainerHealthState rmState = ContainerHealthState.UNHEALTHY;
 
     if (state.equals(UnHealthyContainerStates.MISSING) &&
         reconResponse.getMissingCount() > 0) {
-      rmState = HealthState.MISSING;
+      rmState = ContainerHealthState.MISSING;
     } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
                reconResponse.getUnderReplicatedCount() > 0) {
-      rmState = HealthState.UNDER_REPLICATED;
+      rmState = ContainerHealthState.UNDER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
                reconResponse.getOverReplicatedCount() > 0) {
-      rmState = HealthState.OVER_REPLICATED;
+      rmState = ContainerHealthState.OVER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
                reconResponse.getMisReplicatedCount() > 0) {
-      rmState = HealthState.MIS_REPLICATED;
+      rmState = ContainerHealthState.MIS_REPLICATED;
     }
 
     List<ContainerID> rmContainerIDs = rmReport.getSample(rmState);
@@ -457,6 +472,8 @@ class TestReconAndAdminContainerCLI {
         1, SECONDS);
     CONF.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, SECONDS);
+    // Configure multiple task threads for concurrent task execution
+    CONF.setInt("ozone.recon.task.thread.count", 6);
     CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");

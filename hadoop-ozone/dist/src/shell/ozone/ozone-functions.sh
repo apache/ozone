@@ -48,14 +48,14 @@ function ozone_debug
 ## @replaceable yes
 function ozone_validate_classpath_usage
 {
-  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
+  description=$'The --validate flag checks that all jars required for the command are present on the classpath\n\n'
   usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
   options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
   ozone_error "${description}${usage_text}${options}"
   exit 1
 }
 
-## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
+## @description Validates that all jars required for the command are present on the classpath
 ## @audience private
 ## @stability evolving
 ## @replaceable yes
@@ -890,6 +890,8 @@ function ozone_basic_init
   OZONE_PID_DIR=${OZONE_PID_DIR:-/tmp}
   OZONE_ROOT_LOGGER=${OZONE_ROOT_LOGGER:-${OZONE_LOGLEVEL},console}
   OZONE_DAEMON_ROOT_LOGGER=${OZONE_DAEMON_ROOT_LOGGER:-${OZONE_LOGLEVEL},RFA}
+  OZONE_HTTP_REQUEST_LOGGER=${OZONE_HTTP_REQUEST_LOGGER:-INFO,console}
+  OZONE_DAEMON_HTTP_REQUEST_LOGGER=${OZONE_DAEMON_HTTP_REQUEST_LOGGER:-INFO,HttpAccess}
   OZONE_SECURITY_LOGGER=${OZONE_SECURITY_LOGGER:-INFO,NullAppender}
   OZONE_SSH_OPTS=${OZONE_SSH_OPTS-"-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10s"}
   OZONE_SECURE_LOG_DIR=${OZONE_SECURE_LOG_DIR:-${OZONE_LOG_DIR}}
@@ -1420,6 +1422,17 @@ function ozone_java_setup
     RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
   fi
 
+  # Opt-in caps on Netty's pooled direct-memory arena (HDDS-11234). Two
+  # properties are needed because Ozone runs both the unshaded io.netty
+  # *and* the Ratis-shaded copy in the same JVM, each with its own
+  # independent ceiling.
+  if [[ -n "${OZONE_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    OZONE_OPTS="-Dio.netty.maxDirectMemory=${OZONE_NETTY_MAX_DIRECT_MEMORY} ${OZONE_OPTS}"
+  fi
+  if [[ -n "${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.maxDirectMemory=${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY} ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -1520,17 +1533,15 @@ function ozone_translate_cygwin_path
 ## @replaceable  yes
 function ozone_add_default_gc_opts
 {
-  java_major_version=$(ozone_get_java_major_version)
   if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
-    if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
-      OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
-      if [[ "$java_major_version" -lt 15 ]]; then
-        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
-      else
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
-      fi
+    local gc_opts
+    local java_major_version
+    java_major_version=$(ozone_get_java_major_version)
+    gc_opts="-XX:ParallelGCThreads=8"
+    if [[ "$java_major_version" -lt 15 ]]; then
+      gc_opts="${gc_opts} -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
+    ozone_add_param OZONE_OPTS XX "${gc_opts}"
   fi
 }
 
@@ -1590,6 +1601,7 @@ function ozone_finalize_opts
   ozone_add_param OZONE_OPTS hadoop.home.dir "-Dhadoop.home.dir=${OZONE_HOME}"
   ozone_add_param OZONE_OPTS hadoop.id.str "-Dhadoop.id.str=${OZONE_IDENT_STRING}"
   ozone_add_param OZONE_OPTS hadoop.root.logger "-Dhadoop.root.logger=${OZONE_ROOT_LOGGER}"
+  ozone_add_param OZONE_OPTS ozone.http.request.logger "-Dozone.http.request.logger=${OZONE_HTTP_REQUEST_LOGGER}"
   ozone_add_param OZONE_OPTS hadoop.policy.file "-Dhadoop.policy.file=${OZONE_POLICYFILE}"
   ozone_add_param OZONE_OPTS hadoop.security.logger "-Dhadoop.security.logger=${OZONE_SECURITY_LOGGER}"
 }
@@ -2721,6 +2733,7 @@ function ozone_generic_java_subcmd_handler
   # if yes, use the daemon logger and the appropriate log file.
   if [[ "${OZONE_DAEMON_MODE}" != "default" ]]; then
     OZONE_ROOT_LOGGER="${OZONE_DAEMON_ROOT_LOGGER}"
+    OZONE_HTTP_REQUEST_LOGGER="${OZONE_DAEMON_HTTP_REQUEST_LOGGER}"
     if [[ "${OZONE_SUBCMD_SECURESERVICE}" = true ]]; then
       OZONE_LOGFILE="ozone-${OZONE_SECURE_USER}-${OZONE_IDENT_STRING}-${OZONE_SUBCMD}-${HOSTNAME}.log"
     else
@@ -2799,6 +2812,33 @@ function ozone_validate_classpath_util
   fi
 }
 
+## @description Add items from .classpath file to the classpath
+## @audience private
+## @stability evolving
+## @replaceable no
+function ozone_add_classpath_from_file() {
+  local classpath_file="$1"
+
+  if [[ ! -e "$classpath_file" ]]; then
+    echo "Skip non-existent classpath file: $classpath_file" >&2
+    return
+  fi
+
+  local classpath
+  # shellcheck disable=SC1090,SC2086
+  source "$classpath_file"
+  local original_ifs=$IFS
+  IFS=':'
+
+  local jar
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    ozone_add_classpath "$jar"
+  done
+
+  IFS=$original_ifs
+}
+
 ## @description Add all the required jar files to the classpath
 ## @audience private
 ## @stability evolving
@@ -2818,15 +2858,7 @@ function ozone_assemble_classpath() {
     echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
     exit 255
   fi
-  # shellcheck disable=SC1090,SC2086
-  source "$CLASSPATH_FILE"
-  OIFS=$IFS
-  IFS=':'
-
-  # shellcheck disable=SC2154
-  for jar in $classpath; do
-    ozone_add_classpath "$jar"
-  done
+  ozone_add_classpath_from_file "$CLASSPATH_FILE"
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
 
   #Add optional jars to the classpath
@@ -2835,9 +2867,6 @@ function ozone_assemble_classpath() {
   if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
     ozone_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
   fi
-
-  # TODO can be moved earlier? (after 'for jar in $classpath' loop)
-  IFS=$OIFS
 }
 
 ## @description  Fallback to value of `oldvar` if `newvar` is undefined
@@ -2923,4 +2952,33 @@ function ozone_set_deprecated_hadoop_vars
   for suffix in "$@"; do
     ozone_set_deprecated_var "HADOOP_${suffix}" "OZONE_${suffix}"
   done
+}
+
+## @description  Check if command is one that was moved from freon to vapor
+function ozone_is_freon_command_moved_to_vapor
+{
+  local opt subcommand
+
+  for opt in "${OZONE_SUBCMD_ARGS[@]}"; do
+    for subcommand in \
+        cgdn \
+        cgom \
+        cgscm \
+        cmdw chunk-manager-disk-write \
+        cr container-replicator \
+        falg follower-append-log-generator \
+        lalg leader-append-log-generator \
+        simulate-datanode \
+        stb scm-throughput-benchmark \
+        strmg streaming-generator
+    do
+      if [[ "$opt" == "$subcommand" ]]; then
+        echo "WARN: 'ozone freon $subcommand' is changed to 'ozone vapor $subcommand'." >&2
+        echo "      Please update your scripts since 'ozone freon $subcommand' may no longer" >&2
+        echo "      work in future releases." >&2
+        return 0
+      fi
+    done
+  done
+  return 1
 }

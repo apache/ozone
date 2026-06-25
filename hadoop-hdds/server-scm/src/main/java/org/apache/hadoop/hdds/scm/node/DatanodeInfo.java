@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,11 @@ public class DatanodeInfo extends DatanodeDetails {
   private long lastStatsUpdatedTime;
   private int failedVolumeCount;
 
+  /**
+   * Two-window tumbling bucket for tracking pending container allocations on this datanode.
+   */
+  private final TwoWindowBucket pendingContainerAllocations;
+
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
@@ -64,7 +70,7 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param layoutInfo Details about the LayoutVersionProto
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-        LayoutVersionProto layoutInfo) {
+       LayoutVersionProto layoutInfo, long containerRollIntervalMs) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
@@ -75,6 +81,7 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
+    this.pendingContainerAllocations = new TwoWindowBucket(this.getID(), containerRollIntervalMs);
   }
 
   /**
@@ -351,6 +358,14 @@ public class DatanodeInfo extends DatanodeDetails {
     } finally {
       lock.readLock().unlock();
     }
+  }
+
+  /**
+   * Returns the {@link TwoWindowBucket} for this datanode.
+   */
+  public TwoWindowBucket getPendingContainerAllocations() {
+    pendingContainerAllocations.rollIfNeeded();
+    return pendingContainerAllocations;
   }
 
   @Override

@@ -66,13 +66,10 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestPipelinePlacementFactory {
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
-  private NodeManager nodeManagerBase;
   private PipelineStateManager stateManager;
   private NetworkTopologyImpl cluster;
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
-  private DBStore dbStore;
-  private SCMHAManager scmhaManager;
 
   private static final long STORAGE_CAPACITY = 100L;
 
@@ -106,7 +103,8 @@ public class TestPipelinePlacementFactory {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(
@@ -123,7 +121,7 @@ public class TestPipelinePlacementFactory {
           new ArrayList<>(Arrays.asList(metaStorage1)));
       dnInfos.add(datanodeInfo);
     }
-    nodeManagerBase = new MockNodeManager(cluster, datanodes,
+    NodeManager nodeManagerBase = new MockNodeManager(cluster, datanodes,
         false, 10);
     nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
@@ -131,8 +129,8 @@ public class TestPipelinePlacementFactory {
           .thenReturn(dn);
     }
 
-    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
 
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))

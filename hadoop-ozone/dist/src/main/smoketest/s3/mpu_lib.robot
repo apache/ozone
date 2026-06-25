@@ -42,6 +42,7 @@ Upload MPU part
     IF    '${expected_rc}' == '0'
         Should contain    ${result}    ETag
         ${etag} =      Execute    echo '${result}' | jq -r '.ETag'
+        ${etag} =      Replace String    ${etag}    \"    ${EMPTY}
         ${md5sum} =    Execute    md5sum ${file} | awk '{print $1}'
         Should Be Equal As Strings    ${etag}    ${md5sum}
         RETURN    ${etag}

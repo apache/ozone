@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -128,6 +129,8 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testPreExecuteBadOwner() {
+    when(getOzoneManager().isAdminAuthorizationEnabled()).thenReturn(true);
+
     // Owner is not set for the request.
     OMRequest omRequest = deleteSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName);
@@ -152,12 +155,13 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
     // add key to cache
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(getVolumeName(), getBucketName(),
-        snapshotName, null, Time.now());
+        snapshotName, UUID.randomUUID(), Time.now());
     assertEquals(SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
     getOmMetadataManager().getSnapshotInfoTable().addCacheEntry(
         new CacheKey<>(key),
         CacheValue.get(1L, snapshotInfo));
 
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMSnapshotDeleteRequest.class);
     // Trigger validateAndUpdateCache
     OMClientResponse omClientResponse =
         omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 2L);
@@ -178,6 +182,9 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
     assertEquals(-1, getOmMetrics().getNumSnapshotActive());
     assertEquals(1, getOmMetrics().getNumSnapshotDeleted());
     assertEquals(0, getOmMetrics().getNumSnapshotDeleteFails());
+    assertThat(logCapturer.getOutput()).contains(String.format(
+        "Deleted snapshot '%s' (snapshotId='%s') under path '%s'",
+        snapshotName, snapshotInfo.getSnapshotId(), snapshotInfo.getSnapshotPath()));
   }
 
   /**

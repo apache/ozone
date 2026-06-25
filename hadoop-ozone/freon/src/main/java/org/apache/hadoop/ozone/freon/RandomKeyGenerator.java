@@ -27,6 +27,8 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -114,36 +116,31 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = {"--num-of-threads", "--numOfThreads"},
-      description = "number of threads to be launched for the run. Full name " +
-          "--numOfThreads will be removed in later versions.",
+  @Option(names = {"--num-of-threads"},
+      description = "number of threads to be launched for the run.",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = {"--num-of-volumes", "--numOfVolumes"},
-      description = "specifies number of Volumes to be created in offline " +
-          "mode. Full name --numOfVolumes will be removed in later versions.",
+  @Option(names = {"--num-of-volumes"},
+      description = "specifies number of Volumes to be created in offline mode.",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = {"--num-of-buckets", "--numOfBuckets"},
-      description = "specifies number of Buckets to be created per Volume. " +
-          "Full name --numOfBuckets will be removed in later versions.",
+  @Option(names = {"--num-of-buckets"},
+      description = "specifies number of Buckets to be created per Volume.",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
   @Option(
-      names = {"--num-of-keys", "--numOfKeys"},
-      description = "specifies number of Keys to be created per Bucket. Full" +
-          " name --numOfKeys will be removed in later versions.",
+      names = {"--num-of-keys"},
+      description = "specifies number of Keys to be created per Bucket.",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
   @Option(
-      names = {"--key-size", "--keySize"},
-      description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions. " +
+      names = {"--key-size"},
+      description = "Specifies the size of Key in bytes to be created." +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
       converter = StorageSizeConverter.class
@@ -151,22 +148,19 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private StorageSize keySize;
 
   @Option(
-      names = {"--validate-writes", "--validateWrites"},
-      description = "Specifies whether to validate keys after writing. Full" +
-          " name --validateWrites will be removed in later versions."
+      names = {"--validate-writes"},
+      description = "Specifies whether to validate keys after writing"
   )
   private boolean validateWrites = false;
 
-  @Option(names = {"--num-of-validate-threads", "--numOfValidateThreads"},
-      description = "number of threads to be launched for validating keys." +
-          "Full name --numOfValidateThreads will be removed in later versions.",
+  @Option(names = {"--num-of-validate-threads"},
+      description = "number of threads to be launched for validating keys.",
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
   @Option(
-      names = {"--buffer-size", "--bufferSize"},
-      description = "Specifies the buffer size while writing. Full name " +
-          "--bufferSize will be removed in later versions.",
+      names = {"--buffer-size"},
+      description = "Specifies the buffer size while writing.",
       defaultValue = "4096"
   )
   private int bufferSize = 4096;
@@ -201,10 +195,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private ReplicationConfig replicationConfig;
 
+  @SuppressWarnings("PMD.SingularField")
   private int threadPoolSize;
 
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
+  @SuppressWarnings("PMD.SingularField")
   private ExecutorService executor;
 
   private long startTime;
@@ -241,6 +237,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private ArrayList<Histogram> histograms = new ArrayList<>();
 
   private OzoneConfiguration ozoneConfiguration;
+  @SuppressWarnings("PMD.SingularField")
   private ProgressBar progressbar;
 
   public RandomKeyGenerator() {
@@ -308,8 +305,8 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     if (validateWrites) {
       commonInitialMD = DigestUtils.getDigest(DIGEST_ALGORITHM);
       for (long nrRemaining = keySize.toBytes(); nrRemaining > 0;
-          nrRemaining -= bufferSize) {
-        int curSize = (int)Math.min(bufferSize, nrRemaining);
+           nrRemaining -= bufferSize) {
+        int curSize = (int) Math.min(bufferSize, nrRemaining);
         commonInitialMD.update(keyValueBuffer, 0, curSize);
       }
     }
@@ -330,8 +327,10 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     LOG.info("validateWrites : {}", validateWrites);
     LOG.info("Number of Validate Threads: {}", numOfValidateThreads);
     LOG.info("cleanObjects : {}", cleanObjects);
+
+    Span currentSpan = TracingUtil.getActiveSpan();
     for (int i = 0; i < numOfThreads; i++) {
-      executor.execute(new ObjectCreator());
+      executor.execute(new ObjectCreator(currentSpan));
     }
 
     ExecutorService validateExecutor = null;
@@ -357,7 +356,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
     // wait until all keys are added or exception occurred.
     while ((numberOfKeysAdded.get() != totalKeyCount)
-           && exception == null) {
+        && exception == null) {
       Thread.sleep(CHECK_INTERVAL_MILLIS);
     }
     executor.shutdown();
@@ -686,9 +685,9 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     /**
      * Constructs a new ozone keyValidate.
      *
-     * @param bucket    bucket part
-     * @param keyName   key part
-     * @param digest    digest of this key's full value
+     * @param bucket  bucket part
+     * @param keyName key part
+     * @param digest  digest of this key's full value
      */
     KeyValidate(OzoneBucket bucket, String keyName, byte[] digest) {
       this.bucket = bucket;
@@ -698,22 +697,32 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   private class ObjectCreator implements Runnable {
+    private final Span parentSpan;
+
+    ObjectCreator(Span parentSpan) {
+      this.parentSpan = parentSpan;
+    }
+
     @Override
     public void run() {
+      try (Scope scope = parentSpan.makeCurrent()) {
+        createObjects();
+      }
+    }
+
+    private void createObjects() {
       int v;
       while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
         if (!createVolume(v)) {
           return;
         }
       }
-
       int b;
       while ((b = bucketCounter.getAndIncrement()) < totalBucketCount) {
         if (!createBucket(b)) {
           return;
         }
       }
-
       long k;
       while ((k = keyCounter.getAndIncrement()) < totalKeyCount) {
         if (!createKey(k)) {
@@ -739,7 +748,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     String volumeName = "vol-" + volumeNumber + "-"
         + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating volume: {}", volumeName);
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("createVolume")) {
       long start = System.nanoTime();
       objectStore.createVolume(volumeName);
@@ -771,7 +780,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("createBucket")) {
 
       long start = System.nanoTime();
@@ -814,7 +823,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {
-      try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
+      try (TracingUtil.TraceCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
         try (OzoneOutputStream os = bucket.createKey(keyName, keySize.toBytes(),
             replicationConfig, new HashMap<>())) {
@@ -864,7 +873,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     OzoneVolume volume = getVolume(volumeNumber);
     String volumeName = volume.getName();
     LOG.trace("Cleaning volume: {}", volumeName);
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("cleanVolume")) {
       objectStore.deleteVolume(volumeName);
       numberOfVolumesCleaned.getAndIncrement();
@@ -916,7 +925,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
    * threads).
    *
    * @return may return null if this thread is interrupted, or if any other
-   *   thread encounters an exception (and stores it to {@code exception})
+   * thread encounters an exception (and stores it to {@code exception})
    */
   private <T> T waitUntilAddedToMap(Map<Integer, T> map, Integer i) {
     while (exception == null && !map.containsKey(i)) {

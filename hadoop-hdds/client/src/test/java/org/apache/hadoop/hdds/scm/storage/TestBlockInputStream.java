@@ -267,8 +267,8 @@ public class TestBlockInputStream {
 
   @Test
   public void testRefreshPipelineFunction() throws Exception {
-    LogCapturer logCapturer = LogCapturer.captureLogs(BlockInputStream.class);
-    GenericTestUtils.setLogLevel(BlockInputStream.class, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BlockExtendedInputStream.class);
+    GenericTestUtils.setLogLevel(BlockExtendedInputStream.class, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);

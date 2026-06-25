@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import static java.util.Collections.emptySet;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -66,7 +65,7 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
   }
 
   public static ReconcileContainerCommand getFromProtobuf(ReconcileContainerCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     List<HddsProtos.DatanodeDetailsProto> peers = protoMessage.getPeersList();
     Set<DatanodeDetails> peerNodes = !peers.isEmpty()
