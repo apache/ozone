@@ -757,7 +757,7 @@ public class SCMNodeManager implements NodeManager {
               datanodeInfo.getID());
         }
       } catch (PipelineNotFoundException e) {
-        LOG.debug("Reported Datanode {} pipeline {} is not found",
+        LOG.warn("Reported Datanode {} pipeline {} is not found",
             datanodeInfo.getID(), pipelineId);
       } catch (RuntimeException e) {
         LOG.warn("Failed to update supported storage tiers for Pipeline ID {} "
