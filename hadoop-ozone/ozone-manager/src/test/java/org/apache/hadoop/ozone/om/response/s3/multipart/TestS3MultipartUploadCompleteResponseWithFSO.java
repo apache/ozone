@@ -58,16 +58,6 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
   }
 
   @Override
-  protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) throws IOException {
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getMultipartKey(volumeId, bucketId, parentID,
-        fileName, multipartUploadID);
-  }
-
-  @Override
   protected String getPartOpenKey(String volumeName, String bucketName,
       String keyName, long clientId) throws IOException {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);

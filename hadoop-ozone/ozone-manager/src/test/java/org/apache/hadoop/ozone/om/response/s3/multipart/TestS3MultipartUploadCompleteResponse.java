@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -327,8 +328,8 @@ public class TestS3MultipartUploadCompleteResponse
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) throws IOException {
-    return omMetadataManager.getMultipartKey(volumeName, bucketName, keyName,
-        multipartUploadID);
+    return OMMultipartUploadUtils.getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID, omMetadataManager, getBucketLayout());
   }
 
   protected String getPartOpenKey(String volumeName, String bucketName,

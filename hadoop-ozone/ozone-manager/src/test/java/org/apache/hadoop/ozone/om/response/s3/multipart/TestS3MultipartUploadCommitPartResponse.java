@@ -119,14 +119,16 @@ public class TestS3MultipartUploadCommitPartResponse
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
-    assertNull(
-        omMetadataManager.getMultipartInfoTable().get(multipartKey));
-
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    // As 1 parts are created, so 1 entry should be there in delete table.
+    // The open key is removed from the open key table, while the committed
+    // part is persisted to the multipart info table.
+    assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
+    assertNotNull(
+        omMetadataManager.getMultipartInfoTable().get(multipartKey));
+
+    // As 1 part is overwritten, so 1 entry should be there in delete table.
     assertEquals(1, omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()));
 
@@ -186,14 +188,16 @@ public class TestS3MultipartUploadCommitPartResponse
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // The aborted upload neither persists the invalid multipart key nor adds
+    // the open key back to the open key table.
     String multipartKeyInvalid = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyNameInvalid, multipartUploadID);
     assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     assertNull(
             omMetadataManager.getMultipartInfoTable().get(multipartKeyInvalid));
-
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // openkey entry should be there in delete table.
     assertEquals(1, omMetadataManager.countRowsInTable(
