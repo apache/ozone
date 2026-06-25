@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -233,6 +235,9 @@ public final class ReplicationSupervisor {
     if (queueHasRoomFor(task)) {
       initCounters(task);
       addToQueue(task);
+    } else {
+      // Queue is full: drain the PENDING status entry so SCM can reschedule promptly.
+      updateCommandStatus(task, CommandStatus::markAsFailed);
     }
   }
 
@@ -276,7 +281,21 @@ public final class ReplicationSupervisor {
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
+    } else {
+      // Duplicate: an identical task is already in-flight; the in-flight copy will report the real
+      // outcome, so drain this command's PENDING entry now to avoid a status-map leak.
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
     }
+  }
+
+  private void updateCommandStatus(AbstractReplicationTask task,
+      Consumer<CommandStatus> updater) {
+    long cmdId = task.getCommandId();
+    if (context == null || cmdId == 0) {
+      // No SCM context (test) or no tracked command (e.g. reconcile task).
+      return;
+    }
+    context.updateCommandStatus(cmdId, updater);
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
@@ -395,6 +414,8 @@ public final class ReplicationSupervisor {
           LOG.info("Ignoring {} since the deadline has passed ({} < {})",
               this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
           timeoutCounter.get(task.getMetricName()).incrementAndGet();
+          // FAILED drains the PENDING status entry so SCM can clear and reschedule promptly.
+          updateCommandStatus(task, CommandStatus::markAsFailed);
           return;
         }
 
@@ -405,6 +426,7 @@ public final class ReplicationSupervisor {
               && task.shouldOnlyRunOnInServiceDatanodes()) {
             LOG.info("Ignoring {} since datanode is not in service ({})",
                 this, dn.getPersistedOpState());
+            updateCommandStatus(task, CommandStatus::markAsFailed);
             return;
           }
 
@@ -413,6 +435,7 @@ public final class ReplicationSupervisor {
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
             LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
                 this, taskTerm, currentTerm.getAsLong());
+            updateCommandStatus(task, CommandStatus::markAsFailed);
             return;
           }
         }
@@ -422,23 +445,34 @@ public final class ReplicationSupervisor {
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
           failureCounter.get(task.getMetricName()).incrementAndGet();
+          updateCommandStatus(task, CommandStatus::markAsFailed);
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.get(task.getMetricName()).incrementAndGet();
+          // Mark EXECUTED (non-PENDING) so CommandStatusReportPublisher drains this entry from the status map.
+          updateCommandStatus(task, CommandStatus::markAsExecuted);
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
           skippedCounter.get(task.getMetricName()).incrementAndGet();
+          // SKIPPED means the replica already exists; EXECUTED drains the entry.
+          updateCommandStatus(task, CommandStatus::markAsExecuted);
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
+        updateCommandStatus(task, CommandStatus::markAsFailed);
       } finally {
         queuedCounter.get(task.getMetricName()).decrementAndGet();
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
+    }
+
+    private void updateCommandStatus(AbstractReplicationTask t,
+        Consumer<CommandStatus> updater) {
+      ReplicationSupervisor.this.updateCommandStatus(t, updater);
     }
 
     @Override

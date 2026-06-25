@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeStat
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus.CommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
@@ -850,6 +851,14 @@ public class StateContext {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
+              .setCmdId(cmd.getId())
+              .setStatus(Status.PENDING)
+              .setType(cmd.getType())
+              .build());
+    } else if (cmd.getType() == SCMCommandProto.Type.replicateContainerCommand
+        || cmd.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+      addCmdStatus(cmd.getId(),
+          CommandStatusBuilder.newBuilder()
               .setCmdId(cmd.getId())
               .setStatus(Status.PENDING)
               .setType(cmd.getType())

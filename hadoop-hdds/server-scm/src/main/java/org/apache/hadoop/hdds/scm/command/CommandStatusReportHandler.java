@@ -54,16 +54,22 @@ public class CommandStatusReportHandler implements
 
     // Route command status to its watchers.
     List<CommandStatus> deleteBlocksCommandStatus = new ArrayList<>();
+    List<CommandStatus> failedReplicationStatus = new ArrayList<>();
     cmdStatusList.forEach(cmdStatus -> {
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace("Emitting command status for id:{} type: {}", cmdStatus
             .getCmdId(), cmdStatus.getType());
       }
-      if (cmdStatus.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
+      SCMCommandProto.Type type = cmdStatus.getType();
+      if (type == SCMCommandProto.Type.deleteBlocksCommand) {
         deleteBlocksCommandStatus.add(cmdStatus);
+      } else if ((type == SCMCommandProto.Type.replicateContainerCommand
+          || type == SCMCommandProto.Type.reconstructECContainersCommand)
+          && cmdStatus.getStatus() == CommandStatus.Status.FAILED) {
+        failedReplicationStatus.add(cmdStatus);
       } else {
         LOGGER.debug("CommandStatus of type:{} not handled in " +
-            "CommandStatusReportHandler.", cmdStatus.getType());
+            "CommandStatusReportHandler.", type);
       }
     });
 
@@ -76,6 +82,10 @@ public class CommandStatusReportHandler implements
     if (!deleteBlocksCommandStatus.isEmpty()) {
       publisher.fireEvent(SCMEvents.DELETE_BLOCK_STATUS, new DeleteBlockStatus(
           deleteBlocksCommandStatus, report.getDatanodeDetails()));
+    }
+    if (!failedReplicationStatus.isEmpty()) {
+      publisher.fireEvent(SCMEvents.REPLICATION_STATUS, new ReplicationStatus(
+          failedReplicationStatus, report.getDatanodeDetails()));
     }
   }
 
@@ -111,6 +121,23 @@ public class CommandStatusReportHandler implements
     private final DatanodeDetails datanodeDetails;
 
     public DeleteBlockStatus(List<CommandStatus> cmdStatus,
+        DatanodeDetails datanodeDetails) {
+      super(cmdStatus);
+      this.datanodeDetails = datanodeDetails;
+    }
+
+    public DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+  }
+
+  /**
+   * Wrapper event for failed replication / reconstruction command statuses.
+   */
+  public static class ReplicationStatus extends CommandStatusEvent {
+    private final DatanodeDetails datanodeDetails;
+
+    public ReplicationStatus(List<CommandStatus> cmdStatus,
         DatanodeDetails datanodeDetails) {
       super(cmdStatus);
       this.datanodeDetails = datanodeDetails;

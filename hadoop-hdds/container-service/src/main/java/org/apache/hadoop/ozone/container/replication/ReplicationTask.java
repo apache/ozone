@@ -67,6 +67,11 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   @Override
+  public long getCommandId() {
+    return cmd.getId();
+  }
+
+  @Override
   public String getMetricName() {
     return METRIC_NAME;
   }

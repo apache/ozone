@@ -52,6 +52,11 @@ public class ContainerReplicaPendingOps {
   private final Clock clock;
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
+  // Maps an in-flight command id back to the container it belongs to, so a
+  // failed-command report from a datanode can locate and clear the pending op
+  // without scanning every container.
+  private final ConcurrentHashMap<Long, ContainerID> commandIdToContainer =
+      new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
   private final ReentrantReadWriteLock globalLock =
       new ReentrantReadWriteLock();
@@ -125,6 +130,7 @@ public class ContainerReplicaPendingOps {
     globalLock.writeLock().lock();
     try {
       pendingOps.clear();
+      commandIdToContainer.clear();
       resetCounters();
       containerSizeScheduled.clear();
     } finally {
@@ -274,6 +280,9 @@ public class ContainerReplicaPendingOps {
                 releaseScheduledContainerSize(op);
               }
               decrementCounter(op.getOpType(), op.getReplicaIndex());
+              if (op.getCommand() != null) {
+                commandIdToContainer.remove(op.getCommand().getId());
+              }
             }
             expiredOps.add(op);
             updateTimeoutMetrics(op);
@@ -290,6 +299,62 @@ public class ContainerReplicaPendingOps {
       if (!expiredOps.isEmpty()) {
         notifySubscribers(expiredOps, containerID, true);
       }
+    }
+  }
+
+  /**
+   * Handle a failure report for a failed replication or reconstruction (ADD)
+   * command from a datanode. This is called by
+   * {@code CommandStatusReportHandler} only for FAILED
+   * {@code replicateContainerCommand} and {@code reconstructECContainersCommand}
+   * statuses; DELETE command IDs are never routed here by the current
+   * command-status tracking path.
+   *
+   * <p>The matched op is removed from the pending list and its counter
+   * decremented so the inflight quota is freed immediately instead of waiting
+   * for the event timeout. For ADD ops the scheduled container size is also
+   * released. Subscribers are notified with timedOut=true so the
+   * ReplicationManager re-evaluates the container as it would for an expired op.
+   *
+   * @param cmdId the id of the failed command, as reported by the datanode
+   */
+  public void onReplicationCommandFailed(long cmdId) {
+    ContainerID containerID = commandIdToContainer.get(cmdId);
+    if (containerID == null) {
+      // Already completed, already expired, or not a tracked replication op.
+      return;
+    }
+    List<ContainerReplicaOp> failedOps = new ArrayList<>();
+    Lock lock = writeLock(containerID);
+    lock(lock);
+    try {
+      List<ContainerReplicaOp> ops = pendingOps.get(containerID);
+      if (ops == null) {
+        return;
+      }
+      Iterator<ContainerReplicaOp> iterator = ops.listIterator();
+      while (iterator.hasNext()) {
+        ContainerReplicaOp op = iterator.next();
+        if (op.getCommand() != null && op.getCommand().getId() == cmdId) {
+          iterator.remove();
+          if (op.getOpType() == ADD) {
+            releaseScheduledContainerSize(op);
+          }
+          decrementCounter(op.getOpType(), op.getReplicaIndex());
+          commandIdToContainer.remove(cmdId);
+          failedOps.add(op);
+        }
+      }
+      if (ops.isEmpty()) {
+        pendingOps.remove(containerID);
+      }
+    } finally {
+      unlock(lock);
+    }
+    if (!failedOps.isEmpty()) {
+      // Failures reuse timedOut=true so ReplicationManager re-evaluates like an expired op.
+      // Timeout metrics are not updated here.
+      notifySubscribers(failedOps, containerID, true);
     }
   }
 
@@ -339,6 +404,9 @@ public class ContainerReplicaPendingOps {
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
           target, replicaIndex, command, deadlineEpochMillis, containerSize));
+      if (command != null) {
+        commandIdToContainer.put(command.getId(), containerID);
+      }
       DatanodeID id = target.getID();
       if (opType == ADD) {
         containerSizeScheduled.compute(id, (k, v) -> {
@@ -374,6 +442,9 @@ public class ContainerReplicaPendingOps {
             found = true;
             completedOps.add(op);
             iterator.remove();
+            if (op.getCommand() != null) {
+              commandIdToContainer.remove(op.getCommand().getId());
+            }
             if (opType == ADD) {
               containerSizeScheduled.computeIfPresent(target.getID(), (k, v) -> {
                 long newSize = v.getSize() - op.getContainerSize();
