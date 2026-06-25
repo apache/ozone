@@ -401,9 +401,10 @@ public class BlockOutputStream extends OutputStream {
       while (len > 0) {
         allocateNewBufferIfNeeded();
         final int writeLen = Math.min(currentBufferRemaining, len);
+        final int writeStart = currentBuffer.position();
         currentBuffer.put(b, off, writeLen);
         if (runningCrc != null) {
-          accumulateRunningCrc(b, off, writeLen);
+          accumulateRunningCrc(currentBuffer, writeStart, writeLen);
         }
         currentBufferRemaining -= writeLen;
         updateWrittenDataLength(writeLen);
@@ -434,19 +435,22 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void accumulateRunningCrc(byte[] b, int off, int len) {
-    while (len > 0) {
-      final int space = config.getBytesPerChecksum() - runningCrcBytesInSegment;
-      final int toUpdate = Math.min(space, len);
-      runningCrc.update(b, off, toUpdate);
-      runningCrcBytesInSegment += toUpdate;
-      if (runningCrcBytesInSegment == config.getBytesPerChecksum()) {
-        runningCrcChecksums.add(Checksum.int2ByteString((int) runningCrc.getValue()));
-        runningCrc.reset();
-        runningCrcBytesInSegment = 0;
+  private void accumulateRunningCrc(ChunkBuffer src, int startPos, int writeLen) {
+    for (ByteBuffer bb : src.duplicate(startPos, startPos + writeLen).iterate(writeLen)) {
+      while (bb.hasRemaining()) {
+        final int space = config.getBytesPerChecksum() - runningCrcBytesInSegment;
+        final int toUpdate = Math.min(space, bb.remaining());
+        final int savedLimit = bb.limit();
+        bb.limit(bb.position() + toUpdate);
+        runningCrc.update(bb);
+        bb.limit(savedLimit);
+        runningCrcBytesInSegment += toUpdate;
+        if (runningCrcBytesInSegment == config.getBytesPerChecksum()) {
+          runningCrcChecksums.add(Checksum.int2ByteString((int) runningCrc.getValue()));
+          runningCrc.reset();
+          runningCrcBytesInSegment = 0;
+        }
       }
-      off += toUpdate;
-      len -= toUpdate;
     }
   }
 

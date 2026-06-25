@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
+import org.apache.ratis.thirdparty.io.netty.util.ResourceLeakDetector;
 
 /**
  * Minimal xceiver client for {@link BlockOutputStreamWriteBenchmark}.
@@ -57,12 +58,27 @@ import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
  */
 final class BenchmarkMockXceiverClient extends XceiverClientSpi {
 
+  static {
+    // The thread-local ByteBufs are never released (they live for the worker
+    // thread's lifetime), which triggers ResourceLeakDetector warnings when
+    // benchmark thread pools are torn down between phases.  Disable detection
+    // for this benchmark-only class to keep output clean.
+    ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
+  }
+
+  // One reusable direct buffer per worker thread — eliminates the per-call
+  // PoolArena.allocateHuge + ByteBuffer.allocateDirect + OS zero-fill cycle
+  // that dominates CPU at large (≥4 MB) write sizes.
+  private static final ThreadLocal<ByteBuf> FRAME_BUF = ThreadLocal.withInitial(
+      () -> PooledByteBufAllocator.DEFAULT.directBuffer(4 * 1024 * 1024 + 1024));
+
   private final Pipeline pipeline;
   private final AtomicLong logIndex = new AtomicLong();
-  // Simulated Raft commit latency. The calling thread parks for this duration in
-  // watchForCommit(), mimicking the real-cluster scenario where the writer blocks
-  // waiting for consensus before allocating the next buffer.
   private final long commitLatencyNs;
+
+  BenchmarkMockXceiverClient(Pipeline pipeline) {
+    this(pipeline, 0);
+  }
 
   BenchmarkMockXceiverClient(Pipeline pipeline, long commitLatencyNs) {
     this.pipeline = pipeline;
@@ -89,18 +105,16 @@ final class BenchmarkMockXceiverClient extends XceiverClientSpi {
     // OutputStreamEncoder → WritableBufferOutputStream → ByteBuf.writeBytes().
     // For NioByteString (direct chunk data): copyMemory(direct→heap tmp) + write(heap→direct).
     // For BoundedByteString (heap chunk data): write(heap→direct) only.
-    // The buffer is released immediately rather than being enqueued to a socket.
-    final int size = request.getSerializedSize();
-    final ByteBuf frame = PooledByteBufAllocator.DEFAULT.directBuffer(size, size);
+    // Reuse a thread-local direct buffer rather than allocating per call:
+    // ≥4 MB requests exceed PoolArena's chunk size and fall into allocateHuge,
+    // which calls ByteBuffer.allocateDirect + OS zero-fill on every invocation.
+    final ByteBuf frame = FRAME_BUF.get();
+    frame.clear();
+    frame.ensureWritable(request.getSerializedSize());
     try {
-      final ByteBufOutputStream out = new ByteBufOutputStream(frame);
-      try {
-        request.writeTo(out);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    } finally {
-      frame.release();
+      request.writeTo(new ByteBufOutputStream(frame));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
 
     final ContainerCommandResponseProto.Builder builder =
@@ -129,11 +143,6 @@ final class BenchmarkMockXceiverClient extends XceiverClientSpi {
 
   @Override
   public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
-    // Block the calling thread for commitLatencyNs to mimic the Raft leader
-    // requiring consensus before acknowledging a putBlock. This causes back-pressure:
-    // buffers stay in-flight, pool fills up, and concurrent threads thrash L3 cache
-    // while each writer waits — reproducing the cold-staging-buffer scenario captured
-    // by the real-cluster async-profiler (12% CPU in computeChecksum).
     if (commitLatencyNs > 0) {
       LockSupport.parkNanos(commitLatencyNs);
     }
