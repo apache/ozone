@@ -44,6 +44,7 @@ import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +61,10 @@ public class SCMNodeInfo {
   private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
   private final String serviceId;
   private final String nodeId;
-  private final String blockClientAddress;
-  private final String scmClientAddress;
-  private final String scmSecurityAddress;
-  private final String scmDatanodeAddress;
+  private final HostAndPort blockClientAddress;
+  private final HostAndPort scmClientAddress;
+  private final HostAndPort scmSecurityAddress;
+  private final HostAndPort scmDatanodeAddress;
 
   /**
    * Build SCM Node information from configuration.
@@ -177,8 +178,8 @@ public class SCMNodeInfo {
 
   }
 
-  public static String buildAddress(String address, int port) {
-    return address + ':' + port;
+  private static HostAndPort buildAddress(String address, int port) {
+    return new HostAndPort(address, port);
   }
 
   public static int getPort(ConfigurationSource conf,
@@ -209,8 +210,8 @@ public class SCMNodeInfo {
    * @param scmDatanodeAddress
    */
   public SCMNodeInfo(String serviceId, String nodeId,
-      String blockClientAddress, String scmClientAddress,
-      String scmSecurityAddress, String scmDatanodeAddress) {
+      HostAndPort blockClientAddress, HostAndPort scmClientAddress,
+      HostAndPort scmSecurityAddress, HostAndPort scmDatanodeAddress) {
     this.serviceId = serviceId;
     this.nodeId = nodeId;
     this.blockClientAddress = blockClientAddress;
@@ -228,18 +229,22 @@ public class SCMNodeInfo {
   }
 
   public String getBlockClientAddress() {
-    return blockClientAddress;
+    return blockClientAddress.getHostAndPortString();
   }
 
   public String getScmClientAddress() {
-    return scmClientAddress;
+    return scmClientAddress.getHostAndPortString();
   }
 
   public String getScmSecurityAddress() {
-    return scmSecurityAddress;
+    return scmSecurityAddress.getHostAndPortString();
+  }
+
+  public HostAndPort getScmDatanodeHostPortAddress() {
+    return scmDatanodeAddress;
   }
 
   public String getScmDatanodeAddress() {
-    return scmDatanodeAddress;
+    return scmDatanodeAddress.getHostAndPortString();
   }
 }

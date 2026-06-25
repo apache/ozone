@@ -36,8 +36,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.junit.jupiter.api.Test;
 
@@ -58,17 +58,15 @@ public class TestHddsServerUtil {
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
-    InetSocketAddress addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("1.2.3.4", addr.getHostString());
+    HostAndPort addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("1.2.3.4", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Next try a client address with just a host name and port.
     // Verify the port is ignored and the default DataNode port is used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
-    addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("1.2.3.4", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("1.2.3.4", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Set both OZONE_SCM_CLIENT_ADDRESS_KEY and
@@ -77,9 +75,8 @@ public class TestHddsServerUtil {
     // default.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8");
-    addr = NetUtils.createSocketAddr(
-            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("5.6.7.8", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("5.6.7.8", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Set both OZONE_SCM_CLIENT_ADDRESS_KEY and
@@ -88,9 +85,8 @@ public class TestHddsServerUtil {
     // used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8:200");
-    addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("5.6.7.8", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("5.6.7.8", addr.getHostName());
     assertEquals(200, addr.getPort());
   }
 
@@ -187,9 +183,9 @@ public class TestHddsServerUtil {
   @Test
   void testGetSCMAddresses() {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    Collection<InetSocketAddress> addresses;
-    InetSocketAddress addr;
-    Iterator<InetSocketAddress> it;
+    Collection<HostAndPort> addresses;
+    HostAndPort addr;
+    Iterator<HostAndPort> it;
 
     // Verify valid IP address setup
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
@@ -228,7 +224,7 @@ public class TestHddsServerUtil {
     it = addresses.iterator();
     HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
-      InetSocketAddress current = it.next();
+      HostAndPort current = it.next();
       assertTrue(expected1.remove(current.getHostName(),
           current.getPort()));
     }
@@ -242,7 +238,7 @@ public class TestHddsServerUtil {
     it = addresses.iterator();
     HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
-      InetSocketAddress current = it.next();
+      HostAndPort current = it.next();
       assertTrue(expected2.remove(current.getHostName(),
           current.getPort()));
     }
@@ -292,14 +288,14 @@ public class TestHddsServerUtil {
       expected.add("scm" + ":" + port);
     }
 
-    Collection<InetSocketAddress> scmAddressList =
+    Collection<HostAndPort> scmAddressList =
         getSCMAddressForDatanodes(conf);
 
     assertNotNull(scmAddressList);
     assertEquals(3, scmAddressList.size());
 
-    for (InetSocketAddress next : scmAddressList) {
-      expected.remove(next.getHostName() + ":" + next.getPort());
+    for (HostAndPort next : scmAddressList) {
+      expected.remove(next.getHostAndPortString());
     }
 
     assertEquals(0, expected.size());
