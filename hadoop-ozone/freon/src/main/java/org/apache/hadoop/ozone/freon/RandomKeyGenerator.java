@@ -293,24 +293,32 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private void validateCounts() {
     if (numOfVolumes <= 0) {
       throw new IllegalArgumentException(
-          "Invalid command, numOfVolumes must be a positive integer");
+          "Invalid command, --num-of-volumes must be a positive integer");
     }
     if (numOfBuckets <= 0) {
       throw new IllegalArgumentException(
-          "Invalid command, numOfBuckets must be a positive integer");
+          "Invalid command, --num-of-buckets must be a positive integer");
     }
     if (numOfKeys <= 0) {
       throw new IllegalArgumentException(
-          "Invalid command, numOfKeys must be a positive integer");
+          "Invalid command, --num-of-keys must be a positive integer");
+    }
+    if (numOfThreads <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-threads must be a positive integer");
+    }
+    if (validateWrites && numOfValidateThreads <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-validate-threads must be a positive integer");
     }
   }
+
 
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
       ozoneConfiguration = freon.getOzoneConf();
     }
-    validateCounts();
     if (!ozoneConfiguration.getBoolean(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA_DEFAULT)) {
@@ -318,6 +326,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           + HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA + " is set to false.");
       validateWrites = false;
     }
+    validateCounts();
     init(ozoneConfiguration);
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);

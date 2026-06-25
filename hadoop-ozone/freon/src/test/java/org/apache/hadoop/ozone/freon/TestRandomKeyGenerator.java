@@ -32,31 +32,52 @@ public class TestRandomKeyGenerator {
   @Test
   void rejectsNegativeNumOfVolumes() {
     assertValidationFails(
-        new String[] {"--num-of-volumes", "-1",
-            "--num-of-buckets", "1",
-            "--num-of-keys", "1"},
-        "numOfVolumes must be a positive integer");
+        "--num-of-volumes must be a positive integer",
+        "--num-of-volumes", "-1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1");
   }
 
   @Test
   void rejectsZeroNumOfBuckets() {
     assertValidationFails(
-        new String[] {"--num-of-volumes", "1",
-            "--num-of-buckets", "0",
-            "--num-of-keys", "1"},
-        "numOfBuckets must be a positive integer");
+        "--num-of-buckets must be a positive integer",
+        "--num-of-volumes", "1",
+        "--num-of-buckets", "0",
+        "--num-of-keys", "1");
   }
 
   @Test
   void rejectsNegativeNumOfKeys() {
     assertValidationFails(
-        new String[] {"--num-of-volumes", "1",
-            "--num-of-buckets", "1",
-            "--num-of-keys", "-1"},
-        "numOfKeys must be a positive integer");
+        "--num-of-keys must be a positive integer",
+        "--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "-1");
   }
 
-  private void assertValidationFails(String[] args, String expectedMessage) {
+  @Test
+  void rejectsNegativeNumOfThreads() {
+    assertValidationFails(
+        "--num-of-threads must be a positive integer",
+        "--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1",
+        "--num-of-threads", "-1");
+  }
+
+  @Test
+  void rejectsNegativeNumOfValidateThreadsWhenValidateWritesEnabled() {
+    assertValidationFails(
+        "--num-of-validate-threads must be a positive integer",
+        "--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1",
+        "--validate-writes",
+        "--num-of-validate-threads", "-1");
+  }
+
+  private void assertValidationFails(String expectedMessage, String... args) {
     RandomKeyGenerator generator = new RandomKeyGenerator(new OzoneConfiguration());
     CommandLine cmd = new CommandLine(generator);
     cmd.parseArgs(args);
