@@ -55,7 +55,7 @@ public class DeletedBlockLogStateManagerImpl
   private Table<String, ByteString> statefulConfigTable;
   private ContainerManager containerManager;
   private final SCMHADBTransactionBuffer transactionBuffer;
-  private final Set<Long> deletingTxIDs;
+  private volatile Set<Long> deletingTxIDs;
   public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
   public DeletedBlockLogStateManagerImpl(Table<Long, DeletedBlocksTransaction> deletedTable,
@@ -74,6 +74,7 @@ public class DeletedBlockLogStateManagerImpl
     return new Table.KeyValueIterator<Long, DeletedBlocksTransaction>() {
 
       private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
+      private final Set<Long> snapshotDeletingTxIDs = deletingTxIDs;
       private TypedTable.KeyValue<Long, DeletedBlocksTransaction> nextTx;
 
       {
@@ -85,7 +86,7 @@ public class DeletedBlockLogStateManagerImpl
           final TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter.next();
           final long txID = next.getKey();
 
-          if ((!deletingTxIDs.contains(txID))) {
+          if (!snapshotDeletingTxIDs.contains(txID)) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}", txID);
@@ -177,7 +178,8 @@ public class DeletedBlockLogStateManagerImpl
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Objects.requireNonNull(deletingTxIDs, "deletingTxIDs == null");
-    deletingTxIDs.clear();
+    // avoid synchronization of deletingTxIDs as onFlush is called by SCM statemachine thread
+    deletingTxIDs = ConcurrentHashMap.newKeySet();
   }
 
   @Override
