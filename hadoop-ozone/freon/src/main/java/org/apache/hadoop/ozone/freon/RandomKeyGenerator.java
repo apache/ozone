@@ -313,7 +313,6 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
   }
 
-
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
