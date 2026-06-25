@@ -203,6 +203,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
 
+  /**
    * Returns true if the datanode has at least one available container slot considering
    * in-flight allocations tracked by PendingContainerTracker.
    *
