@@ -80,7 +80,7 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex(), "ignored"));
-      ozoneManager.getMetrics().setFinalizationMarkerPresent(true);
+      ozoneManager.getMetrics().setFinalizationInProgress(true);
 
 
       OzoneManagerProtocolProtos.StartFinalizeUpgradeResponse omResponse =

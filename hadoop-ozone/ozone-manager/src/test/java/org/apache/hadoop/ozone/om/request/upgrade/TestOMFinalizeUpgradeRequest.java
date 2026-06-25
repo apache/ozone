@@ -56,18 +56,18 @@ public class TestOMFinalizeUpgradeRequest extends TestOMKeyRequest {
     omMetadataManager.getMetaTable().put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignored");
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(1, "ignored"));
-    omMetrics.setFinalizationMarkerPresent(true);
+    omMetrics.setFinalizationInProgress(true);
 
     String progressKey = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
 
     assertNotNull(progressKey);
-    assertEquals(1, omMetrics.getFinalizationMarkerPresent(),
+    assertEquals(1, omMetrics.getFinalizationInProgress(),
         "metric should be 1 before finalizing");
     submitRequest();
 
     progressKey = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
     assertNull(progressKey);
-    assertEquals(0, omMetrics.getFinalizationMarkerPresent(),
+    assertEquals(0, omMetrics.getFinalizationInProgress(),
         "metric should be 0 after finalizing");
   }
 

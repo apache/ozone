@@ -956,7 +956,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new OmMetadataManagerImpl(configuration, this);
     this.metadataManager = metadataManagerImpl;
     versionManager.validateDBVersion(metadataManager.getMetaTable());
-    metrics.setFinalizationMarkerPresent(
+    metrics.setFinalizationInProgress(
         metadataManager.getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY) != null);
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
