@@ -86,6 +86,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListSnapshotDiffJobs;
 
   private @Metric MutableGaugeInt numSnapshotCacheSize;
+  @Metric("Set to 1 if OM is monitoring ongoing upgrade finalization, 0 otherwise")
+  private MutableGaugeInt finalizationMarkerPresent;
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
   private @Metric MutableCounterLong numCreateFile;
@@ -614,6 +616,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void decNumSnapshotCacheSize() {
     numSnapshotCacheSize.decr();
+  }
+
+  public void setFinalizationMarkerPresent(boolean present) {
+    finalizationMarkerPresent.set(present ? 1 : 0);
+  }
+
+  public int getFinalizationMarkerPresent() {
+    return finalizationMarkerPresent.value();
   }
 
   public void incNumCompleteMultipartUploadFails() {

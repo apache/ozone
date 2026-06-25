@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -55,14 +56,19 @@ public class TestOMFinalizeUpgradeRequest extends TestOMKeyRequest {
     omMetadataManager.getMetaTable().put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignored");
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(1, "ignored"));
+    omMetrics.setFinalizationMarkerPresent(true);
 
     String progressKey = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
 
     assertNotNull(progressKey);
+    assertEquals(1, omMetrics.getFinalizationMarkerPresent(),
+        "metric should be 1 before finalizing");
     submitRequest();
 
     progressKey = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
     assertNull(progressKey);
+    assertEquals(0, omMetrics.getFinalizationMarkerPresent(),
+        "metric should be 0 after finalizing");
   }
 
   private void submitRequest() throws IOException {
