@@ -45,7 +45,7 @@ public class FilterPipelineOptions {
   private String replication;
 
   @CommandLine.Option(
-      names = {"--filterByFactor", "--filter-by-factor"},
+      names = {"--filter-by-factor"},
       description = "[deprecated] Filter pipelines by factor (e.g. ONE, THREE) (implies RATIS replication type)")
   private ReplicationFactor factor;
 

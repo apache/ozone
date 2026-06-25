@@ -94,7 +94,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Table name")
   private String tableName;
@@ -137,7 +137,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           "     \"keyName:regex:^key.*$\" for showing records having keyName that matches the given regex.")
   private String filter;
 
-  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+  @CommandLine.Option(names = {"--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
   private String dnDBSchemaVersion;
