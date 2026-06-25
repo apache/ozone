@@ -379,7 +379,7 @@ class PipelineStateMap {
 
     PipelineInfo newInfo = new PipelineInfo(updated);
 
-    for (ContainerID cid : oldInfo.copyContainers()) {
+    for (ContainerID cid : oldInfo.getContainers()) {
       newInfo.addContainer(cid);
     }
 
@@ -418,10 +418,6 @@ class PipelineStateMap {
     }
 
     NavigableSet<ContainerID> getContainers() {
-      return new TreeSet<>(containers);
-    }
-    
-    NavigableSet<ContainerID> copyContainers() {
       return new TreeSet<>(containers);
     }
 
