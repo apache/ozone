@@ -258,6 +258,7 @@ public class TestPipelinePlacementPolicy {
         "the space requirement";
 
     // A huge container size
+    localNodeManager.setPendingContainerMaxSize(200 * OzoneConsts.TB);
     SCMException ex =
         assertThrows(SCMException.class,
             () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
