@@ -239,8 +239,6 @@
       <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
-
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-annotation-processing</artifactId>
       <scope>provided</scope>
