@@ -22,23 +22,27 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,34 +51,29 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Tests for {@link ChatbotAgent} specifically handling the listKeys endpoint.
+ * Tests for {@link ChatbotAgent} specifically handling the {@code api_v1_keys_listKeys} tool.
  *
- * <p>This class verifies the agent's policy and routing layer for listKeys.
- * It uses a mocked {@link LLMClient} to simulate LLM responses and a mocked
- * {@link ToolExecutor} to verify execution behavior.</p>
- *
- * <p><b>Lifecycle Phase:</b> Post-1st LLM Call & Post-Execution. This tests the validation step after the first LLM
- * call (safe-scope checks), as well as exception handling during and after the ToolExecutor runs
- * (before/during the 2nd LLM call).</p>
- *
- * <p><b>Key scenarios tested:</b></p>
- * <ul>
- *   <li><b>Safe-scope validation:</b> Ensures listKeys requests without a bucket-scoped prefix
- *       (e.g., "/") are blocked.</li>
- *   <li><b>Parameter pass-through:</b> Verifies optional LLM parameters (limit, replicationType)
- *       are passed to the executor.</li>
- *   <li><b>Exception handling:</b> Ensures executor and LLM failures are properly wrapped in
- *   {@link org.apache.hadoop.ozone.recon.chatbot.ChatbotException}.</li>
- * </ul>
+ * <p>The model selects tools via native tool calls (tool name + JSON arguments). These tests use a
+ * mocked {@link LLMClient} that returns a listKeys tool call, and verify the agent's safe-scope
+ * validation (a bucket-scoped {@code startPrefix} is required) plus parameter pass-through and
+ * exception wrapping around {@link ReconQueryExecutor}.</p>
  */
 @ExtendWith(MockitoExtension.class)
 public class TestChatbotAgentListKeysPolicy {
+
+  private static final String LIST_KEYS_TOOL = "api_v1_keys_listKeys";
 
   @Mock
   private LLMClient mockLlmClient;
 
   @Mock
-  private ToolExecutor mockToolExecutor;
+  private ReconQueryExecutor mockReconQueryExecutor;
+
+  @Mock
+  private ReconApiAllowlist mockReconApiAllowlist;
+
+  @Mock
+  private LlmToolSpecFactory mockLlmToolSpecFactory;
 
   private ChatbotAgent agent;
 
@@ -87,11 +86,13 @@ public class TestChatbotAgentListKeysPolicy {
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, true);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
-    lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt()))
+    lenient().when(mockReconQueryExecutor.execute(anyString(), anyMap()))
         .thenReturn(defaultOutcome());
 
-    agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
+    lenient().when(mockReconApiAllowlist.isRegistered(anyString())).thenReturn(true);
+
+    agent = new ChatbotAgent(mockLlmClient, mockReconQueryExecutor, mockReconApiAllowlist,
+        mockLlmToolSpecFactory, conf);
   }
 
   // ── Safe-scope violations (listKeys without a bucket prefix) ───────
@@ -99,11 +100,7 @@ public class TestChatbotAgentListKeysPolicy {
   @Test
   public void testListKeysWithRootPrefixIsRejectedBySafeScopeCheck() throws Exception {
     // startPrefix=/ would scan the entire cluster — must be blocked
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
+    selectListKeys("{\"startPrefix\":\"/\"}");
 
     String result = agent.processQuery(
         "List all keys in the entire cluster", null, null);
@@ -112,74 +109,54 @@ public class TestChatbotAgentListKeysPolicy {
     assertTrue(result.toLowerCase().contains("bucket") ||
             result.toLowerCase().contains("prefix"),
         "Response should ask for a bucket-scoped prefix");
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
   public void testListKeysWithNullPrefixIsRejected() throws Exception {
     // No startPrefix field at all — must be rejected
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
+    selectListKeys("{}");
 
     String result = agent.processQuery("List all keys", null, null);
 
     assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
   public void testListKeysWithEmptyPrefixIsRejected() throws Exception {
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"\"},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
+    selectListKeys("{\"startPrefix\":\"\"}");
 
     String result = agent.processQuery("List all keys", null, null);
 
     assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
   public void testListKeysWithVolumeOnlyPrefixIsRejected() throws Exception {
     // /myvol alone is not bucket-scoped — must require /<volume>/<bucket>
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/myvol\"},\"reasoning\":\"volume only\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
+    selectListKeys("{\"startPrefix\":\"/myvol\"}");
 
     String result = agent.processQuery("List keys in volume myvol", null, null);
 
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("bucket"),
         "Response should ask for a bucket-scoped prefix");
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   @Test
   public void testListKeysWithValidBucketScopedPrefixIsAllowed() throws Exception {
     // startPrefix=/vol1/bucket1 is bucket-scoped — must be allowed through
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+    selectListKeys("{\"startPrefix\":\"/vol1/bucket1\"}");
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(textResp(SUMMARY_RESPONSE));
 
     agent.processQuery("List keys in bucket1", null, null);
 
-    // Executor must be called with the correct endpoint
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt());
+    // Executor must be called with the listKeys tool
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), anyMap());
   }
 
   @Test
@@ -188,34 +165,26 @@ public class TestChatbotAgentListKeysPolicy {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED, true);
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, false);
-    ChatbotAgent agentNoScope = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
+    ChatbotAgent agentNoScope = new ChatbotAgent(mockLlmClient, mockReconQueryExecutor,
+        mockReconApiAllowlist, mockLlmToolSpecFactory, conf);
 
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+    selectListKeys("{\"startPrefix\":\"/\"}");
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(textResp(SUMMARY_RESPONSE));
 
     agentNoScope.processQuery("List all keys", null, null);
 
     // Safe-scope check is off — executor IS called
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), anyMap());
   }
 
   // ── Exception Handling and Parameter Pass-through ───────────────────────
 
   @Test
   public void testToolExecutorIoExceptionIsWrappedAsChatbotException() throws Exception {
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
+    selectListKeys("{\"startPrefix\":\"/vol1/bucket1\"}");
 
-    when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt()))
+    when(mockReconQueryExecutor.execute(anyString(), anyMap()))
         .thenThrow(new IOException("Recon API is down"));
 
     ChatbotException exception = assertThrows(ChatbotException.class, () -> {
@@ -230,13 +199,9 @@ public class TestChatbotAgentListKeysPolicy {
 
   @Test
   public void testSummarizationLlmFailureIsWrappedAsChatbotException() throws Exception {
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-
-    // First call returns valid tool call JSON, second call throws exception
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
+    // First (selection) call returns a valid tool call, second (summarization) call throws.
+    selectListKeys("{\"startPrefix\":\"/vol1/bucket1\"}");
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
         .thenThrow(new RuntimeException("LLM summarization failed"));
 
     ChatbotException exception = assertThrows(ChatbotException.class, () -> {
@@ -250,27 +215,21 @@ public class TestChatbotAgentListKeysPolicy {
     assertEquals("LLM summarization failed", exception.getCause().getMessage());
 
     // Executor should have been called successfully
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), anyMap());
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testOptionalParametersArePassedToToolExecutor() throws Exception {
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\",\"limit\":\"50\"," +
-        "\"replicationType\":\"RATIS\",\"keySize\":\"1024\"}," +
-        "\"reasoning\":\"scoped with filters\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+    selectListKeys("{\"startPrefix\":\"/vol1/bucket1\",\"limit\":\"50\"," +
+        "\"replicationType\":\"RATIS\",\"keySize\":\"1024\"}");
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(textResp(SUMMARY_RESPONSE));
 
     agent.processQuery("List 50 RATIS keys in bucket1 larger than 1024 bytes", null, null);
 
+    @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        eq("/api/v1/keys/listKeys"), eq("GET"), paramsCaptor.capture(), anyInt(), anyInt());
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), paramsCaptor.capture());
 
     Map<String, String> capturedParams = paramsCaptor.getValue();
     assertEquals("/vol1/bucket1", capturedParams.get("startPrefix"));
@@ -281,12 +240,19 @@ public class TestChatbotAgentListKeysPolicy {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private LLMClient.LLMResponse resp(String content) {
+  /** Stub the tool-selection call to return a native listKeys tool call with the given args. */
+  private void selectListKeys(String argumentsJson) throws LLMClient.LLMException {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(new LLMClient.LLMResponse("", "test-model", 10, 20,
+            Collections.singletonList(new LLMClient.ToolCallRequest(LIST_KEYS_TOOL, argumentsJson))));
+  }
+
+  private LLMClient.LLMResponse textResp(String content) {
     return new LLMClient.LLMResponse(content, "test-model", 10, 20, null);
   }
 
-  private ToolExecutor.ToolExecutionOutcome defaultOutcome() {
-    return new ToolExecutor.ToolExecutionOutcome(
-        new HashMap<>(), 0, 1, false, null, new HashMap<>());
+  private ReconQueryResult defaultOutcome() {
+    return new ReconQueryResult(
+        JsonNodeFactory.instance.objectNode(), 0, false, 1000);
   }
 }
