@@ -44,8 +44,8 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -81,19 +81,24 @@ public class TestSCMFollowerCatchupWithContainerReport {
   private static final int NUM_OF_SCMS = 3;
   private static final int NUM_OF_DNS = 3;
   private static final int NUM_KEYS = 5;
-  private static final String VOLUME = "testvol";
-  private static final String BUCKET = "testbucket";
 
-  private MiniOzoneHAClusterImpl cluster;
+  // One cluster is shared by all tests in this class (built once in @BeforeAll).
+  // Each test uses its own volume/bucket and re-discovers leader/follower, so the
+  // restart + leadership-transfer each test performs leaves the cluster healthy
+  // for the next one.
+  private static MiniOzoneHAClusterImpl cluster;
 
-  @BeforeEach
-  void init() throws Exception {
+  @BeforeAll
+  static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Keep the full container report interval long so a replica dropped during
     // catch-up is not silently re-reported within the test window. This makes
     // the regression deterministic: only the deferred-start path can repopulate
     // replicas in time.
     conf.setTimeDuration("hdds.container.report.interval", 5, TimeUnit.MINUTES);
+    // Fast datanode heartbeats so safe-mode exit at startup and replica
+    // re-reporting after the deferred DN-server start happen within ~1s.
+    conf.setTimeDuration("hdds.heartbeat.interval", 1, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(OM_SERVICE_ID)
         .setSCMServiceId(SCM_SERVICE_ID)
@@ -104,8 +109,8 @@ public class TestSCMFollowerCatchupWithContainerReport {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterEach
-  void shutdown() {
+  @AfterAll
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -118,8 +123,10 @@ public class TestSCMFollowerCatchupWithContainerReport {
    */
   @Test
   void testFollowerCatchupAfterContainerClose() throws Exception {
+    String vol = "vol-close";
+    String buck = "buck-close";
     byte[] keyData = "value-of-key".getBytes(UTF_8);
-    Set<Long> containerIds = createKeys(keyData);
+    Set<Long> containerIds = createKeys(vol, buck, keyData);
     assertFalse(containerIds.isEmpty(), "Should have created containers");
 
     StorageContainerManager followerScm = null;
@@ -142,11 +149,11 @@ public class TestSCMFollowerCatchupWithContainerReport {
 
     StorageContainerManager newFollower =
         cluster.restartStorageContainerManager(followerScm, false);
-    GenericTestUtils.waitFor(() -> !newFollower.isInSafeMode(), 1000, 120_000);
+    GenericTestUtils.waitFor(() -> !newFollower.isInSafeMode(), 250, 120_000);
 
     cluster.getStorageContainerLocationClient()
         .transferLeadership(newFollower.getScmId());
-    GenericTestUtils.waitFor(newFollower::checkLeader, 1000, 60_000);
+    GenericTestUtils.waitFor(newFollower::checkLeader, 250, 60_000);
 
     for (long cid : containerIds) {
       ContainerID id = ContainerID.valueOf(cid);
@@ -158,7 +165,7 @@ public class TestSCMFollowerCatchupWithContainerReport {
           newFollower.getContainerManager().getContainerReplicas(id).size(),
           "Container " + cid + " should have " + NUM_OF_DNS + " replicas");
     }
-    assertKeysReadable(keyData);
+    assertKeysReadable(vol, buck, keyData);
   }
 
   /**
@@ -183,20 +190,22 @@ public class TestSCMFollowerCatchupWithContainerReport {
     followerScm.join();
 
     // ---- Step 3: create keys -> new containers created while follower offline.
+    String vol = "vol-create";
+    String buck = "buck-create";
     byte[] keyData = "value-of-key".getBytes(UTF_8);
-    Set<Long> containerIds = createKeys(keyData);
+    Set<Long> containerIds = createKeys(vol, buck, keyData);
     assertFalse(containerIds.isEmpty(), "Should have created containers");
 
     // ---- Step 4: restart the follower and wait for safe-mode exit ----
     StorageContainerManager newFollower =
         cluster.restartStorageContainerManager(followerScm, false);
     BooleanSupplier safeModeExited = () -> !newFollower.isInSafeMode();
-    GenericTestUtils.waitFor(safeModeExited, 1000, 120_000);
+    GenericTestUtils.waitFor(safeModeExited, 250, 120_000);
 
     // ---- Step 5: transfer leadership to the restarted follower ----
     cluster.getStorageContainerLocationClient()
         .transferLeadership(newFollower.getScmId());
-    GenericTestUtils.waitFor(newFollower::checkLeader, 1000, 60_000);
+    GenericTestUtils.waitFor(newFollower::checkLeader, 250, 60_000);
     LOG.info("Leadership transferred to {}", newFollower.getScmId());
 
     // ---- Step 6: every container must have a full replica set on the new
@@ -210,7 +219,7 @@ public class TestSCMFollowerCatchupWithContainerReport {
     }
 
     // ---- Step 7: every key must still be readable ----
-    assertKeysReadable(keyData);
+    assertKeysReadable(vol, buck, keyData);
   }
 
   /**
@@ -221,8 +230,10 @@ public class TestSCMFollowerCatchupWithContainerReport {
    */
   @Test
   void testFollowerCatchupOnIdleCluster() throws Exception {
+    String vol = "vol-idle";
+    String buck = "buck-idle";
     byte[] keyData = "value-of-key".getBytes(UTF_8);
-    Set<Long> containerIds = createKeys(keyData);
+    Set<Long> containerIds = createKeys(vol, buck, keyData);
     assertFalse(containerIds.isEmpty(), "Should have created containers");
 
     StorageContainerManager followerScm = null;
@@ -241,11 +252,11 @@ public class TestSCMFollowerCatchupWithContainerReport {
         cluster.restartStorageContainerManager(followerScm, false);
     // Must still exit safe mode (i.e. the datanode server started) without any
     // new transactions to apply.
-    GenericTestUtils.waitFor(() -> !newFollower.isInSafeMode(), 1000, 120_000);
+    GenericTestUtils.waitFor(() -> !newFollower.isInSafeMode(), 250, 120_000);
 
     cluster.getStorageContainerLocationClient()
         .transferLeadership(newFollower.getScmId());
-    GenericTestUtils.waitFor(newFollower::checkLeader, 1000, 60_000);
+    GenericTestUtils.waitFor(newFollower::checkLeader, 250, 60_000);
 
     for (long cid : containerIds) {
       ContainerID id = ContainerID.valueOf(cid);
@@ -254,17 +265,18 @@ public class TestSCMFollowerCatchupWithContainerReport {
           newFollower.getContainerManager().getContainerReplicas(id).size(),
           "Container " + cid + " should have " + NUM_OF_DNS + " replicas");
     }
-    assertKeysReadable(keyData);
+    assertKeysReadable(vol, buck, keyData);
   }
 
-  private Set<Long> createKeys(byte[] keyData) throws IOException {
+  private Set<Long> createKeys(String volumeName, String bucketName, byte[] keyData)
+      throws IOException {
     Set<Long> containerIds = new LinkedHashSet<>();
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore store = client.getObjectStore();
-      store.createVolume(VOLUME);
-      OzoneVolume volume = store.getVolume(VOLUME);
-      volume.createBucket(BUCKET);
-      OzoneBucket bucket = volume.getBucket(BUCKET);
+      store.createVolume(volumeName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      volume.createBucket(bucketName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
 
       for (int i = 0; i < NUM_KEYS; i++) {
         String keyName = "key-" + i;
@@ -278,10 +290,11 @@ public class TestSCMFollowerCatchupWithContainerReport {
     return containerIds;
   }
 
-  private void assertKeysReadable(byte[] keyData) throws IOException {
+  private void assertKeysReadable(String volumeName, String bucketName, byte[] keyData)
+      throws IOException {
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore store = client.getObjectStore();
-      OzoneBucket bucket = store.getVolume(VOLUME).getBucket(BUCKET);
+      OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
       for (int i = 0; i < NUM_KEYS; i++) {
         String keyName = "key-" + i;
         try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -304,7 +317,7 @@ public class TestSCMFollowerCatchupWithContainerReport {
       } catch (Exception e) {
         return false;
       }
-    }, 1000, 120_000);
+    }, 250, 120_000);
   }
 
   private static void waitForReplicaCount(
@@ -318,6 +331,6 @@ public class TestSCMFollowerCatchupWithContainerReport {
         return false;
       }
     };
-    GenericTestUtils.waitFor(check, 1000, 120_000);
+    GenericTestUtils.waitFor(check, 250, 120_000);
   }
 }
