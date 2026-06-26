@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.ContainerStateKey;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
@@ -33,15 +36,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Functional tests for {@link ContainerHealthSchemaManager} delete handling.
- *
- * <p>{@code deleteScmStatesForContainers} coalesces long contiguous container
- * id runs into single range ({@code BETWEEN}) deletes while folding shorter
- * runs and scattered ids into chunked {@code IN} deletes. These tests assert
- * that both paths remove exactly the requested rows for contiguous, scattered,
- * and mixed id distributions, and that non-SCM states are never removed.</p>
+ * Functional tests for {@link ContainerHealthSchemaManager#syncUnhealthyContainerRecordsAtomically}.
  */
 public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
+
+  private static final long ORIGINAL_TIMESTAMP = 1_000L;
+  private static final long UPDATED_TIMESTAMP = 2_000L;
 
   private ContainerSchemaDefinition schemaDefinition;
   private ContainerHealthSchemaManager schemaManager;
@@ -54,138 +54,118 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testDeleteContiguousRangeRemovesExactlyRequestedRows() {
-    // A contiguous run (>= MIN_RANGE_RUN_LENGTH) is removed via the range path.
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 50;
-    insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
-    // Survivors that are not part of the delete list.
-    insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 5000L, 5002L, 5004L);
+  public void testSyncInsertsNewUnhealthyRecords() {
+    Map<ContainerStateKey, Long> existing = Collections.emptyMap();
+    List<UnhealthyContainerRecord> desired = Arrays.asList(
+        record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0),
+        record(2L, UnHealthyContainerStates.UNDER_REPLICATED, ORIGINAL_TIMESTAMP, 3, 2));
 
-    List<Long> idsToDelete = contiguous(1, runLength);
-    idsToDelete.add(1L);              // duplicate -> must be de-duplicated
-    Collections.shuffle(idsToDelete); // unsorted -> must be sorted internally
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
 
-    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
-
-    assertEquals(Arrays.asList(5000L, 5002L, 5004L), remainingContainerIds());
+    assertEquals(Arrays.asList(1L, 2L), remainingContainerIds());
+    assertEquals(2L, countRows());
   }
 
   @Test
-  public void testDeleteScatteredIdsRemovesExactlyRequestedRows() {
-    for (long id = 1; id <= 10; id++) {
-      insertIds(UnHealthyContainerStates.MISSING, id);
-    }
+  public void testSyncDeletesStaleRowsWhenContainerBecomesHealthy() {
+    insert(record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
+    insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED, ORIGINAL_TIMESTAMP, 3, 2));
+    insert(record(2L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
 
-    // Delete only the odd ids, supplied out of order.
-    schemaManager.batchDeleteSCMStatesForContainers(
-        new ArrayList<>(Arrays.asList(9L, 1L, 5L, 7L, 3L)));
+    Map<ContainerStateKey, Long> existing = existingMap(
+        key(1L, UnHealthyContainerStates.MISSING),
+        key(1L, UnHealthyContainerStates.UNDER_REPLICATED),
+        key(2L, UnHealthyContainerStates.MISSING));
 
-    assertEquals(Arrays.asList(2L, 4L, 6L, 8L, 10L), remainingContainerIds());
+    // Container 1 recovered; container 2 still missing.
+    List<UnhealthyContainerRecord> desired = Collections.singletonList(
+        record(2L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
+
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
+
+    assertEquals(Collections.singletonList(2L), remainingContainerIds());
+    assertEquals(1L, countRows());
   }
 
   @Test
-  public void testDeleteMixedRunAndScatteredRemovesExactlyRequestedRows() {
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 50;
-    insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
-    insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 9001L, 9003L, 9005L);
-    // Survivor not present in the delete list.
-    insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 9004L);
+  public void testSyncUpdatesExistingRowAndDeletesChangedState() {
+    insert(record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
 
-    List<Long> idsToDelete = contiguous(1, runLength);
-    idsToDelete.add(9001L);
-    idsToDelete.add(9003L);
-    idsToDelete.add(9005L);
+    Map<ContainerStateKey, Long> existing = existingMap(
+        key(1L, UnHealthyContainerStates.MISSING));
 
-    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
+    // Same container now under-replicated instead of missing.
+    List<UnhealthyContainerRecord> desired = Collections.singletonList(
+        record(1L, UnHealthyContainerStates.UNDER_REPLICATED, UPDATED_TIMESTAMP, 3, 2));
 
-    assertEquals(Collections.singletonList(9004L), remainingContainerIds());
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
+
+    assertEquals(Collections.singletonList(1L), remainingContainerIds());
+    assertEquals(1L, countRows());
+    UnhealthyContainerRecord row = fetchRow(1L, UnHealthyContainerStates.UNDER_REPLICATED);
+    assertEquals(UPDATED_TIMESTAMP, row.getInStateSince());
+    assertEquals(2, row.getActualReplicaCount());
+    assertTrue(countByState(UnHealthyContainerStates.MISSING) == 0);
   }
 
   @Test
-  public void testDeletePreservesNonScmStateInsideRange() {
-    int runLength = ContainerHealthSchemaManager.MIN_RANGE_RUN_LENGTH + 100;
-    insertRange(1, runLength, UnHealthyContainerStates.UNDER_REPLICATED);
-    // ALL_REPLICAS_BAD is not an SCM-generated state, so it must survive even
-    // though container 50 falls inside the deleted [1, runLength] range.
-    insertIds(UnHealthyContainerStates.ALL_REPLICAS_BAD, 50L);
+  public void testSyncUpdatesExistingRowInPlace() {
+    insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
+        ORIGINAL_TIMESTAMP, 3, 2, "old reason"));
 
-    schemaManager.batchDeleteSCMStatesForContainers(contiguous(1, runLength));
+    Map<ContainerStateKey, Long> existing = existingMap(
+        key(1L, UnHealthyContainerStates.UNDER_REPLICATED));
 
-    assertEquals(Collections.singletonList(50L), remainingContainerIds());
-    assertEquals(0L, countByState(UnHealthyContainerStates.UNDER_REPLICATED));
+    List<UnhealthyContainerRecord> desired = Collections.singletonList(
+        record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
+            ORIGINAL_TIMESTAMP, 3, 1, "new reason"));
+
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
+
+    assertEquals(1L, countRows());
+    UnhealthyContainerRecord row = fetchRow(1L, UnHealthyContainerStates.UNDER_REPLICATED);
+    assertEquals(ORIGINAL_TIMESTAMP, row.getInStateSince());
+    assertEquals(1, row.getActualReplicaCount());
+    assertEquals("new reason", row.getReason());
+  }
+
+  @Test
+  public void testBatchDeleteStillRemovesAllScmStatesForContainer() {
+    insert(record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
+    insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED, ORIGINAL_TIMESTAMP, 3, 2));
+    insert(record(1L, UnHealthyContainerStates.ALL_REPLICAS_BAD, ORIGINAL_TIMESTAMP, 3, 0));
+
+    schemaManager.batchDeleteSCMStatesForContainers(Collections.singletonList(1L));
+
+    assertEquals(1L, countRows());
     assertEquals(1L, countByState(UnHealthyContainerStates.ALL_REPLICAS_BAD));
   }
 
-  @Test
-  public void testDeleteShortRunsAndPointsCombinedInOneStatement() {
-    // Short contiguous runs of length >= MIN_RANGE_RUN_LENGTH become BETWEEN
-    // terms; runs of 1-2 ids stay as IN points. All are combined into a single
-    // bounded predicate. Inserted rows cover both deleted and surviving ids.
-    insertRange(1, 5, UnHealthyContainerStates.MISSING);      // range term
-    insertRange(20, 24, UnHealthyContainerStates.MISSING);    // range term
-    insertIds(UnHealthyContainerStates.MISSING, 40L, 41L);    // 2 points (kept short)
-    insertIds(UnHealthyContainerStates.MISSING, 60L);         // single point
-    // Survivors interleaved with the deleted ids.
-    insertIds(UnHealthyContainerStates.MISSING, 10L, 30L, 42L, 61L);
-
-    List<Long> idsToDelete = new ArrayList<>();
-    idsToDelete.addAll(contiguous(1, 5));
-    idsToDelete.addAll(contiguous(20, 24));
-    idsToDelete.addAll(Arrays.asList(40L, 41L, 60L));
-    Collections.shuffle(idsToDelete);
-
-    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
-
-    assertEquals(Arrays.asList(10L, 30L, 42L, 61L), remainingContainerIds());
+  private void insert(UnhealthyContainerRecord record) {
+    schemaManager.insertUnhealthyContainerRecords(Collections.singletonList(record));
   }
 
-  @Test
-  public void testDeleteScatteredIdsSpanningMultipleStatements() {
-    // More scattered ids than fit in a single predicate, forcing the operand
-    // budget to flush across multiple DELETE statements.
-    int count = ContainerHealthSchemaManager.MAX_PREDICATE_OPERANDS + 50;
-    List<Long> idsToDelete = new ArrayList<>(count);
-    for (int k = 0; k < count; k++) {
-      // Even ids only -> every id is isolated (no contiguous runs).
-      long id = 2L * (k + 1);
-      insertIds(UnHealthyContainerStates.UNDER_REPLICATED, id);
-      idsToDelete.add(id);
+  private UnhealthyContainerRecord record(long id, UnHealthyContainerStates state,
+      long timestamp, int expected, int actual) {
+    return record(id, state, timestamp, expected, actual, "test");
+  }
+
+  private UnhealthyContainerRecord record(long id, UnHealthyContainerStates state,
+      long timestamp, int expected, int actual, String reason) {
+    return new UnhealthyContainerRecord(id, state.toString(), timestamp,
+        expected, actual, expected - actual, reason);
+  }
+
+  private ContainerStateKey key(long id, UnHealthyContainerStates state) {
+    return new ContainerStateKey(id, state.toString());
+  }
+
+  private Map<ContainerStateKey, Long> existingMap(ContainerStateKey... keys) {
+    Map<ContainerStateKey, Long> existing = new HashMap<>();
+    for (ContainerStateKey key : keys) {
+      existing.put(key, ORIGINAL_TIMESTAMP);
     }
-    // A survivor that must remain untouched.
-    insertIds(UnHealthyContainerStates.UNDER_REPLICATED, 1L);
-
-    schemaManager.batchDeleteSCMStatesForContainers(idsToDelete);
-
-    assertEquals(Collections.singletonList(1L), remainingContainerIds());
-  }
-
-  private void insertRange(long startInclusive, long endInclusive,
-      UnHealthyContainerStates state) {
-    List<UnhealthyContainerRecord> records = new ArrayList<>();
-    for (long id = startInclusive; id <= endInclusive; id++) {
-      records.add(record(id, state));
-    }
-    schemaManager.insertUnhealthyContainerRecords(records);
-  }
-
-  private void insertIds(UnHealthyContainerStates state, long... ids) {
-    List<UnhealthyContainerRecord> records = new ArrayList<>();
-    for (long id : ids) {
-      records.add(record(id, state));
-    }
-    schemaManager.insertUnhealthyContainerRecords(records);
-  }
-
-  private UnhealthyContainerRecord record(long id, UnHealthyContainerStates state) {
-    return new UnhealthyContainerRecord(id, state.toString(), 1L, 3, 2, 1, "test");
-  }
-
-  private List<Long> contiguous(long startInclusive, long endInclusive) {
-    List<Long> ids = new ArrayList<>();
-    for (long id = startInclusive; id <= endInclusive; id++) {
-      ids.add(id);
-    }
-    return ids;
+    return existing;
   }
 
   private List<Long> remainingContainerIds() {
@@ -196,9 +176,25 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
         .fetch(UNHEALTHY_CONTAINERS.CONTAINER_ID);
   }
 
+  private long countRows() {
+    DSLContext dsl = schemaDefinition.getDSLContext();
+    return dsl.fetchCount(UNHEALTHY_CONTAINERS);
+  }
+
   private long countByState(UnHealthyContainerStates state) {
     DSLContext dsl = schemaDefinition.getDSLContext();
     return dsl.fetchCount(dsl.selectFrom(UNHEALTHY_CONTAINERS)
         .where(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString())));
+  }
+
+  private UnhealthyContainerRecord fetchRow(long id, UnHealthyContainerStates state) {
+    List<UnhealthyContainerRecord> rows = schemaManager.getUnhealthyContainers(
+        state, 0, 0, 100);
+    for (UnhealthyContainerRecord row : rows) {
+      if (row.getContainerId() == id) {
+        return row;
+      }
+    }
+    throw new AssertionError("Row not found for container " + id + " state " + state);
   }
 }

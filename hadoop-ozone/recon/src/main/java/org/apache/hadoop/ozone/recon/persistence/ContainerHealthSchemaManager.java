@@ -69,40 +69,6 @@ public class ContainerHealthSchemaManager {
    */
   static final int MAX_IN_CLAUSE_CHUNK_SIZE = 1_000;
 
-  /**
-   * Minimum length of a contiguous container-id run that is deleted with a
-   * range ({@code BETWEEN}) term instead of being expanded into individual
-   * {@code IN} values.
-   *
-   * <p>Derby compiles every statement to JVM bytecode whose size grows with the
-   * number of id literals in the predicate. A contiguous run of {@code L} ids
-   * costs {@code L} operands when listed in an {@code IN} clause, but only
-   * {@link #RANGE_OPERAND_COST} (the two endpoints) when written as
-   * {@code BETWEEN lo AND hi}, independent of {@code L}. The range form is
-   * therefore strictly smaller once {@code L > RANGE_OPERAND_COST}, i.e. for
-   * runs of 3 or more ids; runs of 1–2 ids are left as {@code IN} values since
-   * the range form would save nothing. This lets the optimization benefit
-   * realistic, fragmented unhealthy-container sets rather than only rare
-   * 1,000+ contiguous ranges.</p>
-   */
-  static final int MIN_RANGE_RUN_LENGTH = 3;
-
-  /** Estimated predicate operand cost of a single {@code BETWEEN} range term. */
-  private static final int RANGE_OPERAND_COST = 2;
-
-  /**
-   * Upper bound on the estimated number of id operands packed into one combined
-   * DELETE predicate before it is flushed.
-   *
-   * <p>Range terms count as {@link #RANGE_OPERAND_COST} operands and scattered
-   * ids as one operand each. The cap reuses {@link #MAX_IN_CLAUSE_CHUNK_SIZE} —
-   * the id count already proven to keep a pure {@code IN} delete well under
-   * Derby's 64 KB per-method bytecode limit — so a mixed range/{@code IN}
-   * predicate of the same operand budget stays within the same safe
-   * envelope.</p>
-   */
-  static final int MAX_PREDICATE_OPERANDS = MAX_IN_CLAUSE_CHUNK_SIZE;
-
   private final ContainerSchemaDefinition containerSchemaDefinition;
   private final int unhealthyContainersFetchSize;
 
@@ -120,8 +86,8 @@ public class ContainerHealthSchemaManager {
    * Insert unhealthy container records in UNHEALTHY_CONTAINERS table using
    * true batch insert.
    *
-   * <p>In the health-task flow, inserts are preceded by delete in the same
-   * transaction via {@link #replaceUnhealthyContainerRecordsAtomically(List, List)}.
+   * <p>In the health-task flow, inserts are usually part of
+   * {@link #syncUnhealthyContainerRecordsAtomically(Map, List)}.
    * Therefore duplicate-key fallback is not expected and this method fails fast
    * on any insert error.</p>
    */
@@ -214,6 +180,70 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
+   * Atomically syncs unhealthy rows for a scan chunk: insert new
+   * (container_id, state) pairs, update existing pairs, and delete only stale
+   * pairs that are no longer unhealthy.
+   *
+   * <p>Unlike {@link #replaceUnhealthyContainerRecordsAtomically}, this does not
+   * delete all SCM states for every container that previously had a row. It
+   * removes only keys present in {@code existingByKey} but absent from the
+   * desired scan result (containers that recovered or changed state).</p>
+   *
+   * @param existingByKey prior rows for this chunk, keyed by
+   *                      (container_id, container_state)
+   * @param desiredRecords unhealthy rows produced by the current scan
+   */
+  public void syncUnhealthyContainerRecordsAtomically(
+      Map<ContainerStateKey, Long> existingByKey,
+      List<UnhealthyContainerRecord> desiredRecords) {
+    if ((existingByKey == null || existingByKey.isEmpty())
+        && (desiredRecords == null || desiredRecords.isEmpty())) {
+      return;
+    }
+
+    Map<ContainerStateKey, UnhealthyContainerRecord> desiredByKey = new HashMap<>();
+    if (desiredRecords != null) {
+      for (UnhealthyContainerRecord record : desiredRecords) {
+        desiredByKey.put(new ContainerStateKey(record.getContainerId(),
+            record.getContainerState()), record);
+      }
+    }
+
+    Map<ContainerStateKey, Long> existing =
+        existingByKey == null ? new HashMap<>() : existingByKey;
+
+    List<ContainerStateKey> staleKeys = new ArrayList<>();
+    List<UnhealthyContainerRecord> toInsert = new ArrayList<>();
+    List<UnhealthyContainerRecord> toUpdate = new ArrayList<>();
+
+    for (ContainerStateKey key : existing.keySet()) {
+      if (!desiredByKey.containsKey(key)) {
+        staleKeys.add(key);
+      }
+    }
+    for (UnhealthyContainerRecord record : desiredByKey.values()) {
+      ContainerStateKey key = new ContainerStateKey(record.getContainerId(),
+          record.getContainerState());
+      if (existing.containsKey(key)) {
+        toUpdate.add(record);
+      } else {
+        toInsert.add(record);
+      }
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    dslContext.transaction(configuration -> {
+      DSLContext txContext = configuration.dsl();
+      deleteStaleUnhealthyRecords(txContext, staleKeys);
+      batchInsertInChunks(txContext, toInsert);
+      batchUpdateInChunks(txContext, toUpdate);
+    });
+
+    LOG.debug("Synced unhealthy container records: deleted {} stale, inserted {}, updated {}",
+        staleKeys.size(), toInsert.size(), toUpdate.size());
+  }
+
+  /**
    * Atomically replaces unhealthy rows for a given set of containers.
    * Delete and insert happen in the same DB transaction.
    */
@@ -239,99 +269,63 @@ public class ContainerHealthSchemaManager {
 
   private int deleteScmStatesForContainers(DSLContext dslContext,
       List<Long> containerIds) {
-
-    // Sort and de-duplicate so contiguous runs are detectable regardless of the
-    // order in which the caller supplied the ids.
-    List<Long> sortedIds = containerIds.stream()
-        .distinct()
-        .sorted()
-        .collect(Collectors.toList());
-
     int totalDeleted = 0;
 
-    // Build each DELETE predicate as the combination of compact range terms (one
-    // BETWEEN per contiguous run of at least MIN_RANGE_RUN_LENGTH ids) and a
-    // single IN list for the remaining scattered ids. Terms are accumulated
-    // until the estimated operand count reaches MAX_PREDICATE_OPERANDS, then the
-    // statement is flushed so the generated Derby bytecode stays within budget.
-    List<long[]> ranges = new ArrayList<>();
-    List<Long> points = new ArrayList<>();
-    int operandsUsed = 0;
+    for (int from = 0; from < containerIds.size(); from += MAX_IN_CLAUSE_CHUNK_SIZE) {
+      int to = Math.min(from + MAX_IN_CLAUSE_CHUNK_SIZE, containerIds.size());
+      List<Long> chunk = containerIds.subList(from, to);
 
-    int i = 0;
-    while (i < sortedIds.size()) {
-      int runStart = i;
-      while (i + 1 < sortedIds.size()
-          && sortedIds.get(i + 1) == sortedIds.get(i) + 1) {
-        i++;
-      }
-      int runLength = i - runStart + 1;
-
-      // A contiguous run is cheaper as a BETWEEN (RANGE_OPERAND_COST operands,
-      // regardless of length) than as IN values (one operand each) once it spans
-      // at least MIN_RANGE_RUN_LENGTH ids; shorter runs stay as IN points.
-      boolean asRange = runLength >= MIN_RANGE_RUN_LENGTH;
-      int termOperands = asRange ? RANGE_OPERAND_COST : runLength;
-
-      if (operandsUsed > 0
-          && operandsUsed + termOperands > MAX_PREDICATE_OPERANDS) {
-        totalDeleted += executeCombinedDelete(dslContext, ranges, points);
-        ranges.clear();
-        points.clear();
-        operandsUsed = 0;
-      }
-
-      if (asRange) {
-        ranges.add(new long[] {sortedIds.get(runStart), sortedIds.get(i)});
-      } else {
-        for (int j = runStart; j <= i; j++) {
-          points.add(sortedIds.get(j));
-        }
-      }
-      operandsUsed += termOperands;
-      i++;
-    }
-
-    if (operandsUsed > 0) {
-      totalDeleted += executeCombinedDelete(dslContext, ranges, points);
+      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .execute();
+      totalDeleted += deleted;
     }
     return totalDeleted;
   }
 
-  /**
-   * Executes a single DELETE whose container-id predicate is the combination of the
-   * given contiguous ranges (as {@code BETWEEN} terms) and scattered ids (as a
-   * single {@code IN} list), restricted to SCM-generated states.
-   */
-  private int executeCombinedDelete(DSLContext dslContext,
-      List<long[]> ranges, List<Long> points) {
-    Condition idCondition = null;
-    if (!points.isEmpty()) {
-      idCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.in(points);
+  private void deleteStaleUnhealthyRecords(DSLContext dslContext,
+      List<ContainerStateKey> staleKeys) {
+    if (staleKeys.isEmpty()) {
+      return;
     }
-    for (long[] range : ranges) {
-      Condition rangeCondition =
-          UNHEALTHY_CONTAINERS.CONTAINER_ID.between(range[0], range[1]);
-      idCondition = (idCondition == null)
-          ? rangeCondition : idCondition.or(rangeCondition);
+    for (ContainerStateKey key : staleKeys) {
+      dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(key.getContainerId()))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(key.getContainerState()))
+          .execute();
     }
-    if (idCondition == null) {
-      return 0;
-    }
-    return dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-        .where(idCondition.and(scmGeneratedStatesCondition()))
-        .execute();
   }
 
-  private Condition scmGeneratedStatesCondition() {
-    return UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
-        UnHealthyContainerStates.MISSING.toString(),
-        UnHealthyContainerStates.EMPTY_MISSING.toString(),
-        UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-        UnHealthyContainerStates.OVER_REPLICATED.toString(),
-        UnHealthyContainerStates.MIS_REPLICATED.toString(),
-        UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-        UnHealthyContainerStates.REPLICA_MISMATCH.toString());
+  private void batchUpdateInChunks(DSLContext dslContext,
+      List<UnhealthyContainerRecord> recs) {
+    if (recs.isEmpty()) {
+      return;
+    }
+    for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+      int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+      for (int i = from; i < to; i++) {
+        UnhealthyContainerRecord rec = recs.get(i);
+        dslContext.update(UNHEALTHY_CONTAINERS)
+            .set(UNHEALTHY_CONTAINERS.IN_STATE_SINCE, rec.getInStateSince())
+            .set(UNHEALTHY_CONTAINERS.EXPECTED_REPLICA_COUNT,
+                rec.getExpectedReplicaCount())
+            .set(UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT,
+                rec.getActualReplicaCount())
+            .set(UNHEALTHY_CONTAINERS.REPLICA_DELTA, rec.getReplicaDelta())
+            .set(UNHEALTHY_CONTAINERS.REASON, rec.getReason())
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(rec.getContainerId()))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(rec.getContainerState()))
+            .execute();
+      }
+    }
   }
 
   /**
@@ -393,10 +387,20 @@ public class ContainerHealthSchemaManager {
         || containerIds == null || containerIds.isEmpty()) {
       return records;
     }
+    return applyExistingInStateSince(records,
+        getExistingInStateSinceByContainerIds(containerIds));
+  }
 
-    Map<ContainerStateKey, Long> existingByContainerAndState =
-        getExistingInStateSinceByContainerIds(containerIds);
-    if (existingByContainerAndState.isEmpty()) {
+  /**
+   * Preserve existing inStateSince values for records that remain in the
+   * same unhealthy state across scan cycles, using a pre-loaded existing map.
+   */
+  public List<UnhealthyContainerRecord> applyExistingInStateSince(
+      List<UnhealthyContainerRecord> records,
+      Map<ContainerStateKey, Long> existingByContainerAndState) {
+    if (records == null || records.isEmpty()
+        || existingByContainerAndState == null
+        || existingByContainerAndState.isEmpty()) {
       return records;
     }
 
@@ -674,6 +678,10 @@ public class ContainerHealthSchemaManager {
 
     public long getContainerId() {
       return containerId;
+    }
+
+    public String getContainerState() {
+      return state;
     }
 
     @Override
