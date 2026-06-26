@@ -2073,6 +2073,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     );
   }
 
+  @Override
+  public OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
+    OzoneManagerProtocolProtos.QueryUpgradeStatusRequest
+        req = OzoneManagerProtocolProtos.QueryUpgradeStatusRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.QueryUpgradeStatus)
+        .setQueryUpgradeStatusRequest(req)
+        .build();
+
+    return handleError(submitRequest(omRequest)).getQueryUpgradeStatusResponse();
+  }
+
   /**
    * Get a valid Delegation Token.
    *

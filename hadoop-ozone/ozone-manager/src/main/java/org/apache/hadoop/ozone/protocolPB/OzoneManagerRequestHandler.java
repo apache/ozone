@@ -398,6 +398,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
+      case QueryUpgradeStatus:
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatusResponse =
+            getOzoneManager().queryUpgradeStatus();
+        responseBuilder.setQueryUpgradeStatusResponse(queryUpgradeStatusResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
