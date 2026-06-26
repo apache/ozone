@@ -30,19 +30,15 @@ public class HostAndPort {
   private final String hostAndPortString;
   private final int hash;
   /** The address can be updated from time to time. */
-  private InetSocketAddress address;
+  private final InetSocketAddress address;
 
-  private HostAndPort(String host, int port, InetSocketAddress address) {
+  public HostAndPort(String host, int port) {
     this.host = host;
     this.port = port;
     this.hostAndPortString = host + ":" + port;
     this.hash = host.hashCode() ^ Integer.hashCode(port);
     // TODO: HDDS-15533 change the address resolution logic and make this.address threadsafe.
-    this.address = address != null ? address : NetUtils.createSocketAddr(hostAndPortString);
-  }
-
-  public HostAndPort(String host, int port) {
-    this(host, port, null);
+    this.address = NetUtils.createSocketAddr(hostAndPortString);
   }
 
   public String getHostName() {
