@@ -95,7 +95,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
             .setKeyArgs(resolvedArgs))
-        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
+        .build();
 
   }
 
