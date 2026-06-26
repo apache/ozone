@@ -98,6 +98,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final XceiverClientMetrics metrics;
   private final Semaphore semaphore;
   private long timeout;
+  private final long streamReadTimeoutNanos;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
@@ -123,6 +124,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     Objects.requireNonNull(config, "config == null");
     setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
         OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
+        .getStreamReadTimeout().toNanos();
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -578,8 +581,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           request.getReadBlock().getBlockID().getLocalID(),
           request.getReadBlock().getOffset(),
           request.getReadBlock().getLength());
-      final long deadlineNs = streamObserver.hasReadDeadline() ? streamObserver.getReadDeadlineNs()
-          : System.nanoTime() + TimeUnit.SECONDS.toNanos(timeout);
+      final long deadlineNs = System.nanoTime() + streamReadTimeoutNanos;
       while (!obs.isReady() && System.nanoTime() - deadlineNs < 0) {
         LockSupport.parkNanos(10_000_000L);
         if (Thread.currentThread().isInterrupted()) {

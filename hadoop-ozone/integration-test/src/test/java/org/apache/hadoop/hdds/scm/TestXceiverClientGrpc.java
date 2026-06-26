@@ -333,13 +333,12 @@ public class TestXceiverClientGrpc {
   }
 
   /**
-   * streamRead() honours the caller-supplied deadline rather than the client read timeout
-   * and does not send while the stream is not ready.
+   * streamRead() honours the stream read timeout and does not send while the stream is not ready.
    */
   @Test
   public void testStreamReadFailsAfterTimeoutIfNeverReady() throws Exception {
-    OzoneConfiguration longClientTimeout = new OzoneConfiguration();
-    longClientTimeout.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "60s");
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    timeoutConf.set("ozone.client.stream.read.timeout", "1s");
 
     TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
     StreamingReadResponse response = new StreamingReadResponse(
@@ -347,9 +346,7 @@ public class TestXceiverClientGrpc {
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
     long start;
-    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, longClientTimeout)) {
-      response.setReadDeadlineNs(System.nanoTime()
-          + java.util.concurrent.TimeUnit.SECONDS.toNanos(1));
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, timeoutConf)) {
       start = System.currentTimeMillis();
       assertThrows(TimeoutIOException.class, () -> client.streamRead(request, response));
     }
@@ -369,7 +366,7 @@ public class TestXceiverClientGrpc {
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
     OzoneConfiguration longTimeout = new OzoneConfiguration();
-    longTimeout.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "60s");
+    longTimeout.set("ozone.client.stream.read.timeout", "60s");
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, longTimeout)) {
       Thread self = Thread.currentThread();

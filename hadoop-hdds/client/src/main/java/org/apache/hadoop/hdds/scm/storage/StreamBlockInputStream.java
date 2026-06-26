@@ -322,10 +322,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (r == null) {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
-    r.setReadDeadlineNs(System.nanoTime() + readTimeoutNanos);
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
         blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
-    r.setReadDeadlineNs(System.nanoTime() + readTimeoutNanos);
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -408,7 +406,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ReadBlockResponseProto poll() throws IOException {
-      final long deadlineNs = getReadDeadlineNs();
+      final long startTime = System.nanoTime();
       final long pollTimeoutNanos = Math.min(readTimeoutNanos / 10, 100_000_000);
 
       while (true) {
@@ -432,24 +430,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           return null; // Stream ended, queue is empty
         }
 
-        if (System.nanoTime() - deadlineNs >= 0) {
+        final long elapsedNanos = System.nanoTime() - startTime;
+        if (elapsedNanos >= readTimeoutNanos) {
           setFailedAndThrow(new TimeoutIOException(
               "Timed out waiting for response after " + readTimeout));
           return null;
         }
-      }
-    }
-
-    private long getReadDeadlineNs() {
-      final StreamingReadResponse r = getResponse();
-      return r != null && r.hasReadDeadline()
-          ? r.getReadDeadlineNs() : System.nanoTime() + readTimeoutNanos;
-    }
-
-    private void refreshReadDeadline() {
-      final StreamingReadResponse r = getResponse();
-      if (r != null) {
-        r.setReadDeadlineNs(System.nanoTime() + readTimeoutNanos);
       }
     }
 
@@ -461,7 +447,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         return responseQueue.isEmpty() ? null : readFromQueue();
       }
 
-      refreshReadDeadline();
       readBlock(length, preRead);
 
       while (true) {

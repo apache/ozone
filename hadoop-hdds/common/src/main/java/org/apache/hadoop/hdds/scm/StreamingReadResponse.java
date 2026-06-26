@@ -31,15 +31,6 @@ public class StreamingReadResponse {
   private final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
   private final String name;
 
-  /**
-   * Deadline (a {@link System#nanoTime} value) bounding the current wait, used as a single read budget
-   * for the call: set before streamRead() to bound the isReady() flow-control wait, then refreshed
-   * afterwards to bound the response wait in poll(). {@link #readDeadlineSet} tracks whether it has been
-   * set, since nanoTime values may be zero or negative and cannot be used as a sentinel.
-   */
-  private volatile long readDeadlineNs;
-  private volatile boolean readDeadlineSet;
-
   public StreamingReadResponse(DatanodeDetails dn,
       ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver) {
     this.dn = dn;
@@ -47,19 +38,6 @@ public class StreamingReadResponse {
 
     final String s = dn.getID().toString();
     this.name = "dn" + s.substring(s.lastIndexOf('-')) + "_stream";
-  }
-
-  public void setReadDeadlineNs(long deadlineNs) {
-    this.readDeadlineNs = deadlineNs;
-    this.readDeadlineSet = true;
-  }
-
-  public long getReadDeadlineNs() {
-    return readDeadlineNs;
-  }
-
-  public boolean hasReadDeadline() {
-    return readDeadlineSet;
   }
 
   public DatanodeDetails getDatanodeDetails() {
