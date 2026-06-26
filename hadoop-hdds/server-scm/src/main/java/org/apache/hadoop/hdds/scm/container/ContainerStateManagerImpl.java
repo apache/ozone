@@ -405,31 +405,28 @@ public final class ContainerStateManagerImpl
               containerInfo.getSequenceId(), sequenceId);
         }
 
-        try {
-          final LifeCycleState oldState = containerInfo.getState();
-          final LifeCycleState newState = stateMachine.getNextState(
-              oldState, event);
+        final LifeCycleState oldState = containerInfo.getState();
+        final LifeCycleState newState = stateMachine.getNextState(
+            oldState, event);
 
-          if (newState.getNumber() > oldState.getNumber()) {
-            ExecutionUtil.create(() -> {
-              containers.updateState(id, oldState, newState);
-              transactionBuffer.addToBuffer(containerStore, id,
-                  containers.getContainerInfo(id));
-            }).onException(() -> {
-              containers.updateState(id, newState, oldState);
-              ContainerInfo currentInfo = containers.getContainerInfo(id);
-              transactionBuffer.addToBuffer(containerStore, id, currentInfo);
+        if (newState.getNumber() > oldState.getNumber()) {
+          ExecutionUtil.create(() -> {
+            containers.updateState(id, oldState, newState);
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
+          }).onException(() -> {
+            containers.updateState(id, newState, oldState);
+            ContainerInfo currentInfo = containers.getContainerInfo(id);
+            transactionBuffer.addToBuffer(containerStore, id, currentInfo);
 
-            }).execute();
-            containerStateChangeActions.getOrDefault(event, info -> { })
-                .accept(containerInfo);
-          }
-        } catch (InvalidStateTransitionException ex) {
-          LOG.warn("Ignoring invalid container state transition for container {} " +
-                  "for event {} at state {}",
-              id, event, containerInfo.getState(), ex);
+          }).execute();
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(containerInfo);
         }
       }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Failed to updateContainerStateWithSequenceId for container {} at sequenceId {}, ignoring it.",
+          id, sequenceId, e);
     }
   }
 
