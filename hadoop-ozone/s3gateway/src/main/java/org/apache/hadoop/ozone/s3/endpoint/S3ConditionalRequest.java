@@ -195,7 +195,7 @@ final class S3ConditionalRequest {
     ObjectEndpoint.addLastModifiedDate(responseBuilder, key);
     return responseBuilder.build();
   }
-  
+
   public static boolean eTagMatches(String headerValue, String currentETag) {
     if (headerValue == null) {
       return false;
