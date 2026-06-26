@@ -196,6 +196,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
+   * Records a container allocation on the given datanode.
+   * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
+   * available space — it is called after the placement policy has already
+   * validated space and a replication command has been committed.
+   */
+  void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
    * Returns true if the datanode has at least one available container slot considering
    * in-flight allocations tracked by PendingContainerTracker.
    *

@@ -145,6 +145,15 @@ public class PendingContainerTracker {
     }
 
     /**
+     * Records a container allocation in the current window,
+     * without checking available space. Use this when the space check has
+     * already been performed by the placement policy.
+     */
+    synchronized void add(ContainerID containerID) {
+      currentWindow.add(containerID);
+    }
+
+    /**
      * Atomically checks whether there is allocatable space for one more container of
      * {@code maxContainerSize} given the current pending count, and adds {@code containerID}
      * to the current window if so.
@@ -213,6 +222,24 @@ public class PendingContainerTracker {
       }
     }
     return added;
+  }
+
+  /**
+   * Records a container allocation on the given datanode in the
+   * current window, without performing a space check. This is used when the
+   * space check was already done by the placement policy (e.g. from
+   * {@link org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps}).
+   *
+   * @param datanodeInfo the datanode receiving the container
+   * @param containerID  the container being allocated
+   */
+  public void recordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    Objects.requireNonNull(containerID, "containerID == null");
+    datanodeInfo.getPendingContainerAllocations().add(containerID);
+    if (metrics != null) {
+      metrics.incNumPendingContainersAdded();
+    }
   }
 
   /**

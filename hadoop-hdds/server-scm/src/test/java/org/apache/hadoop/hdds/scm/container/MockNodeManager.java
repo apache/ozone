@@ -462,6 +462,13 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo != null) {
+      pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+    }
+  }
+    
+  @Override  
   public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
     return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
   }

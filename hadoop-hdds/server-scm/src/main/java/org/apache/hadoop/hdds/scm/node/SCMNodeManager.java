@@ -74,6 +74,8 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -117,7 +119,7 @@ import org.slf4j.LoggerFactory;
  * get functions in this file as a snap-shot of information that is inconsistent
  * as soon as you read it.
  */
-public class SCMNodeManager implements NodeManager {
+public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSubscriber {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
@@ -1085,6 +1087,11 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+  }
+  
+  @Override
   public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
     return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
   }
@@ -1093,6 +1100,26 @@ public class SCMNodeManager implements NodeManager {
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
+  }
+
+  @Override
+  public void opAdded(ContainerReplicaOp op, ContainerID containerID) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      DatanodeInfo dnInfo = getDatanodeInfo(op.getTarget());
+      if (dnInfo != null) {
+        recordAllocationForDatanode(dnInfo, containerID);
+      }
+    }
+  }
+
+  @Override
+  public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD && !timedOut) {
+      DatanodeInfo dnInfo = getDatanodeInfo(op.getTarget());
+      if (dnInfo != null) {
+        removePendingAllocationForDatanode(dnInfo, containerID);
+      }
+    }
   }
 
   /**
