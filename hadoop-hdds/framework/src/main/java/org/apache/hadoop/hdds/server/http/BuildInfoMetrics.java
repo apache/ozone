@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -60,14 +61,32 @@ public final class BuildInfoMetrics implements MetricsSource {
   }
 
   /**
-   * Register a build-info source for the given component, if not already
-   * registered. Safe to call from each {@code BaseHttpServer} instance.
+   * Return the existing build-info source if one is already registered,
+   * otherwise create a new one, register it and return it. Build info is
+   * process-wide, so a single source is shared by every {@code BaseHttpServer}
+   * in the JVM (e.g. the S3 Gateway runs two). Making this idempotent keeps a
+   * second caller from failing with a duplicate-source error.
+   *
+   * @return a new or existing {@link BuildInfoMetrics}
    */
   public static synchronized BuildInfoMetrics create(String component) {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSource existing = ms.getSource(METRICS_SOURCE_NAME);
+    if (existing != null) {
+      return (BuildInfoMetrics) existing;
+    }
     BuildInfoMetrics source =
         new BuildInfoMetrics(component, HddsVersionInfo.HDDS_VERSION_INFO);
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "Ozone build version info", source);
+    return ms.register(METRICS_SOURCE_NAME, "Ozone build version info", source);
+  }
+
+  /**
+   * Unregister the build-info source. Idempotent: a no-op if it was never
+   * registered or was already removed. Called when the owning server stops so
+   * that a later {@link #create(String)} does not fail with a duplicate source.
+   */
+  public static synchronized void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
   @Override
