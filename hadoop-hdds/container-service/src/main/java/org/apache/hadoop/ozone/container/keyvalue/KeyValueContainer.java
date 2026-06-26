@@ -393,8 +393,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       if (!getContainerFile().getParentFile().exists()) {
         // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
-        // Attempting to write the .container file would fail, and writing a partial file
-        // with only the state field is more harmful than not writing one at all.
+        // Attempting to write the .container file would fail
         // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
         // and schedule deletion without requiring a persisted .container file.
         containerData.setState(UNHEALTHY);

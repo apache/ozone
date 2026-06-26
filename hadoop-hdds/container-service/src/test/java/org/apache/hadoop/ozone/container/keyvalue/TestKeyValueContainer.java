@@ -783,7 +783,7 @@ public class TestKeyValueContainer {
     assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         keyValueContainer.getContainerState());
 
-    // The metadata directory must NOT be recreated; no partial .container file should be written.
+    // Regression guards: if a future change adds mkdirs/persist logic, these catch it early.
     assertFalse(metadataDir.exists(), "Metadata dir should not be recreated by markContainerUnhealthy");
     assertFalse(keyValueContainer.getContainerFile().exists(),
         "Container file should not be written when metadata dir is missing");
