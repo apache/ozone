@@ -73,7 +73,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
@@ -100,7 +99,7 @@ public class TestContainerReportHandler {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  void setup() throws IOException, InvalidStateTransitionException {
+  void setup() throws IOException {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);

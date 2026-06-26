@@ -99,7 +99,6 @@ import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -934,7 +933,7 @@ public class TestContainerCommandsEC {
   }
 
   private void closeContainer(long conID)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     //Close the container first.
     scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
