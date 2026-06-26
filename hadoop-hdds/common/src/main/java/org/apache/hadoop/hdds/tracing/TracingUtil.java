@@ -54,7 +54,7 @@ public final class TracingUtil {
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
-  private static SdkTracerProvider sdkTracerProvider;
+  private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
 
   private TracingUtil() {
@@ -134,7 +134,7 @@ public final class TracingUtil {
       return;
     }
     try {
-      sdkTracerProvider.shutdown();
+      sdkTracerProvider.shutdown().join(10L, TimeUnit.SECONDS);
     } catch (Exception e) {
       LOG.warn("Tracing shutdown failed", e);
     } finally {
