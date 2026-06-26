@@ -413,7 +413,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       try {
         OzoneKeyDetails keyDetails = bucket.getKey(key);
         String currentETag = keyDetails.getMetadata().get(ETAG);
-        if (!S3ConditionalRequest.matchesETag(deleteObject.getIfMatch(), currentETag)) {
+        if (!S3ConditionalRequest.eTagMatches(deleteObject.getIfMatch(), currentETag)) {
           addPreconditionFailedError(result, key);
           return;
         }
