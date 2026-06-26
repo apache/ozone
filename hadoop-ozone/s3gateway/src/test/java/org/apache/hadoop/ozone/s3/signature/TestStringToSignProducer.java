@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
@@ -114,6 +115,33 @@ public class TestStringToSignProducer {
             + "20181009/us-east-1/s3/aws4_request\n"
             + Hex.encode(md.digest()).toLowerCase(),
         signatureBase, "String to sign is invalid");
+  }
+
+  @Test
+  public void testUrlEncodeInCanonicalRequest() {
+    final Map<String, String> headers = new HashMap<>();
+    headers.put("host", "example.com");
+    headers.put("x-amz-content-sha256", UNSIGNED_PAYLOAD);
+    headers.put("x-amz-date", DATETIME);
+
+    final Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("q+1*2~3", "v 4*5~6");
+
+    final String canonicalRequest = StringToSignProducer.buildCanonicalRequest(
+        "https", "GET", "/bucket/a+b*c~d/foo bar", "host;x-amz-content-sha256;x-amz-date",
+        headers, queryParams, true);
+
+    assertEquals(
+        "GET\n"
+            + "/bucket/a%2Bb%2Ac~d/foo%20bar\n"
+            + "q%2B1%2A2~3=v%204%2A5~6\n"
+            + "host:example.com\n"
+            + "x-amz-content-sha256:" + UNSIGNED_PAYLOAD + "\n"
+            + "x-amz-date:" + DATETIME + "\n"
+            + "\n"
+            + "host;x-amz-content-sha256;x-amz-date\n"
+            + UNSIGNED_PAYLOAD,
+        canonicalRequest);
   }
 
   private ContainerRequestContext setupContext(
