@@ -638,7 +638,8 @@ public class PipelineManagerImpl implements PipelineManager {
     final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
     final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
     for (DatanodeDetails dn : datanodeDetails) {
-      final DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+      // Refactored to use getNode instead of getDatanodeInfo
+      final DatanodeInfo info = nodeManager.getNode(dn.getID());
       if (info == null) {
         LOG.warn("DatanodeInfo not found for {}", dn.getID());
         return false;
