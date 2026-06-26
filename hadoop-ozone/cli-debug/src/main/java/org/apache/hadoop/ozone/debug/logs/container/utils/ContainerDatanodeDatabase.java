@@ -304,7 +304,7 @@ public class ContainerDatanodeDatabase {
 
           while (rs.next()) {
             if (limitProvided && count >= limit) {
-              out.println("Note: There might be more containers. Use -all option to list all entries");
+              out.println("Note: There might be more replica rows. Use --all option to list all entries");
               break;
             }
             String timestamp = rs.getString("timestamp");
@@ -320,9 +320,9 @@ public class ContainerDatanodeDatabase {
           }
           
           if (count == 0) {
-            out.printf("No containers found for state: %s%n", state);
+            out.printf("No replicas found with latest state %s%n", state);
           } else {
-            out.printf("Number of containers listed: %d%n", count);
+            out.printf("Number of replica rows listed: %d%n", count);
           }
         }
       }
@@ -410,6 +410,7 @@ public class ContainerDatanodeDatabase {
     Set<String> unhealthyReplicas = new HashSet<>();
     Set<String> closedReplicas = new HashSet<>();
     Set<String> openReplicas = new HashSet<>();
+    Set<String> closingReplicas = new HashSet<>();
     Set<String> quasiclosedReplicas = new HashSet<>();
     Set<String> deletedReplicas = new HashSet<>();
     Set<Long> bcsids = new HashSet<>();
@@ -444,6 +445,7 @@ public class ContainerDatanodeDatabase {
           otherTimestamps.add(stateTimestamp);
           break;
         case CLOSING:
+          closingReplicas.add(datanodeId);
           otherTimestamps.add(stateTimestamp);
           break;
         case CLOSED:
@@ -474,7 +476,7 @@ public class ContainerDatanodeDatabase {
       out.println("Container " + containerID + " has MISMATCHED REPLICATION as there are multiple" +
           " CLOSED containers with varying BCSIDs.");
     } else if (closedCount == DEFAULT_REPLICATION_FACTOR && allClosedNewer) {
-      out.println("Container " + containerID + " has enough replicas.");
+      out.println("Container " + containerID + " has enough closed replicas.");
     } else if (closedCount > DEFAULT_REPLICATION_FACTOR && allClosedNewer) {
       out.println("Container " + containerID + " is OVER-REPLICATED.");
     } else if (closedCount < DEFAULT_REPLICATION_FACTOR && closedCount != 0 && allClosedNewer) {
@@ -499,6 +501,12 @@ public class ContainerDatanodeDatabase {
         out.println("Container " + containerID + " has enough replicas.");
       } 
     }
+
+    out.println();
+    out.println("Log summary (latest per datanode, Replication Factor=" + DEFAULT_REPLICATION_FACTOR + "):");
+    out.printf("  CLOSED=%d, QUASI_CLOSED=%d, CLOSING=%d, OPEN=%d, DELETED=%d, UNHEALTHY=%d%n",
+        closedReplicas.size(), quasiclosedReplicas.size(), closingReplicas.size(), openReplicas.size(),
+        deletedReplicas.size(), unhealthyReplicas.size());
   }
 
   /**
@@ -564,8 +572,9 @@ public class ContainerDatanodeDatabase {
     return logEntries;
   }
 
-  public void findDuplicateOpenContainer() throws SQLException {
+  public void findDuplicateOpenContainer(Integer limit) throws SQLException {
     String sql = SQLDBConstants.SELECT_DISTINCT_CONTAINER_IDS_QUERY;
+    boolean limitProvided = limit != Integer.MAX_VALUE;
 
     try (Connection connection = getConnection()) {
 
@@ -576,8 +585,11 @@ public class ContainerDatanodeDatabase {
         while (resultSet.next()) {
           Long containerID = resultSet.getLong("container_id");
           List<DatanodeContainerInfo> logEntries = getContainerLogDataForOpenContainers(containerID, connection);
-          boolean hasIssue = checkForMultipleOpenStates(logEntries);
-          if (hasIssue) {
+          if (checkForMultipleOpenStates(logEntries)) {
+            if (limitProvided && count >= limit) {
+              err.println("Note: There might be more containers. Use --all option to list all entries.");
+              break;
+            }
             int openStateCount = (int) logEntries.stream()
                 .filter(entry -> "OPEN".equalsIgnoreCase(entry.getState()))
                 .count();
@@ -624,37 +636,36 @@ public class ContainerDatanodeDatabase {
    */
   
   public void listReplicatedContainers(String overOrUnder, Integer limit) throws SQLException {
-    String operator;
-    if ("OVER_REPLICATED".equalsIgnoreCase(overOrUnder)) {
-      operator = ">";
+    String query;
+    boolean overReplicated = "OVER_REPLICATED".equalsIgnoreCase(overOrUnder);
+    if (overReplicated) {
+      query = SQLDBConstants.SELECT_OVER_REPLICATED_CONTAINERS;
     } else if ("UNDER_REPLICATED".equalsIgnoreCase(overOrUnder)) {
-      operator = "<";
+      query = SQLDBConstants.SELECT_UNDER_REPLICATED_CONTAINERS;
     } else {
       err.println("Invalid type. Use OVER_REPLICATED or UNDER_REPLICATED.");
       return;
     }
-    
-    String rawQuery = SQLDBConstants.SELECT_REPLICATED_CONTAINERS;
-
-    if (!rawQuery.contains("{operator}")) {
-      err.println("Query not defined correctly.");
-      return;
-    }
-
-    String finalQuery = rawQuery.replace("{operator}", operator);
 
     boolean limitProvided = limit != Integer.MAX_VALUE;
     if (limitProvided) {
-      finalQuery += " LIMIT ?";
+      query += " LIMIT ?";
     }
 
     try (Connection connection = getConnection();
-         PreparedStatement pstmt = connection.prepareStatement(finalQuery)) {
+         PreparedStatement pstmt = connection.prepareStatement(query)) {
 
-      pstmt.setInt(1, DEFAULT_REPLICATION_FACTOR);
-      
-      if (limitProvided) {
-        pstmt.setInt(2, limit + 1);
+      if (overReplicated) {
+        pstmt.setInt(1, DEFAULT_REPLICATION_FACTOR);
+        pstmt.setInt(2, DEFAULT_REPLICATION_FACTOR);
+        if (limitProvided) {
+          pstmt.setInt(3, limit + 1);
+        }
+      } else {
+        pstmt.setInt(1, DEFAULT_REPLICATION_FACTOR);
+        if (limitProvided) {
+          pstmt.setInt(2, limit + 1);
+        }
       }
 
       try (ResultSet rs = pstmt.executeQuery()) {
