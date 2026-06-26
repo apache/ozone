@@ -119,6 +119,12 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
+  public ChunkBuffer put(byte[] b, int offset, int length) {
+    buffer.put(b, offset, length);
+    return this;
+  }
+
+  @Override
   public ChunkBuffer put(byte b) {
     buffer.put(b);
     return this;
