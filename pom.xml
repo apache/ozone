@@ -85,8 +85,6 @@
     <gson.version>2.13.1</gson.version>
     <guava.version>33.6.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
-    <hadoop.native.lib.name>libhadoop_osx_aarch_64.dylib</hadoop.native.lib.name>
-    <hadoop.native.lib.symbolic.name>libhadoop.dylib</hadoop.native.lib.symbolic.name>
     <hadoop.version>3.4.3</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
@@ -2552,36 +2550,6 @@
 
   <profiles>
     <profile>
-      <id>linux-x86_64</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <os>
-          <name>linux</name>
-          <family>unix</family>
-          <arch>amd64</arch>
-        </os>
-      </activation>
-      <properties>
-        <hadoop.native.lib.name>libhadoop_linux_x86_64.so</hadoop.native.lib.name>
-        <hadoop.native.lib.symbolic.name>libhadoop.so</hadoop.native.lib.symbolic.name>
-      </properties>
-    </profile>
-    <profile>
-      <id>linux-aarch64</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <os>
-          <name>linux</name>
-          <family>unix</family>
-          <arch>aarch64</arch>
-        </os>
-      </activation>
-      <properties>
-        <hadoop.native.lib.name>libhadoop_linux_aarch_64.so</hadoop.native.lib.name>
-        <hadoop.native.lib.symbolic.name>libhadoop.so</hadoop.native.lib.symbolic.name>
-      </properties>
-    </profile>
-    <profile>
       <id>dist</id>
       <build>
         <plugins>
@@ -2646,39 +2614,42 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-hadoop-native-library</id>
+                <id>fetch-linux-x86_64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/${hadoop.native.lib.name}</url>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
                   <unpack>false</unpack>
                   <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
                   <skipCache>false</skipCache>
                 </configuration>
               </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
-            <inherited>false</inherited>
-            <executions>
               <execution>
-                <id>extract-hadoop-native-library</id>
+                <id>fetch-linux-aarch64-library</id>
                 <goals>
-                  <goal>run</goal>
+                  <goal>wget</goal>
                 </goals>
-                <phase>prepare-package</phase>
+                <phase>generate-resources</phase>
                 <configuration>
-                  <target>
-                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
-                      <arg value="-c" />
-                      <arg value="ln -sf ${hadoop.native.lib.name} ${hadoop.native.lib.symbolic.name}" />
-                    </exec>
-                  </target>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
                 </configuration>
               </execution>
             </executions>
@@ -2967,39 +2938,42 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-hadoop-native-library</id>
+                <id>fetch-linux-x86_64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/${hadoop.native.lib.name}</url>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
                   <unpack>false</unpack>
                   <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
                   <skipCache>false</skipCache>
                 </configuration>
               </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
-            <inherited>false</inherited>
-            <executions>
               <execution>
-                <id>extract-hadoop-native-library</id>
+                <id>fetch-linux-aarch64-library</id>
                 <goals>
-                  <goal>run</goal>
+                  <goal>wget</goal>
                 </goals>
-                <phase>prepare-package</phase>
+                <phase>generate-resources</phase>
                 <configuration>
-                  <target>
-                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
-                      <arg value="-c" />
-                      <arg value="ln -sf ${hadoop.native.lib.name} ${hadoop.native.lib.symbolic.name}" />
-                    </exec>
-                  </target>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
                 </configuration>
               </execution>
             </executions>
