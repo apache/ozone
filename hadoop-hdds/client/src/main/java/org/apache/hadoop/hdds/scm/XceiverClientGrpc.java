@@ -590,7 +590,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
       if (excludedDatanodes.contains(dn.getID())) {
-        LOG.info("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
+        LOG.debug("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
             dn, dn.getUuidString(), blockID.getContainerBlockID());
         continue;
       }

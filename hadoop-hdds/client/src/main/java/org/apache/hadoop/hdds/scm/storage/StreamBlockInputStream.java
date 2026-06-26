@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -338,7 +339,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private void handleExceptions(IOException cause) throws IOException {
-    IOException root = unwrapCause(cause);
+    IOException root = ConnectionFailureUtils.unwrapCause(cause);
     if (root instanceof StorageContainerException || isConnectivityIssue(root) ||
          root instanceof TimeoutIOException) {
       if (shouldRetryRead(root, retryPolicy, retries++)) {
@@ -355,25 +356,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private IOException unwrapCause(IOException ex) {
-    Throwable t = ex;
-    while (t != null) {
-      if (t instanceof TimeoutIOException || t instanceof StorageContainerException) {
-        return (IOException) t;
-      }
-      if (t instanceof ExecutionException && t.getCause() != null) {
-        t = t.getCause();
-        continue;
-      }
-      if (t.getCause() instanceof IOException) {
-        t = t.getCause();
-        continue;
-      }
-      break;
-    }
-    return ex;
-  }
-
   private void recordFailedStreamingDatanode() {
     if (streamingReader == null) {
       return;
@@ -384,8 +366,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     final DatanodeDetails dn = response.getDatanodeDetails();
     if (failedStreamingDatanodes.add(dn.getID())) {
-      LOG.warn("Excluding datanode {} (uuid={}) from streaming read retries for block {}",
-          dn, dn.getUuidString(), blockID);
+      LOG.warn("Excluding DataNode {} from streaming read retries for block {}",
+          dn, blockID);
     }
   }
 
