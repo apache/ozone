@@ -44,8 +44,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.FINALIZATION_IN_PROGRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.FINALIZATION_IN_PROGRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
