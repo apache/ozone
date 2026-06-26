@@ -114,7 +114,7 @@ public class TestS3MultipartUploadCommitPartResponse
 
     PartKeyInfo part1 = createPartKeyInfo(volumeName, bucketName, keyName, 1);
 
-    addPart(1, part1, omMultipartKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(part1);
 
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);
@@ -189,7 +189,7 @@ public class TestS3MultipartUploadCommitPartResponse
 
     PartKeyInfo part1 = createPartKeyInfo(volumeName, bucketName, keyName, 1);
 
-    addPart(1, part1, omMultipartKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(part1);
 
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);

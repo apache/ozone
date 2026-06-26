@@ -158,9 +158,10 @@ public class TestS3MultipartUploadCompleteResponse
         .build();
     RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey,
         bucketInfo.getObjectID());
-    String ozoneKey = omMetadataManager
-        .getOzoneKey(prevKey.getVolumeName(),
-            prevKey.getBucketName(), prevKey.getFileName());
+    String ozoneKey = omMetadataManager.getOzoneDeletePathKey(
+        prevKey.getObjectID(),
+        omMetadataManager.getOzoneKey(prevKey.getVolumeName(),
+            prevKey.getBucketName(), prevKey.getFileName()));
     omMetadataManager.getDeletedTable().put(ozoneKey, prevKeys);
 
     long oId = runAddDBToBatchWithParts(volumeName, bucketName, keyName, 1);
@@ -178,7 +179,7 @@ public class TestS3MultipartUploadCompleteResponse
   }
 
   private long runAddDBToBatchWithParts(String volumeName,
-      String bucketName, String keyName, int deleteEntryCount)
+      String bucketName, String keyName, int expectedDeleteEntryCount)
           throws Exception {
 
     String multipartUploadID = UUID.randomUUID().toString();
@@ -197,13 +198,11 @@ public class TestS3MultipartUploadCompleteResponse
     OmMultipartKeyInfo omMultipartKeyInfo =
             s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo();
 
-    // After commit, it adds an entry to the deleted table. Incrementing the
-    // variable before the method call, because this method also has entry
-    // count check inside.
-    deleteEntryCount++;
+    // Committing the overwritten part adds one entry to the deleted table,
+    // which commitOnePart also asserts internally.
     OmKeyInfo committedPartKeyInfo = commitOnePart(volumeName, bucketName,
         keyName, multipartUploadID, dbMultipartKey, omMultipartKeyInfo,
-        deleteEntryCount);
+        expectedDeleteEntryCount + 1);
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
         .get(omMetadataManager.getBucketKey(volumeName, bucketName));
@@ -246,12 +245,12 @@ public class TestS3MultipartUploadCompleteResponse
    */
   private OmKeyInfo commitOnePart(String volumeName, String bucketName,
       String keyName, String multipartUploadID, String dbMultipartKey,
-      OmMultipartKeyInfo omMultipartKeyInfo, int deleteEntryCount)
+      OmMultipartKeyInfo omMultipartKeyInfo, int expectedDeleteEntryCount)
       throws Exception {
 
     PartKeyInfo part1 = createPartKeyInfo(volumeName, bucketName, keyName, 1);
 
-    addPart(1, part1, omMultipartKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(part1);
 
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);
@@ -279,7 +278,7 @@ public class TestS3MultipartUploadCompleteResponse
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
 
     // The overwritten part is added to the deleted table.
-    assertEquals(deleteEntryCount,
+    assertEquals(expectedDeleteEntryCount,
         omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()));
 
