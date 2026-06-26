@@ -1647,8 +1647,8 @@ message QueryUpgradeStatusRequest {
 }
 
 message QueryUpgradeStatusResponse {
-    required bool omFinalized = 1;
-    required hadoop.hdds.UpgradeStatus hddsStatus = 2;
+    optional bool omFinalized = 1;
+    optional hadoop.hdds.UpgradeStatus hddsStatus = 2;
 }
 
 // deprecated, use QueryUpgradeStatusRequest/Response instead. Retained for wire compatibility.

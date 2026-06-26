@@ -47,18 +47,18 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
     try (OzoneManagerProtocol client = getClient()) {
       OzoneManagerVersion omVersion = RpcClient.getOmVersion(client.getServiceInfo());
       if (!OzoneManagerVersion.ZDU.isSupportedBy(omVersion)) {
-        err().println("OM does not support ZDU. The cluster upgrade status should be queried with the pre ZDU " +
-            "commands, eg `ozone admin scm finalizationstatus` and `ozone admin om finalizationstatus`");
+        err().println("OM does not support zero downtime upgrade. The cluster upgrade status should be queried with " +
+            "`ozone admin scm finalizationstatus` and `ozone admin om finalizationstatus`");
         return 1;
       }
       OzoneManagerProtocolProtos.QueryUpgradeStatusResponse status = client.queryUpgradeStatus();
 
+
       out().println("Upgrade status:");
-      out().println("    OM Finalized: " + status.getOmFinalized());
-      out().println("    SCM Finalized: " + status.getHddsStatus().getScmFinalized());
-      out().println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized());
-      out().println("    Total Datanodes: " + status.getHddsStatus().getNumDatanodesTotal());
-      out().println("    Should Finalize: " + status.getHddsStatus().getShouldFinalize());
+      out().println("    OM Finalized? " + status.getOmFinalized());
+      out().println("    SCM Finalized? " + status.getHddsStatus().getScmFinalized());
+      out().println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized()
+          + "/" + status.getHddsStatus().getNumDatanodesTotal());
     }
     return 0;
   }

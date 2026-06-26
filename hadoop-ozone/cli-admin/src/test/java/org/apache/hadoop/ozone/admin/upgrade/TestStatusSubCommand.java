@@ -121,7 +121,7 @@ public class TestStatusSubCommand {
 
     String errOutput = errContent.toString(DEFAULT_ENCODING);
     assertTrue(errOutput.contains("OM does not support ZDU"));
-    verify(omClient, never()).finalizeUpgrade();
+    verify(omClient, never()).queryUpgradeStatus();
   }
 
   private ServiceInfoEx serviceInfoWithVersion(OzoneManagerVersion version) {
