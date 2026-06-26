@@ -257,6 +257,15 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  }
+  
+  @Override
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    return true;
+  }
+
+  @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
   }
 
