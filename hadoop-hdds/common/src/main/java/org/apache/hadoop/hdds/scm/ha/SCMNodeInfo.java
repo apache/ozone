@@ -39,6 +39,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalInt;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -214,10 +215,10 @@ public class SCMNodeInfo {
       HostAndPort scmSecurityAddress, HostAndPort scmDatanodeAddress) {
     this.serviceId = serviceId;
     this.nodeId = nodeId;
-    this.blockClientAddress = blockClientAddress;
-    this.scmClientAddress = scmClientAddress;
-    this.scmSecurityAddress = scmSecurityAddress;
-    this.scmDatanodeAddress = scmDatanodeAddress;
+    this.blockClientAddress = Objects.requireNonNull(blockClientAddress, "blockClientAddress == null");
+    this.scmClientAddress = Objects.requireNonNull(scmClientAddress, "scmClientAddress == null");
+    this.scmSecurityAddress = Objects.requireNonNull(scmSecurityAddress, "scmSecurityAddress == null");
+    this.scmDatanodeAddress = Objects.requireNonNull(scmDatanodeAddress, "scmDatanodeAddress == null");
   }
 
   public String getServiceId() {

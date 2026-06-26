@@ -179,7 +179,7 @@ public class EndpointStateMachine
 
   @Override
   public String getAddressString() {
-    return getAddress().getHostAndPortString();
+    return hostAndPort.getAddress().toString();
   }
 
   public void zeroMissedCount() {

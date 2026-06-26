@@ -151,7 +151,7 @@ public final class ContainerTestUtils {
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
-    return new EndpointStateMachine(new HostAndPort(address), rpcClient,
+    return new EndpointStateMachine(new HostAndPort(address.getHostName(), address.getPort()), rpcClient,
         new LegacyHadoopConfigurationSource(conf), "");
   }
 
