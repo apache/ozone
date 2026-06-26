@@ -72,6 +72,10 @@ message DecommissionOMResponse {
 
 message CompactRequest {
     required string columnFamily = 1;
+  // BottommostLevelCompaction option:
+  // 0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized.
+  // Defaults to kSkip (0) if not set.
+  optional int32 bottommostLevelCompaction = 2 [default = 0];
 }
 
 message CompactResponse {

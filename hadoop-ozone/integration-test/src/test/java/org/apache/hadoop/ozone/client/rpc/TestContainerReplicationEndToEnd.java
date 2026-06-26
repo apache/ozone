@@ -111,7 +111,6 @@ public class TestContainerReplicationEndToEnd {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -203,7 +202,7 @@ public class TestContainerReplicationEndToEnd {
 
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       Predicate<DatanodeDetails> p =
-          i -> i.getUuid().equals(dn.getDatanodeDetails().getUuid());
+          i -> i.getID().equals(dn.getDatanodeDetails().getID());
       if (!pipeline.getNodes().stream().anyMatch(p)) {
         dnService = dn;
       }

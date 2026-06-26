@@ -108,6 +108,7 @@ class TestDiskBalancerProtocolServer {
             .setUtilization(TEST_UTILIZATION_1)
             .setCommittedBytes(TEST_COMMITTED_BYTES_1)
             .setTotalCapacity(TEST_TOTAL_CAPACITY)
+            .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1)
             .setUsedSpace(TEST_USED_SPACE_1)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_1)
             .build(),
@@ -117,6 +118,7 @@ class TestDiskBalancerProtocolServer {
             .setUtilization(TEST_UTILIZATION_2)
             .setCommittedBytes(TEST_COMMITTED_BYTES_2)
             .setTotalCapacity(TEST_TOTAL_CAPACITY)
+            .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2)
             .setUsedSpace(TEST_USED_SPACE_2)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_2)
             .build()));
@@ -157,6 +159,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_1, volReport0.getCommittedBytes());
     assertEquals(TEST_TOTAL_CAPACITY, volReport0.getTotalCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1, volReport0.getOzoneAvailable());
     assertEquals(TEST_USED_SPACE_1, volReport0.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_1, volReport0.getEffectiveUsedSpace());
     assertEquals(TEST_STORAGE_ID_2, volReport1.getStorageId());
@@ -164,6 +167,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_UTILIZATION_2, volReport1.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_2, volReport1.getCommittedBytes());
     assertEquals(TEST_TOTAL_CAPACITY, volReport1.getTotalCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2, volReport1.getOzoneAvailable());
     assertEquals(TEST_USED_SPACE_2, volReport1.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_2, volReport1.getEffectiveUsedSpace());
   }

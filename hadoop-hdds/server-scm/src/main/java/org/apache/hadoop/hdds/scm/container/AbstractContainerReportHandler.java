@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -107,7 +106,7 @@ abstract class AbstractContainerReportHandler {
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo containerInfo,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher, Object detailsForLogging)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     getLogger().debug("Processing replica {}", detailsForLogging);
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
@@ -242,10 +241,11 @@ abstract class AbstractContainerReportHandler {
                                     final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher,
-      Object detailsForLogging) throws IOException, InvalidStateTransitionException {
+      Object detailsForLogging) throws IOException {
 
     final ContainerID containerId = container.containerID();
     boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
+    HddsProtos.ReplicationType replicationType = container.getReplicationType();
 
     switch (container.getState()) {
     case OPEN:
@@ -274,8 +274,7 @@ abstract class AbstractContainerReportHandler {
         guaranteed to have block data. So, update the container's state in SCM
         only if replica index is one of these indexes.
          */
-        if (container.getReplicationType()
-            .equals(HddsProtos.ReplicationType.EC)) {
+        if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
           int replicaIndex = replica.getReplicaIndex();
           int dataNum =
               ((ECReplicationConfig)container.getReplicationConfig()).getData();
@@ -314,19 +313,23 @@ abstract class AbstractContainerReportHandler {
         deleteReplica(containerId, datanode, publisher, "DELETED", false, detailsForLogging);
         return false;
       }
-      if (container.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
+      if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
         // In case of EC container, delete its replica to avoid orphan replica
         deleteReplica(containerId, datanode, publisher, "DELETED", true, detailsForLogging);
         return false;
       }
       // HDDS-12421: fall-through to case DELETING
     case DELETING:
+      if (replicationType.equals(HddsProtos.ReplicationType.EC) && !replicaIsEmpty) {
+        deleteReplica(containerId, datanode, publisher, "DELETING", true, detailsForLogging);
+        return false;
+      }
       // HDDS-11136: If a DELETING container has a non-empty CLOSED replica, transition the container to CLOSED
       // HDDS-12421: If a DELETING or DELETED container has a non-empty replica, transition the container to CLOSED
       boolean isReplicaClosed = replica.getState() == State.CLOSED;
       boolean isReplicaQuasiClosed = replica.getState() == State.QUASI_CLOSED;
       if ((isReplicaClosed || isReplicaQuasiClosed) && replica.getBlockCommitSequenceId() <= container.getSequenceId()
-          && container.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)) {
+          && replicationType.equals(HddsProtos.ReplicationType.RATIS)) {
         deleteReplica(containerId, datanode, publisher, "DELETED", true, detailsForLogging);
         // We should not move back CLOSED or QUASI_CLOSED if replica bcsId <= container bcsId
         return false;

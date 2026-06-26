@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link ContainerStateManager}.  Do not modify. */
@@ -116,12 +115,12 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
-      public List<ContainerInfo> getContainerInfos(ReplicationType arg0) {
+      public List<ContainerInfo> getContainerInfos(LifeCycleState arg0) {
         return invoker.getImpl().getContainerInfos(arg0);
       }
 
       @Override
-      public List<ContainerInfo> getContainerInfos(LifeCycleState arg0) {
+      public List<ContainerInfo> getContainerInfos(ReplicationType arg0) {
         return invoker.getImpl().getContainerInfos(arg0);
       }
 
@@ -181,7 +180,7 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
 
       @Override
       public void updateContainerStateWithSequenceId(HddsProtos.ContainerID arg0, LifeCycleEvent arg1, Long arg2) throws
-          IOException, InvalidStateTransitionException {
+          IOException {
         final Object[] args = {arg0, arg1, arg2};
         invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
       }
@@ -231,14 +230,14 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       break;
 
     case "getContainerInfos":
-      if (p.length == 1 && (p[0] == null || ReplicationType.class.isInstance(p[0]))) {
-        final ReplicationType arg7 = (ReplicationType) p[0];
+      if (p.length == 1 && (p[0] == null || LifeCycleState.class.isInstance(p[0]))) {
+        final LifeCycleState arg7 = (LifeCycleState) p[0];
         returnType = List.class;
         returnValue = getImpl().getContainerInfos(arg7);
         break;
       }
-      if (p.length == 1 && (p[0] == null || LifeCycleState.class.isInstance(p[0]))) {
-        final LifeCycleState arg8 = (LifeCycleState) p[0];
+      if (p.length == 1 && (p[0] == null || ReplicationType.class.isInstance(p[0]))) {
+        final ReplicationType arg8 = (ReplicationType) p[0];
         returnType = List.class;
         returnValue = getImpl().getContainerInfos(arg8);
         break;

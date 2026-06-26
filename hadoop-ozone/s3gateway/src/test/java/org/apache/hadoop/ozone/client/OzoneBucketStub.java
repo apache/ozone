@@ -145,7 +145,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(key, toByteArray());
+            byte[] bytes = toByteArray();
+            super.close();
+            keyContents.put(key, bytes);
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -158,7 +160,6 @@ public final class OzoneBucketStub extends OzoneBucket {
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
-            super.close();
           }
         };
 
@@ -179,7 +180,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(keyName, toByteArray());
+            byte[] bytes = toByteArray();
+            super.close();
+            keyContents.put(keyName, bytes);
             keyDetails.put(keyName, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -190,7 +193,6 @@ public final class OzoneBucketStub extends OzoneBucket {
                 new ArrayList<>(), finalReplicationCon, metadata, null,
                 () -> readKey(keyName), true, null, null
             ));
-            super.close();
           }
         };
 
@@ -531,8 +533,10 @@ public final class OzoneBucketStub extends OzoneBucket {
           new KeyMetadataAwareOutputStream((int) size, new HashMap<>()) {
             @Override
             public void close() throws IOException {
-              Part part = new Part(key + size,
-                  toByteArray(), getMetadata().get(ETAG));
+              byte[] bytes = toByteArray();
+              String eTag = getMetadata().get(ETAG);
+              super.close();
+              Part part = new Part(key + size, bytes, eTag);
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -540,7 +544,6 @@ public final class OzoneBucketStub extends OzoneBucket {
               } else {
                 partList.get(key).put(partNumber, part);
               }
-              super.close();
             }
           };
       return new OzoneOutputStreamStub(keyOutputStream, key + size);

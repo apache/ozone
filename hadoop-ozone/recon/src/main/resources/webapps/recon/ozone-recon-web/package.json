@@ -16,7 +16,7 @@
     "ag-charts-community": "^7.3.0",
     "ag-charts-react": "^7.3.0",
     "antd": "~4.10.3",
-    "axios": "1.13.6",
+    "axios": "1.16.0",
     "classnames": "^2.3.2",
     "echarts": "^5.5.0",
     "filesize": "^6.4.0",
@@ -25,9 +25,11 @@
     "pretty-ms": "^5.1.0",
     "react": "^16.8.6",
     "react-dom": "^16.14.0",
+    "react-markdown": "^8.0.7",
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4",
     "react-select": "^3.2.0",
+    "remark-gfm": "^3.0.1",
     "typescript": "4.9.5"
   },
   "scripts": {
@@ -35,6 +37,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest",
+    "e2e": "playwright test",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --middlewares api/pagination.js --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
     "lint": "eslint src/*",
@@ -56,6 +59,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.4.8",
     "@testing-library/react": "^12.1.5",
     "@testing-library/user-event": "^14.5.2",
@@ -76,9 +80,9 @@
     "jsdom": "^24.1.1",
     "json-server": "^0.15.1",
     "msw": "1.3.3",
-    "npm-run-all": "^4.1.5",
+    "npm-run-all2": "^8.0.4",
     "prettier": "^2.8.4",
-    "vite": "4.5.14",
+    "vite": "6.4.3",
     "vite-tsconfig-paths": "^3.6.0",
     "vitest": "^1.6.1"
   },

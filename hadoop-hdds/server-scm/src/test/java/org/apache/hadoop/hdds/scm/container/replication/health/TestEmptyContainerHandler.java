@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +62,7 @@ public class TestEmptyContainerHandler {
 
   @BeforeEach
   public void setup()
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException, TimeoutException {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);

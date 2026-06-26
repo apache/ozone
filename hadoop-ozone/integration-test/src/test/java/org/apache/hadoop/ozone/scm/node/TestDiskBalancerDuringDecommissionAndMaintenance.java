@@ -34,7 +34,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -77,7 +76,6 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);
@@ -222,16 +220,16 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // in DiskBalancer report and status (since we only queried IN_SERVICE nodes)
     boolean isDecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getUuid().toString()));
+            equals(dnToDecommission.getID().toString()));
     boolean isMaintenanceDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getUuid().toString()));
+            equals(dnToMaintenance.getID().toString()));
     boolean isDecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getUuid().toString()));
+            equals(dnToDecommission.getID().toString()));
     boolean isMaintenanceDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getUuid().toString()));
+            equals(dnToMaintenance.getID().toString()));
 
     // Assert that the decommissioned DN is not present in both report and status
     assertFalse(isDecommissionedDnInReport);
@@ -262,10 +260,10 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     boolean isRecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getUuid().toString()));
+            equals(recommissionedDn.getID().toString()));
     boolean isRecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getUuid().toString()));
+            equals(recommissionedDn.getID().toString()));
 
     // Verify that the recommissioned DN is included in both report and status
     assertTrue(isRecommissionedDnInReport);

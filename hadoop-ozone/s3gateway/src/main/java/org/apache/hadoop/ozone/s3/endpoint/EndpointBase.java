@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
@@ -47,6 +48,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -107,6 +109,7 @@ import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +119,22 @@ import org.slf4j.LoggerFactory;
 public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
+  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+
+  // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
+  // collides with the system ETag / Content-Type stored under the same key, so
+  // it is remapped on write and rebuilt on read; the system value is returned
+  // via its own ETag / Content-Type response header.
+  private static final Map<String, String> RESERVED_METADATA_KEYS =
+      ImmutableMap.of(
+          ETAG, ETAG_CUSTOM,
+          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+
+  // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
+  private static final Map<String, String> REBUILT_RESERVED_KEYS =
+      RESERVED_METADATA_KEYS.entrySet().stream()
+          .collect(ImmutableMap.toImmutableMap(
+              Map.Entry::getValue, e -> e.getKey().toLowerCase()));
 
   private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
@@ -198,7 +217,6 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
-    clientProtocol.setIsS3Request(true);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -318,20 +336,27 @@ public abstract class EndpointBase {
       }
     }
 
-    // If the request contains a custom metadata header "x-amz-meta-ETag",
-    // replace the metadata key to "etag-custom" to prevent key metadata collision with
-    // the ETag calculated by hashing the object when storing the key in OM table.
-    // The custom ETag metadata header will be rebuilt during the headObject operation.
-    if (customMetadata.containsKey(HttpHeaders.ETAG)
-        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
-      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
-          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.remove(HttpHeaders.ETAG);
-      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.put(ETAG_CUSTOM, customETag);
-    }
+    // Remap user values that collide with a reserved system key.
+    RESERVED_METADATA_KEYS.forEach((headerName, customKey) ->
+        remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
+  }
+
+  /**
+   * Move a user value under {@code headerName} (canonical or lower-case) to
+   * {@code customKey} so it does not collide with the system value.
+   */
+  private static void remapReservedMetadataKey(Map<String, String> metadata,
+      String headerName, String customKey) {
+    String lowerName = headerName.toLowerCase();
+    if (metadata.containsKey(headerName) || metadata.containsKey(lowerName)) {
+      String value = metadata.get(headerName) != null
+          ? metadata.get(headerName) : metadata.get(lowerName);
+      metadata.remove(headerName);
+      metadata.remove(lowerName);
+      metadata.put(customKey, value);
+    }
   }
 
   protected void addCustomMetadataHeaders(
@@ -339,14 +364,13 @@ public abstract class EndpointBase {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
-      if (entry.getKey().equals(ETAG)) {
+      String metadataKey = entry.getKey();
+      // System ETag / Content-Type are returned via their own response header.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      String metadataKey = entry.getKey();
-      if (metadataKey.equals(ETAG_CUSTOM)) {
-        // Rebuild the ETag custom metadata header
-        metadataKey = ETAG.toLowerCase();
-      }
+      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
@@ -363,7 +387,16 @@ public abstract class EndpointBase {
 
     List<NameValuePair> tagPairs = URLEncodedUtils.parse(tagString, UTF_8);
 
-    return validateAndGetTagging(tagPairs, NameValuePair::getName, NameValuePair::getValue);
+    // Put Object with x-amz-tagging header. A segment with no '=' (e.g."foo=bar&bar") is
+    // typically represented as (key=bar, value=null). AWS S3 treats that as an empty value for "bar".
+    // We map null → "" here only for this header path.
+    // PutObjectTagging is different: the XML/JSON API requires each Tag to
+    // include a Value element; so a missing Value stays null and fails validation.
+    return validateAndGetTagging(tagPairs, NameValuePair::getName,
+        pair -> {
+          String v = pair.getValue();
+          return v != null ? v : "";
+        });
   }
 
   protected static <KV> Map<String, String> validateAndGetTagging(
@@ -389,7 +422,8 @@ public abstract class EndpointBase {
       }
 
       if (tagValue == null) {
-        // For example for query parameter with only value (e.g. "tag1")
+        // Missing tag value is invalid for PutObjectTagging XML/JSON; x-amz-tagging must
+        // normalize null to "" in getTaggingFromHeaders before calling this method.
         OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("Some tag values are not specified, please specify the tag values");
         throw ex;
@@ -678,6 +712,19 @@ public abstract class EndpointBase {
 
   public static MessageDigest getSha256DigestInstance() {
     return SHA_256_PROVIDER.get();
+  }
+
+  protected static CheckedRunnable<IOException> validateContentLength(
+      long expectedLength, long actualLength, String keyPath) {
+    return () -> {
+      if (actualLength != expectedLength) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage(String.format(
+            "Request body length %d does not match expected length %d",
+            actualLength, expectedLength));
+        throw ex;
+      }
+    };
   }
 
   protected static String extractPartsCount(String eTag) {

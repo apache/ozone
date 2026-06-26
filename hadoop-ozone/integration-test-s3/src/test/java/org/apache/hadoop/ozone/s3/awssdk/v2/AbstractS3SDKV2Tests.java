@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static software.amazon.awssdk.core.sync.RequestBody.fromString;
@@ -70,6 +71,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
@@ -103,6 +105,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -125,6 +128,8 @@ import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
+import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
+import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
@@ -242,6 +247,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  static Stream<Arguments> onlyTagKeyCasesV2() {
+    Map<String, String> fooBarEmptyBar = new HashMap<>();
+    fooBarEmptyBar.put("foo", "bar");
+    fooBarEmptyBar.put("bar", "");
+    return Stream.of(
+        Arguments.of("tag1", Collections.singletonMap("tag1", "")),
+        Arguments.of("foo=bar&bar", fooBarEmptyBar)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCasesV2")
+  public void testPutObjectWithOnlyTagKey(String taggingHeader,
+      Map<String, String> expectedTags) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectRequest request = PutObjectRequest.builder()
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(taggingHeader)
+        .build();
+    s3Client.putObject(request, RequestBody.fromString(content));
+
+    Map<String, String> actualTags = s3Client.getObjectTagging(
+            b -> b.bucket(bucketName).key(keyName))
+        .tagSet()
+        .stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals(expectedTags, actualTags);
   }
 
   @Test
@@ -2665,6 +2704,244 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
+    }
+  }
+
+  /**
+   * Integration tests for the ListDirectoryBuckets S3 API (HDDS-15450).
+   *
+   * <p>These tests verify that GET / with the {@code max-directory-buckets} query parameter
+   * correctly routes to the ListDirectoryBuckets handler and returns only FSO (File System
+   * Optimized) buckets, while {@code ListBuckets} continues to return all bucket types.
+   *
+   * <p>Note: passing {@code maxDirectoryBuckets} explicitly is required to trigger the
+   * ListDirectoryBuckets routing in Ozone's S3 Gateway, because both ListBuckets and
+   * ListDirectoryBuckets share the same {@code GET /} endpoint and must be distinguished
+   * by either the {@code max-directory-buckets} query parameter or S3 Express credential
+   * scope. See {@code RootEndpoint#isListDirectoryBucketsRequest()}.
+   */
+  @Nested
+  class ListDirectoryBucketsTests {
+
+    /**
+     * Verifies that only FSO (directory) buckets are returned, and OBS buckets are excluded.
+     * Also verifies that the standard ListBuckets still returns all bucket types.
+     */
+    @Test
+    public void testListDirectoryBucketsReturnsOnlyFSOBuckets() throws Exception {
+      final String obsBucketName = uniqueObjectName();
+      final String fsoBucketName1 = uniqueObjectName();
+      final String fsoBucketName2 = uniqueObjectName();
+
+      s3Client.createBucket(b -> b.bucket(obsBucketName));
+      createFsoBucket(fsoBucketName1);
+      createFsoBucket(fsoBucketName2);
+      try {
+        ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(
+            ListDirectoryBucketsRequest.builder()
+                .maxDirectoryBuckets(1000)
+                .build());
+
+        List<String> dirBucketNames = response.buckets().stream()
+            .map(Bucket::name)
+            .collect(Collectors.toList());
+
+        assertThat(dirBucketNames).contains(fsoBucketName1, fsoBucketName2);
+        assertThat(dirBucketNames).doesNotContain(obsBucketName);
+      } finally {
+        s3Client.deleteBucket(b -> b.bucket(obsBucketName));
+        deleteFsoBucket(fsoBucketName1);
+        deleteFsoBucket(fsoBucketName2);
+      }
+    }
+
+    /**
+     * Verifies that an empty result with no continuation token is returned when no FSO
+     * buckets exist (only OBS buckets present).
+     */
+    @Test
+    public void testListDirectoryBucketsEmptyWhenNoFSOBuckets() throws Exception {
+      final String obsBucketName = uniqueObjectName();
+
+      s3Client.createBucket(b -> b.bucket(obsBucketName));
+      try {
+        ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(
+            ListDirectoryBucketsRequest.builder()
+                .maxDirectoryBuckets(1000)
+                .build());
+
+        List<String> dirBucketNames = response.buckets().stream()
+            .map(Bucket::name)
+            .collect(Collectors.toList());
+
+        assertThat(dirBucketNames).doesNotContain(obsBucketName);
+        assertNull(response.continuationToken());
+      } finally {
+        s3Client.deleteBucket(b -> b.bucket(obsBucketName));
+      }
+    }
+
+    /**
+     * Verifies pagination: listing FSO buckets page-by-page using {@code maxDirectoryBuckets}
+     * and the returned continuation token, until all buckets are retrieved.
+     */
+    @Test
+    public void testListDirectoryBucketsPaginationReturnsAllBuckets() throws Exception {
+      final int totalBuckets = 5;
+      final int pageSize = 2;
+      List<String> created = new ArrayList<>();
+
+      for (int i = 0; i < totalBuckets; i++) {
+        String name = uniqueObjectName();
+        createFsoBucket(name);
+        created.add(name);
+      }
+
+      try {
+        List<String> retrieved = new ArrayList<>();
+        String continuationToken = null;
+
+        do {
+          ListDirectoryBucketsRequest.Builder reqBuilder = ListDirectoryBucketsRequest.builder()
+              .maxDirectoryBuckets(pageSize);
+          if (continuationToken != null) {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(reqBuilder.build());
+
+          response.buckets().stream()
+              .map(Bucket::name)
+              .filter(created::contains)
+              .forEach(retrieved::add);
+
+          continuationToken = response.continuationToken();
+        } while (continuationToken != null);
+
+        assertThat(retrieved).containsExactlyInAnyOrderElementsOf(created);
+      } finally {
+        for (String name : created) {
+          deleteFsoBucket(name);
+        }
+      }
+    }
+
+    /**
+     * Verifies that a single page returns no continuation token when fewer buckets exist
+     * than the requested max.
+     */
+    @Test
+    public void testListDirectoryBucketsNoContinuationTokenWhenResultFitsOnePage() throws Exception {
+      final String fsoBucketName = uniqueObjectName();
+      createFsoBucket(fsoBucketName);
+
+      try {
+        ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(
+            ListDirectoryBucketsRequest.builder()
+                .maxDirectoryBuckets(1000)
+                .build());
+
+        List<String> dirBucketNames = response.buckets().stream()
+            .map(Bucket::name)
+            .collect(Collectors.toList());
+
+        assertThat(dirBucketNames).contains(fsoBucketName);
+        assertNull(response.continuationToken(),
+            "No continuation token expected when all results fit on one page");
+      } finally {
+        deleteFsoBucket(fsoBucketName);
+      }
+    }
+
+    /**
+     * Verifies response fields: name, creationDate, bucketRegion, and bucketArn are populated.
+     * The BucketArn must match the expected S3 Express ARN format.
+     */
+    @Test
+    public void testListDirectoryBucketsResponseFieldsArePopulated() throws Exception {
+      final String fsoBucketName = uniqueObjectName();
+      createFsoBucket(fsoBucketName);
+
+      try {
+        ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(
+            ListDirectoryBucketsRequest.builder()
+                .maxDirectoryBuckets(1000)
+                .build());
+
+        Bucket bucket = response.buckets().stream()
+            .filter(b -> b.name().equals(fsoBucketName))
+            .findFirst()
+            .orElse(null);
+
+        assertNotNull(bucket, "FSO bucket should be present in response");
+        assertEquals(fsoBucketName, bucket.name());
+        assertNotNull(bucket.creationDate(), "CreationDate must be set");
+        assertNotNull(bucket.bucketRegion(), "BucketRegion must be set");
+
+        // BucketArn should follow the S3 Express ARN format: arn:aws:s3express:<region>:<accountId>:bucket/<name>
+        assertNotNull(bucket.bucketArn(), "BucketArn must be set");
+        assertThat(bucket.bucketArn())
+            .startsWith("arn:aws:s3express:")
+            .endsWith(":bucket/" + fsoBucketName);
+      } finally {
+        deleteFsoBucket(fsoBucketName);
+      }
+    }
+
+    /**
+     * Verifies that maxDirectoryBuckets=0 returns an empty result immediately.
+     */
+    @Test
+    public void testListDirectoryBucketsMaxZeroReturnsEmpty() throws Exception {
+      final String fsoBucketName = uniqueObjectName();
+      createFsoBucket(fsoBucketName);
+
+      try {
+        ListDirectoryBucketsResponse response = s3Client.listDirectoryBuckets(
+            ListDirectoryBucketsRequest.builder()
+                .maxDirectoryBuckets(0)
+                .build());
+
+        assertEquals(0, response.buckets().size());
+      } finally {
+        deleteFsoBucket(fsoBucketName);
+      }
+    }
+
+    /**
+     * Verifies that creating an FSO bucket does not affect the standard ListBuckets result —
+     * FSO buckets must also appear in ListBuckets (they are still S3-accessible buckets).
+     */
+    @Test
+    public void testListBucketsIncludesFSOBuckets() throws Exception {
+      final String fsoBucketName = uniqueObjectName();
+      createFsoBucket(fsoBucketName);
+
+      try {
+        List<String> allBuckets = s3Client.listBuckets().buckets().stream()
+            .map(Bucket::name)
+            .collect(Collectors.toList());
+
+        assertThat(allBuckets).contains(fsoBucketName);
+      } finally {
+        deleteFsoBucket(fsoBucketName);
+      }
+    }
+
+    private void createFsoBucket(String bucketName) throws Exception {
+      try (OzoneClient ozoneClient = cluster.newClient()) {
+        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+        volume.createBucket(bucketName, BucketArgs.newBuilder()
+            .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .build());
+      }
+    }
+
+    private void deleteFsoBucket(String bucketName) throws Exception {
+      try (OzoneClient ozoneClient = cluster.newClient()) {
+        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+        volume.deleteBucket(bucketName);
+      }
     }
   }
 }

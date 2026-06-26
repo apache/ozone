@@ -454,12 +454,31 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    pendingContainerTracker.recordPendingAllocationForDatanode(info, containerID);
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo == null) {
+      return false;
+    }
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+  }
+
+  @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo != null) {
+      pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+    }
+  }
+    
+  @Override  
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo != null) {
+      pendingContainerTracker.removePendingAllocation(
+          datanodeInfo.getPendingContainerAllocations(), containerID);
+    }
   }
 
   /**
@@ -944,6 +963,16 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
+  }
+
+  public void setPendingContainerMaxSize(long maxContainerSize) {
+    this.pendingContainerTracker = new PendingContainerTracker(maxContainerSize,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
+  }
+
+  @Override
   public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
     return -1;
   }
@@ -954,18 +983,6 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
-  }
-
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    if (info == null) {
-      return false;
-    }
-    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(info);
   }
 
   /**

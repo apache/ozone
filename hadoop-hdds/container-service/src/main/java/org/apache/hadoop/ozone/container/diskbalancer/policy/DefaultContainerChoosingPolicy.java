@@ -83,9 +83,13 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       // Use storage ID as secondary sort for deterministic ordering when utilizations are equal
       final List<VolumeFixedUsage> volumeUsages = allVolumes.stream()
           .map(v -> newVolumeFixedUsage(v, deltaMap))
+          .filter(DefaultContainerChoosingPolicy::hasPositiveCapacity)
           .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization)
               .thenComparing(v -> v.getVolume().getStorageID()))
           .collect(Collectors.toList());
+      if (volumeUsages.size() < 2) {
+        return null;
+      }
 
       // Calculate ideal usage and threshold range (once)
       final double idealUsage = getIdealUsage(volumeUsages);
@@ -143,6 +147,16 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     } finally {
       lock.unlock();
     }
+  }
+
+  private static boolean hasPositiveCapacity(VolumeFixedUsage volumeUsage) {
+    long capacity = volumeUsage.getUsage().getCapacity();
+    if (capacity > 0) {
+      return true;
+    }
+    LOG.debug("Skipping volume {} for disk balancing because capacity is {}",
+        volumeUsage.getVolume(), capacity);
+    return false;
   }
 
   /**

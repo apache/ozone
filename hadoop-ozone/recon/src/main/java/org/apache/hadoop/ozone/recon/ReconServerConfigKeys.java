@@ -132,22 +132,17 @@ public final class  ReconServerConfigKeys {
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
+  /**
+   * Container-count drift threshold used during initial SCM DB setup to decide
+   * whether Recon should refresh from an SCM snapshot before serving requests.
+   */
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
-  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100;
+  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 1_000_000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
-
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
-      "ozone.recon.scm.connection.timeout";
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT = "5s";
-
-  public static final String OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT =
-      "ozone.recon.scm.connection.request.timeout";
-  public static final String
-      OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
 
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
@@ -184,17 +179,34 @@ public final class  ReconServerConfigKeys {
 
   public static final int OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT = 2000;
 
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
-      "ozone.recon.scm.snapshot.task.interval.delay";
+  /**
+   * How often the incremental (targeted) SCM container sync runs.
+   *
+   * <p>Each cycle runs targeted container sync directly. This periodic task
+   * does not download a full SCM DB snapshot automatically.
+   *
+   * <p>Default:
+   * {@link #OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT}. Set to a
+   * shorter value in environments where container state discrepancies need to
+   * be detected and corrected faster.
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.container.sync.task.interval.delay";
 
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "24h";
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT
+      = "6h";
 
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
-      "ozone.recon.scm.snapshot.task.initial.delay";
+  /**
+   * Initial delay before the first incremental SCM container sync run.
+   *
+   * <p>Default: 2m, giving Recon startup enough time to initialize the SCM DB
+   * before the first incremental sync attempts to read it.
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY =
+      "ozone.recon.scm.container.sync.task.initial.delay";
 
   public static final String
-      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+      OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT = "1m";
 
   public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
       "ozone.recon.scmclient.rpc.timeout";
@@ -220,6 +232,11 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT =
       "ozone.recon.dn.metrics.collection.timeout";
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT =
+      "ozone.recon.dn.metrics.collection.thread.count";
+  public static final int OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT =
+      Runtime.getRuntime().availableProcessors() * 2;
 
   /**
    * Application-level ceiling on the number of ContainerIDs fetched from SCM
@@ -252,6 +269,33 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
       "ozone.recon.scm.container.id.batch.size";
   public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
+
+  /**
+   * Page size for DELETED reconciliation in each TARGETED_SYNC cycle.
+   *
+   * <p>DELETED sync paginates SCM's DELETED list using {@code getListOfContainerInfos},
+   * which returns {@code ContainerInfo} objects (~86 bytes each on wire, no
+   * pipeline or DatanodeDetails). The safe IPC upper bound at 128 MB default is
+   * {@code 128 MB / 128 bytes = 1,048,576} containers per page.
+   *
+   * <p>At the default of 1,000,000 per page:
+   * <ul>
+   *   <li>Wire payload: 1M × 86 bytes ≈ 82 MB — within the 128 MB IPC limit.</li>
+   *   <li>JVM heap per page: 1M × ~300 bytes ≈ 286 MB — processed one page at a
+   *       time and GC'd before the next page is fetched.</li>
+   *   <li>Even 1 billion DELETED containers require only ~1,000 page calls per
+   *       sync cycle, each completing quickly.</li>
+   * </ul>
+   *
+   * <p>The value is automatically capped at
+   * {@code ipc.maximum.data.length / 128} (1,048,576 at the 128 MB default)
+   * regardless of what is configured here.
+   *
+   * <p>Default: 1,000,000 containers per page.
+   */
+  public static final String OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE =
+      "ozone.recon.scm.deleted.container.check.batch.size";
+  public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
    * JDBC fetch size for CSV exports.

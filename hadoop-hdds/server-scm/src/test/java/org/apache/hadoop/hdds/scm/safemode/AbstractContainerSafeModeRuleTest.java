@@ -17,16 +17,24 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -44,16 +52,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Abstract base class for container safe mode rule tests.
  */
 public abstract class AbstractContainerSafeModeRuleTest {
+  private final List<ContainerInfo> deletedContainers = new ArrayList<>();
   private List<ContainerInfo> containers;
   private SCMSafeModeManager safeModeManager;
   private ConfigurationSource conf;
   private ContainerManager containerManager;
   private EventQueue eventQueue;
+  private AbstractContainerSafeModeRule safeModeRule;
+  private SafeModeMetrics safeModeMetrics;
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
@@ -61,11 +73,16 @@ public abstract class AbstractContainerSafeModeRuleTest {
     conf = mock(ConfigurationSource.class);
     eventQueue = mock(EventQueue.class);
     safeModeManager = mock(SCMSafeModeManager.class);
-    final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
+    safeModeMetrics = mock(SafeModeMetrics.class);
 
-    when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
+    when(safeModeManager.getSafeModeMetrics()).thenReturn(safeModeMetrics);
+    when(conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
+    when(containerManager.getContainers(LifeCycleState.DELETED)).thenReturn(deletedContainers);
     when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
       ContainerID id = invocation.getArgument(0);
       return containers.stream()
@@ -73,6 +90,9 @@ public abstract class AbstractContainerSafeModeRuleTest {
           .findFirst()
           .orElseThrow(ContainerNotFoundException::new);
     });
+
+    safeModeRule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    safeModeRule.setValidateBasedOnReportProcessing(false);
   }
 
   @Test
@@ -83,11 +103,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
     assertEquals(2, rule.getTotalNumberOfContainers(), "Total number of containers should be 2");
-    containers.add(mockContainer(LifeCycleState.CLOSED, 2L));
-    containers.add(mockContainer(LifeCycleState.OPEN, 3L));
-    containers.add(mockContainer(LifeCycleState.CLOSED, 4L));
-    containers.removeIf(c -> c.containerID().equals(ContainerID.valueOf(8L)));
-    containers.add(mockContainer(LifeCycleState.DELETED, 8L));
+    deletedContainers.add(mockContainer(LifeCycleState.DELETED, 8L));
     rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
@@ -99,6 +115,9 @@ public abstract class AbstractContainerSafeModeRuleTest {
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     containers.add(mockContainer(state, 1L));
+    if (state == LifeCycleState.DELETED) {
+      deletedContainers.add(mockContainer(state, 1L));
+    }
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
@@ -169,6 +188,31 @@ public abstract class AbstractContainerSafeModeRuleTest {
 
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 after refresh also");
     assertTrue(rule.validate(), "Validate should return true when all containers are open");
+  }
+
+  @Test
+  public void testRefreshRecordsDurationAndIncrementsRefreshCount() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 1L));
+    int count = 3;
+    for (int i = 0; i < count; i++) {
+      safeModeRule.refresh(true);
+    }
+
+    ArgumentCaptor<Long> durationCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(safeModeMetrics, times(count)).incNumContainerSafeModeRuleRefreshes();
+    verify(safeModeMetrics, times(count)).setLastContainerSafeModeRuleRefreshDurationMs(
+        eq(getReplicationType()), durationCaptor.capture());
+    durationCaptor.getAllValues().forEach(durationMs -> assertTrue(durationMs >= 0L));
+  }
+
+  @Test
+  public void testRefreshSkippedWhenValidWithoutForce() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 1L));
+
+    safeModeRule.refresh(false);
+
+    verify(safeModeMetrics, never()).incNumContainerSafeModeRuleRefreshes();
+    verify(safeModeMetrics, never()).setLastContainerSafeModeRuleRefreshDurationMs(any(), anyLong());
   }
 
   @Test

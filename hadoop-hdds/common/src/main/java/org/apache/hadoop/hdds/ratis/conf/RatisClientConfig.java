@@ -45,21 +45,21 @@ public class RatisClientConfig {
   private String watchType;
 
   @Config(key = "hdds.ratis.client.request.write.timeout",
-      defaultValue = "5m",
+      defaultValue = "70s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client write request.")
-  private Duration writeRequestTimeout = Duration.ofMinutes(5);
+  private Duration writeRequestTimeout = Duration.ofSeconds(70);
 
   @Config(key = "hdds.ratis.client.request.watch.timeout",
-      defaultValue = "3m",
+      defaultValue = "30s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client watch request.")
-  private Duration watchRequestTimeout = Duration.ofMinutes(3);
+  private Duration watchRequestTimeout = Duration.ofSeconds(30);
 
   @Config(key = "hdds.ratis.client.multilinear.random.retry.policy",
-      defaultValue = "5s, 5, 10s, 5, 15s, 5, 20s, 5, 25s, 5, 60s, 10",
+      defaultValue = "5s, 6",
       type = ConfigType.STRING,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Specifies multilinear random retry policy to be used by"
@@ -70,31 +70,31 @@ public class RatisClientConfig {
   private String multilinearPolicy;
 
   @Config(key = "hdds.ratis.client.exponential.backoff.base.sleep",
-      defaultValue = "4s",
+      defaultValue = "1s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Specifies base sleep for exponential backoff retry policy."
-          + " With the default base sleep of 4s, the sleep duration for ith"
-          + " retry is min(4 * pow(2, i), max_sleep) * r, where r is "
+          + " With the default base sleep of 1s, the sleep duration for ith"
+          + " retry is min(1 * pow(2, i), max_sleep) * r, where r is "
           + "random number in the range [0.5, 1.5).")
-  private Duration exponentialPolicyBaseSleep = Duration.ofSeconds(4);
+  private Duration exponentialPolicyBaseSleep = Duration.ofSeconds(1);
 
   @Config(key = "hdds.ratis.client.exponential.backoff.max.sleep",
-      defaultValue = "40s",
+      defaultValue = "5s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "The sleep duration obtained from exponential backoff "
           + "policy is limited by the configured max sleep. Refer "
           + "dfs.ratis.client.exponential.backoff.base.sleep for further "
           + "details.")
-  private Duration exponentialPolicyMaxSleep = Duration.ofSeconds(40);
+  private Duration exponentialPolicyMaxSleep = Duration.ofSeconds(5);
 
   @Config(key = "hdds.ratis.client.exponential.backoff.max.retries",
-      defaultValue =  "2147483647",
+      defaultValue = "2",
       type = ConfigType.INT,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Client's max retry value for the exponential backoff policy.")
-  private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
+  private int exponentialPolicyMaxRetries = 2;
 
   @Config(key = "hdds.ratis.client.retrylimited.retry.interval",
       defaultValue = "1s",
@@ -215,16 +215,16 @@ public class RatisClientConfig {
     private Duration rpcRequestTimeout = Duration.ofSeconds(60);
 
     @Config(key = "hdds.ratis.raft.client.rpc.watch.request.timeout",
-        defaultValue = "180s",
+        defaultValue = "30s",
         type = ConfigType.TIME,
         tags = { OZONE, CLIENT, PERFORMANCE },
         description =
             "The timeout duration for ratis client watch request. "
                 + "Timeout for the watch API in Ratis client to acknowledge a "
                 + "particular request getting replayed to all servers. "
-                + "It is highly recommended for the timeout duration to be strictly longer than "
+                + "It is recommended for the timeout duration to be at least as long as "
                 + "Ratis server watch timeout (hdds.ratis.raft.server.watch.timeout)")
-    private Duration rpcWatchRequestTimeout = Duration.ofSeconds(180);
+    private Duration rpcWatchRequestTimeout = Duration.ofSeconds(30);
 
     public int getMaxOutstandingRequests() {
       return maxOutstandingRequests;

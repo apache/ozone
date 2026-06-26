@@ -28,11 +28,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
-import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * A ContainerStateManager is responsible for keeping track of all the
@@ -180,7 +178,7 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
                                           HddsProtos.LifeCycleEvent event,
                                           Long sequenceId)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException;
 
 
   /**
@@ -238,7 +236,4 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
       throws IOException;
 
-  static void main(String[] args) {
-    ScmInvokerCodeGenerator.generate(ContainerStateManager.class, true);
-  }
 }

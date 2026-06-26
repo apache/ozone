@@ -227,10 +227,8 @@ public final class OzoneManagerRatisServer {
       // On regular startup, add all OMs to Ratis ring
       raftPeers.add(localRaftPeer);
 
-      for (Map.Entry<String, OMNodeDetails> peerInfo : peerNodes.entrySet()) {
-        String peerNodeId = peerInfo.getKey();
-        OMNodeDetails peerNode = peerInfo.getValue();
-        RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(peerNode, peerNodeId);
+      for (OMNodeDetails peerNode : peerNodes.values()) {
+        RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(peerNode);
 
         // Add other OM nodes belonging to the same OM service to the Ratis ring
         raftPeers.add(raftPeer);
@@ -435,42 +433,31 @@ public final class OzoneManagerRatisServer {
     }
   }
 
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode) {
-    String nodeId = omNode.getNodeId();
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    InetSocketAddress ratisAddr = new InetSocketAddress(
-        omNode.getHostAddress(), omNode.getRatisPort());
-    RaftPeerRole startRole = omNode.isRatisListener() ?
-        RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER;
-
-    return RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setAddress(ratisAddr)
-        .setStartupRole(startRole)
-        .build();
-  }
-
   /**
-   * Helper method to create a RaftPeer from OMNodeDetails, handling unresolved hosts.
-   * @param omNode the OM node details
-   * @param nodeId the node ID to use
-   * @return the created RaftPeer
+   * Build a RaftPeer for the given OM node. The peer address is set from
+   * {@link OMNodeDetails#getRatisHostPortStr()} -- the configured host
+   * string (hostname or IP literal) paired with the Ratis port. The
+   * configured string is passed through verbatim; this method never
+   * resolves it into an {@link InetSocketAddress} (which would bake the
+   * resolved IP into the peer address).
+   * <p>
+   * Why this matters: Ratis hands the address string to gRPC's
+   * {@code NettyChannelBuilder.forTarget(...)}, whose default
+   * {@code DnsNameResolver} re-resolves hostnames on connection failure
+   * / refresh. If the address is a hostname, gRPC recovers automatically
+   * from peer pod restarts in environments like Kubernetes where DNS
+   * names are stable but IPs are not. If the operator configured an IP
+   * literal, gRPC of course uses that IP directly -- the invariant is
+   * "don't pre-resolve", not "must be a hostname". See HDDS-15514
+   * (DNS-refresh-on-failure for all RPC paths).
    */
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode, String nodeId) {
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    RaftPeer.Builder builder = RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setStartupRole(omNode.isRatisListener() ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER);
-    
-    if (omNode.isHostUnresolved()) {
-      builder.setAddress(omNode.getRatisHostPortStr());
-    } else {
-      InetSocketAddress ratisAddr = new InetSocketAddress(
-          omNode.getInetAddress(), omNode.getRatisPort());
-      builder.setAddress(ratisAddr);
-    }
-    
-    return builder.build();
+  static RaftPeer createRaftPeer(OMNodeDetails omNode) {
+    return RaftPeer.newBuilder()
+        .setId(RaftPeerId.valueOf(omNode.getNodeId()))
+        .setAddress(omNode.getRatisHostPortStr())
+        .setStartupRole(omNode.isRatisListener()
+            ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER)
+        .build();
   }
 
   /**

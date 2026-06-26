@@ -92,6 +92,10 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
   private volatile boolean isStarted = false;
 
+  public OzoneConfiguration getConf() {
+    return configuration;
+  }
+
   public static void main(String[] args) {
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
             new OzoneConfiguration());

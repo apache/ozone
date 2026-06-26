@@ -48,7 +48,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -76,7 +75,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -175,10 +173,10 @@ public class TestContainerEndpoint {
   private static final long LOCAL_ID = 0L;
   private static final long KEY_ONE_SIZE = 500L; // 500 bytes
 
-  private UUID uuid1;
-  private UUID uuid2;
-  private UUID uuid3;
-  private UUID uuid4;
+  private DatanodeID id1;
+  private DatanodeID id2;
+  private DatanodeID id3;
+  private DatanodeID id4;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -763,10 +761,10 @@ public class TestContainerEndpoint {
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
@@ -848,10 +846,10 @@ public class TestContainerEndpoint {
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
     putContainerInfos(15);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
@@ -969,11 +967,13 @@ public class TestContainerEndpoint {
 
     // Add unhealthy records
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
+   // createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
+   // createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
@@ -1031,10 +1031,10 @@ public class TestContainerEndpoint {
     // createUnhealthyRecords(5, 4, 3, 2) will create records for containers 1-14
     // So we need to create 14 containers instead of just 6
     putContainerInfos(14);  // Changed from 6 to 14
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 0);
 
     // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
@@ -1072,10 +1072,10 @@ public class TestContainerEndpoint {
   @Test
   public void testGetReplicaHistoryForContainer() throws IOException {
     // Add container history for container id 1
-    final UUID u1 = newDatanode("host1", "127.0.0.1");
-    final UUID u2 = newDatanode("host2", "127.0.0.2");
-    final UUID u3 = newDatanode("host3", "127.0.0.3");
-    final UUID u4 = newDatanode("host4", "127.0.0.4");
+    final DatanodeID u1 = newDatanode("host1", "127.0.0.1");
+    final DatanodeID u2 = newDatanode("host2", "127.0.0.2");
+    final DatanodeID u3 = newDatanode("host3", "127.0.0.3");
+    final DatanodeID u4 = newDatanode("host4", "127.0.0.4");
     reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
@@ -1116,15 +1116,15 @@ public class TestContainerEndpoint {
     }
   }
 
-  UUID newDatanode(String hostName, String ipAddress) throws IOException {
-    final UUID uuid = UUID.randomUUID();
-    reconContainerManager.getNodeDB().put(DatanodeID.of(uuid),
+  DatanodeID newDatanode(String hostName, String ipAddress) throws IOException {
+    final DatanodeID id = DatanodeID.randomID();
+    reconContainerManager.getNodeDB().put(id,
         DatanodeDetails.newBuilder()
-            .setUuid(uuid)
+            .setID(id)
             .setHostName(hostName)
             .setIpAddress(ipAddress)
             .build());
-    return uuid;
+    return id;
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
@@ -1167,13 +1167,13 @@ public class TestContainerEndpoint {
 
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
-    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id1, 1L, 1L,
         "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id2, 2L, 1L,
         "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id3, 3L, 1L,
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id4, 4L, 1L,
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
   }
 
@@ -1330,7 +1330,7 @@ public class TestContainerEndpoint {
   }
 
   private void updateContainerStateToDeleted(long containerId)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
         HddsProtos.LifeCycleEvent.FINALIZE);
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
@@ -1622,7 +1622,7 @@ public class TestContainerEndpoint {
       throws IOException, TimeoutException {
     // Verifies fix for pipeline accumulation bug: containers missing in OM
     // should each have their own isolated pipeline list, not shared.
-    
+
     // Create 3 different pipelines
     Pipeline[] pipelines = {
         getRandomPipeline(), getRandomPipeline(), getRandomPipeline()
@@ -1630,7 +1630,7 @@ public class TestContainerEndpoint {
     for (Pipeline p : pipelines) {
       reconPipelineManager.addPipeline(p);
     }
-    
+
     // Create 3 containers in SCM with different pipelines (not in OM)
     long[] containerIds = {501L, 502L, 503L};
     for (int i = 0; i < containerIds.length; i++) {
@@ -1638,16 +1638,16 @@ public class TestContainerEndpoint {
       assertFalse(reconContainerMetadataManager.doesContainerExists(containerIds[i]),
           "Container " + containerIds[i] + " should NOT exist in OM");
     }
-    
+
     // Call API
     Response response = containerEndpoint.getContainerMisMatchInsights(10, 500, "OM");
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    
+
     Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
     List<ContainerDiscrepancyInfo> discrepancies =
         (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
     assertNotNull(discrepancies);
-    
+
     // Find containers in response
     ContainerDiscrepancyInfo[] infos = new ContainerDiscrepancyInfo[3];
     for (int i = 0; i < containerIds.length; i++) {
@@ -1658,12 +1658,12 @@ public class TestContainerEndpoint {
           .orElseThrow(() -> new AssertionError(
               "Container " + id + " not found in mismatch list"));
     }
-    
+
     // Verify pipeline isolation for each container
     List<Pipeline> pipelineList1 = infos[0].getPipelines();
     List<Pipeline> pipelineList2 = infos[1].getPipelines();
     List<Pipeline> pipelineList3 = infos[2].getPipelines();
-    
+
     verifyPipelineIsolation(infos[0], containerIds[0], pipelines[0].getId(),
         Arrays.asList(pipelineList2, pipelineList3));
     verifyPipelineIsolation(infos[1], containerIds[1], pipelines[1].getId(),
@@ -2030,8 +2030,8 @@ public class TestContainerEndpoint {
         ContainerID.valueOf(210L), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
 
     // Register 2 datanodes and upsert replica history for container 210.
-    UUID dn1 = newDatanode("qc-host1", "10.0.0.1");
-    UUID dn2 = newDatanode("qc-host2", "10.0.0.2");
+    DatanodeID dn1 = newDatanode("qc-host1", "10.0.0.1");
+    DatanodeID dn2 = newDatanode("qc-host2", "10.0.0.2");
     reconContainerManager.upsertContainerHistory(
         210L, dn1, 1L, 2L, "QUASI_CLOSED", ContainerChecksums.of(1111L, 0L));
     reconContainerManager.upsertContainerHistory(

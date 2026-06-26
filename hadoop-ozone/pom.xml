@@ -17,16 +17,17 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
   <modules>
     <module>cli-admin</module>
     <module>cli-debug</module>
+    <module>cli-interactive</module>
     <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>

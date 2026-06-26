@@ -88,8 +88,7 @@ public class CertificateStoreInvoker extends ScmInvoker<CertificateStore> {
       @Override
       public List<X509Certificate> removeAllExpiredCertificates() throws IOException {
         final Object[] args = {};
-        return (List<X509Certificate>) invoker.invokeReplicateDirect(ReplicateMethod.removeAllExpiredCertificates,
-            args);
+        return (List)invoker.invokeReplicateDirect(ReplicateMethod.removeAllExpiredCertificates, args);
       }
 
       @Override

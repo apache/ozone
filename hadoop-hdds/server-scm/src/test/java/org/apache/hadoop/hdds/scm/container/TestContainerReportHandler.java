@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -72,7 +73,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
@@ -99,7 +99,7 @@ public class TestContainerReportHandler {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  void setup() throws IOException, InvalidStateTransitionException {
+  void setup() throws IOException {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
@@ -209,10 +209,6 @@ public class TestContainerReportHandler {
               replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) &&
               (containerState.equals(HddsProtos.LifeCycleState.DELETED) ||
               containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
-            continue;
-          }
-          if (replicationType == HddsProtos.ReplicationType.EC &&
-              containerState.equals(HddsProtos.LifeCycleState.DELETED)) {
             continue;
           }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
@@ -514,13 +510,13 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Tests that a DELETING or DELETED RATIS/EC container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
-   * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported.
+   * Tests that a DELETING or DELETED RATIS container transitions to CLOSED or QUASI_CLOSED depending on
+   * non-empty replica state. EC does not resurrect and non-empty replica gets a force-delete command.
    * It should not transition if the replica is in INVALID or DELETED states.
    */
   @ParameterizedTest
   @MethodSource("containerAndReplicaStates")
-  public void containerShouldTransitionFromDeletingOrDeletedToClosedWhenNonEmptyReplica(
+  public void containerTransitionFromDeletingOrDeletedWhenNonEmptyReplica(
       HddsProtos.ReplicationType replicationType,
       LifeCycleState containerState,
       ContainerReplicaProto.State replicaState,
@@ -565,22 +561,23 @@ public class TestContainerReportHandler {
      * replicationType        EC
      */
 
-    // should transition on processing the valid replica's report
+    clearInvocations(publisher);
+
     ContainerReportsProto closedContainerReport = getContainerReports(validReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithValidReplica, closedContainerReport), publisher);
-    // Determine expected state based on replica state
-    LifeCycleState expectedState;
-    if (replicaState == ContainerReplicaProto.State.CLOSED) {
-      expectedState = LifeCycleState.CLOSED;
-    } else {
-      expectedState = LifeCycleState.QUASI_CLOSED;
-    }
-    assertEquals(expectedState, containerStateManager.getContainer(container.containerID()).getState());
 
-    // verify that no delete command is issued for non-empty replica, regardless of container state
-    verify(publisher, times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    if (replicationType == HddsProtos.ReplicationType.EC) {
+      assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
+      verify(publisher, times(1))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    } else {
+      LifeCycleState expectedState = replicaState == ContainerReplicaProto.State.CLOSED
+          ? LifeCycleState.CLOSED : LifeCycleState.QUASI_CLOSED;
+      assertEquals(expectedState, containerStateManager.getContainer(container.containerID()).getState());
+      verify(publisher, times(0))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    }
   }
 
   @ParameterizedTest

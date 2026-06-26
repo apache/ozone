@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -128,6 +130,7 @@ public class TestPipelinePlacementFactory {
       when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
+    doReturn(true).when(nodeManager).hasAvailableSpace(any(DatanodeInfo.class));
 
     DBStore dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto.DISK;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -474,7 +473,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
+  public void testDatanodeIsInvalidWhenNoSlotsAvailable() {
     NodeManager nodeMngr = mock(NodeManager.class);
     final DatanodeID datanodeID = DatanodeID.of(UUID.randomUUID());
     DummyPlacementPolicy placementPolicy =
@@ -488,43 +487,19 @@ public class TestSCMCommonPlacementPolicy {
     when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
     when(nodeMngr.getNode(eq(datanodeID))).thenReturn(datanodeInfo);
 
-    // capacity = 200000, used = 90000, remaining = 101000, committed = 500
-    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
-                200000, 90000, 101000, DISK).toBuilder()
-            .setCommitted(500)
-            .setFreeSpaceToSpare(10000)
-            .build();
-    // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
-    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        HddsTestUtils.createStorageReport(DatanodeID.randomID(), "/data/hdds",
-                200000, 90000, 101000, DISK).toBuilder()
-            .setCommitted(1000)
-            .setFreeSpaceToSpare(100000)
-            .build();
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
         metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
           200);
-    when(datanodeInfo.getStorageReports())
-        .thenReturn(Collections.singletonList(storageReport1))
-        .thenReturn(Collections.singletonList(storageReport2));
     when(datanodeInfo.getMetadataStorageReports())
         .thenReturn(Collections.singletonList(metaReport));
 
-
-    // 500 committed bytes:
-    //
-    //   101000       500
-    //     |           |
-    // (remaining - committed) > Math.max(4000, freeSpaceToSpare)
-    //                                                    |
-    //                                                  100000
-    //
-    // Summary: 101000 - 500 > 100000 == true
+    // Space check now uses PendingContainerTracker.hasAvailableSpace:
+    // slot available → isValidNode returns true
+    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(true);
     assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
 
-    // 1000 committed bytes:
-    // Summary: 101000 - 1000 > 100000 == false
+    // No slot available (all pending) → isValidNode returns false
+    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(false);
     assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 
@@ -564,6 +539,46 @@ public class TestSCMCommonPlacementPolicy {
     ContainerPlacementStatus placementStatus = placementPolicy.validateContainerPlacement(
         ImmutableList.of(allNodes.get(0), allNodes.get(1), allNodes.get(3)), 3);
     assertTrue(placementStatus.isPolicySatisfied());
+  }
+
+  /**
+   * HDDS-15350: when the network topology transiently reports zero racks
+   * (due to DNS resolution problems), validateContainerPlacement must
+   * not crash with ArithmeticException ("/ by zero") in
+   * getMaxReplicasPerRack. Without the fix this test throws and SCM's
+   * ReplicationMonitor thread dies along with it.
+   */
+  @Test
+  public void testValidateContainerPlacementWithZeroRackTopology() {
+    List<DatanodeDetails> nodes = ImmutableList.of(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.getAllNodes()).thenAnswer(inv -> nodes);
+
+    // Topology that reports zero racks at the rack level during the
+    // empty-topology window observed during DN decommission.
+    NetworkTopology topology = mock(NetworkTopology.class);
+    when(topology.getMaxLevel()).thenReturn(3);
+    when(topology.getNumOfNodes(anyInt())).thenReturn(0);
+    when(mockNodeManager.getClusterNetworkTopologyMap()).thenReturn(topology);
+
+    // rackCnt=2 makes DummyPlacementPolicy.getRequiredRackCount return
+    // min(replicas, 2) > 1, so the original early-return guard does NOT
+    // fire and execution proceeds to the divide site.
+    Map<Integer, Integer> rackMap = new HashMap<>();
+    rackMap.put(0, 0);
+    rackMap.put(1, 0);
+    rackMap.put(2, 0);
+    DummyPlacementPolicy policy = new DummyPlacementPolicy(
+        mockNodeManager, conf, rackMap, 2);
+
+    ContainerPlacementStatus status =
+        policy.validateContainerPlacement(nodes, 3);
+    assertTrue(status.isPolicySatisfied(),
+        "placement should not crash and should be considered satisfied "
+            + "when the topology reports no racks");
   }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {

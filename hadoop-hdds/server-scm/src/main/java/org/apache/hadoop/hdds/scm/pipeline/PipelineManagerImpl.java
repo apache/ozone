@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -61,7 +63,6 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -476,14 +477,13 @@ public class PipelineManagerImpl implements PipelineManager {
     for (ContainerID containerID : containerIDs) {
       if (containerManager.getContainer(containerID).getState()
             == HddsProtos.LifeCycleState.OPEN) {
-        try {
-          containerManager.updateContainerState(containerID,
-              HddsProtos.LifeCycleEvent.FINALIZE);
-        } catch (InvalidStateTransitionException ex) {
-          throw new IOException(ex);
-        }
+        containerManager.updateContainerState(containerID,
+            HddsProtos.LifeCycleEvent.FINALIZE);
       }
-      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      if (containerManager.getContainer(containerID).getState() ==
+          HddsProtos.LifeCycleState.CLOSING) {
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      }
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
@@ -634,20 +634,29 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    for (DatanodeDetails node : pipeline.getNodes()) {
-      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID())) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
+    final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
+    for (DatanodeDetails dn : datanodeDetails) {
+      final DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+      if (info == null) {
+        LOG.warn("DatanodeInfo not found for {}", dn.getID());
         return false;
       }
+      datanodeInfos.add(info);
+    }
+
+    final List<DatanodeInfo> successfulNodes = new ArrayList<>(datanodeInfos.size());
+    for (DatanodeInfo dn : datanodeInfos) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn, containerID)) {
+        for (DatanodeInfo rollbackNode : successfulNodes) {
+          nodeManager.removePendingAllocationForDatanode(rollbackNode, containerID);
+        }
+        return false;
+      }
+      successfulNodes.add(dn);
     }
     return true;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
-    }
   }
 
   /**

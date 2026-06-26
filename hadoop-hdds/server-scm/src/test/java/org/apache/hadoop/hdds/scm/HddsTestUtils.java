@@ -164,7 +164,7 @@ public final class HddsTestUtils {
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
     DatanodeID nodeId = DatanodeID.randomID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getUuid(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
@@ -546,8 +546,7 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+       ContainerID id) throws IOException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(

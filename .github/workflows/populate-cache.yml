@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout project
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -60,7 +60,7 @@ jobs:
 
       - name: Setup Java
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -87,6 +87,17 @@ jobs:
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline clean verify
+
+      - name: Setup Java 8
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
+        with:
+          distribution: 'temurin'
+          java-version: 8
+
+      - name: Fetch dependencies for Java 8
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: mvn $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline -DskipRecon -DskipShade test-compile
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'

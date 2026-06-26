@@ -137,6 +137,20 @@ public class TestBucketList {
   }
 
   @Test
+  public void listWithDelimiterAndPrefixMatchingNoKeys() throws OS3Exception, IOException {
+    OzoneClient ozoneClient =
+        createClientWithKeys("b/a/r", "b/a/c", "b/a/g", "g");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "d");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "/");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertEquals(0, response.getContents().size());
+    assertEquals(0, response.getCommonPrefixes().size());
+  }
+
+  @Test
   public void listWithPrefixAndDelimiter() throws OS3Exception, IOException {
     OzoneClient ozoneClient =
         createClientWithKeys("dir1/file2", "dir1/dir2/file2", "dir1bh/file",

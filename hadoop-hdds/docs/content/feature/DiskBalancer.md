@@ -43,9 +43,9 @@ A disk is considered a candidate for balancing if its
 
 ## Feature Flag
 
-The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled.
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is enabled.
 
-The feature can be **enabled** by setting the following property to `true` in the `ozone-site.xml` configuration file:
+The feature can be **disabled** by setting the following property to `false` in the `ozone-site.xml` configuration file:
 `hdds.datanode.disk.balancer.enabled = false`
 
 ### Authentication and Authorization
@@ -119,8 +119,8 @@ restart the datanode service for the changes to take effect.
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
 
-**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
-is currently considered experimental and is disabled by default. The command is, however, fully functional for those who wish to enable and use the feature.
+**Note:** DiskBalancer is enabled by default on datanodes. Use `hdds.datanode.disk.balancer.enabled=false` in
+`ozone-site.xml` to disable the service on datanodes and prevent CLI commands from running.
 
 ### Command Syntax
 
@@ -154,13 +154,13 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | Option                              | Description                                                                                                                                                                                                                                                                                                                                                           | Example                                        |
 |-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
 | `<datanode-address>`                | One or more datanode addresses as positional arguments. Addresses can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (19864)<br>- Hostname with port (e.g., `DN-1:19864`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:19864`)<br>- Stdin (`-`) - reads datanode addresses from standard input, one per line | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
-| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                                  | `--in-service-datanodes`                       |
+| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE and HEALTHY datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                     | `--in-service-datanodes`                       |
 | `--json`                            | Format output as JSON.                                                                                                                                                                                                                                                                                                                                                | `--json`                                       |
 | `-t/--threshold-percentage`        | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                         | `-t 5`<br>`--threshold-percentage 5.0`         |
 | `-b/--bandwidth-in-mb`              | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                | `-b 20`<br>`--bandwidth-in-mb 50`              |
-| `-p/--parallel-thread`              | Number of parallel threads (default: 1). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                     | `-p 5`<br>`--parallel-thread 10`               |
+| `-p/--parallel-thread`              | Number of parallel threads (default: 5). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                     | `-p 5`<br>`--parallel-thread 10`               |
 | `-s/--stop-after-disk-even`         | Stop automatically after disks are balanced (default: true). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                 | `-s false`<br>`--stop-after-disk-even true`    |
-| `-c/--container-states`             | Comma-separated container lifecycle state names that may be moved between disks . Used with `start` and `update` commands.                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states OPEN,CLOSED` |
+| `-c/--container-states`             | Comma-separated container lifecycle state names that may be moved between disks. Used with `start` and `update` commands.                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
 
 ### Examples
 
@@ -169,7 +169,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 # Start DiskBalancer on multiple datanodes
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
 
-# Start DiskBalancer on all IN_SERVICE datanodes
+# Start DiskBalancer on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer start --in-service-datanodes
 
 # Start DiskBalancer with configuration parameters
@@ -189,7 +189,7 @@ ozone admin datanode diskbalancer start DN-1 --json
 # Stop DiskBalancer on multiple datanodes
 ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
 
-# Stop DiskBalancer on all IN_SERVICE datanodes
+# Stop DiskBalancer on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer stop --in-service-datanodes
 
 # Stop DiskBalancer with json output
@@ -202,7 +202,7 @@ ozone admin datanode diskbalancer stop DN-1 --json
 # Update multiple parameters
 ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
 
-# Update on all IN_SERVICE datanodes
+# Update on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer update --in-service-datanodes -t 5
 # Or using the long form:
 ozone admin datanode diskbalancer update --in-service-datanodes --threshold-percentage 5
@@ -216,7 +216,7 @@ ozone admin datanode diskbalancer update DN-1 -b 50 --json
 # Get status from multiple datanodes
 ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
 
-# Get status from all IN_SERVICE datanodes
+# Get status from all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer status --in-service-datanodes
 
 # Get status as JSON
@@ -228,7 +228,7 @@ ozone admin datanode diskbalancer status --in-service-datanodes --json
 # Get report from multiple datanodes
 ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
 
-# Get report from all IN_SERVICE datanodes
+# Get report from all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer report --in-service-datanodes
 
 # Get report as JSON
@@ -241,14 +241,14 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 
 | Property                                                       | Default Value                                                                          | Description                                                                                                                                                                                                                                                                                                                            |
 |----------------------------------------------------------------|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `hdds.datanode.disk.balancer.enabled`                          | `false`                                                                                | If false, the DiskBalancer service on the Datanode is disabled. Configure it to true for diskBalancer to be enabled.                                                                                                                                                                                                                   |
+| `hdds.datanode.disk.balancer.enabled`                          | `true`                                                                                 | If false, the DiskBalancer service on the Datanode is disabled. By default, DiskBalancer is enabled on datanodes.                                                                                                                                                                                                                    |
 | `hdds.datanode.disk.balancer.volume.density.threshold.percent` | `10.0`                                                                                 | A percentage (0-100). A datanode is considered balanced if for each volume, its utilization differs from the average datanode utilization by no more than this threshold.                                                                                                                                                              |
 | `hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec`    | `10`                                                                                   | The maximum bandwidth (in MB/s) that the balancer can use for moving data, to avoid impacting client I/O.                                                                                                                                                                                                                              |
 | `hdds.datanode.disk.balancer.parallel.thread`                  | `5`                                                                                    | The number of worker threads to use for moving containers in parallel.                                                                                                                                                                                                                                                                 |
 | `hdds.datanode.disk.balancer.service.interval`                 | `60s`                                                                                  | The time interval at which the Datanode DiskBalancer service checks for imbalance and updates its configuration.                                                                                                                                                                                                                       |
 | `hdds.datanode.disk.balancer.stop.after.disk.even`             | `true`                                                                                 | If true, the DiskBalancer will automatically stop its balancing activity once disks are considered balanced (i.e., all volume densities are within the threshold).                                                                                                                                                                     |
 | `hdds.datanode.disk.balancer.replica.deletion.delay`           | `5m`                                                                                   | The delay after a container is successfully moved from source volume to destination volume before the source container replica is deleted. This lazy deletion provides a grace period before failing the read thread holding the old container replica. Unit: ns, ms, s, m, h, d.                                                      |
-| `hdds.datanode.disk.balancer.container.states`                 | `CLOSED,QUASI_CLOSED`                                                                  | Comma-separated container lifecycle state names that may be moved between disks (must match enum names exactly, uppercase). Default includes **CLOSED** and **QUASI_CLOSED**; extend the list when additional states are needed to be balanced. All defined container states are OPEN, CLOSING, QUASI_CLOSED, CLOSED, UNHEALTHY, INVALID, DELETED, RECOVERING. |
+| `hdds.datanode.disk.balancer.container.states`                 | `CLOSED,QUASI_CLOSED`                                                                  | Comma-separated container lifecycle state names that may be moved between disks (must match enum names exactly, uppercase). Default includes **CLOSED** and **QUASI_CLOSED**; extend the list when additional states are needed to be balanced. All defined container states which are eligibile to move QUASI_CLOSED, CLOSED, UNHEALTHY, INVALID. |
 | `hdds.datanode.disk.balancer.container.choosing.policy`        | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | The policy for selecting source/destination volumes and which containers to move.                                                                                                                                                                                                                                                      |
 | `hdds.datanode.disk.balancer.service.timeout`                  | `300s`                                                                                 | Timeout for the Datanode DiskBalancer service operations.                                                                                                                                                                                                                                                                              |
 | `hdds.datanode.disk.balancer.should.run.default`               | `false`                                                                                | If the balancer fails to read its persisted configuration, this value determines if the service should run by default.                                                                                                                                                                                                                 |

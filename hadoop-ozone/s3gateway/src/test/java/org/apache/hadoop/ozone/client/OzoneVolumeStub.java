@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -144,15 +146,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public Iterator<? extends OzoneBucket> listBuckets(String bucketPrefix) {
-    return buckets.values()
-        .stream()
-        .filter(bucket -> {
-          if (bucketPrefix != null) {
-            return bucket.getName().startsWith(bucketPrefix);
-          } else {
-            return true;
-          }
-        })
+    return listBucketsStream(bucketPrefix, null)
         .collect(Collectors.toList())
         .iterator();
   }
@@ -160,12 +154,27 @@ public final class OzoneVolumeStub extends OzoneVolume {
   @Override
   public Iterator<? extends OzoneBucket> listBuckets(String bucketPrefix,
       String prevBucket) {
-    return buckets.values()
-        .stream()
-        .filter(bucket -> bucket.getName().compareTo(prevBucket) > 0)
-        .filter(bucket -> bucket.getName().startsWith(bucketPrefix))
+    return listBucketsStream(bucketPrefix, prevBucket)
         .collect(Collectors.toList())
         .iterator();
+  }
+
+  private Stream<? extends OzoneBucket> listBucketsStream(String bucketPrefix,
+      String prevBucket) {
+    return buckets.values()
+        .stream()
+        .filter(bucket -> matchesBucketPrefix(bucket, bucketPrefix))
+        .filter(bucket -> prevBucket == null
+            || bucket.getName().compareTo(prevBucket) > 0)
+        .sorted(Comparator.comparing(OzoneBucket::getName));
+  }
+
+  private static boolean matchesBucketPrefix(OzoneBucket bucket,
+      String bucketPrefix) {
+    if (bucketPrefix != null) {
+      return bucket.getName().startsWith(bucketPrefix);
+    }
+    return true;
   }
 
   @Override

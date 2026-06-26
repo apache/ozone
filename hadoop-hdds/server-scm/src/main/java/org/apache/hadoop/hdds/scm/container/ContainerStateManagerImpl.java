@@ -241,6 +241,16 @@ public final class ContainerStateManagerImpl
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
+          if (container.getPipelineID() == null) {
+            // This can happen in Recon when SCM returns an OPEN container after
+            // its pipeline metadata has already been cleaned up. Keep the
+            // container record, but skip pipeline registration because there is
+            // no pipeline ID to look up.
+            LOG.warn("Found container {} which is in OPEN state without a "
+                + "pipeline ID. Skipping pipeline registration during SCM "
+                + "start.", container);
+            continue;
+          }
           try {
             pipelineManager.addContainerToPipelineSCMStart(
                 container.getPipelineID(), container.containerID());
@@ -261,8 +271,12 @@ public final class ContainerStateManagerImpl
       getContainerStateChangeActions() {
     final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
         actions = new EnumMap<>(LifeCycleEvent.class);
-    actions.put(FINALIZE, info -> pipelineManager
-        .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
+    actions.put(FINALIZE, info -> {
+      if (info.getPipelineID() != null) {
+        pipelineManager.removeContainerFromPipeline(
+            info.getPipelineID(), info.containerID());
+      }
+    });
     return actions;
   }
 
@@ -335,12 +349,23 @@ public final class ContainerStateManagerImpl
           transactionBuffer.addToBuffer(containerStore,
               containerID, container);
           containers.addContainer(container);
-          if (pipelineManager.containsPipeline(pipelineID)) {
+          if (pipelineID != null && pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
           } else if (containerInfo.getState().
               equals(LifeCycleState.OPEN)) {
-            // Pipeline should exist, but not
-            throw new PipelineNotFoundException();
+            if (pipelineID != null) {
+              // The container names a pipeline, but that pipeline is not in
+              // the pipeline manager. Preserve the existing failure path for
+              // this inconsistent OPEN container state.
+              throw new PipelineNotFoundException();
+            }
+            // There is no pipeline ID to look up or register. This can happen
+            // on Recon sync paths when SCM returns an OPEN container after its
+            // pipeline metadata has already been cleaned up. Keep the
+            // container record so Recon does not miss it permanently, but skip
+            // pipeline tracking until later reports/syncs advance the state.
+            LOG.warn("Adding OPEN container {} without pipeline tracking "
+                    + "because its pipeline ID is null.", containerID);
           }
           //recon may receive report of closed container,
           // no corresponding Pipeline can be synced for scm.
@@ -364,7 +389,7 @@ public final class ContainerStateManagerImpl
   public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
                                                   final LifeCycleEvent event,
                                                   final Long sequenceId)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
@@ -379,10 +404,11 @@ public final class ContainerStateManagerImpl
           LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
               containerInfo.getSequenceId(), sequenceId);
         }
-        
+
         final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
             oldState, event);
+
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
@@ -398,6 +424,9 @@ public final class ContainerStateManagerImpl
               .accept(containerInfo);
         }
       }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Failed to updateContainerStateWithSequenceId for container {} at sequenceId {}, ignoring it.",
+          id, sequenceId, e);
     }
   }
 

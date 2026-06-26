@@ -527,7 +527,7 @@ public class SnapshotDefragService extends BackgroundService
       RocksDBCheckpoint dbCheckpoint = new RocksDBCheckpoint(nextVersionPath);
       // Add a new version to the local data file.
       try (OmMetadataManagerImpl newVersionCheckpointMetadataManager =
-               OmMetadataManagerImpl.createCheckpointMetadataManager(conf, dbCheckpoint, true)) {
+               createDefragCheckpointMetadataManager(dbCheckpoint, true)) {
         RDBStore newVersionCheckpointStore = (RDBStore) newVersionCheckpointMetadataManager.getStore();
         snapshotLocalDataProvider.addSnapshotVersion(newVersionCheckpointStore);
         snapshotLocalDataProvider.commit();
@@ -547,6 +547,16 @@ public class SnapshotDefragService extends BackgroundService
 
       return EmptyTaskResult.newResult();
     }
+  }
+
+  @VisibleForTesting
+  OmMetadataManagerImpl createDefragCheckpointMetadataManager(
+      DBCheckpoint checkpoint, boolean readOnly) throws IOException {
+    // Defrag checkpoint DBs are transient and drop/recreate column families.
+    // Generic RocksDB metrics are not useful for them and can race with CF handle
+    // lifetime changes while the checkpoint is being rewritten.
+    return OmMetadataManagerImpl.createCheckpointMetadataManager(
+        conf, checkpoint, readOnly, false);
   }
 
   /**
@@ -570,7 +580,7 @@ public class SnapshotDefragService extends BackgroundService
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName())) {
       DBCheckpoint checkpoint = snapshot.get().getMetadataManager().getStore().getCheckpoint(tmpDefragDir, true);
       try (OmMetadataManagerImpl metadataManagerBeforeTruncate =
-               OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint, false)) {
+               createDefragCheckpointMetadataManager(checkpoint, false)) {
         DBStore dbStore = metadataManagerBeforeTruncate.getStore();
         for (String table : metadataManagerBeforeTruncate.listTableNames()) {
           if (!incrementalColumnFamilies.contains(table)) {
@@ -581,7 +591,7 @@ public class SnapshotDefragService extends BackgroundService
         throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
       }
       // This will recreate the column families in the checkpoint.
-      return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint, false);
+      return createDefragCheckpointMetadataManager(checkpoint, false);
     }
   }
 

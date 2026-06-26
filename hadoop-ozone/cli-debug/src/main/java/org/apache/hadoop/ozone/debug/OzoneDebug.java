@@ -26,7 +26,7 @@ import picocli.CommandLine;
 /**
  * Ozone Debug Command line tool.
  */
-@CommandLine.Command(name = "ozone debug",
+@CommandLine.Command(name = "ozone debug", aliases = "debug",
         description = "Developer tools for Ozone Debug operations",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)

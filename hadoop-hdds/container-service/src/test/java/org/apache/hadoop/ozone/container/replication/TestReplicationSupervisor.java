@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -1137,6 +1138,37 @@ public class TestReplicationSupervisor {
     } finally {
       subject.stop();
     }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void poolSizeCanBeUpdatedByReplicationStreamsLimitReconfiguration() {
+    final int replicationMaxStreams = 5;
+    ReplicationServer.ReplicationConfig repConf =
+        new ReplicationServer.ReplicationConfig();
+    repConf.setReplicationMaxStreams(replicationMaxStreams);
+
+    AtomicInteger threadPoolSize = new AtomicInteger();
+
+    ReplicationSupervisor rs = ReplicationSupervisor.newBuilder()
+        .executor(new DiscardingExecutorService())
+        .executorThreadUpdater(threadPoolSize::set)
+        .replicationConfig(repConf)
+        .build();
+
+    rs.nodeStateUpdated(IN_SERVICE);
+    assertEquals(replicationMaxStreams, threadPoolSize.get());
+
+    rs.setReplicationMaxStreams(7);
+    assertEquals(7, threadPoolSize.get());
+
+    rs.nodeStateUpdated(DECOMMISSIONING);
+    assertEquals(repConf.scaleOutOfServiceLimit(7), threadPoolSize.get());
+
+    rs.setReplicationMaxStreams(3);
+    assertEquals(repConf.scaleOutOfServiceLimit(3), threadPoolSize.get());
+
+    rs.nodeStateUpdated(IN_SERVICE);
+    assertEquals(3, threadPoolSize.get());
   }
 
   @ContainerLayoutTestInfo.ContainerTest

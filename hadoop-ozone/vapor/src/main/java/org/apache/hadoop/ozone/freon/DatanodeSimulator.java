@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -74,8 +75,8 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -131,7 +132,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
   private ConfigurationSource conf;
   private List<DatanodeSimulationState> datanodes;
-  private Map<UUID, DatanodeSimulationState> datanodesMap;
+  private Map<DatanodeID, DatanodeSimulationState> datanodesMap;
 
   private ScheduledExecutorService heartbeatScheduler;
   private LayoutVersionProto layoutInfo;
@@ -295,7 +296,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
     datanodesMap = new HashMap<>();
     for (DatanodeSimulationState datanode : datanodes) {
-      datanodesMap.put(datanode.getDatanodeDetails().getUuid(), datanode);
+      datanodesMap.put(datanode.getDatanodeDetails().getID(), datanode);
     }
   }
 
@@ -317,8 +318,8 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
               ReplicationFactor.THREE, "test");
 
       for (DatanodeDetails datanode : cp.getPipeline().getNodeSet()) {
-        if (datanodesMap.containsKey(datanode.getUuid())) {
-          datanodesMap.get(datanode.getUuid())
+        if (datanodesMap.containsKey(datanode.getID())) {
+          datanodesMap.get(datanode.getID())
               .newContainer(cp.getContainerInfo().getContainerID());
           totalAssignedContainers++;
         }
@@ -458,7 +459,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   private DatanodeDetails randomDatanodeDetails(ConfigurationSource config)
       throws UnknownHostException {
     DatanodeDetails details = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .build();
     details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);

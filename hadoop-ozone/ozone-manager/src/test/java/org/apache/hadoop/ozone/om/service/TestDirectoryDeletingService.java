@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -228,6 +229,34 @@ public class TestDirectoryDeletingService {
     } finally {
       ozoneManager.stop();
     }
+  }
+
+  @Test
+  void testUpdateAndRestart() throws Exception {
+    int threadCount = 2;
+    OzoneConfiguration conf = createConfAndInitValues(threadCount);
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
+    om = omTestManagers.getOzoneManager();
+    DirectoryDeletingService subject = om.getKeyManager().getDirDeletingService();
+
+    OzoneConfiguration updatedConf = new OzoneConfiguration(conf);
+    int newThreadCount = threadCount + 1;
+    Duration newInterval = Duration.ofSeconds(5);
+    updatedConf.setInt(OZONE_THREAD_NUMBER_DIR_DELETION, newThreadCount);
+    updatedConf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, newInterval.toMillis(), TimeUnit.MILLISECONDS);
+
+    assertThat(subject.getExecutorService().getCorePoolSize())
+        .as("initial thread pool size")
+        .isEqualTo(threadCount);
+
+    subject.updateAndRestart(updatedConf);
+
+    assertThat(subject.getExecutorService().getCorePoolSize())
+        .as("thread pool size after restart")
+        .isEqualTo(newThreadCount);
+    assertThat(subject.getIntervalMillis())
+        .as("interval after restart")
+        .isEqualTo(newInterval.toMillis());
   }
 
   @Test

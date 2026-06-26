@@ -28,7 +28,8 @@ import {
   FolderOpenOutlined,
   InboxOutlined,
   LayoutOutlined,
-  PieChartOutlined
+  PieChartOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import {Link, useLocation} from 'react-router-dom';
 
@@ -36,6 +37,7 @@ import {Link, useLocation} from 'react-router-dom';
 import logo from '@/logo.png';
 import {showDataFetchError} from '@/utils/common';
 import {useApiData} from '@/v2/hooks/useAPIData.hook';
+import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
 import './navBar.less';
 
@@ -60,7 +62,19 @@ const NavBar: React.FC<NavBarProps> = ({
     }
   );
 
+  const { data: chatbotHealth, success: chatbotHealthLoaded } = useApiData<{
+    enabled: boolean;
+    llmClientAvailable: boolean;
+  }>(
+    CHATBOT_ENDPOINTS.HEALTH,
+    { enabled: false, llmClientAvailable: false },
+    {
+      retryAttempts: 0,
+    }
+  );
+
   const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
+  const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
     <Menu.Item key='/Overview'
@@ -135,6 +149,13 @@ const NavBar: React.FC<NavBarProps> = ({
         state: { isHeatmapEnabled: isHeatmapEnabled }
       }}
       />
+    </Menu.Item>
+  ),(
+    isChatbotEnabled &&
+    <Menu.Item key='/Assistant'
+      icon={<ThunderboltOutlined />}>
+      <span>Recon AI</span>
+      <Link to='/Assistant' />
     </Menu.Item>
   )]
   return (

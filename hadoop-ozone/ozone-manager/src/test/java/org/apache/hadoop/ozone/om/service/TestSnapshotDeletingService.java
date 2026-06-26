@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,15 +45,20 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -179,13 +187,13 @@ public class TestSnapshotDeletingService {
         "All entries should be submitted");
 
     // Verify multiple batches were created (since data should exceed buffer)
-    assertTrue(capturedRequests.size() > 1);
+    assertThat(capturedRequests).hasSizeGreaterThan(1);
 
     for (OMRequest omRequest : capturedRequests) {
       assertEquals(OzoneManagerProtocolProtos.Type.SnapshotMoveTableKeys, omRequest.getCmdType());
 
       int requestSize = omRequest.getSerializedSize();
-      assertTrue(requestSize <= ratisBufferLimit);
+      assertThat(requestSize).isLessThanOrEqualTo(ratisBufferLimit);
     }
 
     int totalDeletedKeysProcessed = capturedRequests.stream()
@@ -204,6 +212,111 @@ public class TestSnapshotDeletingService {
 
     // Verify no orphan entries (all items accounted for)
     assertEquals(totalExpected, totalDeletedKeysProcessed + totalRenamedKeysProcessed + totalDeletedDirsProcessed);
+  }
+
+  @Test
+  public void testSnapshotDeletingTaskLogsSnapshotId() throws Exception {
+    IOzoneManagerLock lock = Mockito.mock(IOzoneManagerLock.class);
+    UUID snapshotId = UUID.randomUUID();
+    SnapshotInfo snapshotInfo = SnapshotInfo.newBuilder()
+        .setSnapshotId(snapshotId)
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setName("snap1")
+        .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
+        .setLastTransactionInfo(TransactionInfo.valueOf(1, 1).toByteString())
+        .build();
+
+    Mockito.when(omMetadataManager.getSnapshotChainManager()).thenReturn(chainManager);
+    Mockito.when(omMetadataManager.getLock()).thenReturn(lock);
+    Mockito.when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    Mockito.when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
+    Mockito.when(ozoneManager.isLeaderReady()).thenReturn(true);
+    Mockito.when(chainManager.iterator(true)).thenReturn(
+        Collections.singletonList(snapshotId).iterator());
+    Mockito.when(lock.acquireWriteLocks(any(), any()))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+
+    SnapshotDeletingService service = new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager);
+    LogCapturer logCapturer = LogCapturer.captureLogs(SnapshotDeletingService.class);
+
+    try (MockedStatic<SnapshotUtils> snapshotUtils = mockStatic(SnapshotUtils.class);
+         MockedStatic<OmSnapshotManager> omSnapshotManagerStatic = mockStatic(OmSnapshotManager.class)) {
+      snapshotUtils.when(() -> SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, snapshotId))
+          .thenReturn(snapshotInfo);
+      snapshotUtils.when(() -> SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapshotInfo))
+          .thenReturn(null);
+      omSnapshotManagerStatic.when(() -> OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager,
+          snapshotInfo)).thenReturn(true);
+
+      service.new SnapshotDeletingTask().call();
+    }
+
+    String expectedLogLabel = snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')";
+    assertThat(logCapturer.getOutput()).contains(
+        "Started Snapshot Deletion Processing for snapshot : " + expectedLogLabel);
+    assertThat(logCapturer.getOutput()).contains(
+        "Snapshot: " + expectedLogLabel + " entries will be moved to AOS.");
+  }
+
+  @Test
+  public void testSnapshotDeletingTaskLogsNextActiveSnapshotId()
+      throws Exception {
+    IOzoneManagerLock lock = Mockito.mock(IOzoneManagerLock.class);
+    UUID snapshotId = UUID.randomUUID();
+    SnapshotInfo snapshotInfo = SnapshotInfo.newBuilder()
+        .setSnapshotId(snapshotId)
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setName("snap1")
+        .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
+        .setLastTransactionInfo(TransactionInfo.valueOf(1, 1).toByteString())
+        .build();
+    SnapshotInfo nextSnapshotInfo = SnapshotInfo.newBuilder()
+        .setSnapshotId(UUID.randomUUID())
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
+        .setName("snap2")
+        .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
+        .setLastTransactionInfo(TransactionInfo.valueOf(1, 1).toByteString())
+        .build();
+
+    Mockito.when(omMetadataManager.getSnapshotChainManager()).thenReturn(chainManager);
+    Mockito.when(omMetadataManager.getLock()).thenReturn(lock);
+    Mockito.when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    Mockito.when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
+    Mockito.when(ozoneManager.isLeaderReady()).thenReturn(true);
+    Mockito.when(chainManager.iterator(true)).thenReturn(
+        Collections.singletonList(snapshotId).iterator());
+    Mockito.when(lock.acquireWriteLocks(any(), any()))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+
+    SnapshotDeletingService service =
+        new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager);
+    LogCapturer logCapturer = LogCapturer.captureLogs(SnapshotDeletingService.class);
+
+    try (MockedStatic<SnapshotUtils> snapshotUtils = mockStatic(SnapshotUtils.class);
+         MockedStatic<OmSnapshotManager> omSnapshotManagerStatic = mockStatic(OmSnapshotManager.class)) {
+      snapshotUtils.when(() -> SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, snapshotId))
+          .thenReturn(snapshotInfo);
+      snapshotUtils.when(() -> SnapshotUtils.getNextSnapshot(ozoneManager, chainManager, snapshotInfo))
+          .thenReturn(nextSnapshotInfo);
+      omSnapshotManagerStatic.when(() -> OmSnapshotManager.areSnapshotChangesFlushedToDB(
+          omMetadataManager, snapshotInfo)).thenReturn(true);
+
+      service.new SnapshotDeletingTask().call();
+    }
+
+    String expectedLogLabel = snapshotInfo.getTableKey() + " (snapshotId='"
+        + snapshotInfo.getSnapshotId() + "')";
+    String expectedNextSnapshotLogLabel = nextSnapshotInfo.getTableKey()
+        + " (snapshotId='" + nextSnapshotInfo.getSnapshotId() + "')";
+    assertThat(logCapturer.getOutput()).contains(
+        "Snapshot: " + expectedLogLabel
+            + " entries will be moved to next active snapshot: "
+            + expectedNextSnapshotLogLabel);
   }
 
   /**

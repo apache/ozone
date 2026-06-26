@@ -105,7 +105,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   static String bytes2String(ByteBuffer bytes) {
-    return StringCodec.get().decode(bytes);
+    return StringCodec.get().decodeWithFallback(bytes);
   }
 
   static RocksDatabaseException toRocksDatabaseException(Object name, String op, RocksDBException e) {

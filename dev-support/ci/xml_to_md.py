@@ -27,6 +27,15 @@ import sys
 
 Property = namedtuple('Property', ['name', 'value', 'tag', 'description'])
 
+def escape_mdx_markup(text):
+  """Escapes special characters to prevent MDX/JSX parsing errors."""
+  if not text:
+    return text
+  text = text.replace('&', '&amp;')
+  text = text.replace('<', '&lt;')
+  text = text.replace('>', '&gt;')
+  return text
+
 def extract_xml_from_jar(jar_path, xml_filename):
   xml_files = []
   with zipfile.ZipFile(jar_path, 'r') as jar:
@@ -120,6 +129,7 @@ This page provides a comprehensive overview of the configuration keys available 
     # Escape pipe characters and wrap {placeholders} in backticks
     description = prop.description.replace('|', '\\|')
     description = placeholder_pattern.sub(r'`\1{\2}`', description)
+    description = escape_mdx_markup(description)
 
     value = prop.value
     if value:
@@ -127,6 +137,7 @@ This page provides a comprehensive overview of the configuration keys available 
       value = placeholder_pattern.sub(r'`\1{\2}`', value)
       value = value.replace('\n', ' ')
       value = multi_space_pattern.sub(' ', value)
+      value = escape_mdx_markup(value)
     
     markdown += f"| `{prop.name}` | {value} | {prop.tag} | {description} |\n"
   

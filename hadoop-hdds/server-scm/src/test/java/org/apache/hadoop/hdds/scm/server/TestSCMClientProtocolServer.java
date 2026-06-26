@@ -29,7 +29,12 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -155,12 +160,49 @@ public class TestSCMClientProtocolServer {
       scmServer.stop();
     }
   }
+  
+  @Test
+  public void testListContainerPaginationHasNoDuplicates() throws Exception {
+    Instant base = Instant.parse("2026-01-01T00:00:00Z");
+    List<ContainerInfo> infos = new ArrayList<>();
+    infos.add(newContainerWithLastUsedTime(100, base));
+    infos.add(newContainerWithLastUsedTime(5, base.plusMillis(1)));
+    infos.add(newContainerWithLastUsedTime(10, base.plusMillis(2)));
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockStorageContainerManager(infos), mock(ReconfigurationHandler.class));
+    try {
+      List<Long> ids = new ArrayList<>();
+      long start = 0;
+      int batchSize = 2;
+      while (true) {
+        List<ContainerInfo> page =
+            scmServer.listContainer(start, batchSize, null, null, null).getContainerInfoList();
+        if (page.isEmpty()) {
+          break;
+        }
+        for (ContainerInfo c : page) {
+          ids.add(c.getContainerID());
+        }
+        start = page.get(page.size() - 1).getContainerID() + 1;
+      }
+      List<Long> expectedIds = Arrays.asList(5L, 10L, 100L);
+      assertEquals(ids.size(), new HashSet<>(ids).size());
+      assertEquals(expectedIds, ids);
+    } finally {
+      scmServer.stop();
+    }
+  }
 
   private StorageContainerManager mockStorageContainerManager() {
     List<ContainerInfo> infos = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       infos.add(newContainerInfoForTest());
     }
+    return mockStorageContainerManager(infos);
+  }
+
+  private StorageContainerManager mockStorageContainerManager(List<ContainerInfo> infos) {
     ContainerManagerImpl containerManager = mock(ContainerManagerImpl.class);
     when(containerManager.getContainers()).thenReturn(infos);
     when(containerManager.getContainerStateCount(any(LifeCycleState.class))).thenReturn(infos.size());
@@ -172,6 +214,16 @@ public class TestSCMClientProtocolServer {
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;
+  }
+
+  private ContainerInfo newContainerWithLastUsedTime(long containerId,
+      Instant fixedLastUsedInstant) {
+    return new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setClock(Clock.fixed(fixedLastUsedInstant, ZoneOffset.UTC))
+        .setPipelineID(PipelineID.randomId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .build();
   }
 
   private ContainerInfo newContainerInfoForTest() {
