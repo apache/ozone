@@ -81,7 +81,9 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     ...                 </CompleteMultipartUpload>
     Create File         /tmp/${PREFIX}-complete.xml    ${body}
     ${presigned_url} =  Generate Presigned Complete Multipart Upload Url    ${access_key}    ${secret_key}    ${BUCKET}    ${key}    ${uploadID}    us-east-1    3600    ${ENDPOINT_URL}
-    ${result} =         Execute    curl -s -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}"
+    ${result} =         Execute    curl -sS -v -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}" 2>&1
+    Should Contain      ${result}    > Transfer-Encoding: chunked
+    Should Not Contain  ${result}    > Content-Length:
     # A success response carries <CompleteMultipartUploadResult>/<ETag>; the
     # error response would instead contain the "must specify at least one part"
     # message (the bucket/key alone are not success discriminators, since the
@@ -487,4 +489,3 @@ Test Multipart Upload Part with wrong Content-MD5 header
 
     # Abort the multipart upload (cleanup)
                                 Abort MPU                  ${BUCKET}    ${PREFIX}/mpu/md5test/key2    ${uploadID}
-

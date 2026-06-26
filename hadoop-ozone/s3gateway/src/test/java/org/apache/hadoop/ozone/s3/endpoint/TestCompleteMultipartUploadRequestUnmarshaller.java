@@ -146,7 +146,9 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
         request.getPartList();
 
     assertEquals(part1, parts.get(0).getETag());
+    assertEquals(1, parts.get(0).getPartNumber());
     assertEquals(part2, parts.get(1).getETag());
+    assertEquals(2, parts.get(1).getPartNumber());
   }
 
   private CompleteMultipartUploadRequest unmarshall(
