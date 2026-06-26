@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -194,7 +195,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<DatanodeInfo> getNodes(
+  public List<DatanodeDetails> getNodes(
       NodeOperationalState opState, HddsProtos.NodeState health) {
     return null;
   }
@@ -211,8 +212,8 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<DatanodeInfo> getAllNodes() {
-    return Collections.emptyList();
+  public List<DatanodeDetails> getAllNodes() {
+    return null;
   }
 
   @Override
@@ -241,6 +242,12 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    return null;
+  }
+
+  @Override
+  @Nullable
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
     return null;
   }
 
@@ -364,7 +371,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeInfo getNode(DatanodeID id) {
+  public DatanodeDetails getNode(DatanodeID id) {
     return null;
   }
 

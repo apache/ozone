@@ -336,7 +336,7 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getNode(dn.getID()), containerID)) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getDatanodeInfo(dn), containerID)) {
         return false;
       }
     }

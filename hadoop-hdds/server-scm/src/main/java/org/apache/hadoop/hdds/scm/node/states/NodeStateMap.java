@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
  */
 public class NodeStateMap {
   /** Map: {@link DatanodeID} -> ({@link DatanodeInfo}, {@link ContainerID}s). */
-  private final Map<DatanodeID, DatanodeEntry> nodeMap = new TreeMap<>();
+  private final Map<DatanodeID, DatanodeEntry> nodeMap = new HashMap<>();
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -166,7 +166,11 @@ public class NodeStateMap {
     }
   }
 
-  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
+  /**
+   * Returns the list of all the nodes as DatanodeInfo objects.
+   *
+   * @return list of all the node ids
+   */
   public List<DatanodeInfo> getAllDatanodeInfos() {
     lock.readLock().lock();
     try {

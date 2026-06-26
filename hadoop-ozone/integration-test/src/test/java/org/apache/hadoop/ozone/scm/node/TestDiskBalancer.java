@@ -219,7 +219,7 @@ public class TestDiskBalancer {
     }
 
     // Query status from remaining IN_SERVICE DNs and verify they still show RUNNING
-    final List<DatanodeInfo> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
+    List<DatanodeDetails> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
     statusProtoList.clear();
     for (DatanodeDetails dn : inServiceDatanodes) {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {

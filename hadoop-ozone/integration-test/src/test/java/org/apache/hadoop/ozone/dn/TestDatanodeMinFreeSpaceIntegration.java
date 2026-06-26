@@ -71,7 +71,7 @@ public class TestDatanodeMinFreeSpaceIntegration {
           () -> storageReportsMatchSoftMinFree(nm, dn, dnConf);
       GenericTestUtils.waitFor(softSpareVisibleAtScm, 500, 120_000);
 
-      DatanodeInfo info = nm.getNode(dn.getID());
+      DatanodeInfo info = nm.getDatanodeInfo(dn);
       assertNotNull(info);
       assertFalse(info.getStorageReports().isEmpty());
 
@@ -101,7 +101,7 @@ public class TestDatanodeMinFreeSpaceIntegration {
    */
   private static boolean storageReportsMatchSoftMinFree(
       NodeManager nm, DatanodeDetails dn, DatanodeConfiguration dnConf) {
-    DatanodeInfo info = nm.getNode(dn.getID());
+    DatanodeInfo info = nm.getDatanodeInfo(dn);
     if (info == null || info.getStorageReports().isEmpty()) {
       return false;
     }

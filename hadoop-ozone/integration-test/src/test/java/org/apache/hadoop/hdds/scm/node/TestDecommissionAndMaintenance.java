@@ -213,7 +213,7 @@ public class TestDecommissionAndMaintenance {
 
     waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONED);
     // Ensure one node transitioned to DECOMMISSIONING
-    List<DatanodeInfo> decomNodes = nm.getNodes(
+    List<DatanodeDetails> decomNodes = nm.getNodes(
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(1, decomNodes.size());
@@ -325,7 +325,7 @@ public class TestDecommissionAndMaintenance {
         toDecommission.get(3).getIpAddress(), toDecommission.get(4).getIpAddress()), false);
 
     // Ensure no nodes transitioned to DECOMMISSIONING or DECOMMISSIONED
-    List<DatanodeInfo> decomNodes = nm.getNodes(
+    List<DatanodeDetails> decomNodes = nm.getNodes(
         DECOMMISSIONING,
         HEALTHY);
     assertEquals(0, decomNodes.size());
@@ -717,7 +717,7 @@ public class TestDecommissionAndMaintenance {
         getDNHostAndPort(toMaintenance.get(5))), 0, false);
 
     // Ensure no nodes transitioned to MAINTENANCE
-    List<DatanodeInfo> maintenanceNodes = nm.getNodes(
+    List<DatanodeDetails> maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
     assertEquals(0, maintenanceNodes.size());

@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -230,7 +229,7 @@ public class TestReconNodeManager {
     reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
     assertEquals(DECOMMISSIONING, reconNodeManager
         .getNode(datanodeDetails.getID()).getPersistedOpState());
-    List<DatanodeInfo> nodes =
+    List<DatanodeDetails> nodes =
         reconNodeManager.getNodes(DECOMMISSIONING, null);
     assertEquals(1, nodes.size());
     assertEquals(datanodeDetails.getID(), nodes.get(0).getID());

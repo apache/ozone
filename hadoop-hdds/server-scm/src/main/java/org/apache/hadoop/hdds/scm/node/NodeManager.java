@@ -113,7 +113,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param health - The health of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
-  List<DatanodeInfo> getNodes(
+  List<DatanodeDetails> getNodes(
       NodeOperationalState opState, NodeState health);
 
   /**
@@ -134,8 +134,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int getNodeCount(
       NodeOperationalState opState, NodeState health);
 
-  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
-  List<DatanodeInfo> getAllNodes();
+  /**
+   * @return all datanodes known to SCM.
+   */
+  List<? extends DatanodeDetails> getAllNodes();
 
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
@@ -172,6 +174,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return DatanodeUsageInfo of the specified datanode
    */
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
+
+  /**
+   * Get the datanode info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeInfo of the specified datanode
+   */
+  @Nullable
+  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
 
   /**
    * Atomically checks if the datanode has space for a new container and records the allocation
@@ -393,7 +404,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<SCMCommand<?>> getCommandQueue(DatanodeID dnID);
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
-  @Nullable DatanodeInfo getNode(@Nullable DatanodeID id);
+  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

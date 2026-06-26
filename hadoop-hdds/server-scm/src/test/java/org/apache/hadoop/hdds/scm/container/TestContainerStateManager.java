@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -311,9 +312,8 @@ public class TestContainerStateManager {
       names = {"DELETING", "DELETED"})
   public void testECContainerWithStaleClosedReplicaShouldForceDelete(HddsProtos.LifeCycleState state)
       throws IOException {
-    //Get the first node from our list
-    final DatanodeDetails datanode = nodeManager.getNodes(
-        NodeStatus.inServiceHealthy()).get(0);
+    final DatanodeDetails datanode = randomDatanodeDetails();
+    nodeManager.register(datanode, null, null);
     // Create an EC container
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo ecContainer = getECContainer(

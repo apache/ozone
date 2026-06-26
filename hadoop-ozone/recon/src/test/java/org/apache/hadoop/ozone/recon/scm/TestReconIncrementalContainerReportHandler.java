@@ -48,9 +48,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -138,12 +136,11 @@ public class TestReconIncrementalContainerReportHandler
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
 
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          containerWithPipeline.getPipeline().getFirstNode(),
-          NodeStatus.inServiceHealthy(), null, 1000);
+      DatanodeDetails datanodeDetails =
+          containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
       when(nodeManagerMock.getNode(any(DatanodeID.class)))
-          .thenReturn(datanodeInfo);
+          .thenReturn(datanodeDetails);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())
@@ -151,7 +148,7 @@ public class TestReconIncrementalContainerReportHandler
 
       IncrementalContainerReportProto containerReport =
           getIncrementalContainerReportProto(containerID, state,
-              datanodeInfo.getUuidString());
+              datanodeDetails.getUuidString());
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
@@ -242,10 +239,8 @@ public class TestReconIncrementalContainerReportHandler
   private static NodeManager getNodeManagerMock(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     NodeManager nodeManagerMock = mock(NodeManager.class);
-    DatanodeInfo datanodeInfo = new DatanodeInfo(
-        datanodeDetails, NodeStatus.inServiceHealthy(), null, 1000);
     when(nodeManagerMock.getNode(any(DatanodeID.class)))
-        .thenReturn(datanodeInfo);
+        .thenReturn(datanodeDetails);
     return nodeManagerMock;
   }
 

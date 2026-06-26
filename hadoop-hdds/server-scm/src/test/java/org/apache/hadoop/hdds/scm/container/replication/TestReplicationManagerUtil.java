@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -299,16 +298,13 @@ public class TestReplicationManagerUtil {
     ConcurrentHashMap<DatanodeID, SizeAndTime> sizeScheduledMap = new ConcurrentHashMap<>();
 
     // fullDn has 10GB size scheduled, 30GB available and 20GB min free space, so it should be excluded
-    DatanodeDetails fullDnDetails = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeInfo fullDn = new DatanodeInfo(fullDnDetails, NodeStatus.inServiceHealthy(), null, 1);
+    DatanodeDetails fullDn = MockDatanodeDetails.randomDatanodeDetails();
     sizeScheduledMap.put(fullDn.getID(), new SizeAndTime(10 * oneGb, clock.millis()));
     // spaceAvailableDn should not be excluded as it has sufficient space
-    DatanodeDetails spaceAvailableDnDetails = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeInfo spaceAvailableDn = new DatanodeInfo(spaceAvailableDnDetails, NodeStatus.inServiceHealthy(), null, 1);
+    DatanodeDetails spaceAvailableDn = MockDatanodeDetails.randomDatanodeDetails();
     sizeScheduledMap.put(spaceAvailableDn.getID(), new SizeAndTime(10 * oneGb, clock.millis()));
     // expiredOpDn is the same as fullDn, however its op has expired - so it should not be excluded
-    DatanodeDetails expiredOpDnDetails = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeInfo expiredOpDn = new DatanodeInfo(expiredOpDnDetails, NodeStatus.inServiceHealthy(), null, 1);
+    DatanodeDetails expiredOpDn = MockDatanodeDetails.randomDatanodeDetails();
     sizeScheduledMap.put(expiredOpDn.getID(), new SizeAndTime(10 * oneGb,
         clock.millis() - rmConf.getEventTimeout() - 1));
 
