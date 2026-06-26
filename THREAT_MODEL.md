@@ -75,9 +75,15 @@ library. There is no single "caller"; the roles split:
   (§5a). Secure mode is confirmed as the supported production posture.
   *(maintainer — smengcl, 2026-06-23: secure mode is the supported posture; and
   with security enabled the S3 Gateway rejects anonymous access — no plan to
-  support intended anonymous access, [HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961).)*
+  support intended anonymous access, [HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961).)* *(maintainer — jojochuang, 2026-06-25: the S3 user doc
+  states the secure-mode anonymous rejection only implicitly — making it
+  explicit is tracked; note a future S3 web-hosting feature would require
+  anonymous access by design, which would be a documented opt-in exception.)*
 - **Compromise of the SCM CA root key.** If the SCM CA private key is stolen, all
   service identity collapses by design; protecting it is operational (§10/§7).
+- **The CSI driver.** Not production-ready; excluded from security inspection.
+  Recon, by contrast, **is** in scope — treat it as part of the production
+  cluster. *(maintainer — jojochuang, 2026-06-25.)*
 - Test/integration modules (`integration-test-*`, `*TestImpl`).
 
 ## §4 Trust boundaries and data flow
@@ -150,6 +156,20 @@ disclaimed mode. Other knobs that move the envelope and still need a ruling:
 native vs Ranger ACL authorizer, S3 secret storage backend, and TDE on/off.
 **Q-knobs in §14.**
 
+**Default authz/crypto state — off by default even in secure mode**
+*(maintainer — jojochuang, 2026-06-25)*. Several controls are disabled in a
+stock install and must be explicitly enabled:
+
+- **ACL checks** are off by default (`ozone.acl.enabled=false`); once enabled,
+  the **Native ACL** authorizer is the default (Ranger is opt-in).
+- **Block tokens** are off by default (`hdds.block.token.enabled=false`).
+- **TDE (`hdds.grpc.tls.enabled`) and KMS** are optional and disabled by default.
+
+So a finding that assumes ACLs / tokens / TDE are active in a default build is
+`OUT-OF-MODEL: non-default-build` unless the operator enabled them (§10); the §10
+checklist lists these as required production hardening. (Answers Q-authz /
+Q-token / Q-tde.)
+
 ## §6 Assumptions about inputs
 
 Per-boundary input trust (grouped by family):
@@ -181,7 +201,7 @@ Per-boundary input trust (grouped by family):
   partial: Ozone has **checksum verification on normal reads plus replica/container
   checks**, so ordinary single-replica corruption is detected — but there is **no
   full guarantee against a Byzantine datanode that forges both data and metadata
-  on the path it serves**. *(maintainer — smengcl, 2026-06-23.)*
+  on the path it serves**. *(maintainer — smengcl, 2026-06-23; checksum behaviour documented in [ozone-site#397](https://github.com/apache/ozone-site/pull/397).)*
 - **Out of scope:** compromised KDC / Ranger / SCM-CA-key / operator host;
   side-channel/co-tenant adversaries against the host; a client that an operator
   has authorized to do the thing it did.
@@ -250,8 +270,18 @@ Per-boundary input trust (grouped by family):
 - **Protect tokens and secrets:** enable the relevant transport encryption
   (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
   secrets aren't sniffable; rotate S3 secrets; set sensible token lifetimes.
+- **Protect service metadata at rest.** The OM, SCM, and Recon RocksDB stores
+  hold critical credential/identity data — set restrictive file permissions and,
+  ideally, encrypt them on disk. *(maintainer — jojochuang, 2026-06-25.)*
+- **Isolate the KMS** in a separate, firewalled network segment. *(maintainer —
+  jojochuang, 2026-06-25.)*
 - **Client side:** treat data read from Ozone per your own trust needs; protect
   delegation tokens your app caches.
+
+A consolidated **production secure-deployment checklist** for operators is
+tracked for the Ozone docs (ozone-site) — gathering the secure-mode, ACL, token,
+TDE/KMS, metadata-protection, and network-isolation steps above into one setup
+list. *(requested by jojochuang, 2026-06-25.)*
 
 ## §11 Known misuse patterns
 
