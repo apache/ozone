@@ -899,7 +899,7 @@ public class TestDeletedBlockLog {
       Map<Long, TxBlockInfo> txSizeMap = statusManager.getTxSizeMap();
       for (Map.Entry<Long, List<DeletedBlock>> entry : data.entrySet()) {
         List<DeletedBlock> deletedBlockList = entry.getValue();
-        TxBlockInfo txBlockInfo = new TxBlockInfo(deletedBlockList.size(),
+        TxBlockInfo txBlockInfo = new TxBlockInfo(entry.getKey(), 0, deletedBlockList.size(),
             deletedBlockList.stream().map(DeletedBlock::getSize).reduce(0L, Long::sum),
             deletedBlockList.stream().map(DeletedBlock::getReplicatedSize).reduce(0L, Long::sum));
         txSizeMap.put(entry.getKey(), txBlockInfo);

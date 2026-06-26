@@ -330,8 +330,8 @@ public class DeletedBlockLogImpl
   private void addTxToTxSizeMap(DeletedBlocksTransaction tx) {
     if (tx.hasTotalBlockReplicatedSize()) {
       transactionStatusManager.getTxSizeMap().put(tx.getTxID(),
-          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getLocalIDCount(),
-              tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
+          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getTxID(), tx.getContainerID(),
+              tx.getLocalIDCount(), tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
     }
   }
 
@@ -504,6 +504,11 @@ public class DeletedBlockLogImpl
       DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
     if (!scmContext.isLeader()) {
       LOG.info("Skip commit transactions since current SCM is not leader.");
+      return;
+    }
+
+    if (!scmContext.isLeaderReady()) {
+      LOG.warn("SCM is not ready to commit transactions.");
       return;
     }
 
