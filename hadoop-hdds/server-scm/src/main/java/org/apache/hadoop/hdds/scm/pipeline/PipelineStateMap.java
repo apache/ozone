@@ -41,8 +41,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Holds the data structures which maintain the information about pipeline and
  * its state.
- * Invariant: If a pipeline exists in PipelineStateMap, both pipelineMap and
- * pipeline2container would have a non-null mapping for it.
+ *
+ * Invariant:
+ * If a pipeline exists in PipelineStateMap, pipelineMap contains a
+ * corresponding PipelineInfo, which stores both the Pipeline and its
+ * associated containers.
  *
  * Concurrency consideration:
  *   - thread-unsafe
@@ -379,7 +382,7 @@ class PipelineStateMap {
 
     PipelineInfo newInfo = new PipelineInfo(updated);
 
-    for (ContainerID cid : oldInfo.getContainers()) {
+    for (ContainerID cid : oldInfo.copyContainers()) {
       newInfo.addContainer(cid);
     }
 
