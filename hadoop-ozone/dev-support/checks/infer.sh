@@ -29,6 +29,10 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=true --no-transfer-progress'
 
+# Restore pom.xml files that may have been corrupted by a previous infer run
+# (infer injects profiles into pom.xml and sometimes fails to restore them).
+git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
+
 mkdir -p "$REPORT_DIR"
 infer run --keep-going -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 infer_rc=$?
@@ -44,7 +48,7 @@ elif [[ -d infer-out ]]; then
   find infer-out -name "report.txt" -exec cp {} "${REPORT_DIR}/" \; 2>/dev/null || true
 fi
 
-# Restore pom.xml files corrupted by infer's Maven profile injection
+# Restore pom.xml files again after infer (belt and suspenders)
 git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 touch "$REPORT_FILE"
