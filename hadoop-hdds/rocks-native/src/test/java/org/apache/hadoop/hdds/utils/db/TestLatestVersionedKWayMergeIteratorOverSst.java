@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -168,8 +169,8 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
     logComparison(expected, actual);
     assertResultsEqual(expected, actual);
     assertEquals(2, actual.size(), "delete-recreate should emit tombstone then value");
-    assertTrue(actual.get(0).getValueType() != LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
-    assertTrue(actual.get(1).getValueType() == LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
+    assertNotEquals(LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE, actual.get(0).getValueType());
+    assertEquals(LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE, actual.get(1).getValueType());
     assertTrue(actual.get(1).getSequence() > actual.get(0).getSequence());
   }
 
@@ -183,7 +184,7 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
 
     MergedKeyValue k2Tombstone = actual.get(1);
     assertArrayEquals(keyBytes("k2"), k2Tombstone.getUserKey());
-    assertTrue(k2Tombstone.getValueType() != LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
+    assertNotEquals(LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE, k2Tombstone.getValueType());
 
     MergedKeyValue k2Value = actual.get(2);
     assertArrayEquals(keyBytes("k2"), k2Value.getUserKey());
