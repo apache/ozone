@@ -132,6 +132,9 @@ public class SCMNodeInfo {
       String scmClientAddress = getHostNameFromConfigKeys(conf,
           OZONE_SCM_CLIENT_ADDRESS_KEY,
           OZONE_SCM_NAMES).orElse(null);
+      if (scmClientAddress == null) {
+        throw new ConfigurationException(OZONE_SCM_CLIENT_ADDRESS_KEY + " is not set");
+      }
       
       String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY).orElse(scmClientAddress);
@@ -164,14 +167,10 @@ public class SCMNodeInfo {
 
       scmNodeInfoList.add(new SCMNodeInfo(scmServiceId,
           SCM_DUMMY_NODEID,
-          scmBlockClientAddress == null ? null :
-              buildAddress(scmBlockClientAddress, scmBlockClientPort),
-          scmClientAddress == null ? null :
-              buildAddress(scmClientAddress, scmClientPort),
-          scmSecurityClientAddress == null ? null :
-              buildAddress(scmSecurityClientAddress, scmSecurityPort),
-          scmDatanodeAddress == null ? null :
-              buildAddress(scmDatanodeAddress, scmDatanodePort)));
+          buildAddress(scmBlockClientAddress, scmBlockClientPort),
+          buildAddress(scmClientAddress, scmClientPort),
+          buildAddress(scmSecurityClientAddress, scmSecurityPort),
+          buildAddress(scmDatanodeAddress, scmDatanodePort)));
 
       return scmNodeInfoList;
 
