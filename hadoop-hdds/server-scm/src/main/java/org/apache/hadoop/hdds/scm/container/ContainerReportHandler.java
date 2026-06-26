@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -234,7 +233,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     try {
       processContainerReplica(datanodeDetails, container, replicaProto, publisher, detailsForLogging);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException e) {
       getLogger().error("Failed to process {}", detailsForLogging, e);
     }
   }

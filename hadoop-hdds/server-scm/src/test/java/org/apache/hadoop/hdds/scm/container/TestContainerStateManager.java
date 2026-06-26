@@ -66,7 +66,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.junit.jupiter.api.AfterEach;
@@ -94,7 +93,7 @@ public class TestContainerStateManager {
   private EventPublisher publisher;
 
   @BeforeEach
-  public void init() throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
