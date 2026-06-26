@@ -20,31 +20,47 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.ExpectedLatestVersionMergeOutput.SourceRecord;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.FlushOptions;
+import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * End-to-end test over real SST files written with {@link ManagedSstFileWriter}.
- * Expected output is computed independently by reading each SST file and
- * applying {@link ExpectedLatestVersionMergeOutput}.
+ * End-to-end test over real SST files produced by RocksDB flush.
+ * <p>
+ * {@link org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter} is not used here because
+ * it stores sequence number 0 on every key and rejects duplicate user keys per file. Flushing a
+ * real RocksDB after each logical source batch yields SST files with global sequence numbers and
+ * multiple versions of the same user key within a file, matching production snapshot-diff inputs.
+ * Expected output is computed independently by reading each SST file and applying
+ * {@link ExpectedLatestVersionMergeOutput}.
  */
 @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
 class TestLatestVersionedKWayMergeIteratorOverSst {
@@ -60,48 +76,138 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
   }
 
   @Test
-  void testOverRealSstFilesMatchesExpectedOutput() throws Exception {
-    // Mirrors the worked example shape, but RocksDB assigns real sequence numbers.
-    Path sstA = writeSst("a.sst",
-        op("k1", "v10"),
-        op("k1", "v5"),
-        op("k2", "v20"));
-    Path sstB = writeSst("b.sst",
-        op("k1", "v3"),
-        op("k1", "v15"),
-        del("k2"));
-    Path sstC = writeSst("c.sst",
-        op("k1", "v1"),
-        op("k1", "v30"),
-        op("k2", "v25"));
+  void testWorkedExampleOverRealSstFiles() throws Exception {
+    // Mirrors the unit-test "three-file worked example": within-file multi-version, cross-file
+    // k-way merge, k1 latest-value-only, k2 delete-then-recreate across files.
+    Path dbDir = tempDir.resolve("worked-example-db");
+    Files.createDirectories(dbDir);
+    Set<String> knownSstFiles = new HashSet<>();
+    List<Path> sstFiles = new ArrayList<>(3);
 
-    List<List<SourceRecord>> perSource =
-        TestRawSstFileRecords.readFiles(Arrays.asList(sstA, sstB, sstC));
+    try (ManagedDBOptions dbOptions = new ManagedDBOptions();
+         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
+         FlushOptions flushOptions = new FlushOptions()) {
+      dbOptions.setCreateIfMissing(true);
+      List<ColumnFamilyDescriptor> columnFamilyDescriptors = Collections.singletonList(
+          new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+      List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+      try (ManagedRocksDB db = ManagedRocksDB.open(
+          dbOptions, dbDir.toString(), columnFamilyDescriptors, columnFamilyHandles);
+           ColumnFamilyHandle cf = columnFamilyHandles.get(0)) {
+
+        // Source A: two k1 versions in one SST (v5 older, v10 newer), plus k2.
+        rocksPut(db, cf, "k1", "v5");
+        rocksPut(db, cf, "k1", "v10");
+        rocksPut(db, cf, "k2", "v20");
+        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "a"));
+
+        // Source B: competing k1 versions and a k2 tombstone.
+        rocksPut(db, cf, "k1", "v3");
+        rocksPut(db, cf, "k1", "v15");
+        rocksDelete(db, cf, "k2");
+        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "b"));
+
+        // Source C: oldest k1 plus the winning k1/k2 values.
+        rocksPut(db, cf, "k1", "v1");
+        rocksPut(db, cf, "k1", "v30");
+        rocksPut(db, cf, "k2", "v25");
+        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "c"));
+      }
+    }
+
+    List<SourceRecord> sourceARecords = TestRawSstFileRecords.readFile(sstFiles.get(0));
+    long k1VersionsInSourceA = sourceARecords.stream()
+        .filter(record -> Arrays.equals(record.getUserKey(), keyBytes("k1")))
+        .count();
+    assertEquals(2, k1VersionsInSourceA,
+        "source A SST should retain two k1 versions from one RocksDB flush");
+
+    List<List<SourceRecord>> perSource = TestRawSstFileRecords.readFiles(sstFiles);
     List<SourceRecord> expected = ExpectedLatestVersionMergeOutput.fromSourceRecords(perSource);
-    List<MergedKeyValue> actual = mergeSstFiles(sstA, sstB, sstC);
+    List<MergedKeyValue> actual = mergeSstFiles(sstFiles.toArray(new Path[0]));
 
     logRawInputs(perSource);
     logComparison(expected, actual);
     assertResultsEqual(expected, actual);
+    assertWorkedExampleOutcomes(actual);
   }
 
   @Test
   void testDeleteRecreateOverRealSstFiles() throws Exception {
-    Path sstA = writeSst("delete.sst",
-        op("k1", "v1"),
-        del("k1"));
-    Path sstB = writeSst("recreate.sst",
-        op("k1", "v-new"));
+    Path dbDir = tempDir.resolve("delete-recreate-db");
+    Files.createDirectories(dbDir);
+    Set<String> knownSstFiles = new HashSet<>();
+
+    Path tombstoneSst;
+    Path recreateSst;
+    try (ManagedDBOptions dbOptions = new ManagedDBOptions();
+         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
+         FlushOptions flushOptions = new FlushOptions()) {
+      dbOptions.setCreateIfMissing(true);
+      List<ColumnFamilyDescriptor> columnFamilyDescriptors = Collections.singletonList(
+          new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+      List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+      try (ManagedRocksDB db = ManagedRocksDB.open(
+          dbOptions, dbDir.toString(), columnFamilyDescriptors, columnFamilyHandles);
+           ColumnFamilyHandle cf = columnFamilyHandles.get(0)) {
+
+        rocksDelete(db, cf, "k1");
+        tombstoneSst = flushAndCopySst(db, cf, flushOptions, knownSstFiles, "delete");
+
+        rocksPut(db, cf, "k1", "v-new");
+        recreateSst = flushAndCopySst(db, cf, flushOptions, knownSstFiles, "recreate");
+      }
+    }
 
     List<List<SourceRecord>> perSource =
-        TestRawSstFileRecords.readFiles(Arrays.asList(sstA, sstB));
+        TestRawSstFileRecords.readFiles(Arrays.asList(tombstoneSst, recreateSst));
     List<SourceRecord> expected = ExpectedLatestVersionMergeOutput.fromSourceRecords(perSource);
-    List<MergedKeyValue> actual = mergeSstFiles(sstA, sstB);
+    List<MergedKeyValue> actual = mergeSstFiles(tombstoneSst, recreateSst);
 
     logRawInputs(perSource);
     logComparison(expected, actual);
     assertResultsEqual(expected, actual);
     assertEquals(2, actual.size(), "delete-recreate should emit tombstone then value");
+    assertTrue(actual.get(0).getValueType() != LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
+    assertTrue(actual.get(1).getValueType() == LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
+    assertTrue(actual.get(1).getSequence() > actual.get(0).getSequence());
+  }
+
+  private static void assertWorkedExampleOutcomes(List<MergedKeyValue> actual) {
+    assertEquals(3, actual.size(), "expected k1 winner plus k2 tombstone and recreate value");
+
+    MergedKeyValue k1Winner = actual.get(0);
+    assertArrayEquals(keyBytes("k1"), k1Winner.getUserKey());
+    assertEquals(LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE, k1Winner.getValueType());
+    assertArrayEquals(valueBytes("v30"), k1Winner.getValue());
+
+    MergedKeyValue k2Tombstone = actual.get(1);
+    assertArrayEquals(keyBytes("k2"), k2Tombstone.getUserKey());
+    assertTrue(k2Tombstone.getValueType() != LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE);
+
+    MergedKeyValue k2Value = actual.get(2);
+    assertArrayEquals(keyBytes("k2"), k2Value.getUserKey());
+    assertEquals(LatestVersionedKWayMergeIterator.ROCKS_TYPE_VALUE, k2Value.getValueType());
+    assertArrayEquals(valueBytes("v25"), k2Value.getValue());
+    assertTrue(k2Value.getSequence() > k2Tombstone.getSequence(),
+        "recreate value must be newer than the tombstone");
+  }
+
+  private Path flushAndCopySst(ManagedRocksDB db, ColumnFamilyHandle cf,
+      FlushOptions flushOptions, Set<String> knownSstFiles, String label)
+      throws RocksDBException, IOException {
+    db.get().flush(flushOptions, cf);
+    for (LiveFileMetaData meta : db.get().getLiveFilesMetaData()) {
+      String fileName = meta.fileName();
+      if (!fileName.endsWith(".sst") || !knownSstFiles.add(fileName)) {
+        continue;
+      }
+      Path source = Paths.get(meta.path(), fileName);
+      Path dest = tempDir.resolve(label + "-" + fileName);
+      Files.copy(source, dest);
+      return dest;
+    }
+    throw new IllegalStateException("Flush did not produce a new SST file for " + label);
   }
 
   private List<MergedKeyValue> mergeSstFiles(Path... sstFiles) throws Exception {
@@ -115,31 +221,22 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
     return results;
   }
 
-  private Path writeSst(String fileName, SstOp... ops) throws Exception {
-    File file = Files.createFile(tempDir.resolve(fileName)).toFile();
-    try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
-         ManagedOptions options = new ManagedOptions();
-         ManagedSstFileWriter writer = new ManagedSstFileWriter(envOptions, options)) {
-      writer.open(file.getAbsolutePath());
-      for (SstOp op : ops) {
-        byte[] key = op.key.getBytes(StandardCharsets.UTF_8);
-        if (op.delete) {
-          writer.delete(key);
-        } else {
-          writer.put(key, op.value.getBytes(StandardCharsets.UTF_8));
-        }
-      }
-      writer.finish();
-    }
-    return file.toPath();
+  private static void rocksPut(ManagedRocksDB db, ColumnFamilyHandle cf, String key, String value)
+      throws RocksDBException {
+    db.get().put(cf, keyBytes(key), valueBytes(value));
   }
 
-  private static SstOp op(String key, String value) {
-    return new SstOp(key, value, false);
+  private static void rocksDelete(ManagedRocksDB db, ColumnFamilyHandle cf, String key)
+      throws RocksDBException {
+    db.get().delete(cf, keyBytes(key));
   }
 
-  private static SstOp del(String key) {
-    return new SstOp(key, null, true);
+  private static byte[] keyBytes(String key) {
+    return key.getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static byte[] valueBytes(String value) {
+    return value.getBytes(StandardCharsets.UTF_8);
   }
 
   private static void assertResultsEqual(List<SourceRecord> expected, List<MergedKeyValue> actual) {
@@ -169,18 +266,6 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
       LOG.info("compare[{}] expected seq={} type={} actual seq={} type={}",
           i, expected.get(i).getSequence(), expected.get(i).getType(),
           actual.get(i).getSequence(), actual.get(i).getValueType());
-    }
-  }
-
-  private static final class SstOp {
-    private final String key;
-    private final String value;
-    private final boolean delete;
-
-    private SstOp(String key, String value, boolean delete) {
-      this.key = key;
-      this.value = value;
-      this.delete = delete;
     }
   }
 }
