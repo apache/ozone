@@ -96,12 +96,10 @@ public class TestStatusSubCommand {
     cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Upgrade status:"));
-    assertTrue(output.contains("OM Finalized: false"));
-    assertTrue(output.contains("SCM Finalized: false"));
-    assertTrue(output.contains("Datanodes finalized: 1"));
-    assertTrue(output.contains("Total Datanodes: 3"));
-    assertTrue(output.contains("Should Finalize: true"));
+    assertTrue(output.contains("Upgrade status"));
+    assertTrue(output.contains("OM Finalized? false"));
+    assertTrue(output.contains("SCM Finalized? false"));
+    assertTrue(output.contains("Datanodes finalized: 1/3"));
     verify(omClient).queryUpgradeStatus();
   }
 
@@ -120,7 +118,7 @@ public class TestStatusSubCommand {
     assertEquals(1, cmd.call());
 
     String errOutput = errContent.toString(DEFAULT_ENCODING);
-    assertTrue(errOutput.contains("OM does not support ZDU"));
+    assertTrue(errOutput.contains("OM does not support zero downtime upgrade"));
     verify(omClient, never()).queryUpgradeStatus();
   }
 
