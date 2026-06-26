@@ -43,12 +43,16 @@ jobs:
           java-version: '21'
       - name: Run Infer analysis
         run: hadoop-ozone/dev-support/checks/infer.sh
-      - name: Archive Infer results
+      - name: Upload Infer report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: infer
-          path: target/infer
+          name: infer-report
+          path: |
+            target/infer/report.txt
+            target/infer/output.log
+            target/infer/summary.txt
+            target/infer/failures
         continue-on-error: true
       - name: Summary of failures
         if: ${{ failure() }}

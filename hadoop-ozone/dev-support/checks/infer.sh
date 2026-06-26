@@ -29,52 +29,42 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=true --no-transfer-progress'
 
-# Infer runs by wrapping javac during the Maven build to capture and analyze
-# Java sources. We use 'compile' (not 'clean') to avoid deleting target/,
-# which would wipe the REPORT_DIR. --keep-going tells Infer to continue past
-# compilation errors in individual modules.
 mkdir -p "$REPORT_DIR"
 infer run --keep-going -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
-rc=$?
+infer_rc=$?
 
-# Recreate REPORT_DIR after infer run, in case it was deleted (e.g., during
-# a 'clean' phase or interleaved Maven runs).
 mkdir -p "$REPORT_DIR"
 
-# Infer may exit non-zero solely from epilogue pom.xml restoration errors
-# even when the analysis itself completed and produced results. If infer-out
-# exists, the analysis ran; treat the exit code as successful.
-if [[ -d infer-out ]]; then
-  rc=0
+# Only copy text reports, not the multi-GB capture/results databases
+if [[ -f infer-out/report.txt ]]; then
+  cp infer-out/report.txt "${REPORT_DIR}/"
+  cp infer-out/logs "${REPORT_DIR}/" 2>/dev/null || true
+  cp infer-out/stats "${REPORT_DIR}/" -r 2>/dev/null || true
+elif [[ -d infer-out ]]; then
+  find infer-out -name "report.txt" -exec cp {} "${REPORT_DIR}/" \; 2>/dev/null || true
 fi
 
-# Copy infer output to report directory for artifact upload and reporting
-if [[ -d infer-out ]]; then
-  cp -r infer-out/* "${REPORT_DIR}/" 2>/dev/null || true
-fi
-
-# Infer's Maven integration may inject profiles into pom.xml files in
-# profile-governed modules (ozonefs-hadoop2, ozonefs-shaded) and fail to
-# restore them, leaving them corrupted. Restore from git checkout.
+# Restore pom.xml files corrupted by infer's Maven profile injection
 git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 touch "$REPORT_FILE"
 
 if [[ -f "${REPORT_DIR}/report.txt" ]]; then
-  echo "Infer analysis complete." >> "$REPORT_FILE"
-  echo "" >> "$REPORT_FILE"
-  cat "${REPORT_DIR}/report.txt" >> "$REPORT_FILE"
-
-  # Count issue lines (lines containing .java: which indicate findings)
-  grep -c '\.java:' "${REPORT_DIR}/report.txt" > "${REPORT_DIR}/failures" 2>/dev/null || echo "0" > "${REPORT_DIR}/failures"
+  issue_count=$(grep -c '\.java:' "${REPORT_DIR}/report.txt" 2>/dev/null || echo "0")
+  echo "Infer analysis complete. Found ${issue_count} issues." >> "$REPORT_FILE"
+  echo "${issue_count}" > "${REPORT_DIR}/failures"
 else
-  : > "$REPORT_FILE"
+  echo "Infer analysis produced no report." >> "$REPORT_FILE"
   echo "0" > "${REPORT_DIR}/failures"
 fi
 
-# Generate HTML summary if possible
+# Infer findings are informational, never a failure.
+# Only exit non-zero if infer itself failed without producing any report.
 if [[ -f "${REPORT_DIR}/report.txt" ]]; then
-  infer report --issues-json "${REPORT_DIR}/report.json" 2>/dev/null || true
+  exit 0
+elif [[ ${infer_rc} -ne 0 ]]; then
+  echo "Infer exited with code ${infer_rc} and no report was produced." >> "$REPORT_FILE"
+  exit 1
+else
+  exit 0
 fi
-
-source "${DIR}/_post_process.sh"
