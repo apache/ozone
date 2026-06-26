@@ -68,11 +68,15 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMKeyRequest {
 
     assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
         "key should not exist before the request");
+    assertEquals(0, omMetrics.getFinalizationInProgress(),
+        "metric should be 0 before the request");
 
     submitRequest();
 
     assertNotNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
         "key should be present in the cache after validateAndUpdateCache");
+    assertEquals(1, omMetrics.getFinalizationInProgress(),
+        "metric should be 1 after the request");
   }
 
   @Test
