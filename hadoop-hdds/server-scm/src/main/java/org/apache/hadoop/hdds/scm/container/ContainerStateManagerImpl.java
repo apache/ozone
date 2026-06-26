@@ -355,7 +355,7 @@ public final class ContainerStateManagerImpl
   @Override
   public void updateContainerState(final HddsProtos.ContainerID containerID,
                                    final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
@@ -378,6 +378,9 @@ public final class ContainerStateManagerImpl
               .accept(oldInfo);
         }
       }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Failed to updateContainerState for container {}, ignoring it.",
+          id, e);
     }
   }
 

@@ -59,7 +59,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -201,7 +200,7 @@ public class TestContainerManagerImpl {
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
   void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState desiredState)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // Allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING / DELETED
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(

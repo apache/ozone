@@ -180,7 +180,7 @@ public class TestCloseContainerEventHandler {
 
   private void closeContainerForValidContainer(ReplicationConfig repConfig,
       int nodeCount, boolean forceClose)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     final Pipeline pipeline = createPipeline(repConfig, nodeCount);
     final ContainerInfo container =
         createContainer(repConfig, pipeline.getId());

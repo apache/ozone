@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -106,7 +105,7 @@ abstract class AbstractContainerReportHandler {
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo containerInfo,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher, Object detailsForLogging)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     getLogger().debug("Processing replica {}", detailsForLogging);
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
@@ -241,7 +240,7 @@ abstract class AbstractContainerReportHandler {
                                     final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher,
-      Object detailsForLogging) throws IOException, InvalidStateTransitionException {
+      Object detailsForLogging) throws IOException {
 
     final ContainerID containerId = container.containerID();
     boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
