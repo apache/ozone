@@ -90,15 +90,24 @@ const Capacity: React.FC<object> = () => {
     }
   );
 
-  const [selectedDatanode, setSelectedDatanode] = React.useState<string>(storageDistribution.data.dataNodeUsage[0]?.hostName ?? "");
+  const [selectedDatanode, setSelectedDatanode] = React.useState<string>("");
+
+  // Only show DNs that appear in the pending deletion response (max 15), so the
+  // dropdown and the pending-block-size values are always in sync.
+  const filteredDNs = React.useMemo(() => {
+    const pendingHostNames = new Set(
+      (dnPendingDeletes.data.pendingDeletionPerDataNode ?? []).map(dn => dn.hostName)
+    );
+    return storageDistribution.data.dataNodeUsage.filter(dn => pendingHostNames.has(dn.hostName));
+  }, [storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
   // Seed selected datanode once data loads so dependent calculations work
   React.useEffect(() => {
-    const firstHost = storageDistribution.data.dataNodeUsage[0]?.hostName;
+    const firstHost = filteredDNs[0]?.hostName;
     if (!selectedDatanode && firstHost) {
       setSelectedDatanode(firstHost);
     }
-  }, [selectedDatanode, storageDistribution.data.dataNodeUsage]);
+  }, [selectedDatanode, filteredDNs]);
 
   const loadData = () => {
     storageDistribution.refetch();
@@ -194,17 +203,23 @@ const Capacity: React.FC<object> = () => {
   };
 
   // Adjust the polling interval based on DN scan status:
-  // fast (5s) while a scan is running, normal (60s) once finished.
-  // Honors the auto-reload toggle: if polling is OFF, do nothing.
+  // fast (5s) while a scan is running (regardless of auto-reload toggle, since
+  // the scan is async and must be tracked to completion), normal (60s) once
+  // finished — but only if the user has auto-reload enabled.
   React.useEffect(() => {
-    if (!autoReload.isPolling) {
-      return;
+    if (dnPendingDeletes.data.status !== "FINISHED") {
+      autoReload.startPolling(PENDING_POLL_INTERVAL);
+    } else if (autoReload.isPolling) {
+      // Scan just finished while fast-polling was active.
+      // Switch to normal interval only if the user still wants auto-reload;
+      // otherwise stop so we don't override the toggle.
+      const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') !== 'false';
+      if (autoReloadEnabled) {
+        autoReload.startPolling(AUTO_RELOAD_INTERVAL_DEFAULT);
+      } else {
+        autoReload.stopPolling();
+      }
     }
-    autoReload.startPolling(
-      dnPendingDeletes.data.status === "FINISHED"
-        ? AUTO_RELOAD_INTERVAL_DEFAULT
-        : PENDING_POLL_INTERVAL
-    );
   }, [dnPendingDeletes.data.status, autoReload.isPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dnReportStatus = (
@@ -444,7 +459,7 @@ const Capacity: React.FC<object> = () => {
             downloadUrl={DN_CSV_DOWNLOAD_URL}
             onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}
-            dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
+            dropdownItems={filteredDNs.map(datanode => ({
               label: (
                 <>
                   <span>{datanode.hostName}</span>

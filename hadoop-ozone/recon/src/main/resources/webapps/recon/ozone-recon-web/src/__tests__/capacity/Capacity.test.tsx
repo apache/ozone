@@ -49,9 +49,9 @@ describe('Capacity Page', () => {
       return;
     }
     await waitFor(() =>
-      expect(ozoneCapacityCard).toHaveTextContent(/TOTAL\s*10\s*KB/i)
+      expect(ozoneCapacityCard).toHaveTextContent(/TOTAL CAPACITY\s*10\s*KB/i)
     );
-    expect(ozoneCapacityCard).toHaveTextContent(/OZONE USED SPACE\s*4\s*KB/i);
+    expect(ozoneCapacityCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/OTHER USED SPACE\s*2\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/CONTAINER PRE-ALLOCATED\s*1\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/REMAINING SPACE\s*4\s*KB/i);
@@ -63,7 +63,7 @@ describe('Capacity Page', () => {
       return;
     }
     await waitFor(() =>
-      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*6\s*KB/i)
+      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*8\s*KB/i)
     );
   });
 
@@ -80,7 +80,7 @@ describe('Capacity Page', () => {
       expect(pendingDeletionCard).toHaveTextContent(/OZONE MANAGER\s*2\s*KB/i)
     );
     expect(pendingDeletionCard)
-      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*1\s*KB/i);
+      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*3\s*KB/i);
     expect(pendingDeletionCard).toHaveTextContent(/DATANODES\s*3\s*KB/i);
 
     const downloadLink = await screen.findByText('Download Insights');
