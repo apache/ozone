@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
@@ -433,6 +434,19 @@ public class TestS3MultipartResponse {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
         multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
         getBucketLayout());
+  }
+
+  /**
+   * Seed the part's open key into the open key table, simulating the open
+   * entry created during part upload that the commit response later removes.
+   */
+  protected void addPartToOpenKeyTable(String volumeName, String bucketName,
+      String keyName, String openKey) throws IOException {
+    OmKeyInfo partKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, keyName, RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE)).build();
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put(openKey, partKeyInfo);
   }
 
   public BucketLayout getBucketLayout() {

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -56,6 +57,11 @@ public class TestS3MultipartUploadCommitPartResponse
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);
+
+    // Seed the part's open key so the commit can be verified to remove it.
+    addPartToOpenKeyTable(volumeName, bucketName, keyName, openKey);
+    assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
 
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
         createCommitMPUResponse(volumeName, bucketName, keyName,
@@ -89,6 +95,9 @@ public class TestS3MultipartUploadCommitPartResponse
 
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+    String multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+        volumeName, bucketName, keyName, multipartUploadID, omMetadataManager,
+        getBucketLayout());
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
         createInitiateMPUResponse(volumeName, bucketName, keyName,
@@ -110,6 +119,9 @@ public class TestS3MultipartUploadCommitPartResponse
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);
 
+    // Seed the part's open key so the commit can be verified to remove it.
+    addPartToOpenKeyTable(volumeName, bucketName, keyName, openKey);
+
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createCommitMPUResponse(volumeName, bucketName, keyName,
                     multipartUploadID, omMultipartKeyInfo.getPartKeyInfo(1),
@@ -121,10 +133,14 @@ public class TestS3MultipartUploadCommitPartResponse
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    // The open key is removed from the open key table, while the committed
-    // part is persisted to the multipart info table.
+    // The part's open key is removed from the open key table, while the
+    // committed part is persisted to the multipart info table. The open key
+    // created by initiate MPU uses a different key format and is not removed.
     assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
+    assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .get(multipartOpenKey));
     assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 

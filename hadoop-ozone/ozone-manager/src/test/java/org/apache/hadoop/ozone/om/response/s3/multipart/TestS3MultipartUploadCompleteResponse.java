@@ -256,6 +256,9 @@ public class TestS3MultipartUploadCompleteResponse
     long clientId = Time.now();
     String openKey = getPartOpenKey(volumeName, bucketName, keyName, clientId);
 
+    // Seed the part's open key so the commit can be verified to remove it.
+    addPartToOpenKeyTable(volumeName, bucketName, keyName, openKey);
+
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createCommitMPUResponse(volumeName, bucketName, keyName,
                     multipartUploadID,
@@ -266,12 +269,14 @@ public class TestS3MultipartUploadCompleteResponse
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // The part's open key is removed and the part is persisted to the
+    // multipart info table.
     assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
-    assertNull(
+    assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // The overwritten part is added to the deleted table.
     assertEquals(deleteEntryCount,
