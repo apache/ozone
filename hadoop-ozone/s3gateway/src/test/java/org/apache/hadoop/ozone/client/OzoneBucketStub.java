@@ -479,6 +479,29 @@ public final class OzoneBucketStub extends OzoneBucket {
     keyDetails.remove(key);
   }
 
+  public void deleteKey(String key, String expectedETag) throws IOException {
+    if (expectedETag == null) {
+      deleteKey(key);
+      return;
+    }
+    OzoneKeyDetails existing = keyDetails.get(key);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!"*".equals(expectedETag)) {
+      if (!existing.hasEtag()) {
+        throw new OMException("Key does not have an ETag",
+            ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!existing.isEtagEquals(expectedETag)) {
+        throw new OMException("ETag mismatch",
+            ResultCodes.ETAG_MISMATCH);
+      }
+    }
+    deleteKey(key);
+  }
+
   @Override
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
