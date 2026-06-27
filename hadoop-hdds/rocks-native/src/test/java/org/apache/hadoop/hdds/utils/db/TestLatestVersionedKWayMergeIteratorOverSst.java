@@ -27,13 +27,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.ExpectedLatestVersionMergeOutput.SourceRecord;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
@@ -47,7 +48,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.FlushOptions;
-import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -58,8 +58,9 @@ import org.slf4j.LoggerFactory;
  * <p>
  * {@link org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter} is not used here because
  * it stores sequence number 0 on every key and rejects duplicate user keys per file. Flushing a
- * real RocksDB after each logical source batch yields SST files with global sequence numbers and
- * multiple versions of the same user key within a file, matching production snapshot-diff inputs.
+ * real RocksDB after each logical source batch yields SST files with global sequence numbers.
+ * Memtable flushes retain only the latest value per user key within each SST; competing versions
+ * appear across separate flushed files, matching production snapshot-diff inputs.
  * Expected output is computed independently by reading each SST file and applying
  * {@link ExpectedLatestVersionMergeOutput}.
  */
@@ -78,8 +79,8 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
 
   @Test
   void testWorkedExampleOverRealSstFiles() throws Exception {
-    // Mirrors the unit-test "three-file worked example": within-file multi-version, cross-file
-    // k-way merge, k1 latest-value-only, k2 delete-then-recreate across files.
+    // Mirrors the unit-test "three-file worked example": cross-file k-way merge with competing
+    // versions, k1 latest-value-only, k2 delete-then-recreate across files.
     Path dbDir = tempDir.resolve("worked-example-db");
     Files.createDirectories(dbDir);
     Set<String> knownSstFiles = new HashSet<>();
@@ -96,34 +97,41 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
           dbOptions, dbDir.toString(), columnFamilyDescriptors, columnFamilyHandles);
            ColumnFamilyHandle cf = columnFamilyHandles.get(0)) {
 
-        // Source A: two k1 versions in one SST (v5 older, v10 newer), plus k2.
+        // Source A: latest k1 wins within the memtable before flush, plus k2.
         rocksPut(db, cf, "k1", "v5");
         rocksPut(db, cf, "k1", "v10");
         rocksPut(db, cf, "k2", "v20");
-        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "a"));
+        sstFiles.add(flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "a"));
 
-        // Source B: competing k1 versions and a k2 tombstone.
+        // Source B: competing k1 version and a k2 tombstone.
         rocksPut(db, cf, "k1", "v3");
         rocksPut(db, cf, "k1", "v15");
         rocksDelete(db, cf, "k2");
-        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "b"));
+        sstFiles.add(flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "b"));
 
-        // Source C: oldest k1 plus the winning k1/k2 values.
+        // Source C: winning k1/k2 values.
         rocksPut(db, cf, "k1", "v1");
         rocksPut(db, cf, "k1", "v30");
         rocksPut(db, cf, "k2", "v25");
-        sstFiles.add(flushAndCopySst(db, cf, flushOptions, knownSstFiles, "c"));
+        sstFiles.add(flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "c"));
       }
     }
 
-    List<SourceRecord> sourceARecords = TestRawSstFileRecords.readFile(sstFiles.get(0));
-    long k1VersionsInSourceA = sourceARecords.stream()
+    List<List<SourceRecord>> perSource = TestRawSstFileRecords.readFiles(sstFiles);
+    long k1VersionsAcrossFiles = perSource.stream()
+        .flatMap(List::stream)
         .filter(record -> Arrays.equals(record.getUserKey(), keyBytes("k1")))
         .count();
-    assertEquals(2, k1VersionsInSourceA,
-        "source A SST should retain two k1 versions from one RocksDB flush");
-
-    List<List<SourceRecord>> perSource = TestRawSstFileRecords.readFiles(sstFiles);
+    assertEquals(3, k1VersionsAcrossFiles,
+        "each flushed SST should contribute one surviving k1 version");
+    long distinctK1Sequences = perSource.stream()
+        .flatMap(List::stream)
+        .filter(record -> Arrays.equals(record.getUserKey(), keyBytes("k1")))
+        .mapToLong(SourceRecord::getSequence)
+        .distinct()
+        .count();
+    assertEquals(3, distinctK1Sequences,
+        "k1 versions across SST files should carry distinct RocksDB sequence numbers");
     List<SourceRecord> expected = ExpectedLatestVersionMergeOutput.fromSourceRecords(perSource);
     List<MergedKeyValue> actual = mergeSstFiles(sstFiles.toArray(new Path[0]));
 
@@ -153,10 +161,10 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
            ColumnFamilyHandle cf = columnFamilyHandles.get(0)) {
 
         rocksDelete(db, cf, "k1");
-        tombstoneSst = flushAndCopySst(db, cf, flushOptions, knownSstFiles, "delete");
+        tombstoneSst = flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "delete");
 
         rocksPut(db, cf, "k1", "v-new");
-        recreateSst = flushAndCopySst(db, cf, flushOptions, knownSstFiles, "recreate");
+        recreateSst = flushAndCopySst(db, dbDir, cf, flushOptions, knownSstFiles, "recreate");
       }
     }
 
@@ -194,21 +202,29 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
         "recreate value must be newer than the tombstone");
   }
 
-  private Path flushAndCopySst(ManagedRocksDB db, ColumnFamilyHandle cf,
+  private Path flushAndCopySst(ManagedRocksDB db, Path dbDir, ColumnFamilyHandle cf,
       FlushOptions flushOptions, Set<String> knownSstFiles, String label)
       throws RocksDBException, IOException {
     db.get().flush(flushOptions, cf);
-    for (LiveFileMetaData meta : db.get().getLiveFilesMetaData()) {
-      String fileName = meta.fileName();
-      if (!fileName.endsWith(".sst") || !knownSstFiles.add(fileName)) {
-        continue;
+    Path newSst = findNewSstFile(dbDir, knownSstFiles);
+    Path dest = tempDir.resolve(label + "-" + newSst.getFileName());
+    Files.copy(newSst, dest);
+    return dest;
+  }
+
+  private static Path findNewSstFile(Path dbDir, Set<String> knownSstFiles) throws IOException {
+    try (Stream<Path> sstPaths = Files.list(dbDir)) {
+      List<Path> newFiles = sstPaths
+          .filter(path -> path.getFileName().toString().endsWith(".sst"))
+          .filter(path -> knownSstFiles.add(path.getFileName().toString()))
+          .sorted()
+          .collect(Collectors.toList());
+      if (newFiles.size() != 1) {
+        throw new IllegalStateException(
+            "Expected exactly one new SST file under " + dbDir + ", found " + newFiles);
       }
-      Path source = Paths.get(meta.path(), fileName);
-      Path dest = tempDir.resolve(label + "-" + fileName);
-      Files.copy(source, dest);
-      return dest;
+      return newFiles.get(0);
     }
-    throw new IllegalStateException("Flush did not produce a new SST file for " + label);
   }
 
   private List<MergedKeyValue> mergeSstFiles(Path... sstFiles) throws Exception {
