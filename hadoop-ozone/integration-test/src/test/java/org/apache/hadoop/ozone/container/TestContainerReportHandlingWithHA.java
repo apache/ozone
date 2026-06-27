@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
@@ -45,7 +44,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -121,16 +119,8 @@ public class TestContainerReportHandlingWithHA {
         // flips to CLOSED as soon as the first replica is reported CLOSED, so a lagging replica may still be CLOSING in
         // SCM. Deleting then races with that lagging CLOSING report, which would resurrect the container out of
         // DELETING/DELETED and the replicas would never be deleted.
-        int expectedReplicas = replicationInput.getNumDatanodes();
-        GenericTestUtils.waitFor(() -> {
-          try {
-            Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerID);
-            return replicas.size() == expectedReplicas
-                && replicas.stream().allMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED);
-          } catch (ContainerNotFoundException e) {
-            return false;
-          }
-        }, 100, 60000);
+        TestHelper.waitForReplicaState(containerManager, containerID, replicationInput.getNumDatanodes(),
+            ContainerReplicaProto.State.CLOSED);
 
         // move the container to DELETING
         assertFalse(containerManager.getContainerReplicas(containerID).isEmpty());
