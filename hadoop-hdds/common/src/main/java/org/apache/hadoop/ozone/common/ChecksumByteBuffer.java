@@ -34,11 +34,9 @@ public interface ChecksumByteBuffer extends Checksum {
    * Upon return, the buffer's position will be equal to its limit.
    *
    * @param buffer the bytes to update the checksum with
-   *
-   * @apiNote {@link Override} annotation is missing since {@link Checksum#update(ByteBuffer)} introduced only in Java9.
-   * TODO: Remove when Java 1.8 support is dropped.
-   * TODO: <a href="https://issues.apache.org/jira/browse/HDDS-12366">HDDS-12366</a>
    */
+  // TODO HDDS-12366: Remove when Java 1.8 support is dropped.
+  // Cannot @Override, since introduced only in Java 9.
   @SuppressWarnings("PMD.MissingOverride")
   void update(ByteBuffer buffer);
 
