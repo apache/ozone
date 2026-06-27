@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerStateInSCM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,45 +33,96 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.container.TestHelper.ReplicationInput;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.AfterParameterizedClassInvocation;
+import org.junit.jupiter.params.BeforeParameterizedClassInvocation;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for container report handling.
  */
+@ParameterizedClass
+@MethodSource("clusters")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestContainerReportHandling {
+
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
-  private static final String KEY = "key1";
+  private static final int DATANODE_COUNT = ReplicationInput.EC.getNumDatanodes();
 
-  private static Stream<Arguments> delStatesAndReplication() {
+  private static OzoneConfiguration conf;
+
+  @Parameter
+  private MiniOzoneCluster.Builder builder;
+
+  private MiniOzoneCluster cluster;
+
+  private static List<TestCase> delStatesAndReplication() {
     return Stream.of(
-            HddsProtos.LifeCycleState.DELETING,
-            HddsProtos.LifeCycleState.DELETED)
+            LifeCycleState.DELETING,
+            LifeCycleState.DELETED)
         .flatMap(state -> Stream.of(
-            Arguments.of(state, TestHelper.ReplicationInput.RATIS),
-            Arguments.of(state, TestHelper.ReplicationInput.EC)));
+            new TestCase(state, ReplicationInput.RATIS),
+            new TestCase(state, ReplicationInput.EC)))
+        .collect(Collectors.toList());
+  }
+
+  @BeforeAll
+  static void createConf() {
+    conf = new OzoneConfiguration();
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
+  }
+
+  static Stream<MiniOzoneCluster.Builder> clusters() {
+    return Stream.of(
+        MiniOzoneCluster.newBuilder(conf),
+        MiniOzoneCluster.newHABuilder(conf)
+    );
+  }
+
+  @BeforeParameterizedClassInvocation
+  void startCluster() throws Exception {
+    cluster = builder.setNumDatanodes(DATANODE_COUNT).build();
+    cluster.waitForClusterToBeReady();
+  }
+
+  @AfterParameterizedClassInvocation
+  void shutdown() {
+    Path clusterPath = Paths.get(cluster.getBaseDir());
+    IOUtils.closeQuietly(cluster);
+    assertTrue(FileUtil.fullyDelete(clusterPath.toFile()));
   }
 
   /**
@@ -83,33 +133,31 @@ public class TestContainerReportHandling {
    * container report for the CLOSED replicas.
    * Tests wait for a DELETING (or DELETED) container replica gets deleted based on the bcsid comparison.
    */
-  @ParameterizedTest
-  @MethodSource("delStatesAndReplication")
-  void testDeletingOrDeletedContainerWhenNonEmptyReplicaIsReported(
-      HddsProtos.LifeCycleState desiredState,
-      TestHelper.ReplicationInput replicationInput)
-      throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
+  @Test
+  void testDeletingOrDeletedContainerWhenNonEmptyReplicaIsReported() throws Exception {
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume(VOLUME);
+      OzoneVolume volume = objectStore.getVolume(VOLUME);
+      volume.createBucket(BUCKET);
+      OzoneBucket bucket = volume.getBucket(BUCKET);
 
-    Path clusterPath = null;
-    try (MiniOzoneCluster cluster = newCluster(conf, replicationInput.getNumDatanodes())) {
-      cluster.waitForClusterToBeReady();
-      clusterPath = Paths.get(cluster.getBaseDir());
+      int keyCount = 0;
 
-      try (OzoneClient client = cluster.newClient()) {
+      for (TestCase testCase : delStatesAndReplication()) {
+        LifeCycleState desiredState = testCase.getLeft();
+        ReplicationInput replicationInput = testCase.getRight();
         // create a container and close it
-        createTestData(client, replicationInput.getReplicationConfig());
-        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+        String key = "key" + keyCount;
+        TestDataUtil.createKey(bucket, key, replicationInput.getReplicationConfig(), "Hello".getBytes(UTF_8));
+        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster, key);
         assertThat(keyLocations).isNotEmpty();
         OmKeyLocationInfo keyLocation = keyLocations.get(0);
         ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
         waitForContainerClose(cluster, containerID.getId());
 
         // also wait till the container is closed in SCM
-        waitForContainerStateInSCM(cluster.getStorageContainerManager(), containerID, HddsProtos.LifeCycleState.CLOSED);
+        waitForContainerClosedInSCM(containerID);
 
         ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
         // Wait until SCM sees all replicas CLOSED before moving the container to DELETING. The container state above
@@ -122,48 +170,47 @@ public class TestContainerReportHandling {
         // move the container to DELETING
         assertFalse(containerManager.getContainerReplicas(containerID).isEmpty());
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
-        assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
+        assertEquals(LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
 
         // move the container to DELETED in the second test case
-        if (desiredState == HddsProtos.LifeCycleState.DELETED) {
+        if (desiredState == LifeCycleState.DELETED) {
           containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.CLEANUP);
-          assertEquals(HddsProtos.LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
+          assertEquals(LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
         }
 
         // Since replica state is CLOSED and container is DELETED/DELETING in SCM, and the bcsid of replica and
         // container is same, SCM will trigger delete replica for RATIS (EC ignores bcsid) when it processes a
         // periodic container report for the CLOSED replicas.
         // wait for all replica to be deleted
-        GenericTestUtils.waitFor(() -> {
-          try {
-            return containerManager.getContainerReplicas(containerID).isEmpty();
-          } catch (ContainerNotFoundException e) {
-            throw new RuntimeException(e);
-          }
-        }, 100, 180000);
-      }
-    } finally {
-      if (clusterPath != null) {
-        System.out.println("Deleting path " + clusterPath);
-        boolean deleted = FileUtil.fullyDelete(clusterPath.toFile());
-        assertTrue(deleted);
+        waitForAllReplicasDeleted(containerManager, containerID);
       }
     }
   }
 
-  private static MiniOzoneCluster newCluster(OzoneConfiguration conf, int numDatanodes)
-      throws IOException {
-    return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numDatanodes)
-        .build();
+  private void waitForContainerClosedInSCM(ContainerID containerID)
+      throws TimeoutException, InterruptedException {
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      TestHelper.waitForContainerStateInSCM(scm, containerID, LifeCycleState.CLOSED);
+    }
   }
 
-  private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster)
+  private static void waitForAllReplicasDeleted(ContainerManager containerManager, ContainerID containerID)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerManager.getContainerReplicas(containerID).isEmpty();
+      } catch (ContainerNotFoundException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 180000);
+  }
+
+  private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster, String key)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
-        .setKeyName(KEY)
+        .setKeyName(key)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
@@ -171,15 +218,9 @@ public class TestContainerReportHandling {
     return locations.getLocationList();
   }
 
-  private void createTestData(OzoneClient client, ReplicationConfig replicationConfig) throws IOException {
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(VOLUME);
-    OzoneVolume volume = objectStore.getVolume(VOLUME);
-    volume.createBucket(BUCKET);
-
-    OzoneBucket bucket = volume.getBucket(BUCKET);
-
-    TestDataUtil.createKey(bucket, KEY, replicationConfig, "Hello".getBytes(UTF_8));
+  private static class TestCase extends ImmutablePair<LifeCycleState, ReplicationInput> {
+    TestCase(LifeCycleState state, ReplicationInput replication) {
+      super(state, replication);
+    }
   }
-
 }
