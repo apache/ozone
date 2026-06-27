@@ -104,6 +104,13 @@ public enum StorageTier {
     return isUniform;
   }
 
+  public StorageType getUniformStorageType() {
+    if (!isUniform()) {
+      throw new IllegalArgumentException("Uniform storage type is not supported");
+    }
+    return storageTypes.get(0);
+  }
+
   /**
    * Maps a StorageTier to its corresponding StorageType based on replication type.
    *

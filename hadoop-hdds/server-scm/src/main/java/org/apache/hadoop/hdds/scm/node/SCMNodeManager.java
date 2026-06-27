@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -713,12 +714,56 @@ public class SCMNodeManager implements NodeManager {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
         datanodeInfo.updateMetaDataStorageReports(nodeReport.
             getMetadataStorageReportList());
+        updateSupportedStorageTier(datanodeInfo);
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
       metrics.incNumNodeReportProcessingFailed();
       LOG.warn("Got node report from unregistered datanode {}",
           datanodeDetails);
+    }
+  }
+
+  private void updateSupportedStorageTier(DatanodeInfo datanodeInfo) {
+    if (scmContext.getScm() == null) {
+      LOG.debug("Skip the updating of Pipeline supported StorageTier for Recon");
+      return;
+    }
+
+    PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
+    if (pipelineManager == null) {
+      LOG.debug("Skip the updating of Pipeline supported StorageTier for Recon");
+      return;
+    }
+
+    Set<PipelineID> pipelines = nodeStateManager.getPipelineByDnID(
+        datanodeInfo.getID());
+    for (PipelineID pipelineId : pipelines) {
+      try {
+        Pipeline pipeline = pipelineManager.getPipeline(pipelineId);
+        Set<StorageTier> currentTiers =
+            pipeline.getSupportedStorageTier() != null
+                ? new HashSet<>(pipeline.getSupportedStorageTier())
+                : Collections.emptySet();
+        List<StorageTier> newSupportedTiers =
+            NodeUtils.getDatanodesStorageTypes(pipeline.getNodes(), this);
+        Set<StorageTier> newSupportedTierSet =
+            new HashSet<>(newSupportedTiers);
+        if (!currentTiers.equals(newSupportedTierSet)) {
+          pipeline.setSupportedStorageTier(newSupportedTiers);
+          LOG.info("Updated supported storage tiers for Pipeline ID {} from {} "
+                  + "to {} by Datanode {}",
+              pipeline.getId(), currentTiers, newSupportedTierSet,
+              datanodeInfo.getID());
+        }
+      } catch (PipelineNotFoundException e) {
+        LOG.warn("Reported Datanode {} pipeline {} is not found",
+            datanodeInfo.getID(), pipelineId);
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to update supported storage tiers for Pipeline ID {} "
+                + "by Datanode {} due to: {}",
+            pipelineId, datanodeInfo.getID(), e.getMessage(), e);
+      }
     }
   }
 

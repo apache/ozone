@@ -104,6 +104,10 @@ public class TestSCMRestart {
     assertNotSame(ratisPipeline2AfterRestart, ratisPipeline2);
     assertEquals(ratisPipeline1AfterRestart, ratisPipeline1);
     assertEquals(ratisPipeline2AfterRestart, ratisPipeline2);
+    assertEquals(ratisPipeline1AfterRestart.getSupportedStorageTier(),
+        ratisPipeline1.getSupportedStorageTier());
+    assertEquals(ratisPipeline2AfterRestart.getSupportedStorageTier(),
+        ratisPipeline2.getSupportedStorageTier());
 
     // Try creating a new container, it should be from the same pipeline
     // as was before restart

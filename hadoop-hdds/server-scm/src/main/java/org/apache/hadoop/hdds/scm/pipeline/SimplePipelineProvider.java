@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -29,8 +30,10 @@ import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 /**
@@ -56,7 +59,7 @@ public class SimplePipelineProvider
   public Pipeline create(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
-    StorageType storageType = StorageTierUtil.getStorageTypeForUniformStorageTier(storageTier, replicationConfig);
+    StorageType storageType = storageTier.getUniformStorageType();
     List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
     dns = dns.stream().filter(dn ->
             ((DatanodeInfo) dn).getStorageReports().stream()
@@ -73,33 +76,47 @@ public class SimplePipelineProvider
     }
 
     Collections.shuffle(dns);
+    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
+    if (!storageTiers.contains(storageTier)) {
+      throw new SCMException(String.format("Cannot create pipeline for StorageTier %s replicationConfig: %s",
+          storageTier, replicationConfig), SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
         .setReplicationConfig(replicationConfig)
         .setNodes(dns.subList(0,
             replicationConfig.getReplicationFactor().getNumber()))
+        .setSupportedStorageTier(storageTiers)
+        .build();
+  }
+
+  private Pipeline createPipelineInternal(StandaloneReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes, List<StorageTier> storageTiers) {
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(PipelineState.OPEN)
+        .setReplicationConfig(replicationConfig)
+        .setNodes(nodes)
+        .setSupportedStorageTier(storageTiers)
         .build();
   }
 
   @Override
   public Pipeline create(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
-    return Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(nodes)
-        .build();
+    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+    return createPipelineInternal(replicationConfig, nodes, storageTiers);
   }
 
   @Override
   public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
+    return createPipelineInternal(replicationConfig, replicas
         .stream()
         .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+        .collect(Collectors.toList()), new ArrayList<>());
   }
 
   @Override

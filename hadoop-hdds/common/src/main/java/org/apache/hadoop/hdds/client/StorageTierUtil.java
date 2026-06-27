@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.client;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
@@ -45,22 +47,31 @@ public final class StorageTierUtil {
     }
   }
 
-  /**
-   * Returns the StorageType for uniform StorageTier.
-   *
-   * @param storageTier the StorageTier to get StorageType from
-   * @return The uniform StorageTier corresponding StorageType
-   * @throws SCMException if the StorageTier is non-uniform or the EMPTY StorageTier
-   */
-  public static StorageType getStorageTypeForUniformStorageTier(StorageTier storageTier, ReplicationConfig config)
-      throws SCMException {
-    validateNotEmpty(storageTier);
-    List<StorageType> storageTypes = storageTier.getStorageTypes(config.getRequiredNodes());
-    if (storageTier.isUniform()) {
-      return storageTypes.get(0);
-    } else {
-      throw new SCMException("Unsupported non-uniform storage tier " + storageTier,
-          SCMException.ResultCodes.UNSUPPORTED_NON_UNIFORM_STORAGE_TIER);
+  public static List<StorageTier> findSupportedStorageTiers(
+      List<Set<StorageType>> dnStorageTypes) {
+    List<StorageTier> supportedStorageTiers = new ArrayList<>();
+    if (dnStorageTypes.isEmpty()) {
+      return supportedStorageTiers;
     }
+    // We only support uniform storage tiers currently
+    for (StorageTier storageTier : StorageTier.values()) {
+      if (storageTier.equals(StorageTier.EMPTY)) {
+        continue;
+      }
+      if (!storageTier.isUniform()) {
+        throw new UnsupportedOperationException(storageTier + " is not a uniform storage tier");
+      }
+      boolean supportedTier = true;
+      for (Set<StorageType> dnStorageType : dnStorageTypes) {
+        if (!dnStorageType.contains(storageTier.getUniformStorageType())) {
+          supportedTier = false;
+          break;
+        }
+      }
+      if (supportedTier) {
+        supportedStorageTiers.add(storageTier);
+      }
+    }
+    return supportedStorageTiers;
   }
 }

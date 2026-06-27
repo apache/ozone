@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -42,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -63,6 +63,7 @@ public class TestSimplePipelineProvider {
   @TempDir
   private File testDir;
   private DBStore dbStore;
+  private List<DatanodeDetails> datanodeList;
 
   @BeforeEach
   public void startup() throws Exception {
@@ -78,6 +79,7 @@ public class TestSimplePipelineProvider {
     StorageType storageType = storageTier.getStorageTypes(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE).getRequiredNodes()).get(0);
     NodeManager nodeManager = new MockNodeManager(true, 10, storageType);
+    datanodeList = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -109,6 +111,7 @@ public class TestSimplePipelineProvider {
     assertEquals(pipeline.getReplicationConfig().getRequiredNodes(), factor.getNumber());
     assertEquals(pipeline.getPipelineState(), Pipeline.PipelineState.OPEN);
     assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    assertTrue(pipeline.getSupportedStorageTier().contains(storageTier));
 
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 =
@@ -122,12 +125,13 @@ public class TestSimplePipelineProvider {
             .getReplicationFactor(), factor);
     assertEquals(pipeline1.getPipelineState(), Pipeline.PipelineState.OPEN);
     assertEquals(pipeline1.getNodes().size(), factor.getNumber());
+    assertTrue(pipeline.getSupportedStorageTier().contains(storageTier));
   }
 
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < nodeCount; i++) {
-      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      nodes.add(datanodeList.get(i));
     }
     return nodes;
   }
@@ -147,6 +151,7 @@ public class TestSimplePipelineProvider {
             .getReplicationFactor(), factor);
     assertEquals(pipeline.getPipelineState(), Pipeline.PipelineState.OPEN);
     assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    assertTrue(pipeline.getSupportedStorageTier().contains(StorageTier.getDefaultTier()));
 
     factor = HddsProtos.ReplicationFactor.ONE;
     pipeline = provider.create(StandaloneReplicationConfig.getInstance(factor),
@@ -157,6 +162,7 @@ public class TestSimplePipelineProvider {
             .getReplicationFactor(), factor);
     assertEquals(pipeline.getPipelineState(), Pipeline.PipelineState.OPEN);
     assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    assertTrue(pipeline.getSupportedStorageTier().contains(StorageTier.getDefaultTier()));
   }
 
   @Test

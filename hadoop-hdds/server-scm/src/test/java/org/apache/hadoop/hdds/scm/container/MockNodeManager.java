@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -119,6 +120,8 @@ public class MockNodeManager implements NodeManager {
   private PendingContainerTracker pendingContainerTracker;
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private StorageType storageType = null;
+
+  private Map<DatanodeID, StorageType> nodeStorageTypeMap = new HashMap<>();
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -289,10 +292,12 @@ public class MockNodeManager implements NodeManager {
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
+        StorageType nodeStorageType = nodeStorageTypeMap.get(dd.getID()) != null ?
+            nodeStorageTypeMap.get(dd.getID()) : storageType;
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
             di.getID(), "/data1-" + di.getID(),
             capacity, used, remaining,
-            storageType == null ? null : getStorageTypeProto(storageType));
+            nodeStorageType == null ? null : getStorageTypeProto(nodeStorageType));
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
                 "/metadata1-" + di.getID(), capacity, used, remaining, null);
@@ -457,9 +462,12 @@ public class MockNodeManager implements NodeManager {
     long capacity = nodeMetricMap.get(dd).getCapacity().get();
     long used = nodeMetricMap.get(dd).getScmUsed().get();
     long remaining = nodeMetricMap.get(dd).getRemaining().get();
+    StorageType nodeStorageType = nodeStorageTypeMap.get(dd.getID()) != null ?
+        nodeStorageTypeMap.get(dd.getID()) : storageType;
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         di.getID(), "/data1-" + di.getUuidString(),
-        capacity, used, remaining, null);
+        capacity, used, remaining,
+        nodeStorageType == null ? null : StorageTypeUtils.getStorageTypeProto(nodeStorageType));
     MetadataStorageReportProto metaStorage1 =
         HddsTestUtils.createMetadataStorageReport(
             "/metadata1-" + di.getUuidString(), capacity, used,
@@ -1045,5 +1053,9 @@ public class MockNodeManager implements NodeManager {
       this.currentState = currentState;
     }
 
+  }
+
+  public void setStorageTypeForNode(DatanodeID uuid, StorageType st) {
+    this.nodeStorageTypeMap.put(uuid, st);
   }
 }

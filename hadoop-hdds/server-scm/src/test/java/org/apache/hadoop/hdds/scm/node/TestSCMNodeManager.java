@@ -480,7 +480,7 @@ public class TestSCMNodeManager {
         () -> scm.getPipelineManager().createPipeline(config),
         "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage())
-        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
+        .contains("Cannot create pipeline for StorageTier DISK as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
