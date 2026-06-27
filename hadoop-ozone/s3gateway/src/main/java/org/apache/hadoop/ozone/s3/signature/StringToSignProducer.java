@@ -62,6 +62,9 @@ public final class StringToSignProducer {
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
+
+  private static final String[] URL_ENCODE_SEARCH_CHARS = new String[] {"+", "*", "%7E"};
+  private static final String[] URL_ENCODE_REPLACE_CHARS = new String[] {"%20", "%2A", "~"};
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -282,10 +285,7 @@ public final class StringToSignProducer {
 
   private static String urlEncode(String str) {
     try {
-      return S3Utils.urlEncode(str)
-          .replaceAll("\\+", "%20")
-          .replaceAll("\\*", "%2A")
-          .replaceAll("%7E", "~");
+      return StringUtils.replaceEach(S3Utils.urlEncode(str), URL_ENCODE_SEARCH_CHARS, URL_ENCODE_REPLACE_CHARS);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
