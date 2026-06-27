@@ -36,6 +36,7 @@
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.java11.version>1.9.20</aspectj.java11.version>
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
+    <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
     <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.7</assertj.version>
@@ -2658,12 +2659,21 @@
       </properties>
     </profile>
     <profile>
-      <id>aspectj-java21-or-later</id>
+      <id>aspectj-java21-24</id>
       <activation>
-        <jdk>[21,]</jdk>
+        <jdk>[21,24]</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>aspectj-java25-or-later</id>
+      <activation>
+        <jdk>[25,]</jdk>
+      </activation>
+      <properties>
+        <aspectj.version>${aspectj.java25.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
