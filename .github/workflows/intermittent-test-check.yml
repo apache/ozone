@@ -188,7 +188,6 @@ jobs:
           name: ozone-repo
           path: |
             ~/.m2/repository/org/apache/ozone
-        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
@@ -213,7 +212,6 @@ jobs:
             set -x
             hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
-        continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
