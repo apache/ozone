@@ -38,8 +38,8 @@ import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -79,8 +79,8 @@ public class TestContainerReportHandling {
    * Tests that a DELETING (or DELETED) container replica gets deleted when replica bcsid <= container bcsid
    * applicable to RATIS; EC ignores bcsid.
    * To do this, the test first creates a key and closes its corresponding container. Then it moves that container to
-   * DELETING (or DELETED) state using ContainerManager. Then it restarts a Datanode hosting that container,
-   * making it send a full container report.
+   * DELETING (or DELETED) state using ContainerManager. SCM then deletes the replicas when it processes a periodic
+   * container report for the CLOSED replicas.
    * Tests wait for a DELETING (or DELETED) container replica gets deleted based on the bcsid comparison.
    */
   @ParameterizedTest
@@ -111,8 +111,15 @@ public class TestContainerReportHandling {
         // also wait till the container is closed in SCM
         waitForContainerStateInSCM(cluster.getStorageContainerManager(), containerID, HddsProtos.LifeCycleState.CLOSED);
 
-        // move the container to DELETING
         ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
+        // Wait until SCM sees all replicas CLOSED before moving the container to DELETING. The container state above
+        // flips to CLOSED as soon as the first replica is reported CLOSED, so a lagging replica may still be CLOSING in
+        // SCM. Deleting then races with that lagging CLOSING report, which would resurrect the container out of
+        // DELETING/DELETED and the replicas would never be deleted.
+        TestHelper.waitForReplicaState(containerManager, containerID, replicationInput.getNumDatanodes(),
+            ContainerReplicaProto.State.CLOSED);
+
+        // move the container to DELETING
         assertFalse(containerManager.getContainerReplicas(containerID).isEmpty());
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
         assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
@@ -123,14 +130,9 @@ public class TestContainerReportHandling {
           assertEquals(HddsProtos.LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
         }
 
-        // restart all the DNs
-        List<DatanodeDetails> dnlist = keyLocation.getPipeline().getNodes();
-        for (DatanodeDetails dn: dnlist) {
-          cluster.restartHddsDatanode(dn, false);
-        }
-
-        // Since replica state is CLOSED and container is DELETED/DELETING in SCM
-        // bcsid of replica and container is same, SCM will trigger delete replica for RATIS, while EC ignores bcsid
+        // Since replica state is CLOSED and container is DELETED/DELETING in SCM, and the bcsid of replica and
+        // container is same, SCM will trigger delete replica for RATIS (EC ignores bcsid) when it processes a
+        // periodic container report for the CLOSED replicas.
         // wait for all replica to be deleted
         GenericTestUtils.waitFor(() -> {
           try {
