@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -90,10 +91,8 @@ public class SimplePipelineProvider
         .build();
   }
 
-  @Override
-  public Pipeline create(StandaloneReplicationConfig replicationConfig,
-      List<DatanodeDetails> nodes) {
-    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+  private Pipeline createPipelineInternal(StandaloneReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes, List<StorageTier> storageTiers) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
@@ -104,12 +103,20 @@ public class SimplePipelineProvider
   }
 
   @Override
+  public Pipeline create(StandaloneReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes) {
+    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+    return createPipelineInternal(replicationConfig, nodes, storageTiers);
+  }
+
+  @Override
   public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
+    return createPipelineInternal(replicationConfig, replicas
         .stream()
         .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+        .collect(Collectors.toList()), new ArrayList<>());
   }
 
   @Override

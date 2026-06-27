@@ -229,6 +229,11 @@ public class RatisPipelineProvider
   public Pipeline create(RatisReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
     List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+    return createPipelineInternal(replicationConfig, nodes, storageTiers);
+  }
+
+  private Pipeline createPipelineInternal(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes, List<StorageTier> storageTiers) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
@@ -242,10 +247,11 @@ public class RatisPipelineProvider
   public Pipeline createForRead(
       RatisReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
+    return createPipelineInternal(replicationConfig, replicas
         .stream()
         .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+        .collect(Collectors.toList()), new ArrayList<>());
   }
 
   private List<DatanodeDetails> filterPipelineEngagement() {

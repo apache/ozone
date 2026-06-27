@@ -114,8 +114,9 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       dnIndexes.put(dn, ecIndex);
       ecIndex++;
     }
-
-    return createPipelineInternal(replicationConfig, nodes, dnIndexes);
+    List<StorageTier> storageTiers =
+        NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+    return createPipelineInternal(replicationConfig, nodes, dnIndexes, storageTiers);
   }
 
   @Override
@@ -142,13 +143,12 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
-    return createPipelineInternal(replicationConfig, dns, map);
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
+    return createPipelineInternal(replicationConfig, dns, map, new ArrayList<>());
   }
 
   private Pipeline createPipelineInternal(ECReplicationConfig repConfig,
-      List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes) {
-    List<StorageTier> storageTiers =
-        NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
+      List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes, List<StorageTier> storageTiers) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.ALLOCATED)
