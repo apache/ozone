@@ -85,7 +85,7 @@ jobs:
         uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: 25
       - name: Get component versions
         id: versions
         run: |
