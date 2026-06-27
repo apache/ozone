@@ -43,6 +43,9 @@ public final class NodeUtils {
     List<Set<StorageType>> dnStorageTypes = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
+      if (datanodeInfo == null) {
+        throw new IllegalStateException("Cannot get Datanode : " + dn.getUuidString() + " Info");
+      }
       dnStorageTypes.add(getDatanodeStorageTypes(datanodeInfo));
     }
     return StorageTierUtil.findSupportedStorageTiers(dnStorageTypes);

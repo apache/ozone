@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -50,10 +51,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -95,6 +98,8 @@ public class TestECPipelineProvider {
 
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
+    when(nodeManager.getDatanodeInfo(any()))
+        .thenAnswer(invocation -> createDatanodeInfo(invocation.getArgument(0)));
   }
 
   @Test
@@ -221,6 +226,16 @@ public class TestECPipelineProvider {
       replicas.add(r);
     }
     return replicas;
+  }
+
+  private DatanodeInfo createDatanodeInfo(DatanodeDetails dn) {
+    DatanodeInfo datanodeInfo = new DatanodeInfo(dn,
+        NodeStatus.inServiceHealthy(), null,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    datanodeInfo.updateStorageReports(Collections.singletonList(
+        HddsTestUtils.createStorageReport(dn.getID(),
+            "/data-" + dn.getUuidString(), 100)));
+    return datanodeInfo;
   }
 
 }
