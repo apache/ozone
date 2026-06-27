@@ -2409,7 +2409,7 @@
 
   <property>
     <name>ozone.om.bootstrap.checkpoint.estimated.space.headroom.ratio</name>
-    <value>1.25</value>
+    <value>2.0</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
     <description>
       Multiplier applied to the leader-reported estimated uncompressed SST byte total
