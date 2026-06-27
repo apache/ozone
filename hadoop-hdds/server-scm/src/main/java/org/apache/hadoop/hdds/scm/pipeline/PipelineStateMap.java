@@ -382,8 +382,8 @@ class PipelineStateMap {
 
     PipelineInfo newInfo = new PipelineInfo(updated);
 
-    for (ContainerID id : pipeline.copyContainers()) {
-      closeContainer(id);
+    for (ContainerID cid : oldInfo.copyContainers()) {
+      newInfo.addContainer(cid);
     }
 
     pipelineMap.put(pipelineID, newInfo);
