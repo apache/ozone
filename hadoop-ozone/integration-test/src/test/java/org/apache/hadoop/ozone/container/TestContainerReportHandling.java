@@ -33,15 +33,18 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -110,8 +113,23 @@ public class TestContainerReportHandling {
         // also wait till the container is closed in SCM
         waitForContainerStateInSCM(cluster.getStorageContainerManager(), containerID, HddsProtos.LifeCycleState.CLOSED);
 
-        // move the container to DELETING
         ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
+        // Wait until SCM sees all replicas CLOSED before moving the container to DELETING. The container state above
+        // flips to CLOSED as soon as the first replica is reported CLOSED, so a lagging replica may still be CLOSING in
+        // SCM. Deleting then races with that lagging CLOSING report, which would resurrect the container out of
+        // DELETING/DELETED and the replicas would never be deleted.
+        int expectedReplicas = replicationInput.getNumDatanodes();
+        GenericTestUtils.waitFor(() -> {
+          try {
+            Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerID);
+            return replicas.size() == expectedReplicas
+                && replicas.stream().allMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED);
+          } catch (ContainerNotFoundException e) {
+            return false;
+          }
+        }, 100, 60000);
+
+        // move the container to DELETING
         assertFalse(containerManager.getContainerReplicas(containerID).isEmpty());
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
         assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
