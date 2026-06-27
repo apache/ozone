@@ -129,29 +129,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
-      LOG.warn("Skipping handling command, expected command "
-              + "type {} but found {}",
-          SCMCommandProto.Type.deleteBlocksCommand, command.getType());
-      return;
+      throw new IllegalArgumentException("Skipping handling command, expected command "
+          + "type " + SCMCommandProto.Type.deleteBlocksCommand + " but found " + command.getType());
     }
     DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
         container, context, connectionManager);
-    try {
-      deleteCommandQueues.add(cmd);
-    } catch (IllegalStateException e) {
-      String dnId = context.getParent().getDatanodeDetails().getUuidString();
-      Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
-        cmdStatus.markAsFailed();
-        ContainerBlocksDeletionACKProto emptyACK =
-            ContainerBlocksDeletionACKProto
-                .newBuilder()
-                .setDnId(dnId)
-                .build();
-        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(emptyACK);
-      };
-      updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
-      LOG.warn("Command is discarded because of the command queue is full");
-    }
+    deleteCommandQueues.add(cmd);
   }
 
   /**
@@ -255,6 +238,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           try {
             processCmd(cmd);
           } catch (Throwable e) {
+            updateCommandStatus(cmd.getContext(), cmd.getCmd(), CommandStatus::markAsFailed, LOG);
             LOG.error("taskProcess failed.", e);
           }
         }

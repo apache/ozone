@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -358,21 +359,31 @@ public class TestDeleteBlocksCommandHandler {
 
     // Set Queue limit
     dnConf.setBlockDeleteQueueLimit(blockDeleteQueueLimit);
+    dnConf.setBlockDeleteCommandWorkerInterval(Duration.ofMinutes(5));
     handler = new DeleteBlocksCommandHandler(
         container, configuration, dnConf, "");
+    CommandDispatcher dispatcher = CommandDispatcher.newBuilder()
+        .setContainer(container)
+        .setConnectionManager(mock(SCMConnectionManager.class))
+        .setContext(context)
+        .addHandler(handler)
+        .build();
 
     // Check if the command status is as expected: PENDING when queue is not full, FAILED when queue is full
-    for (int i = 0; i < blockDeleteQueueLimit + 2; i++) {
-      DeleteBlocksCommand deleteBlocksCommand = new DeleteBlocksCommand(emptyList());
-      context.addCommand(deleteBlocksCommand);
-      handler.handle(deleteBlocksCommand, container, context, mock(SCMConnectionManager.class));
-      CommandStatus cmdStatus = context.getCmdStatus(deleteBlocksCommand.getId());
-      if (i < blockDeleteQueueLimit) {
-        assertEquals(cmdStatus.getStatus(), Status.PENDING);
-      } else {
-        assertEquals(cmdStatus.getStatus(), Status.FAILED);
-        assertEquals(cmdStatus.getProtoBufMessage().getBlockDeletionAck().getResultsCount(), 0);
+    try {
+      for (int i = 0; i < blockDeleteQueueLimit + 2; i++) {
+        DeleteBlocksCommand deleteBlocksCommand = new DeleteBlocksCommand(emptyList());
+        context.addCommand(deleteBlocksCommand);
+        dispatcher.handle(deleteBlocksCommand);
+        CommandStatus cmdStatus = context.getCmdStatus(deleteBlocksCommand.getId());
+        if (i < blockDeleteQueueLimit) {
+          assertEquals(cmdStatus.getStatus(), Status.PENDING);
+        } else {
+          assertEquals(cmdStatus.getStatus(), Status.FAILED);
+        }
       }
+    } finally {
+      dispatcher.stop();
     }
   }
 
