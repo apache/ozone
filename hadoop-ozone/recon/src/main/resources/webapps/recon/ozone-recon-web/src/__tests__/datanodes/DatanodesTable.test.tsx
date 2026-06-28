@@ -35,6 +35,7 @@ const defaultProps: DatanodeTableProps = {
   selectedColumns: [
     { label: 'Hostname', value: 'hostname' },
     { label: 'State', value: 'state' },
+    { label: 'Storage Used', value: 'storageUsed' }
   ],
   handleSelectionChange: vi.fn(),
 };
@@ -50,10 +51,11 @@ function getDataWith(name: string, state: "HEALTHY" | "STALE" | "DEAD", uuid: nu
       capacity: 125645656770,
       used: 4096,
       remaining: 114225606656,
+      reserved: 1256456566,
       committed: 0,
       filesystemCapacity: 150000000000,
       filesystemUsed: 30000000000,
-      filesystemAvailable: 120000000000
+      filesystemAvailable: 120000000000,
     },
     storageUsed: 4096,
     storageTotal: 125645656770,
@@ -61,27 +63,27 @@ function getDataWith(name: string, state: "HEALTHY" | "STALE" | "DEAD", uuid: nu
     storageRemaining: 114225606656,
     pipelines: [
       {
-          "pipelineID": "0f9f7bc0-505e-4428-b148-dd7eac2e8ac2",
-          "replicationType": "RATIS",
-          "replicationFactor": "THREE",
-          "leaderNode": "ozone-datanode-3.ozone_default"
+        pipelineID: "0f9f7bc0-505e-4428-b148-dd7eac2e8ac2",
+        replicationType: "RATIS",
+        replicationFactor: "THREE",
+        leaderNode: "ozone-datanode-3.ozone_default",
       },
       {
-          "pipelineID": "2c23e76e-3f18-4b86-9541-e48bdc152fda",
-          "replicationType": "RATIS",
-          "replicationFactor": "ONE",
-          "leaderNode": "ozone-datanode-1.ozone_default"
-      }
+        pipelineID: "2c23e76e-3f18-4b86-9541-e48bdc152fda",
+        replicationType: "RATIS",
+        replicationFactor: "ONE",
+        leaderNode: "ozone-datanode-1.ozone_default",
+      },
     ],
     containers: 8192,
     openContainers: 8182,
     leaderCount: 2,
-    version: '0.6.0-SNAPSHOT',
+    version: "0.6.0-SNAPSHOT",
     setupTime: 1728280539733,
-    revision: '3f9953c0fbbd2175ee83e8f0b4927e45e9c10ac1',
-    buildDate: '2024-10-06T16:41Z',
-    networkLocation: '/default-rack'
-  }
+    revision: "3f9953c0fbbd2175ee83e8f0b4927e45e9c10ac1",
+    buildDate: "2024-10-06T16:41Z",
+    networkLocation: "/default-rack",
+  };
 }
 
 describe('DatanodesTable Component', () => {

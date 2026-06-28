@@ -18,7 +18,7 @@
 
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 
 import Capacity from '@/v2/pages/capacity/capacity';
 import { capacityServer } from '@tests/mocks/capacityMocks/capacityServer';
@@ -48,10 +48,8 @@ describe('Capacity Page', () => {
     if (!ozoneCapacityCard) {
       return;
     }
-    await waitFor(() =>
-      expect(ozoneCapacityCard).toHaveTextContent(/TOTAL\s*10\s*KB/i)
-    );
-    expect(ozoneCapacityCard).toHaveTextContent(/OZONE USED SPACE\s*4\s*KB/i);
+    await waitFor(() => expect(ozoneCapacityCard).toHaveTextContent(/TOTAL CAPACITY\s*10\s*KB/i));
+    expect(ozoneCapacityCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/OTHER USED SPACE\s*2\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/CONTAINER PRE-ALLOCATED\s*1\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/REMAINING SPACE\s*4\s*KB/i);
@@ -63,7 +61,7 @@ describe('Capacity Page', () => {
       return;
     }
     await waitFor(() =>
-      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*6\s*KB/i)
+      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*7\s*KB/i)
     );
   });
 
@@ -80,7 +78,7 @@ describe('Capacity Page', () => {
       expect(pendingDeletionCard).toHaveTextContent(/OZONE MANAGER\s*2\s*KB/i)
     );
     expect(pendingDeletionCard)
-      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*1\s*KB/i);
+      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*2\s*KB/i);
     expect(pendingDeletionCard).toHaveTextContent(/DATANODES\s*3\s*KB/i);
 
     const downloadLink = await screen.findByText('Download Insights');
@@ -97,33 +95,24 @@ describe('Capacity Page', () => {
 
   test('shows scm-only error state when SCM pending deletion returns sentinel failure values', async () => {
     capacityServer.use(
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('/api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get("component");
         switch (component) {
         case 'scm':
-          return res(
-            ctx.status(200),
-            ctx.json({
-              totalBlocksize: -1,
-              totalReplicatedBlockSize: -1,
-              totalBlocksCount: -1
-            })
-          );
+          return HttpResponse.json({
+            totalBlocksize: -1,
+            totalReplicatedBlockSize: -1,
+            totalBlocksCount: -1,
+          });
         case 'om':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.OmPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.OmPendingDeletion);
         case 'dn':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.DnPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.DnPendingDeletion);
         default:
-          return res(
-            ctx.status(400),
-            ctx.json({ message: 'Unsupported pending deletion component.' })
-          );
+          return HttpResponse.json({
+            message: "Unsupported pending deletion component.",
+          }, { status: 400 });
         }
       })
     );

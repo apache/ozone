@@ -16,21 +16,14 @@
  * limitations under the License.
  */
 
-import React, { HTMLAttributes } from 'react';
-import { Card, Col, Row, Table } from 'antd';
+import React from 'react';
+import { Card, Col, Row } from 'antd';
 
-import { ColumnType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
 import ErrorCard from '@/v2/components/errors/errorCard';
 import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
 
 // ------------- Types -------------- //
-type TableData = {
-  key: React.Key;
-  name: string;
-  value: string;
-  action?: React.ReactElement | string;
-}
 
 type OverviewTableCardProps = {
   title: string;
@@ -56,7 +49,7 @@ const cardBodyStyle: React.CSSProperties = {
 
 
 // ------------- Component -------------- //
-const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
+const OverviewHealthCard: React.FC<OverviewTableCardProps> = ({
   available,
   total,
   title = '',
@@ -111,6 +104,7 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
 
   return (
     <Card
+      data-testid={`overview-Health-${title}`}
       size='small'
       className={'overview-card'}
       loading={loading}
@@ -134,4 +128,4 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   )
 }
 
-export default OverviewSummaryCard;
+export default OverviewHealthCard;

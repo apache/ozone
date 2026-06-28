@@ -15,140 +15,98 @@
  * limitations under the License.
  */
 
-import { rest } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
-export const mockHealthEnabled = rest.get(CHATBOT_ENDPOINTS.HEALTH, (req, res, ctx) => {
-  return res(
-    ctx.status(200),
-    ctx.json({
-      enabled: true,
-      llmClientAvailable: true
-    })
-  );
+export const mockHealthEnabled = http.get(CHATBOT_ENDPOINTS.HEALTH, () => {
+  return HttpResponse.json({
+    enabled: true,
+    llmClientAvailable: true,
+  });
 });
 
-export const mockHealthDisabled = rest.get(CHATBOT_ENDPOINTS.HEALTH, (req, res, ctx) => {
-  return res(
-    ctx.status(200),
-    ctx.json({
-      enabled: false,
-      llmClientAvailable: true
-    })
-  );
+export const mockHealthDisabled = http.get(CHATBOT_ENDPOINTS.HEALTH, () => {
+  return HttpResponse.json({
+    enabled: false,
+    llmClientAvailable: true,
+  });
 });
 
-export const mockHealthNotConfigured = rest.get(CHATBOT_ENDPOINTS.HEALTH, (req, res, ctx) => {
-  return res(
-    ctx.status(200),
-    ctx.json({
-      enabled: true,
-      llmClientAvailable: false
-    })
-  );
+export const mockHealthNotConfigured = http.get(CHATBOT_ENDPOINTS.HEALTH, () => {
+  return HttpResponse.json({
+    enabled: true,
+    llmClientAvailable: false,
+  });
 });
 
-export const mockModels = rest.get(CHATBOT_ENDPOINTS.MODELS, (req, res, ctx) => {
-  return res(
-    ctx.status(200),
-    ctx.json({
-      models: ['gpt-4.1-nano', 'gemini-2.5-flash', 'gemini-2.5-pro', 'claude-opus-4-6']
-    })
-  );
+export const mockModels = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
+  return HttpResponse.json({
+    models: ['gpt-4.1-nano', 'gemini-2.5-flash', 'gemini-2.5-pro', 'claude-opus-4-6'],
+  });
 });
 
-export const mockModelsError = rest.get(CHATBOT_ENDPOINTS.MODELS, (req, res, ctx) => {
-  return res(
-    ctx.status(500),
-    ctx.json({
-      error: 'Failed to fetch models'
-    })
-  );
+export const mockModelsError = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
+  return HttpResponse.json({
+    error: 'Failed to fetch models',
+  }, { status: 500 });
 });
 
-export const mockModelsDisabled = rest.get(CHATBOT_ENDPOINTS.MODELS, (req, res, ctx) => {
-  return res(
-    ctx.status(503),
-    ctx.json({
-      error: 'Chatbot service is not enabled'
-    })
-  );
+export const mockModelsDisabled = http.get(CHATBOT_ENDPOINTS.MODELS, () => {
+  return HttpResponse.json({
+    error: 'Chatbot service is not enabled',
+  }, { status: 503 });
 });
 
-export const mockChatSuccess = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(200),
-    ctx.json({
-      response: 'This is a **Markdown** response with a table:\n\n| Col 1 | Col 2 |\n|---|---|\n| A | B |',
-      success: true
-    })
-  );
+export const mockChatSuccess = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    response: 'This is a **Markdown** response with a table:\n\n| Col 1 | Col 2 |\n|---|---|\n| A | B |',
+    success: true,
+  });
 });
 
-export const mockChatDelayed = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.delay(100),
-    ctx.status(200),
-    ctx.json({
-      response: 'Delayed',
-      success: true
-    })
-  );
+export const mockChatDelayed = http.post(CHATBOT_ENDPOINTS.CHAT, async () => {
+  await delay(100);
+  return HttpResponse.json({
+    response: 'Delayed',
+    success: true,
+  }, { status: 200 });
 });
 
-export const mockChatBusy = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(503),
-    ctx.json({
-      error: 'The chatbot is currently handling too many requests. Please try again in a moment.'
-    })
-  );
+export const mockChatBusy = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'The chatbot is currently handling too many requests. Please try again in a moment.'
+  }, { status: 503 });
 });
 
-export const mockChatTimeout = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(504),
-    ctx.json({
-      error: 'The chatbot request timed out. The LLM or Recon API took too long to respond. Please try again or use a different model.'
-    })
-  );
+export const mockChatTimeout = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'The chatbot request timed out. The LLM or Recon API took too long to respond. Please try again or use a different model.',
+  }, { status: 504 });
 });
 
-export const mockChatError = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(500),
-    ctx.json({
-      error: 'An error occurred processing your request.'
-    })
-  );
+export const mockChatError = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'An error occurred processing your request.',
+  }, { status: 500 });
 });
 
-export const mockChatDisabled = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(503),
-    ctx.json({
-      error: 'Chatbot service is not enabled'
-    })
-  );
+export const mockChatDisabled = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'Chatbot service is not enabled',
+  }, { status: 503 });
 });
 
-export const mockChatInterrupted = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(503),
-    ctx.json({
-      error: 'Request was interrupted. Please try again.'
-    })
-  );
+export const mockChatInterrupted = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'Request was interrupted. Please try again.',
+  }, { status: 503 });
 });
 
-export const mockChatEmpty = rest.post(CHATBOT_ENDPOINTS.CHAT, (req, res, ctx) => {
-  return res(
-    ctx.status(400),
-    ctx.json({
-      error: 'Query cannot be empty'
-    })
-  );
+export const mockChatEmpty = http.post(CHATBOT_ENDPOINTS.CHAT, () => {
+  return HttpResponse.json({
+    error: 'Query cannot be empty',
+  }, { status: 400 });
 });
 
 export const assistantServer = setupServer(

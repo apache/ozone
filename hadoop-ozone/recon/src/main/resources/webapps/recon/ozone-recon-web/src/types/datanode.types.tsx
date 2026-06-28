@@ -29,6 +29,7 @@ export type DatanodeOpState = DatanodeOpStateType[number];
 export interface IStorageReport {
   capacity: number;
   used: number;
+  reserved: number;
   remaining: number;
   committed: number;
 }

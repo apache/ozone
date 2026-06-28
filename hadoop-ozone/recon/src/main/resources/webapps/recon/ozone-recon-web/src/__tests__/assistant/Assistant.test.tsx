@@ -18,7 +18,7 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/react/dont-cleanup-after-each';
-import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { 
   assistantServer, 
@@ -32,13 +32,12 @@ import {
   mockHealthEnabled,
   mockModels,
   mockModelsError,
-  mockModelsDisabled,
   mockChatSuccess,
   mockChatDelayed
 } from '@tests/mocks/assistantMocks/assistantServer';
 import Assistant from '@/v2/pages/assistant/assistant';
-import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
-import { rest } from 'msw';
+import { vi } from 'vitest';
+import { RECON_LOGS_HINT } from '@/v2/constants/chatbot.constants';
 
 const WrappedAssistantComponent = () => {
   return (
@@ -47,6 +46,19 @@ const WrappedAssistantComponent = () => {
     </BrowserRouter>
   )
 }
+
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
+  return {
+    ...actual,
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
+        ...options,
+        retryAttempts: 0,
+        retryDelay: 0,
+      }),
+  };
+});
 
 describe('Assistant Tests', () => {
   afterEach(() => {
@@ -172,7 +184,7 @@ describe('Assistant Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/An error occurred while processing your request/)).toBeVisible();
-      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+      expect(screen.getByText(RECON_LOGS_HINT, { exact: false })).toBeVisible();
     });
   });
 
@@ -193,7 +205,7 @@ describe('Assistant Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/OpenAI could not complete this request/)).toBeVisible();
-      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+      expect(screen.getByText(RECON_LOGS_HINT, { exact: false })).toBeVisible();
     });
   });
 
@@ -214,7 +226,7 @@ describe('Assistant Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Google Gemini could not complete this request/)).toBeVisible();
-      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+      expect(screen.getByText(RECON_LOGS_HINT, { exact: false })).toBeVisible();
     });
   });
 
@@ -235,7 +247,7 @@ describe('Assistant Tests', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Anthropic Claude could not complete this request/)).toBeVisible();
-      expect(screen.getByText('For more details, check the Recon server logs.')).toBeVisible();
+      expect(screen.getByText(RECON_LOGS_HINT, { exact: false })).toBeVisible();
     });
   });
 
