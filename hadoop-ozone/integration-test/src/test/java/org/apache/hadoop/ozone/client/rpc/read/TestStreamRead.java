@@ -74,6 +74,7 @@ public class TestStreamRead {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("ExpiredContainerReplicaOpScrubber"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("SCMHATransactionMonitor"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(CodecBuffer.class), Level.ERROR);
+//    GenericTestUtils.setLogLevel(StreamBlockInputStream.class, Level.DEBUG);
   }
 
   static final int CHUNK_SIZE = 1 << 20;          // 1MB
