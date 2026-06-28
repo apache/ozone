@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.MALF
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
@@ -32,16 +31,32 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.ABORT_MULTIPART_UPLOAD;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.CREATE_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_OBJECT_TAGGING;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_BUCKET_ACL;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_OBJECT_TAGGING;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_ALL_MY_BUCKETS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_BUCKET_MULTIPART_UPLOADS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_MULTIPART_UPLOAD_PARTS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_BUCKET_ACL;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_OBJECT_TAGGING;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3ResourceType;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.buildCaseInsensitiveS3ActionMap;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.createPathsAndPermissions;
-import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.groupObjectsByAcls;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.groupObjectsByAclsAndActions;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.mapPolicyActionsToS3Actions;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.resolve;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.validateAndCategorizeResources;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -61,6 +76,36 @@ import org.junit.jupiter.api.Test;
 public class TestIamSessionPolicyResolver {
 
   private static final String VOLUME = "s3v";
+  private static final Set<String> ALL_OBJECT_ACTIONS = strSet(
+      "AbortMultipartUpload", "DeleteObject", "DeleteObjectTagging", "GetObject", "GetObjectTagging",
+      "ListMultipartUploadParts", "PutObject", "PutObjectTagging");
+
+  private static final Set<String> ALL_BUCKET_ACTIONS = strSet(
+      "CreateBucket", "DeleteBucket", "GetBucketAcl", "ListBucket", "ListBucketMultipartUploads", "PutBucketAcl");
+
+  private static final Set<String> ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_BUCKET_ACTIONS);
+    tempSet.add("ListAllMyBuckets");
+    ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS = Collections.unmodifiableSet(tempSet);
+  }
+
+  private static final Set<String> ALL_BUCKET_AND_OBJECT_ACTIONS;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_BUCKET_ACTIONS);
+    tempSet.addAll(ALL_OBJECT_ACTIONS);
+    ALL_BUCKET_AND_OBJECT_ACTIONS = Collections.unmodifiableSet(tempSet);
+  }
+
+  private static final Set<String> ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_OBJECT_ACTIONS);
+    tempSet.add("ListBucket");
+    ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET = Collections.unmodifiableSet(tempSet);
+  }
 
   @Test
   public void testUnsupportedConditionOperatorThrows() {
@@ -302,42 +347,38 @@ public class TestIamSessionPolicyResolver {
 
     // Verify that wildcard actions are present
     assertThat(caseInsensitiveS3ActionMap).containsKeys(
-        "s3:*", "s3:get*", "s3:put*", "s3:list*", "s3:delete*", "s3:create*");
+        "s3:get*", "s3:put*", "s3:list*", "s3:delete*", "s3:create*");
 
     // Verify s3:Get* contains Get actions
     final Set<S3Action> getActions = caseInsensitiveS3ActionMap.get("s3:get*");
-    assertThat(getActions).containsOnly(
-        S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_OBJECT_TAGGING);
+    assertThat(getActions).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
 
     // Verify s3:Put* contains Put actions
     final Set<S3Action> putActions = caseInsensitiveS3ActionMap.get("s3:put*");
-    assertThat(putActions).containsOnly(
-        S3Action.PUT_OBJECT, S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
+    assertThat(putActions).containsOnly(PUT_OBJECT, PUT_OBJECT_TAGGING, PUT_BUCKET_ACL);
 
     // Verify s3:List* contains List actions
     final Set<S3Action> listActions = caseInsensitiveS3ActionMap.get("s3:list*");
     assertThat(listActions).containsOnly(
-        S3Action.LIST_BUCKET, S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET_MULTIPART_UPLOADS,
-        S3Action.LIST_MULTIPART_UPLOAD_PARTS);
+        LIST_BUCKET, LIST_ALL_MY_BUCKETS, LIST_BUCKET_MULTIPART_UPLOADS, LIST_MULTIPART_UPLOAD_PARTS);
 
     // Verify s3:Delete* contains Delete actions
     final Set<S3Action> deleteActions = caseInsensitiveS3ActionMap.get("s3:delete*");
-    assertThat(deleteActions).containsOnly(
-        S3Action.DELETE_OBJECT, S3Action.DELETE_BUCKET, S3Action.DELETE_OBJECT_TAGGING);
+    assertThat(deleteActions).containsOnly(DELETE_OBJECT, DELETE_BUCKET, DELETE_OBJECT_TAGGING);
 
     // Verify s3:Create* contains Create actions
     final Set<S3Action> createActions = caseInsensitiveS3ActionMap.get("s3:create*");
-    assertThat(createActions).containsOnly(S3Action.CREATE_BUCKET);
+    assertThat(createActions).containsOnly(CREATE_BUCKET);
   }
 
   @Test
   public void testBuildCaseInsensitiveS3ActionMapIndividualActionsContainSingleEntry() {
     final Map<String, Set<S3Action>> actionMap = buildCaseInsensitiveS3ActionMap();
-    
+
     // Individual actions should map to a set with exactly one entry
     final Set<S3Action> listBucketAction = actionMap.get("s3:listbucket");
     assertThat(listBucketAction).hasSize(1);
-    
+
     final Set<S3Action> getObjectAction = actionMap.get("s3:getobject");
     assertThat(getObjectAction).hasSize(1);
   }
@@ -357,50 +398,53 @@ public class TestIamSessionPolicyResolver {
   @Test
   public void testMapPolicyActionsToS3ActionsWithSingleActionMapsCorrectly() {
     final Set<S3Action> listBucket = mapPolicyActionsToS3Actions(Collections.singleton("s3:ListBucket"));
-    assertThat(listBucket).containsOnly(S3Action.LIST_BUCKET);
+    assertThat(listBucket).containsOnly(LIST_BUCKET);
 
     // Ensure case-insensitive action works
     final Set<S3Action> listBucketCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:ListBuCKet"));
-    assertThat(listBucketCi).containsOnly(S3Action.LIST_BUCKET);
+    assertThat(listBucketCi).containsOnly(LIST_BUCKET);
 
     final Set<S3Action> deleteObject = mapPolicyActionsToS3Actions(Collections.singleton("s3:DeleteObject"));
-    assertThat(deleteObject).containsOnly(S3Action.DELETE_OBJECT);
+    assertThat(deleteObject).containsOnly(DELETE_OBJECT);
 
     // Ensure case-insensitive action works
     final Set<S3Action> deleteObjectCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:DeLETeObjeCT"));
-    assertThat(deleteObjectCi).containsOnly(S3Action.DELETE_OBJECT);
+    assertThat(deleteObjectCi).containsOnly(DELETE_OBJECT);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsWithMultipleActionsMapAllCorrectly() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:ListBucket", "s3:GetObject", "s3:PutObject"));
-    assertThat(result).containsOnly(S3Action.LIST_BUCKET, S3Action.GET_OBJECT, S3Action.PUT_OBJECT);
+    assertThat(result).containsOnly(LIST_BUCKET, GET_OBJECT, PUT_OBJECT);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsWithWildcardExpansion() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:Get*"));
-    assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_OBJECT_TAGGING);
+    assertThat(result).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
 
     // Ensure it is case-insensitive
     final Set<S3Action> resultCi = mapPolicyActionsToS3Actions(Collections.singleton("s3:gET*"));
-    assertThat(resultCi).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_OBJECT_TAGGING);
+    assertThat(resultCi).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsWithS3StarReturnsAll() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:*"));
-    assertThat(result).containsOnly(S3Action.ALL_S3);
+    assertThat(result).containsOnly(
+        LIST_ALL_MY_BUCKETS, CREATE_BUCKET, DELETE_BUCKET, GET_BUCKET_ACL, LIST_BUCKET, LIST_BUCKET_MULTIPART_UPLOADS,
+        PUT_BUCKET_ACL, ABORT_MULTIPART_UPLOAD, DELETE_OBJECT, DELETE_OBJECT_TAGGING, GET_OBJECT, GET_OBJECT_TAGGING,
+        LIST_MULTIPART_UPLOAD_PARTS, PUT_OBJECT, PUT_OBJECT_TAGGING);
 
     final Set<S3Action> resultCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:*"));
-    assertThat(resultCi).containsOnly(S3Action.ALL_S3);
+    assertThat(resultCi).isEqualTo(result);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsIgnoresUnsupportedActions() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:GetAccelerateConfiguration", "s3:GetObject"));
     // Unsupported action should be silently ignored
-    assertThat(result).containsOnly(S3Action.GET_OBJECT);
+    assertThat(result).containsOnly(GET_OBJECT);
   }
 
   @Test
@@ -413,22 +457,24 @@ public class TestIamSessionPolicyResolver {
   @Test
   public void testMapPolicyActionsToS3ActionsDeduplicatesResults() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:GetObject", "s3:GetBucketAcl"));
-    assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_OBJECT_TAGGING);
+    assertThat(result).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsHandlesMultipleWildcards() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:Put*"));
     assertThat(result).containsOnly(
-        S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_OBJECT_TAGGING, S3Action.PUT_OBJECT,
-        S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
+        GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING, PUT_OBJECT, PUT_OBJECT_TAGGING, PUT_BUCKET_ACL);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsWithS3StarIgnoresOtherActions() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:*", "s3:GetObject", "s3:PutObject"));
-    // When s3:* is present, it should return only the ALL_S3 action
-    assertThat(result).containsOnly(S3Action.ALL_S3);
+    // When s3:* is present, it should return all supported concrete actions
+    assertThat(result).containsOnly(
+        LIST_ALL_MY_BUCKETS, CREATE_BUCKET, DELETE_BUCKET, GET_BUCKET_ACL, LIST_BUCKET, LIST_BUCKET_MULTIPART_UPLOADS,
+        PUT_BUCKET_ACL, ABORT_MULTIPART_UPLOAD, DELETE_OBJECT, DELETE_OBJECT_TAGGING, GET_OBJECT, GET_OBJECT_TAGGING,
+        LIST_MULTIPART_UPLOAD_PARTS, PUT_OBJECT, PUT_OBJECT_TAGGING);
   }
 
   @Test
@@ -699,86 +745,98 @@ public class TestIamSessionPolicyResolver {
   @Test
   public void testCreatePathsAndPermissionsWithResourceAny() {
     // This also tests that acls are deduplicated across different resource types
-    final Set<S3Action> actions = Stream.of(S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET, S3Action.GET_OBJECT)
+    final Set<S3Action> actions = Stream.of(LIST_ALL_MY_BUCKETS, LIST_BUCKET, GET_OBJECT)
         .collect(Collectors.toSet()); // actions at volume, bucket and key levels
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.ANY, "*", null, null));
 
     expectIllegalArgumentException(
-        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>()),
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
         "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
-    final Set<IOzoneObj> readAndListObjects = objSet(volume(), bucket("*")); // volume, bucket level have READ, LIST
-    final Set<IOzoneObj> readObject = objSet(key("*", "*")); // key level has READ
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    // volume and bucket have READ, LIST; key has READ; result is now grouped by (ACLs, S3 actions)
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndListObjects, acls(READ, LIST)),
-        new OzoneGrant(readObject, acls(READ)));
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket", "GetObject")),
+        new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket", "GetObject")),
+        new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket", "GetObject")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithBucketResourceThatIsListBucket() {
-    final Set<S3Action> actions = Collections.singleton(IamSessionPolicyResolver.S3Action.LIST_BUCKET);
+    final Set<S3Action> actions = Collections.singleton(LIST_BUCKET);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Set<IOzoneObj> readAndListObject = objSet(bucket("bucket1"));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
     final Set<IOzoneObj> nativeReadObjects = objSet(volume(), prefix("bucket1", ""));
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndListObject, acls(READ, LIST)), new OzoneGrant(nativeReadObjects, acls(READ)));
+        new OzoneGrant(readAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(nativeReadObjects, acls(READ), strSet("ListBucket")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
     final Set<IOzoneObj> rangerReadObjects = objSet(volume(), key("bucket1", "*"));
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndListObject, acls(READ, LIST)), new OzoneGrant(rangerReadObjects, acls(READ)));
+        new OzoneGrant(readAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(rangerReadObjects, acls(READ), strSet("ListBucket")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithBucketResourceThatIsNotListBucket() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.CREATE_BUCKET);
+    final Set<S3Action> actions = Collections.singleton(CREATE_BUCKET);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Set<IOzoneObj> createObject = objSet(bucket("bucket1"));
     final Set<IOzoneObj> readObject = objSet(volume());
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(createObject, acls(CREATE)), new OzoneGrant(readObject, acls(READ)));
+        new OzoneGrant(createObject, acls(CREATE), strSet("CreateBucket")),
+        new OzoneGrant(readObject, acls(READ), strSet("CreateBucket")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(createObject, acls(CREATE)), new OzoneGrant(readObject, acls(READ)));
+        new OzoneGrant(createObject, acls(CREATE), strSet("CreateBucket")),
+        new OzoneGrant(readObject, acls(READ), strSet("CreateBucket")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithBucketWildcardResource() {
-    final Set<S3Action> actions = Collections.singleton(IamSessionPolicyResolver.S3Action.PUT_BUCKET_ACL);
+    final Set<S3Action> actions = Collections.singleton(PUT_BUCKET_ACL);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "bucket1*", null, null));
     final Set<IOzoneObj> readReadAclAndWriteAclObject = objSet(bucket("bucket1*"));
     final Set<IOzoneObj> readVolume = objSet(volume());
 
     expectIllegalArgumentException(
-        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>()),
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
         "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readReadAclAndWriteAclObject, acls(READ, READ_ACL, WRITE_ACL)),
-        new OzoneGrant(readVolume, acls(READ)));
+        new OzoneGrant(readReadAclAndWriteAclObject, acls(READ, READ_ACL, WRITE_ACL), strSet("PutBucketAcl")),
+        new OzoneGrant(readVolume, acls(READ), strSet("PutBucketAcl")));
   }
 
   @Test
@@ -787,124 +845,148 @@ public class TestIamSessionPolicyResolver {
     // Resource values.  The "*" case is covered by testCreatePathsAndPermissionsWithResourceAny.
     // This test ensures that "arn:aws:s3:::*" (parsed as BUCKET_WILDCARD with bucket="*")
     // also grants the expected volume-level permissions for ListAllMyBuckets.
-    final Set<S3Action> actions = Stream.of(S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET)
+    final Set<S3Action> actions = Stream.of(LIST_ALL_MY_BUCKETS, LIST_BUCKET)
         .collect(Collectors.toSet());
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "*", null, null));
 
     expectIllegalArgumentException(
-        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>()),
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
         "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
 
     // Both the volume and the wildcard bucket should end up with READ + LIST permissions.
     // We also need READ access on the keys
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
-    final Set<IOzoneObj> readAndListObjects = objSet(volume(), bucket("*"));
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    final Set<IOzoneObj> volumeObj = objSet(volume());
+    final Set<IOzoneObj> bucketObj = objSet(bucket("*"));
     final Set<IOzoneObj> readObjects = objSet(key("*", "*"));
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndListObjects, acls(READ, LIST)), new OzoneGrant(readObjects, acls(READ)));
+        new OzoneGrant(volumeObj, acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket")),
+        new OzoneGrant(bucketObj, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(readObjects, acls(READ), strSet("ListBucket")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithObjectExactResource() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
-    final Set<IOzoneObj> readObjects = objSet(key("bucket1", "key.txt"), bucket("bucket1"), volume());
+    final Set<IOzoneObj> readVolumeBucketAndKey = objSet(volume(), bucket("bucket1"), key("bucket1", "key.txt"));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
-    assertThat(resultNative).containsExactly(new OzoneGrant(readObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeBucketAndKey, acls(READ), strSet("GetObject")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
-    assertThat(resultRanger).containsExactly(new OzoneGrant(readObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeBucketAndKey, acls(READ), strSet("GetObject")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithDeleteObjectGrantsDeleteOnKey() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.DELETE_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(DELETE_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
     final Set<IOzoneObj> readVolumeAndBucket = objSet(volume(), bucket("bucket1"));
     final Set<IOzoneObj> deleteKey = objSet(key("bucket1", "key.txt"));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(readVolumeAndBucket, acls(READ)), new OzoneGrant(deleteKey, acls(DELETE)));
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("DeleteObject")),
+        new OzoneGrant(deleteKey, acls(DELETE), strSet("DeleteObject")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readVolumeAndBucket, acls(READ)), new OzoneGrant(deleteKey, acls(DELETE)));
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("DeleteObject")),
+        new OzoneGrant(deleteKey, acls(DELETE), strSet("DeleteObject")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithAbortMultipartUploadGrantsWriteOnKey() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.ABORT_MULTIPART_UPLOAD);
+    final Set<S3Action> actions = Collections.singleton(ABORT_MULTIPART_UPLOAD);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
     final Set<IOzoneObj> readVolumeAndBucket = objSet(volume(), bucket("bucket1"));
     final Set<IOzoneObj> writeKey = objSet(key("bucket1", "key.txt"));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(readVolumeAndBucket, acls(READ)), new OzoneGrant(writeKey, acls(WRITE)));
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("AbortMultipartUpload")),
+        new OzoneGrant(writeKey, acls(WRITE), strSet("AbortMultipartUpload")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readVolumeAndBucket, acls(READ)), new OzoneGrant(writeKey, acls(WRITE)));
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("AbortMultipartUpload")),
+        new OzoneGrant(writeKey, acls(WRITE), strSet("AbortMultipartUpload")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithObjectPrefixResource() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
 
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "prefix/", null));
-    final Set<IOzoneObj> nativeReadObjects = objSet(prefix("bucket1", "prefix/"), bucket("bucket1"), volume());
+    final Set<IOzoneObj> nativeReadVolumeBucketAndPrefix = objSet(
+        bucket("bucket1"), volume(), prefix("bucket1", "prefix/"));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
-    assertThat(resultNative).containsExactly(new OzoneGrant(nativeReadObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(nativeReadVolumeBucketAndPrefix, acls(READ), strSet("GetObject")));
 
     expectIllegalArgumentException(
-        () -> createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, new LinkedHashMap<>()),
+        () -> createPathsAndPermissions(
+            VOLUME, RANGER, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
         "ResourceSpec type OBJECT_PREFIX not supported for RangerOzoneAuthorizer");
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithObjectPrefixWildcardResource() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "prefix/*", null));
 
     expectIllegalArgumentException(
-        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>()),
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
         "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
 
-    final Set<IOzoneObj> rangerReadObjects = objSet(key("bucket1", "prefix/*"), bucket("bucket1"), volume());
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
-    assertThat(resultRanger).containsExactly(new OzoneGrant(rangerReadObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(
+            objSet(bucket("bucket1"), volume(), key("bucket1", "prefix/*")), acls(READ), strSet("GetObject")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithConditionPrefixesForObjectActionMustIgnoreConditionPrefixes() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
     final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
         "StringEquals", prefixes);
@@ -912,23 +994,29 @@ public class TestIamSessionPolicyResolver {
     final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "", null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    final Set<IOzoneObj> nativeReadObjects = objSet(prefix("bucket1", ""), bucket("bucket1"), volume());
-    createPathsAndPermissions(VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
-    assertThat(resultNative).containsExactly(new OzoneGrant(nativeReadObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    final Set<IOzoneObj> nativeReadVolumeBucketAndPrefix = objSet(bucket("bucket1"), volume(), prefix("bucket1", ""));
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(nativeReadVolumeBucketAndPrefix, acls(READ), strSet("GetObject")));
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "*", null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    final Set<IOzoneObj> rangerReadObjects = objSet(key("bucket1", "*"), bucket("bucket1"), volume());
-    createPathsAndPermissions(VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
-    assertThat(resultRanger).containsExactly(new OzoneGrant(rangerReadObjects, acls(READ)));
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    final Set<IOzoneObj> rangerReadVolumeBucketAndKey = objSet(bucket("bucket1"), volume(), key("bucket1", "*"));
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(rangerReadVolumeBucketAndKey, acls(READ), strSet("GetObject")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsListBucket() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.LIST_BUCKET);
+    final Set<S3Action> actions = Collections.singleton(LIST_BUCKET);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
     final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
         "StringEquals", prefixes);
@@ -939,10 +1027,13 @@ public class TestIamSessionPolicyResolver {
         prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"), volume());
     final Set<IOzoneObj> nativeReadAndListObject = objSet(bucket("bucket1"));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(nativeReadObjects, acls(READ)), new OzoneGrant(nativeReadAndListObject, acls(READ, LIST)));
+        new OzoneGrant(nativeReadAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(nativeReadObjects, acls(READ), strSet("ListBucket")));
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
@@ -950,15 +1041,18 @@ public class TestIamSessionPolicyResolver {
         key("bucket1", "folder1/"), key("bucket1", "folder2/"), volume());
     final Set<IOzoneObj> rangerReadAndListObject = objSet(bucket("bucket1"));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(rangerReadObjects, acls(READ)), new OzoneGrant(rangerReadAndListObject, acls(READ, LIST)));
+        new OzoneGrant(rangerReadAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(rangerReadObjects, acls(READ), strSet("ListBucket")));
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsNotListBucket() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_BUCKET_ACL);
+    final Set<S3Action> actions = Collections.singleton(GET_BUCKET_ACL);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
     final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
         "StringEquals", prefixes);
@@ -968,18 +1062,24 @@ public class TestIamSessionPolicyResolver {
     final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(readObject, acls(READ)), new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL)));
+        new OzoneGrant(readObject, acls(READ), strSet("GetBucketAcl")),
+        new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL), strSet("GetBucketAcl")));
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readObject, acls(READ)), new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL)));
+        new OzoneGrant(readObject, acls(READ), strSet("GetBucketAcl")),
+        new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL), strSet("GetBucketAcl")));
   }
 
   @Test
@@ -989,38 +1089,45 @@ public class TestIamSessionPolicyResolver {
     final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", null, null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, nativeResourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).isEmpty();
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", null, null));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, rangerResourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).isEmpty();
   }
 
   @Test
   public void testCreatePathsAndPermissionsWithNoMappedResources() {
-    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = emptySet();
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).isEmpty();
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).isEmpty();
   }
 
   @Test
   public void testCreatePathsAndPermissionsDeduplicatesAcrossSameResourceTypes() {
-    final Set<S3Action> actions = Stream.of(
-        S3Action.GET_OBJECT, S3Action.GET_OBJECT_TAGGING, S3Action.DELETE_OBJECT, S3Action.DELETE_OBJECT_TAGGING)
+    final Set<S3Action> actions = Stream.of(GET_OBJECT, GET_OBJECT_TAGGING, DELETE_OBJECT, DELETE_OBJECT_TAGGING)
         .collect(Collectors.toSet());
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
@@ -1028,44 +1135,60 @@ public class TestIamSessionPolicyResolver {
     final Set<IOzoneObj> readObjects = objSet(bucket("bucket1"), volume());
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE)),
-        new OzoneGrant(readObjects, acls(READ)));
+        new OzoneGrant(
+            readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")),
+        new OzoneGrant(readObjects, acls(READ),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")));
 
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE)),
-        new OzoneGrant(readObjects, acls(READ)));
+        new OzoneGrant(
+            readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")),
+        new OzoneGrant(readObjects, acls(READ),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")));
   }
 
   @Test
-  public void testCreatePathsAndPermissionsWithAllS3ActionsOverridesAnyOtherAction() {
-    final Set<S3Action> actions = Stream.of(
-        S3Action.ALL_S3, S3Action.GET_OBJECT, S3Action.DELETE_OBJECT, S3Action.LIST_BUCKET)
+  public void testCreatePathsAndPermissionsWithAllConcreteS3Actions() {
+    final Set<S3Action> actions = Stream.of(S3Action.values())
         .collect(Collectors.toSet());
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Stream.of(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"),
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket2", null, null))
         .collect(Collectors.toSet());
-    final Set<IOzoneObj> allObjects = objSet(key("bucket1", "key.txt"), bucket("bucket2"));
-
-    final Set<IOzoneObj> nativeReadObjects = objSet(volume(), bucket("bucket1"), prefix("bucket2", ""));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative);
-    final Set<OzoneGrant> resultNative = groupObjectsByAcls(objToAclsMapNative);
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
     assertThat(resultNative).containsExactlyInAnyOrder(
-        new OzoneGrant(allObjects, acls(ALL)), new OzoneGrant(nativeReadObjects, acls(READ)));
+        new OzoneGrant(objSet(key("bucket1", "key.txt")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(bucket("bucket1")), acls(READ), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS),
+        new OzoneGrant(
+            objSet(bucket("bucket2")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_ACTIONS),
+        new OzoneGrant(objSet(prefix("bucket2", "")), acls(READ), strSet("ListBucket")));
 
-    final Set<IOzoneObj> rangerReadObjects = objSet(volume(), bucket("bucket1"), key("bucket2", "*"));
     final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
-    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger);
-    final Set<OzoneGrant> resultRanger = groupObjectsByAcls(objToAclsMapRanger);
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new OzoneGrant(allObjects, acls(ALL)), new OzoneGrant(rangerReadObjects, acls(READ)));
+        new OzoneGrant(objSet(key("bucket1", "key.txt")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(bucket("bucket1")), acls(READ), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS),
+        new OzoneGrant(
+            objSet(bucket("bucket2")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_ACTIONS),
+        new OzoneGrant(objSet(key("bucket2", "*")), acls(READ), strSet("ListBucket")));
+
   }
 
   @Test
@@ -1102,14 +1225,21 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and prefix "" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("my-bucket", "")), acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and key "*"  READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("my-bucket", "*")), acls(READ)));
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and key "*" READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1147,16 +1277,22 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and prefix "" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"), bucket("my-bucket2"));
     final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
     expectedResolvedNative.add(new OzoneGrant(
-        objSet(volume(), prefix("my-bucket2", ""), prefix("my-bucket", "")), acls(READ)));
+        objSet(prefix("my-bucket2", ""), prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and key "*" READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(
-        objSet(volume(), key("my-bucket2", "*"), key("my-bucket", "*")), acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket2", "*"), key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1193,14 +1329,22 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL, CREATE; volume, prefix "" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL, CREATE);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("my-bucket", "")), acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL, CREATE; volume, key "*" READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("my-bucket", "*")), acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1231,17 +1375,19 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: bucket ALL (instead of individual actions); volume and prefix "" READ
+    // Expected for native: bucket union of supported bucket ACLs; volume READ; prefix "" READ (from ListBucket)
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
-    final Set<ACLType> bucketAcls = acls(ALL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("my-bucket", "")), acls(READ)));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: bucket ALL (instead of individual actions); volume and key "*" READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("my-bucket", "*")), acls(READ)));
+    // Expected for Ranger: bucket union of supported bucket ACLs; volume READ; key "*" READ (from ListBucket)
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1264,8 +1410,10 @@ public class TestIamSessionPolicyResolver {
     // Expected: READ, CREATE, WRITE on key; bucket READ; volume READ
     final Set<IOzoneObj> keySet = objSet(key("my-bucket", "folder/file.txt"));
     final Set<ACLType> keyAcls = acls(READ, CREATE, WRITE);
-    expectedResolvedFromBothAuthorizers.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ)));
-    expectedResolvedFromBothAuthorizers.add(new OzoneGrant(keySet, keyAcls));
+    expectedResolvedFromBothAuthorizers.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), strSet("GetObject", "PutObject")));
+    expectedResolvedFromBothAuthorizers.add(
+        new OzoneGrant(keySet, keyAcls, strSet("GetObject", "PutObject")));
 
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedFromBothAuthorizers);
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedFromBothAuthorizers);
@@ -1286,18 +1434,18 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: all key ACLs on prefix "" under bucket; bucket READ, volume READ
+    // Expected for native: all supported object ACLs on prefix "" under bucket; bucket READ, volume READ
     final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
-    final Set<ACLType> allKeyAcls = acls(ALL);
-    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, allKeyAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ)));
+    final Set<ACLType> allKeyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, allKeyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), ALL_OBJECT_ACTIONS));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
-    // Expected for Ranger: all key acls for resource type KEY with key name "*"
+    // Expected for Ranger: all supported object ACLs for resource type KEY with key name "*"
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, allKeyAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, allKeyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), ALL_OBJECT_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1340,17 +1488,19 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: all Bucket ACLs for bucket; volume, prefix "" READ
+    // Expected for native: union of supported bucket ACLs for bucket; volume READ; prefix "" READ (from ListBucket)
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
-    final Set<ACLType> allBucketAcls = acls(ALL);
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("my-bucket", "")), acls(READ)));
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, allBucketAcls));
+    final Set<ACLType> allBucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, allBucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
-    // Expected for Ranger: all Bucket ACLs for bucket; volume, key "*" READ
+    // Expected for Ranger: union of supported bucket ACLs for bucket; volume READ; key "*" READ (from ListBucket)
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("my-bucket", "*")), acls(READ)));
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, allBucketAcls));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, allBucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1379,18 +1529,20 @@ public class TestIamSessionPolicyResolver {
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcls = acls(READ, LIST);
     expectedResolvedNative.add(
-        new OzoneGrant(objSet(volume(), prefix("my-bucket", "team/folder"), prefix("my-bucket", "team/folder/")),
-            acls(READ)));
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
+        new OzoneGrant(
+            objSet(volume(), prefix("my-bucket", "team/folder"),
+            prefix("my-bucket", "team/folder/")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     // Expected for Ranger: READ, LIST ACLs for bucket (only ListBucket supports s3:prefix); volume READ,
     // key "team/folder", "team/folder/*" READ
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     expectedResolvedRanger.add(
-        new OzoneGrant(objSet(volume(), key("my-bucket", "team/folder"), key("my-bucket", "team/folder/*")),
-            acls(READ)));
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
+        new OzoneGrant(
+            objSet(volume(), key("my-bucket", "team/folder"), key("my-bucket", "team/folder/*")),
+            acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1421,24 +1573,27 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ
+    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ; prefix "" has all supported object
+    // ACLs and is further restricted to the object actions + ListBucket.
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ)));
-    // Expected for native: all key ACLs on prefix "" under bucket
+    final Set<String> bucketAndObjectActions = new LinkedHashSet<>(
+        strSet("GetBucketAcl", "PutBucketAcl", "ListBucket"));
+    bucketAndObjectActions.addAll(ALL_OBJECT_ACTIONS);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, bucketAndObjectActions));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), bucketAndObjectActions));
     final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
-    final Set<ACLType> keyAllAcls = acls(ALL);
-    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, keyAllAcls));
+    final Set<ACLType> allKeyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, allKeyAcls, ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ)));
-    // Expected for Ranger: all key acls for resource type KEY with key name "*"
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ; key "*" has all supported object ACLs
+    // and is further restricted to the object actions + ListBucket.
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, bucketAndObjectActions));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), bucketAndObjectActions));
     final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, keyAllAcls));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, allKeyAcls, ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1465,17 +1620,26 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: all for bucket and key acls; volume READ
-    final Set<IOzoneObj> resourceSetNative = objSet(bucket("my-bucket"), prefix("my-bucket", ""));
-    expectedResolvedNative.add(new OzoneGrant(resourceSetNative, acls(ALL)));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    // Expected for native: bucket union of supported bucket ACLs; prefix "" union of supported object ACLs; volume READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            bucketSet, acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(prefix("my-bucket", "")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: all for bucket and key acls; volume READ
-    final Set<IOzoneObj> resourceSetRanger = objSet(bucket("my-bucket"), key("my-bucket", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(resourceSetRanger, acls(ALL)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    // Expected for Ranger: bucket union of supported bucket ACLs; key "*" union of supported object ACLs; volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            bucketSet, acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(key("my-bucket", "*")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1502,22 +1666,22 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: all key ACLs on prefix "team/folder1/security/" under
-    // my-bucket and all key ACLs on prefix "team/folder2/misc/" under my-bucket2; bucket READ; volume READ
+    // Expected for native: all supported object ACLs on both prefixes; bucket READ; volume READ
     final Set<IOzoneObj> keyPrefixSet = objSet(
         prefix("my-bucket", "team/folder1/security/"), prefix("my-bucket2", "team/folder2/misc/"));
-    final Set<ACLType> keyAllAcls = acls(ALL);
-    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, keyAllAcls));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ)));
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ), ALL_OBJECT_ACTIONS));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: all key acls for resource type KEY with key name
+    // Expected for Ranger: all supported object ACLs for resource type KEY with key name
     // "team/folder1/security/*" under my-bucket and "team/folder2/misc/*" under my-bucket2; bucket READ; volume READ
     final Set<IOzoneObj> rangerKeySet = objSet(
         key("my-bucket", "team/folder1/security/*"), key("my-bucket2", "team/folder2/misc/*"));
-    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, keyAllAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ), ALL_OBJECT_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1573,8 +1737,8 @@ public class TestIamSessionPolicyResolver {
     // Expected for Ranger: bucket READ and LIST on wildcard pattern; volume and key "*" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("proj-*"));
     final Set<ACLType> bucketAcls = acls(READ, LIST);
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("proj-*", "*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("proj-*", "*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1601,16 +1765,22 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ and LIST; volume, prefix "" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("proj"));
     final Set<ACLType> bucketAcls = acls(READ, LIST);
-    final Set<IOzoneObj> nativeReadObjects = objSet(volume(), prefix("proj", ""));
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(nativeReadObjects, acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("proj", "")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     // Expected for Ranger: bucket READ and LIST; volume, key "*" READ
-    final Set<IOzoneObj> rangerReadObjects = objSet(volume(), key("proj", "*"));
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(rangerReadObjects, acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("proj", "*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1649,16 +1819,20 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: READ, LIST bucket acls; volume and prefixes "team/folder", "team/folder/" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("bucket1"));
     final Set<ACLType> bucketAcls = acls(READ, LIST);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedNative.add(new OzoneGrant(
-        objSet(volume(), prefix("bucket1", "team/folder"), prefix("bucket1", "team/folder/")), acls(READ)));
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(volume(), prefix("bucket1", "team/folder"), prefix("bucket1", "team/folder/")),
+            acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: READ, LIST bucket acls; volume and keys "team/folder" and "team/folder/*" READ
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(
-        objSet(volume(), key("bucket1", "team/folder"), key("bucket1", "team/folder/*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume(), key("bucket1", "team/folder"), key("bucket1", "team/folder/*")),
+            acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1698,15 +1872,17 @@ public class TestIamSessionPolicyResolver {
     // Expected for native (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
     // prefix "log/team" READ
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    expectedResolvedNative.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST)));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("logs", "team/")), acls(READ)));
+    expectedResolvedNative.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume(), prefix("logs", "team/")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     // Expected for Ranger (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
     // key "log/team/*" READ
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("logs", "team/*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), key("logs", "team/*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1746,8 +1922,8 @@ public class TestIamSessionPolicyResolver {
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: READ acl on key "file*.log", bucket READ, volume READ
-    final Set<IOzoneObj> readObjectsRanger = objSet(key("logs", "file*.log"), bucket("logs"), volume());
-    expectedResolvedRanger.add(new OzoneGrant(readObjectsRanger, acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("logs", "file*.log"), bucket("logs"), volume()), acls(READ), strSet("GetObject")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1767,14 +1943,16 @@ public class TestIamSessionPolicyResolver {
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
     // Expected for native: READ acl on prefix "file" under bucket, bucket READ, volume READ
-    final Set<IOzoneObj> readObjectsNative = objSet(prefix("myBucket", "file"), bucket("myBucket"), volume());
-    expectedResolvedNative.add(new OzoneGrant(readObjectsNative, acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(prefix("myBucket", "file"), bucket("myBucket"), volume()), acls(READ), strSet("GetObject")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: READ acl on key "file*", bucket READ, volume READ
-    final Set<IOzoneObj> readObjectsRanger = objSet(key("myBucket", "file*"), bucket("myBucket"), volume());
-    expectedResolvedRanger.add(new OzoneGrant(readObjectsRanger, acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(key("myBucket", "file*"), bucket("myBucket"), volume()), acls(READ), strSet("GetObject")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1798,9 +1976,10 @@ public class TestIamSessionPolicyResolver {
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: READ and LIST on volume and bucket (wildcard), READ on key "*"
-    final Set<IOzoneObj> resourceSet = objSet(volume(), bucket("*"));
-    expectedResolvedRanger.add(new OzoneGrant(resourceSet, acls(READ, LIST)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1823,8 +2002,8 @@ public class TestIamSessionPolicyResolver {
     // Expected for Ranger: CREATE and WRITE key acls on wildcard pattern, bucket READ, volume READ
     final Set<IOzoneObj> keySet = objSet(key("*", "*"));
     final Set<ACLType> keyAcls = acls(CREATE, WRITE);
-    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls, strSet("PutObject")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ), strSet("PutObject")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1851,9 +2030,10 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: (only ListBucket supports s3:prefix) READ volume; READ, LIST acl on bucket;
     // READ on key "team/folder", "team/folder/*"
-    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket")));
     expectedResolvedRanger.add(
-        new OzoneGrant(objSet(volume(), key("*", "team/folder"), key("*", "team/folder/*")), acls(READ)));
+        new OzoneGrant(
+            objSet(volume(), key("*", "team/folder"), key("*", "team/folder/*")), acls(READ), strSet("ListBucket")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1873,10 +2053,16 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: READ, LIST acl on volume, ALL acl bucket (wildcard) and key (wildcard)
-    final Set<IOzoneObj> resourceSet = objSet(bucket("*"), key("*", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(resourceSet, acls(ALL)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ, LIST)));
+    // Expected for Ranger:
+    // - volume READ, LIST (ListAllMyBuckets applies at volume scope; other actions imply navigation READ)
+    // - bucket union of supported bucket ACLs
+    // - key union of supported object ACLs (and is only action-restricted to object actions + ListBucket)
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ, LIST), emptySet()));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(bucket("*")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("*", "*")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1896,12 +2082,13 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: ALL bucket acls on wildcard pattern, volume READ, key "*" READ
+    // Expected for Ranger: union of supported bucket ACLs on wildcard bucket; volume READ, LIST; key "*" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("*"));
-    final Set<ACLType> bucketAcls = acls(ALL);
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ, LIST)));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1921,11 +2108,11 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: ALL key acls on wildcard pattern; bucket READ; volume READ
+    // Expected for Ranger: union of supported object ACLs on wildcard key; bucket READ; volume READ
     final Set<IOzoneObj> keySet = objSet(key("*", "*"));
-    final Set<ACLType> keyAcls = acls(ALL);
-    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ)));
+    final Set<ACLType> keyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ), ALL_OBJECT_ACTIONS));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1950,18 +2137,24 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ, READ_ACL acls
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcls = acls(READ, READ_ACL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
     // Expected for native: READ acl on prefix "" under bucket; volume READ
-    final Set<IOzoneObj> readObjectsNative = objSet(prefix("my-bucket", ""), volume());
-    expectedResolvedNative.add(new OzoneGrant(readObjectsNative, acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("GetObject", "GetObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: bucket READ, READ_ACL acls
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
     // Expected for Ranger: READ key acl for resource type KEY with key name "*"; volume READ
-    final Set<IOzoneObj> readObjectsRanger = objSet(key("my-bucket", "*"), volume());
-    expectedResolvedRanger.add(new OzoneGrant(readObjectsRanger, acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("GetObject", "GetObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1983,21 +2176,33 @@ public class TestIamSessionPolicyResolver {
 
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: READ, LIST bucket acls
-    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
-    final Set<ACLType> bucketAcls = acls(READ, LIST);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
-    // Expected for native: READ acl on prefix "" under bucket; volume READ
-    final Set<IOzoneObj> readObjectsNative = objSet(prefix("my-bucket", ""), volume());
-    expectedResolvedNative.add(new OzoneGrant(readObjectsNative, acls(READ)));
+    // Expected for native: READ, LIST bucket acls, READ acl on prefix "" under bucket; volume READ
+    final Set<IOzoneObj> readAndListObjectsNative = objSet(bucket("my-bucket"));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            readAndListObjectsNative, acls(READ, LIST),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket", "ListMultipartUploadParts")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: READ, LIST bucket acls
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    // Expected for Ranger: READ key acl for resource type KEY with key name "*"; volume READ
-    final Set<IOzoneObj> readObjectsRanger = objSet(key("my-bucket", "*"), volume());
-    expectedResolvedRanger.add(new OzoneGrant(readObjectsRanger, acls(READ)));
+    // Expected for Ranger: READ, LIST bucket acls; READ key acl for resource type KEY with key name "*";
+    // volume READ
+    final Set<IOzoneObj> readAndListObjectRanger = objSet(bucket("my-bucket"));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            readAndListObjectRanger, acls(READ, LIST),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket", "ListMultipartUploadParts")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -2022,23 +2227,27 @@ public class TestIamSessionPolicyResolver {
     // Expected for native: bucket READ, READ_ACL, WRITE_ACL acl
     final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
     final Set<ACLType> bucketAcl = acls(READ, READ_ACL, WRITE_ACL);
-    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcl));
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcl, strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
     // Expected for native: CREATE, WRITE acls on prefix "" under bucket
     final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
     final Set<ACLType> keyAcls = acls(CREATE, WRITE);
-    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, keyAcls));
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, keyAcls, strSet("PutObject", "PutObjectTagging")));
     // Expected for native: volume READ
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: bucket READ, READ_ACL, WRITE_ACL acl
-    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcl));
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcl, strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
     // Expected for Ranger: CREATE, WRITE key acls for resource type KEY with key name "*"
     final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, keyAcls));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, keyAcls, strSet("PutObject", "PutObjectTagging")));
     // Expected for Ranger: volume READ
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -2062,17 +2271,27 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
     // Expected for native: DELETE and WRITE on prefix "" under bucket; bucket READ, DELETE; volume READ
     final Set<IOzoneObj> resourceSetNative = objSet(prefix("my-bucket", ""));
-    expectedResolvedNative.add(new OzoneGrant(resourceSetNative, acls(DELETE, WRITE)));
-    expectedResolvedNative.add(new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, DELETE)));
-    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    expectedResolvedNative.add(
+        new OzoneGrant(resourceSetNative, acls(DELETE, WRITE), strSet("DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(bucket("my-bucket")), acls(READ, DELETE),
+            strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     // Expected for Ranger: DELETE and WRITE on resource type KEY with key name "*"; bucket READ, DELETE; volume READ
     final Set<IOzoneObj> resourceSetRanger = objSet(key("my-bucket", "*"));
-    expectedResolvedRanger.add(new OzoneGrant(resourceSetRanger, acls(DELETE, WRITE)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, DELETE)));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(resourceSetRanger, acls(DELETE, WRITE), strSet("DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(bucket("my-bucket")), acls(READ, DELETE),
+            strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
