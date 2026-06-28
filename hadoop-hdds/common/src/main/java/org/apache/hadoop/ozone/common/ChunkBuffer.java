@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.common;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
@@ -62,6 +64,34 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
       return wrap(buffers.get(0));
     }
     return new ChunkBufferImplWithByteBufferList(buffers);
+  }
+
+  default void checkArgument(byte[] b, int offset, int length) {
+    Objects.requireNonNull(b, "b == null");
+    Preconditions.checkArgument(offset >= 0 && length >= 0,
+        "offset = %s, length = %s", offset, length);
+    Preconditions.checkArgument(length <= b.length - offset,
+        "length = %s out of range for array.length = %s, offset = %s",
+        length, b.length, offset);
+    if (length > remaining()) {
+      final BufferOverflowException boe = new BufferOverflowException();
+      boe.initCause(new IllegalArgumentException(
+          "Failed to put since length = " + length
+              + " > this.remaining() = " + remaining()));
+      throw boe;
+    }
+  }
+
+  default void checkArgument(ByteBuffer that) {
+    Objects.requireNonNull(that, "that == null");
+    final int thatRemaining = that.remaining();
+    if (thatRemaining > remaining()) {
+      final BufferOverflowException boe = new BufferOverflowException();
+      boe.initCause(new IllegalArgumentException(
+          "Failed to put since that.remaining() = " + thatRemaining
+              + " > this.remaining() = " + remaining()));
+      throw boe;
+    }
   }
 
   /** Similar to {@link ByteBuffer#position()}. */
