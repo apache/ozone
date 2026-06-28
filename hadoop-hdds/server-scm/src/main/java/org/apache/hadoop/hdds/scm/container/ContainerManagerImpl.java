@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
@@ -256,7 +255,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setStateEnterTime(Time.now())
         .setOwner(owner)
         .setContainerID(containerID.getId())
-        .setDeleteTransactionId(0)
         .setReplicationType(pipeline.getType());
 
     if (pipeline.getReplicationConfig() instanceof ECReplicationConfig) {
@@ -353,12 +351,6 @@ public class ContainerManagerImpl implements ContainerManager {
     } else {
       throw new ContainerNotFoundException(cid);
     }
-  }
-
-  @Override
-  public void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
   }
 
   @Override

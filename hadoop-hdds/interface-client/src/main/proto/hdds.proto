@@ -267,7 +267,8 @@ message ContainerInfoProto {
     required uint64 numberOfKeys = 5;
     optional int64 stateEnterTime = 6;
     required string owner = 7;
-    optional int64 deleteTransactionId = 8;
+    // Legacy SCM-side delete transaction ID. SCM no longer updates this field.
+    optional int64 deleteTransactionId = 8 [deprecated = true];
     optional int64 sequenceId = 9;
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;

@@ -489,28 +489,6 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-
-    // TODO: Refactor this. Error handling is not done.
-    for (Map.Entry<ContainerID, Long> transaction :
-        deleteTransactionMap.entrySet()) {
-      ContainerID containerID = transaction.getKey();
-      try (AutoCloseableLock ignored = writeLock(containerID)) {
-        final ContainerInfo info = containers.getContainerInfo(
-            transaction.getKey());
-        if (info == null) {
-          LOG.warn("Cannot find container {}, transaction id is {}",
-              transaction.getKey(), transaction.getValue());
-          continue;
-        }
-        info.updateDeleteTransactionId(transaction.getValue());
-        transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
-      }
-    }
-  }
-
-  @Override
   public ContainerInfo getMatchingContainer(final long size, String owner,
       PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
     if (containerIDs.isEmpty()) {

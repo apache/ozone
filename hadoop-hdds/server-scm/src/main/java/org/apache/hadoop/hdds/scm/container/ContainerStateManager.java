@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -190,13 +189,6 @@ public interface ContainerStateManager extends SCMHandler {
    */
   @Replicate
   void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
-      throws IOException;
-
-  /**
-   *
-   */
-  // Make this as @Replicate
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
       throws IOException;
 
   /**
