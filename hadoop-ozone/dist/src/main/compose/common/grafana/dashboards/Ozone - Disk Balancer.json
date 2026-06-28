@@ -26,7 +26,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
-          "expr": "{__name__=~\"volume_info_metrics_data_disk[0-9]+_ozone_used\", instance=~\"$datanode.*\"}",
+          "expr": "sum({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode.*\"}) by (instance, storagedirectory)",
           "legendFormat": "{{storagedirectory}}",
           "refId": "A"
         }
@@ -52,7 +52,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
-          "expr": "max({__name__=~\"volume_info_metrics_data_disk[0-9]+_ozone_used\", instance=~\"$datanode.*\"}) by (instance) - min({__name__=~\"volume_info_metrics_data_disk[0-9]+_ozone_used\", instance=~\"$datanode.*\"}) by (instance)",
+          "expr": "max(sum({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode.*\"}) by (instance, storagedirectory)) by (instance) - min(sum({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode.*\"}) by (instance, storagedirectory)) by (instance)",
           "instant": true,
           "refId": "A"
         }
@@ -353,6 +353,6 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "Ozone Disk Balancer Operations Matrix",
+  "title": "Ozone Disk Balancer Operations",
   "uid": "ozone-disk-balancer"
 }
