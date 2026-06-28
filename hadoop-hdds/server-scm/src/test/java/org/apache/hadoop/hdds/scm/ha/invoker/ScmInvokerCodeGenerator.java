@@ -585,7 +585,7 @@ public final class ScmInvokerCodeGenerator {
   void printProxyClass() {
     printf("return new %s() {", apiName);
     try (UncheckedAutoCloseable ignored = printScope(false, 1)) {
-      for (Method m : getMethods(null, false)) {
+      for (Method m : getMethods(m -> m.getAnnotation(Deprecated.class) == null || !m.isDefault())) {
         printProxyClassMethod(m);
       }
     }
