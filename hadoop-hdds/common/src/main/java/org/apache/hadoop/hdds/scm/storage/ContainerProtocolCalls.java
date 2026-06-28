@@ -909,6 +909,14 @@ public final class ContainerProtocolCalls  {
       BlockID blockID, long offset, long length, int responseDataSize,
       Token<? extends TokenIdentifier> token, Pipeline pipeline)
       throws IOException {
+    return buildReadBlockCommandProto(blockID, offset, length, responseDataSize,
+        token != null ? token.encodeToUrlString() : null, pipeline);
+  }
+
+  public static ContainerCommandRequestProto buildReadBlockCommandProto(
+      BlockID blockID, long offset, long length, int responseDataSize,
+      String encodedToken, Pipeline pipeline)
+      throws IOException {
     final DatanodeDetails datanode = pipeline.getClosestNode();
     final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());
     final ReadBlockRequestProto.Builder readBlockRequest = ReadBlockRequestProto.newBuilder()
@@ -919,8 +927,8 @@ public final class ContainerProtocolCalls  {
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
             .setContainerID(blockID.getContainerID());
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
+    if (encodedToken != null) {
+      builder.setEncodedToken(encodedToken);
     }
 
     return builder.setDatanodeUuid(datanode.getUuidString())
