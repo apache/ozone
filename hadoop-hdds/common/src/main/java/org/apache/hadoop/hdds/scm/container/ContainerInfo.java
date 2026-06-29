@@ -183,10 +183,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
    *
    * The size of a container can change over time. For an open container we
    * assume the size of the container will grow, and hence the value will be
-   * the maximum of the values reported from its replicas.
+   * the minimum of the values reported from its replicas.
    *
    * A closed container can only reduce in size as its blocks are removed. For
-   * a closed container, the value will be the minimum of the values reported
+   * a closed container, the value will be the maximum of the values reported
    * from its replicas.
    *
    * An EC container, is made from a group data and parity containers where the
