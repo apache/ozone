@@ -21,12 +21,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -36,7 +43,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests OMAllocateBlockRequest class.
@@ -223,6 +232,41 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         allocateBlockRequest.getClientID());
 
     return modifiedOmRequest;
+  }
+
+  @Test
+  public void testAllocateBlockDoesNotSendClientMachineToScm() throws Exception {
+    // OM now sorts the write pipeline locally, so SCM must receive an empty
+    // clientMachine even when the client requests sorted datanodes.
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
+    request.preExecute(ozoneManager);
+
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
+        any(), any(), clientMachine.capture());
+    assertEquals("", clientMachine.getValue());
+  }
+
+  private OMRequest createAllocateBlockRequestWithSort(String clientAddress) {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)
+        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setSortDatanodes(true)
+        .build();
+    AllocateBlockRequest allocateBlockRequest = AllocateBlockRequest.newBuilder()
+        .setClientID(clientID).setKeyArgs(keyArgs).build();
+    return OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
+        .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(UserInfo.newBuilder().setRemoteAddress(clientAddress).build())
+        .setAllocateBlockRequest(allocateBlockRequest).build();
   }
 
   protected OMRequest createAllocateBlockRequest() {

@@ -55,10 +55,12 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -66,6 +68,7 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -190,7 +193,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      boolean shouldSortDatanodes, UserInfo userInfo, KeyManager keyManager)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
@@ -208,7 +211,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     try {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+              excludeList, "");
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
@@ -220,11 +223,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
+      Pipeline pipeline = allocatedBlock.getPipeline();
+      if (shouldSortDatanodes) {
+        final List<DatanodeDetails> nodes = pipeline.getNodes();
+        final List<? extends DatanodeDetails> sorted =
+            keyManager.sortDatanodesForWrite(nodes, clientMachine);
+        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+          pipeline = pipeline.copyWithNodesInOrder(sorted);
+        }
+      }
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline());
+          .setPipeline(pipeline);
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager.generateToken(remoteUser, blockID,
             EnumSet.of(READ, WRITE), scmBlockSize));
