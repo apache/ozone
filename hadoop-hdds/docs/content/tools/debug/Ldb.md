@@ -74,7 +74,7 @@ Usage: ozone debug ldb scan [--compact] [--count] [--with-keys]
 Parse specified metadataTable
       --batch-size=<batchSize>
                           Batch size for processing DB data.
-      --cf, --column_family, --column-family=<tableName>
+      --cf, --column-family=<tableName>
                           Table name
       --cid, --container-id=<containerId>
                           Container ID. Applicable if datanode DB Schema is V3
@@ -82,7 +82,7 @@ Parse specified metadataTable
       --count, --show-count
                           Get estimated key count for the given DB column family
                             Default: false
-  -d, --dnSchema, --dn-schema=<dnDBSchemaVersion>
+  -d, --dn-schema=<dnDBSchemaVersion>
                           Datanode DB Schema Version: V1/V2/V3
   -e, --ek, --endkey=<endKey>
                           Key at which iteration of the DB ends

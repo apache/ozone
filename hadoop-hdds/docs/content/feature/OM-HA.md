@@ -137,7 +137,7 @@ ozone admin om transfer -id <OM_SERVICE_ID> -r
 ```
 
 *   `-id, --service-id`: Specifies the Ozone Manager Service ID.
-*   `-n, --newLeaderId, --new-leader-id`: The node ID of the OM to which leadership will be transferred (e.g., `om1`).
+*   `-n, --new-leader-id`: The node ID of the OM to which leadership will be transferred (e.g., `om1`).
 *   `-r, --random`: Randomly chooses a follower to transfer leadership to.
 
 ### Example

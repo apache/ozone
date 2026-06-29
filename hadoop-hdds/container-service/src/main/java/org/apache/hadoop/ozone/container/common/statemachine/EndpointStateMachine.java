@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
-import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -46,7 +46,7 @@ public class EndpointStateMachine
       LOG = LoggerFactory.getLogger(EndpointStateMachine.class);
   private final StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint;
   private final AtomicLong missedCount;
-  private final InetSocketAddress address;
+  private final HostAndPort hostAndPort;
   private final Lock lock;
   private final ConfigurationSource conf;
   private EndPointStates state = EndPointStates.FIRST;
@@ -64,18 +64,17 @@ public class EndpointStateMachine
    *
    * @param endPoint - RPC endPoint.
    */
-  public EndpointStateMachine(InetSocketAddress address,
+  public EndpointStateMachine(HostAndPort hostAndPort,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
       ConfigurationSource conf, String threadNamePrefix) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
-    this.address = address;
+    this.hostAndPort = hostAndPort;
     lock = new ReentrantLock();
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder()
-            .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-"
-                + this.address + "-%d ")
+            .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-" + hostAndPort + "-%d ")
             .build());
   }
 
@@ -180,7 +179,7 @@ public class EndpointStateMachine
 
   @Override
   public String getAddressString() {
-    return getAddress().toString();
+    return hostAndPort.getAddress().toString();
   }
 
   public void zeroMissedCount() {
@@ -192,8 +191,8 @@ public class EndpointStateMachine
    *
    * @return - EndPoint.
    */
-  public InetSocketAddress getAddress() {
-    return this.address;
+  public HostAndPort getAddress() {
+    return hostAndPort;
   }
 
   /**
@@ -213,7 +212,7 @@ public class EndpointStateMachine
    */
   @Override
   public String toString() {
-    return address.toString();
+    return hostAndPort.toString();
   }
 
   /**
@@ -236,14 +235,8 @@ public class EndpointStateMachine
       long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(
               this.getMissedCount() * getScmHeartbeatInterval(this.conf)
       );
-      LOG.warn(
-              "Unable to communicate to {} server at {}:{} for past {} seconds.",
-              serverName,
-              address.getAddress(),
-              address.getPort(),
-              missedDurationSeconds,
-              ex
-      );
+      LOG.warn("Unable to communicate to {} server at {} past {} seconds.",
+              serverName, hostAndPort, missedDurationSeconds, ex);
     }
 
     if (LOG.isTraceEnabled()) {

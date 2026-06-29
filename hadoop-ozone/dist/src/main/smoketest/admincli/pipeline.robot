@@ -24,23 +24,39 @@ Test Timeout        5 minutes
 ${PIPELINE}
 ${SCM}       scm
 
+*** Keywords ***
+List Should Have Ratis Pipeline
+    [arguments]    ${json}    ${factor}    ${expected}=${TRUE}
+    ${actual} =    Execute     echo '${json}' | jq 'map(.replicationConfig) | contains([{"replicationFactor": "${factor}", "replicationType": "RATIS"}])'
+    Should Be Equal    '${expected}'    '${actual}'    ignore_case=True
+
 *** Test Cases ***
 List pipelines
     ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   RATIS/ONE
-    ${pipeline} =       Execute          ozone admin pipeline list | grep 'ReplicationConfig: RATIS/ONE' | head -n 1 | cut -d' ' -f3 | sed 's/,$//'
+    ${pipeline} =       Execute          echo '${output}' | grep 'ReplicationConfig: RATIS/ONE' | head -n 1 | cut -d' ' -f3 | sed 's/,$//'
                         Set Suite Variable    ${PIPELINE}    ${pipeline}
 
 List pipeline with json option
-    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
-    Should be true      $output
+    ${output} =         Execute          ozone admin pipeline list --json
+    List Should Have Ratis Pipeline    ${output}    ONE
 
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
                         Should contain   ${output}   RATIS/ONE
 
 List pipelines with explicit host and json option
-    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
+    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json
+    List Should Have Ratis Pipeline    ${output}    ONE
+
+List pipeline respects deprecated option -ffc
+    ${output} =         Execute          ozone admin pipeline list --json -ffc ONE 2>/dev/null
+    List Should Have Ratis Pipeline    ${output}    ONE
+    List Should Have Ratis Pipeline    ${output}    THREE    ${FALSE}
+
+List pipeline respects deprecated option -fst
+    ${output} =         Execute          ozone admin pipeline list -fst DORMANT
+    Should Not Contain  ${output}        DORMANT
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"

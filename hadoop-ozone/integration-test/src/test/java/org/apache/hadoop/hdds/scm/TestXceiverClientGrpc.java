@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -43,6 +44,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -292,6 +295,175 @@ public class TestXceiverClientGrpc {
     BlockID bid = new BlockID(1, 1);
     bid.setBlockCommitSequenceId(1);
     ContainerProtocolCalls.readSmallFile(client, bid, null);
+  }
+
+  /** streamRead() calls onNext() immediately when isReady() is true from the start. */
+  @Test
+  public void testStreamReadSendsImmediatelyWhenReady() throws Exception {
+    TrackingStreamObserver obs = new TrackingStreamObserver(0);
+    StreamingReadResponse response = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), obs);
+    ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+      client.streamRead(request, response);
+    }
+
+    assertEquals(1, obs.getSent().size(), "onNext must be called exactly once");
+    assertEquals(request, obs.getSent().get(0));
+    assertEquals(1, obs.getReadyCalls().get(),
+        "isReady() must be checked exactly once when stream is immediately ready");
+  }
+
+  /** streamRead() spin-waits until isReady() becomes true, then calls onNext(). */
+  @Test
+  public void testStreamReadWaitsUntilReadyThenSends() throws Exception {
+    TrackingStreamObserver obs = new TrackingStreamObserver(3);
+    StreamingReadResponse response = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), obs);
+    ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+      client.streamRead(request, response);
+    }
+
+    assertEquals(1, obs.getSent().size(), "onNext must be called exactly once");
+    assertEquals(request, obs.getSent().get(0));
+    assertThat(obs.getReadyCalls().get()).isGreaterThanOrEqualTo(4);
+  }
+
+  /**
+   * streamRead() honours the stream read timeout and does not send while the stream is not ready.
+   */
+  @Test
+  public void testStreamReadFailsAfterTimeoutIfNeverReady() throws Exception {
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    timeoutConf.set("ozone.client.stream.read.timeout", "1s");
+
+    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    StreamingReadResponse response = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), obs);
+    ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
+
+    long start;
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, timeoutConf)) {
+      start = System.currentTimeMillis();
+      assertThrows(TimeoutIOException.class, () -> client.streamRead(request, response));
+    }
+    long elapsed = System.currentTimeMillis() - start;
+
+    assertEquals(0, obs.getSent().size(), "onNext must not be called while the stream is not ready");
+    assertThat(elapsed).isGreaterThanOrEqualTo(1000L);
+    assertThat(elapsed).isLessThan(10_000L);
+  }
+
+  /** streamRead() exits the spin-wait immediately on interrupt and restores the interrupt flag. */
+  @Test
+  public void testStreamReadRestoresInterruptFlagOnInterruption() throws Exception {
+    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    StreamingReadResponse response = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), obs);
+    ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
+
+    OzoneConfiguration longTimeout = new OzoneConfiguration();
+    longTimeout.set("ozone.client.stream.read.timeout", "60s");
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, longTimeout)) {
+      Thread self = Thread.currentThread();
+      new Thread(() -> {
+        try {
+          Thread.sleep(50);
+        } catch (InterruptedException ignored) {
+        }
+        self.interrupt();
+      }).start();
+
+      long start = System.currentTimeMillis();
+      assertThrows(InterruptedIOException.class, () -> client.streamRead(request, response));
+      long elapsed = System.currentTimeMillis() - start;
+
+      assertThat(elapsed).isLessThan(5_000L);
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+      assertEquals(0, obs.getSent().size());
+    } finally {
+      Thread.interrupted(); // clear for test cleanup
+    }
+  }
+
+  /** Records onNext() calls and controls when isReady() starts returning true. */
+  private static final class TrackingStreamObserver
+      extends ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> {
+
+    private final List<ContainerProtos.ContainerCommandRequestProto> sent = new ArrayList<>();
+    private final AtomicInteger readyCalls = new AtomicInteger();
+    private final int readyAfter;
+
+    TrackingStreamObserver(int readyAfter) {
+      this.readyAfter = readyAfter;
+    }
+
+    List<ContainerProtos.ContainerCommandRequestProto> getSent() {
+      return sent;
+    }
+
+    AtomicInteger getReadyCalls() {
+      return readyCalls;
+    }
+
+    @Override
+    public boolean isReady() {
+      return readyCalls.incrementAndGet() > readyAfter;
+    }
+
+    @Override
+    public void onNext(ContainerProtos.ContainerCommandRequestProto value) {
+      sent.add(value);
+    }
+
+    @Override
+    public void cancel(String msg, Throwable cause) {
+    }
+
+    @Override
+    public void setOnReadyHandler(Runnable r) {
+    }
+
+    @Override
+    public void disableAutoInboundFlowControl() {
+    }
+
+    @Override
+    public void request(int count) {
+    }
+
+    @Override
+    public void setMessageCompression(boolean enable) {
+    }
+
+    @Override
+    public void onError(Throwable t) {
+    }
+
+    @Override
+    public void onCompleted() {
+    }
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto buildReadBlockRequest() {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setContainerID(1L)
+        .setDatanodeUuid(dns.get(0).getUuidString())
+        .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+            .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder()
+                .setContainerID(1L)
+                .setLocalID(1L)
+                .setBlockCommitSequenceId(1L)
+                .build())
+            .setOffset(0L)
+            .setLength(1024L)
+            .build())
+        .build();
   }
 
   private XceiverClientReply buildValidResponse() {

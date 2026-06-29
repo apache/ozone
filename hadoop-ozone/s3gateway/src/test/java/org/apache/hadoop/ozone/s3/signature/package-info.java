@@ -15,20 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.api;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import javax.ws.rs.Path;
-
 /**
- * Annotation to apply to endpoint classes that also have a {@link Path}
- * annotation that will cause their access to be restricted to ozone and
- * recon administrators only.
+ * Unit tests for AWS Signature V4 request canonicalization and signature base creation used by the S3 Gateway.
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AdminOnly {
-}
+package org.apache.hadoop.ozone.s3.signature;
+

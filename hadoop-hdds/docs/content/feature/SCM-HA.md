@@ -104,7 +104,7 @@ ozone admin scm transfer -id <SCM_SERVICE_ID> -r
 ```
 
 *   `-id, --service-id`: Specifies the SCM Service ID.
-*   `-n, --newLeaderId, --new-leader-id`: The SCM UUID (Raft peer ID) of the SCM to which leadership will be transferred (e.g., `e6877ce5-56cd-4f0b-ad60-4c8ef9000882`).
+*   `-n, --new-leader-id`: The SCM UUID (Raft peer ID) of the SCM to which leadership will be transferred (e.g., `e6877ce5-56cd-4f0b-ad60-4c8ef9000882`).
 *   `-r, --random`: Randomly chooses a follower to transfer leadership to.
 
 ### Example
@@ -291,7 +291,7 @@ layoutVersion=0
 You can also create data and double check with `ozone debug` tool if all the container metadata is replicated.
 
 ```shell
-bin/ozone freon randomkeys --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=10000 --keySize=524288 --replicationType=RATIS --numOfThreads=8 --factor=THREE --bufferSize=1048576
+bin/ozone freon randomkeys --num-of-volumes=1 --num-of-buckets=1 --num-of-keys=10000 --key-size=524288 --type=RATIS --num-of-threads=8 --factor=THREE --buffer-size=1048576
 
 
 # use debug ldb to check scm.db on all the machines

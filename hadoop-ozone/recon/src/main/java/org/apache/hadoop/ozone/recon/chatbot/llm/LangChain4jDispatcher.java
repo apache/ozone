@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.recon.chatbot.llm;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolParameters;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -54,22 +57,18 @@ import org.slf4j.LoggerFactory;
  * <p><b>Startup:</b> reads configuration and checks which providers have API keys. No
  * network calls are made until {@link #chatCompletion} is first invoked.</p>
  *
- * <p><b>Provider routing</b> — resolved in this order on every call:</p>
+ * <p><b>Provider/model routing</b> — resolved on every call via {@link LlmRouting}:</p>
  * <ol>
- *   <li>Explicit {@code _provider} key in the parameters map, or a {@code provider:model}
- *       prefix in the model string.</li>
- *   <li>Reverse lookup in the configured model lists ({@link #supportedModels}): the same
- *       map that drives {@code GET /chatbot/models}. Adding a model to
- *       {@code ozone.recon.chatbot.openai.models} in {@code ozone-site.xml} makes it
- *       routable with no code change.</li>
- *   <li>If the model is not found and no hint was given, {@link LLMException} is thrown
- *       directing the caller to {@code GET /api/v1/chatbot/models}.</li>
+ *   <li>Use the requested provider if it is configured with an API key.</li>
+ *   <li>Else infer provider from a supported model name, else use the configured default provider.</li>
+ *   <li>Use the requested model if it appears in any configured model list, else the default model.</li>
+ *   <li>If the model is not valid for the chosen provider, fall back to default provider + default model.</li>
  * </ol>
  *
  * <p><b>Model caching:</b> building a {@link ChatLanguageModel} creates an HTTP client and
- * SSL context, so each {@code (provider, model)} pair is built once and cached in
- * {@link #modelCache}. If the first call with that model fails, the entry is evicted so a
- * bad model name cannot get stuck in the cache permanently.</p>
+ * SSL context, so each {@code (provider, model, temperature, max_tokens)} combination is built
+ * once and cached in {@link #modelCache}. If the first call with that combination fails, the
+ * entry is evicted so a bad configuration cannot get stuck in the cache permanently.</p>
  */
 @Singleton
 public class LangChain4jDispatcher implements LLMClient {
@@ -77,10 +76,16 @@ public class LangChain4jDispatcher implements LLMClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(LangChain4jDispatcher.class);
 
+  private static final String PROVIDER_OPENAI = "openai";
+  private static final String PROVIDER_GEMINI = "gemini";
+  private static final String PROVIDER_ANTHROPIC = "anthropic";
+
   private final OzoneConfiguration configuration;
   private final CredentialHelper credentialHelper;
   private final Duration timeout;
   private final String defaultProvider;
+  private final String defaultModel;
+  private final LlmRouting routing;
 
   /**
    * Per-provider static model lists — used by getSupportedModels() and isAvailable().
@@ -116,6 +121,9 @@ public class LangChain4jDispatcher implements LLMClient {
     this.defaultProvider = configuration.get(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER_DEFAULT);
+    this.defaultModel = configuration.get(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL_DEFAULT);
 
     // Register available providers. A provider is considered "available" only if
     // a non-empty API key has been configured for it. Model lists are read from
@@ -140,81 +148,153 @@ public class LangChain4jDispatcher implements LLMClient {
           ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT));
     }
 
-    LOG.info("LangChain4jDispatcher initialized. Available providers: {}, default: {}",
-        supportedModels.keySet(), defaultProvider);
+    this.routing = new LlmRouting(defaultProvider, defaultModel, supportedModels);
+
+    LOG.info("LangChain4jDispatcher initialized. Available providers: {}, default: {}/{}",
+        supportedModels.keySet(), defaultProvider, defaultModel);
   }
 
   /**
    * Sends the conversation to the appropriate LLM provider and returns a standardised response.
+   * When {@code tools} is non-null the model may reply with native tool calls instead of (or in
+   * addition to) text; text-only callers (summarization, fallback) pass {@code null}.
    *
    * <p>Steps:
    * <ol>
-   *   <li>Determine which provider to use from model name prefix or explicit provider hint.</li>
-   *   <li>Build a LangChain4j {@link ChatLanguageModel} for that provider + model.</li>
-   *   <li>Translate internal {@link ChatMessage} list to LangChain4j message types.</li>
+   *   <li>Resolve provider and model via {@link LlmRouting}.</li>
+   *   <li>Build a LangChain4j {@link ChatLanguageModel} for that provider + model
+   *       (including optional {@code temperature} and {@code max_tokens} from parameters).</li>
+   *   <li>Translate internal {@link ChatMessage} list to LangChain4j message types and attach
+   *       tool specifications when {@code tools} is supplied.</li>
    *   <li>Call the model, extract text + token counts, return {@link LLMResponse}.</li>
    * </ol>
    */
   @Override
-  public LLMResponse chatCompletion(List<ChatMessage> messages, String modelStr, Map<String, Object> parameters)
+  public LLMResponse chatCompletion(List<ChatMessage> messages, String modelStr, String providerStr,
+                                    GenParams params, List<ToolSpec> tools)
       throws LLMException {
 
     if (messages == null || messages.isEmpty()) {
       throw new LLMException("Messages cannot be null or empty");
     }
 
-    // Extract provider hint and actual model name from "provider:model" format if present.
-    String providerHint = null;
-    String actualModel = modelStr;
-    if (parameters != null && parameters.containsKey("_provider")) {
-      providerHint = (String) parameters.get("_provider");
-    }
-    if (modelStr != null && modelStr.contains(":")) {
-      String[] parts = modelStr.split(":", 2);
-      providerHint = parts[0].toLowerCase();
-      actualModel = parts[1];
-    }
+    // Pick the provider/model we can actually call (user request may be unsupported).
+    LlmRouting.Resolved resolved = routing.resolve(providerStr, modelStr);
+    String provider = resolved.getProvider();
+    String actualModel = resolved.getModel();
+    LOG.debug("Routing LLM call: requested provider={}, model={} -> resolved provider={}, model={}",
+        providerStr, modelStr, provider, actualModel);
 
-    String provider = resolveProvider(providerHint, actualModel);
-    LOG.debug("Routing chatCompletion: model={}, resolvedProvider={}", actualModel, provider);
-
-    // Build the LangChain4j model for this specific request.
-    ChatLanguageModel chatModel = buildModel(provider, actualModel);
-
-    // Translate our internal ChatMessage list into LangChain4j's message types.
-    List<dev.langchain4j.data.message.ChatMessage> lc4jMessages =
-        translateMessages(messages);
+    // Cached HTTP client + model for this (provider, model, temperature, max_tokens).
+    ChatLanguageModel chatModel = buildModel(provider, actualModel, params);
+    // Messages for the LLM; attach Recon tool specs when tools != null (tool-selection step).
+    ChatRequest chatRequest = buildChatRequest(translateMessages(messages), tools);
 
     try {
-      ChatRequest chatRequest = ChatRequest.builder()
-          .messages(lc4jMessages)
-          .build();
-      ChatResponse response = chatModel.chat(chatRequest);
-
-      String content = response.aiMessage().text();
-      if (content == null) {
-        content = "";
-      }
-
-      // Extract token usage for cost tracking. LangChain4j normalises this across providers.
-      TokenUsage usage = response.tokenUsage();
-      int promptTokens = usage != null ? safeInt(usage.inputTokenCount()) : 0;
-      int completionTokens = usage != null ? safeInt(usage.outputTokenCount()) : 0;
-
-      Map<String, Object> metadata = new HashMap<>();
-      metadata.put("provider", provider);
-      if (response.finishReason() != null) {
-        metadata.put("finish_reason", response.finishReason().toString());
-      }
-
-      return new LLMResponse(content, actualModel, promptTokens, completionTokens, metadata);
-
+      ChatResponse response = invokeModel(chatModel, chatRequest, provider, actualModel);
+      // Reasoning models may return no visible text; treat that as empty, not a 500.
+      return response == null ? emptyTextResponse(actualModel) : toLLMResponse(response, actualModel);
     } catch (Exception e) {
-      modelCache.remove(provider + ":" + actualModel);
+      // Drop cached model so a bad config is not reused on the next request.
+      modelCache.remove(buildCacheKey(provider, actualModel, params));
       LOG.error("LangChain4j call failed for provider={}, model={}", provider, actualModel, e);
       throw new LLMException(
           "LLM request failed for provider '" + provider + "': " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Builds the outgoing LangChain4j {@link ChatRequest} from the translated messages, attaching
+   * tool specifications when the caller supplied any.
+   */
+  private ChatRequest buildChatRequest(List<dev.langchain4j.data.message.ChatMessage> messages,
+                                       List<ToolSpec> tools) {
+    ChatRequest.Builder requestBuilder = ChatRequest.builder().messages(messages);
+    if (tools != null && !tools.isEmpty()) {
+      requestBuilder.toolSpecifications(toLangChain4jToolSpecs(tools));
+    }
+    return requestBuilder.build();
+  }
+
+  /**
+   * Converts our internal {@link ToolSpec} list into LangChain4j {@link ToolSpecification}s,
+   * mapping each parameter to a JSON-schema-like {@code {type: ...}} property.
+   */
+  private List<ToolSpecification> toLangChain4jToolSpecs(List<ToolSpec> tools) {
+    List<ToolSpecification> toolSpecs = new ArrayList<>();
+    for (ToolSpec spec : tools) {
+      ToolSpecification.Builder specBuilder = ToolSpecification.builder()
+          .name(spec.getName())
+          .description(spec.getDescription());
+      if (spec.getParametersSchema() != null && !spec.getParametersSchema().isEmpty()) {
+        Map<String, Map<String, Object>> props = new HashMap<>();
+        for (Map.Entry<String, Object> entry : spec.getParametersSchema().entrySet()) {
+          Map<String, Object> typeMap = new HashMap<>();
+          typeMap.put("type", entry.getValue());
+          props.put(entry.getKey(), typeMap);
+        }
+        ToolParameters toolParams = ToolParameters.builder()
+            .type("object")
+            .properties(props)
+            .build();
+        specBuilder.parameters(toolParams);
+      }
+      toolSpecs.add(specBuilder.build());
+    }
+    return toolSpecs;
+  }
+
+  /**
+   * Fires the actual provider call. Returns {@code null} when the provider returned a null text
+   * body — LangChain4j 0.35.0 surfaces this as an {@link IllegalArgumentException}, common with
+   * reasoning models that exhaust {@code max_tokens} on thinking before any visible text.
+   */
+  private ChatResponse invokeModel(ChatLanguageModel chatModel, ChatRequest chatRequest,
+                                   String provider, String model) {
+    try {
+      return chatModel.chat(chatRequest);
+    } catch (IllegalArgumentException e) {
+      if (isNullTextContentFromProvider(e)) {
+        LOG.warn("Model returned null text for provider={}, model={}; treating as empty response",
+            provider, model);
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Normalises a LangChain4j {@link ChatResponse} into our internal {@link LLMResponse}: text
+   * content (empty when the model only wants to call a tool), any native tool calls, and token
+   * usage for cost tracking.
+   */
+  private LLMResponse toLLMResponse(ChatResponse response, String model) {
+    String content = response.aiMessage().text();
+    if (content == null) {
+      content = "";
+    }
+
+    List<ToolCallRequest> toolCallRequests = null;
+    if (response.aiMessage().hasToolExecutionRequests()) {
+      toolCallRequests = new ArrayList<>();
+      for (ToolExecutionRequest req : response.aiMessage().toolExecutionRequests()) {
+        toolCallRequests.add(new ToolCallRequest(req.name(), req.arguments()));
+      }
+    }
+
+    TokenUsage usage = response.tokenUsage();
+    int promptTokens = usage != null ? safeInt(usage.inputTokenCount()) : 0;
+    int completionTokens = usage != null ? safeInt(usage.outputTokenCount()) : 0;
+
+    return new LLMResponse(content, model, promptTokens, completionTokens, toolCallRequests);
+  }
+
+  private static boolean isNullTextContentFromProvider(IllegalArgumentException e) {
+    return e.getMessage() != null && e.getMessage().contains("text cannot be null");
+  }
+
+  private static LLMResponse emptyTextResponse(String model) {
+    return new LLMResponse("", model, 0, 0, null);
   }
 
   /**
@@ -243,42 +323,29 @@ public class LangChain4jDispatcher implements LLMClient {
   // =========================================================================
 
   /**
-   * Returns the provider for the given model.
-   * If a hint is supplied (via explicit field or "provider:model" prefix), it is used directly.
-   * Otherwise, the model name is looked up in the configured model lists (same data the UI uses).
-   * Throws if the model is not found in any list — callers should use GET /chatbot/models.
-   */
-  private String resolveProvider(String providerHint, String model) throws LLMException {
-    if (providerHint != null && !providerHint.isEmpty()) {
-      return providerHint.toLowerCase();
-    }
-    if (model != null) {
-      for (Map.Entry<String, List<String>> entry : supportedModels.entrySet()) {
-        if (entry.getValue().contains(model)) {
-          return entry.getKey();
-        }
-      }
-    }
-    throw new LLMException(
-        "Model '" + model + "' is not recognised. "
-            + "Use GET /api/v1/chatbot/models for the list of supported models.");
-  }
-
-  /**
    * Returns a {@link ChatLanguageModel} for the given provider and model, building and caching
    * it on first use. Subsequent calls for the same (provider, model) pair return the cached
    * instance immediately — no HTTP client or SSL context is re-created.
    */
-  private ChatLanguageModel buildModel(String provider, String model) throws LLMException {
-    String cacheKey = provider + ":" + model;
+  private ChatLanguageModel buildModel(String provider, String model,
+                                       GenParams params) throws LLMException {
+    String cacheKey = buildCacheKey(provider, model, params);
     ChatLanguageModel cached = modelCache.get(cacheKey);
     if (cached != null) {
       return cached;
     }
-    ChatLanguageModel built = buildModelInternal(provider, model);
+    ChatLanguageModel built =
+        buildModelInternal(provider, model, params.temperature(), params.maxTokens());
     modelCache.put(cacheKey, built);
-    LOG.info("Built and cached ChatLanguageModel for provider={}, model={}", provider, model);
+    LOG.info("Built and cached ChatLanguageModel for provider={}, model={}, temperature={}, maxTokens={}",
+        provider, model, params.temperature(), params.maxTokens());
     return built;
+  }
+
+  private static String buildCacheKey(String provider, String model, GenParams params) {
+    return provider + ":" + model
+        + ":t=" + params.temperature()
+        + ":m=" + params.maxTokens();
   }
 
   /**
@@ -286,33 +353,38 @@ public class LangChain4jDispatcher implements LLMClient {
    * The API key is always resolved from the server configuration via {@link CredentialHelper}.
    * Callers should prefer {@link #buildModel} which caches the result.
    */
-  private ChatLanguageModel buildModelInternal(String provider, String model) throws LLMException {
+  private ChatLanguageModel buildModelInternal(String provider, String model,
+                                               double temperature, int maxTokens)
+      throws LLMException {
     switch (provider) {
-    case "openai":
-      return buildOpenAiModel(model);
-    case "gemini":
-      return buildGeminiModel(model);
-    case "anthropic":
-      return buildAnthropicModel(model);
+    case PROVIDER_OPENAI:
+      return buildOpenAiModel(model, temperature, maxTokens);
+    case PROVIDER_GEMINI:
+      return buildGeminiModel(model, temperature, maxTokens);
+    case PROVIDER_ANTHROPIC:
+      return buildAnthropicModel(model, temperature, maxTokens);
     default:
       throw new LLMException("Unknown or unconfigured provider: '" + provider + "'");
     }
   }
 
-  private ChatLanguageModel buildOpenAiModel(String model) throws LLMException {
+  private ChatLanguageModel buildOpenAiModel(String model, double temperature, int maxTokens)
+      throws LLMException {
     String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
     String baseUrl = configuration.get(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT);
-    return OpenAiChatModel.builder()
+    OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
         .apiKey(key)
         .modelName(model)
         .baseUrl(baseUrl)
-        .timeout(timeout)
-        .build();
+        .timeout(timeout);
+    applyGenerationParams(builder, temperature, maxTokens);
+    return builder.build();
   }
 
-  private ChatLanguageModel buildGeminiModel(String model) throws LLMException {
+  private ChatLanguageModel buildGeminiModel(String model, double temperature, int maxTokens)
+      throws LLMException {
     String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
     String baseUrl = configuration.get(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL,
@@ -321,15 +393,17 @@ public class LangChain4jDispatcher implements LLMClient {
     // LangChain4j 0.35.0's native Gemini client has a known bug where it ignores read timeouts.
     // Since Google's Gemini API is fully compatible with the OpenAI API spec via the /openai/
     // endpoint, we route Gemini requests through the OpenAiChatModel to ensure timeouts are honored.
-    return OpenAiChatModel.builder()
+    OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
         .apiKey(key)
         .modelName(model)
         .baseUrl(baseUrl)
-        .timeout(timeout)
-        .build();
+        .timeout(timeout);
+    applyGenerationParams(builder, temperature, maxTokens);
+    return builder.build();
   }
 
-  private ChatLanguageModel buildAnthropicModel(String model) throws LLMException {
+  private ChatLanguageModel buildAnthropicModel(String model, double temperature, int maxTokens)
+      throws LLMException {
     String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "anthropic");
     String betaHeader = configuration.get(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER,
@@ -342,7 +416,20 @@ public class LangChain4jDispatcher implements LLMClient {
     if (betaHeader != null && !betaHeader.isEmpty()) {
       builder.beta(betaHeader);
     }
+    applyGenerationParams(builder, temperature, maxTokens);
     return builder.build();
+  }
+
+  private static void applyGenerationParams(OpenAiChatModel.OpenAiChatModelBuilder builder,
+                                            double temperature, int maxTokens) {
+    builder.temperature(temperature);
+    builder.maxTokens(maxTokens);
+  }
+
+  private static void applyGenerationParams(AnthropicChatModel.AnthropicChatModelBuilder builder,
+                                            double temperature, int maxTokens) {
+    builder.temperature(temperature);
+    builder.maxTokens(maxTokens);
   }
 
   /**
@@ -376,6 +463,9 @@ public class LangChain4jDispatcher implements LLMClient {
       switch (msg.getRole()) {
       case "system":
         result.add(SystemMessage.from(msg.getContent()));
+        break;
+      case "user":
+        result.add(UserMessage.from(msg.getContent()));
         break;
       case "assistant":
         result.add(AiMessage.from(msg.getContent()));
