@@ -44,7 +44,7 @@ public final class IOUtils {
    * Close the Closeable objects and <b>ignore</b> any {@link Throwable} or
    * null pointers. Must only be used for cleanup in exception handlers.
    *
-   * @param logger     the log to record problems to at debug level. Can be
+   * @param logger     the log to record problems to at warn level. Can be
    *                   null.
    * @param closeables the objects to close
    */
@@ -58,7 +58,7 @@ public final class IOUtils {
           c.close();
         } catch (Throwable e) {
           if (logger != null) {
-            logger.debug("Exception in closing {}", c, e);
+            logger.warn("Exception in closing {}", c, e);
           }
         }
       }

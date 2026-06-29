@@ -31,8 +31,6 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A bounded pool implementation that provides {@link ChunkBuffer}s. This pool allows allocating and releasing
@@ -42,8 +40,6 @@ import org.slf4j.LoggerFactory;
  * wait until a allocated buffer is released.
  */
 public class BufferPool {
-  private static final Logger LOG = LoggerFactory.getLogger(BufferPool.class);
-
   private static final BufferPool EMPTY = new BufferPool(0, 0);
   private final int bufferSize;
   private final int capacity;
@@ -90,7 +86,6 @@ public class BufferPool {
           "Total created buffer must not exceed capacity.");
 
       while (allocated.size() == capacity) {
-        LOG.debug("Allocation needs to wait the pool is at capacity (allocated = capacity = {}).", capacity);
         notFull.await();
       }
       // Get a buffer to allocate, preferably from the released ones.
@@ -99,8 +94,6 @@ public class BufferPool {
       allocated.add(buffer);
       currentBuffer = buffer;
 
-      LOG.debug("Allocated new buffer {}, number of used buffers {}, capacity {}.",
-          buffer, allocated.size(), capacity);
       return buffer;
     } finally {
       lock.unlock();
@@ -108,7 +101,6 @@ public class BufferPool {
   }
 
   void releaseBuffer(ChunkBuffer buffer) {
-    LOG.debug("Releasing buffer {}", buffer);
     lock.lock();
     try {
       Preconditions.assertTrue(removeByIdentity(allocated, buffer), "Releasing unknown buffer");
