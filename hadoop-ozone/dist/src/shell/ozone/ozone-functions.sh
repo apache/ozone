@@ -48,14 +48,14 @@ function ozone_debug
 ## @replaceable yes
 function ozone_validate_classpath_usage
 {
-  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
+  description=$'The --validate flag checks that all jars required for the command are present on the classpath\n\n'
   usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
   options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
   ozone_error "${description}${usage_text}${options}"
   exit 1
 }
 
-## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
+## @description Validates that all jars required for the command are present on the classpath
 ## @audience private
 ## @stability evolving
 ## @replaceable yes
@@ -1447,6 +1447,15 @@ function ozone_set_module_access_args
   fi
 
   # populate JVM args based on java version
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 24 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --enable-native-access=ALL-UNNAMED"
+  fi
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 23 ]]; then
+    # allow sun.misc.Unsafe until protobuf-java moves away from it
+    # see: https://github.com/protocolbuffers/protobuf/issues/20760
+    # see: https://openjdk.org/jeps/471
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --sun-misc-unsafe-memory-access=allow"
+  fi
   if [[ "${JAVA_MAJOR_VERSION}" -ge 17 ]]; then
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"

@@ -33,7 +33,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -59,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -89,9 +89,9 @@ public class TestStateContext {
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
         datanodeStateMachineMock, "");
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     ctx.addEndpoint(scm1);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
     ctx.addEndpoint(scm2);
 
     Map<String, Integer> expectedReportCount = new HashMap<>();
@@ -143,9 +143,9 @@ public class TestStateContext {
   @Test
   public void testReportQueueWithAddReports() throws IOException {
     StateContext ctx = createSubject();
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     ctx.addEndpoint(scm1);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
     ctx.addEndpoint(scm2);
     // Check initial state
     assertEquals(0, ctx.getAllAvailableReports(scm1).size());
@@ -304,9 +304,9 @@ public class TestStateContext {
       DatanodeStateMachine datanodeStateMachineMock) {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock, "");
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     stateContext.addEndpoint(scm1);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
     stateContext.addEndpoint(scm2);
     return stateContext;
   }
@@ -333,8 +333,8 @@ public class TestStateContext {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
 
     Message generatedMessage =
         newMockReport(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME);
@@ -395,7 +395,7 @@ public class TestStateContext {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
 
     // Add SCM endpoint.
     stateContext.addEndpoint(scm1);
@@ -453,8 +453,8 @@ public class TestStateContext {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
 
     // Try to get containerActions for endpoint which is not yet added.
     List<ContainerAction> containerActions =
@@ -656,9 +656,9 @@ public class TestStateContext {
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
         datanodeStateMachineMock, "");
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     ctx.addEndpoint(scm1);
-    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
     ctx.addEndpoint(scm2);
     // Check initial state
     assertEquals(0, ctx.getAllAvailableReports(scm1).size());

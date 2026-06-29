@@ -22,14 +22,11 @@ import com.google.inject.Scopes;
 import com.google.inject.servlet.ServletModule;
 import java.net.URL;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import javax.ws.rs.core.UriBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.recon.api.AdminOnly;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAdminFilter;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAuthFilter;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
@@ -41,9 +38,6 @@ import org.glassfish.jersey.server.spi.ContainerLifecycleListener;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.jvnet.hk2.guice.bridge.api.GuiceBridge;
 import org.jvnet.hk2.guice.bridge.api.GuiceIntoHK2Bridge;
-import org.reflections.Reflections;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ReconRestServletModule extends ServletModule {
 
-  public static final String BASE_API_PATH = UriBuilder.fromPath("/api").path(
-      "v1").build().toString();
+  public static final String BASE_API_PATH = "/api/v1";
   public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
   public static final String CHATBOT_API_PACKAGE = "org.apache.hadoop.ozone.recon.chatbot.api";
@@ -71,35 +64,21 @@ public class ReconRestServletModule extends ServletModule {
   protected void configureServlets() {
     if (conf instanceof OzoneConfiguration
         && ChatbotConfigKeys.isChatbotEnabled((OzoneConfiguration) conf)) {
-      configureApi(BASE_API_PATH, API_PACKAGE, CHATBOT_API_PACKAGE);
+      configureApi(API_PACKAGE, CHATBOT_API_PACKAGE);
     } else {
-      configureApi(BASE_API_PATH, API_PACKAGE);
+      configureApi(API_PACKAGE);
     }
   }
 
-  private void configureApi(String baseApiPath, String... packages) {
+  private void configureApi(String... packages) {
     StringBuilder sb = new StringBuilder();
-    Set<String> adminEndpoints = new HashSet<>();
 
     for (String pkg : packages) {
       if (sb.length() > 0) {
         sb.append(',');
       }
-      checkIfPackageExistsAndLog(pkg, baseApiPath);
+      checkIfPackageExistsAndLog(pkg);
       sb.append(pkg);
-      // Check for classes marked as admin only that will need an extra
-      // filter applied to their path.
-      Reflections reflections = new Reflections(pkg,
-          new TypeAnnotationsScanner(), new SubTypesScanner());
-      Set<Class<?>> adminEndpointClasses =
-          reflections.getTypesAnnotatedWith(AdminOnly.class);
-      adminEndpointClasses.stream()
-          .map(clss -> UriBuilder.fromResource(clss).build().toString())
-          .forEachOrdered(adminEndpoints::add);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Registered the following endpoint classes as admin only: {}",
-            adminEndpointClasses);
-      }
     }
     Map<String, String> params = new HashMap<>();
     params.put("javax.ws.rs.Application",
@@ -109,45 +88,35 @@ public class ReconRestServletModule extends ServletModule {
     }
     bind(ServletContainer.class).in(Scopes.SINGLETON);
 
-    String allApiPath =
-        UriBuilder.fromPath(baseApiPath).path("*").build().toString();
+    String allApiPath = UriBuilder.fromPath(BASE_API_PATH).path("*").build().toString();
     serve(allApiPath).with(ServletContainer.class, params);
-    addFilters(baseApiPath, adminEndpoints);
-  }
 
-  private void addFilters(String basePath, Set<String> adminSubPaths) {
     if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
-      String authPath =
-          UriBuilder.fromPath(basePath).path("*").build().toString();
-      filter(authPath).through(ReconAuthFilter.class);
+      filter(allApiPath).through(ReconAuthFilter.class);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Added authentication filter to path {}", authPath);
+        LOG.debug("Added authentication filter to path {}", allApiPath);
       }
 
       boolean authorizationEnabled = OzoneSecurityUtil.isAuthorizationEnabled(conf);
       if (authorizationEnabled) {
-        for (String path : adminSubPaths) {
-          String adminPath =
-              UriBuilder.fromPath(basePath).path(path + "*").build().toString();
-          filter(adminPath).through(ReconAdminFilter.class);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Added admin filter to path {}", adminPath);
-          }
+        filter(allApiPath).through(ReconAdminFilter.class);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Added admin filter to path {}", allApiPath);
         }
       }
     }
   }
 
-  private void checkIfPackageExistsAndLog(String pkg, String path) {
+  private void checkIfPackageExistsAndLog(String pkg) {
     String resourcePath = pkg.replace(".", "/");
     URL resource = getClass().getClassLoader().getResource(resourcePath);
     if (resource != null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Using API endpoints from package {} for paths under {}.",
-            pkg, path);
+            pkg, BASE_API_PATH);
       }
     } else {
-      LOG.warn("No Beans in '{}' found. Requests {} will fail.", pkg, path);
+      LOG.warn("No Beans in '{}' found. Requests {} will fail.", pkg, BASE_API_PATH);
     }
   }
 }

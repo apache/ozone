@@ -35,6 +35,7 @@ public enum S3GAction implements AuditAction {
 
   //RootEndpoint
   LIST_S3_BUCKETS,
+  LIST_DIRECTORY_BUCKETS,
 
   //ObjectEndpoint
   CREATE_MULTIPART_KEY,

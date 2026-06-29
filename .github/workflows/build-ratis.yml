@@ -54,6 +54,9 @@ on:
       protobuf-version:
         description: "Protobuf Version"
         value: ${{ jobs.ratis-thirdparty.outputs.protobuf-version }}
+      build-args:
+        description: "Arguments for building with Ratis"
+        value: ${{ jobs.summary.outputs.build-args }}
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 permissions: { }
@@ -66,7 +69,7 @@ jobs:
       thirdparty-version: ${{ steps.versions.outputs.thirdparty }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           repository: ${{ inputs.repo }}
@@ -79,7 +82,7 @@ jobs:
             !~/.m2/repository/org/apache/ratis
           key: ratis-dependencies-${{ hashFiles('**/pom.xml') }}
       - name: Setup java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           distribution: 'temurin'
           java-version: 8
@@ -115,7 +118,7 @@ jobs:
       protobuf-version: ${{ steps.versions.outputs.protobuf }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           repository: apache/ratis-thirdparty
@@ -126,19 +129,30 @@ jobs:
           echo "grpc=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
           echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
           echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
-  debug:
+  summary:
     runs-on: ubuntu-slim
     needs:
       - ratis
       - ratis-thirdparty
+    outputs:
+      build-args: ${{ steps.versions.outputs.build-args }}
     steps:
       - name: Print versions
+        id: versions
         run: |
+          build_args="-Dratis.version=$ratis_version"
+          build_args="$build_args -Dratis.thirdparty.version=$ratis_thirdparty_version"
+          build_args="$build_args -Dratis-thirdparty.grpc.version=$grpc_version"
+          build_args="$build_args -Dratis-thirdparty.netty.version=$netty_version"
+          build_args="$build_args -Dratis-thirdparty.protobuf.version=$protobuf_version"
+          echo "build-args=$build_args" >> "$GITHUB_OUTPUT"
+
           echo "Ratis: $ratis_version"
           echo "Thirdparty: $ratis_thirdparty_version"
           echo "Grpc: $grpc_version"
           echo "Netty: $netty_version"
           echo "Protobuf: $protobuf_version"
+          echo "Build args for Ozone: $build_args"
         env:
           ratis_version: ${{ needs.ratis.outputs.ratis-version }}
           ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}

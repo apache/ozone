@@ -228,12 +228,12 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (exception == null) {
       omMetrics.decNumSnapshotActive();
       omMetrics.incNumSnapshotDeleted();
-      LOG.info("Deleted snapshot '{}' under path '{}'",
-          snapshotName, snapshotPath);
+      LOG.info("Deleted snapshot '{}' (snapshotId='{}') under path '{}'",
+          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     } else {
       omMetrics.incNumSnapshotDeleteFails();
-      LOG.error("Failed to delete snapshot '{}' under path '{}'",
-          snapshotName, snapshotPath);
+      LOG.error("Failed to delete snapshot '{}' (snapshotId='{}') under path '{}'",
+          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     }
     return omClientResponse;
   }

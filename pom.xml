@@ -94,8 +94,8 @@
     <httpcore.version>4.4.16</httpcore.version>
     <iceberg.version>1.10.1</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.3</jackson2-bom.version>
-    <jacoco.version>0.8.14</jacoco.version>
+    <jackson2-bom.version>2.21.4</jackson2-bom.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
@@ -161,7 +161,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>20.18.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.62.0</opentelemetry.version>
+    <opentelemetry.version>1.63.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Kenai Fjords</ozone.release>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
@@ -182,7 +182,7 @@
     <properties.maven.plugin.version>1.3.0</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <protobuf.version>3.25.8</protobuf.version>
+    <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.8.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
     <ratis-thirdparty.grpc.version>1.75.0</ratis-thirdparty.grpc.version>
@@ -207,7 +207,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.53.1.0</sqlite.version>
+    <sqlite.version>3.53.2.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -222,7 +222,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-9</zstd-jni.version>
+    <zstd-jni.version>1.5.7-11</zstd-jni.version>
   </properties>
 
   <dependencyManagement>

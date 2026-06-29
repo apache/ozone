@@ -2381,6 +2381,8 @@ message BucketQuotaCount {
     required int64 diffUsedBytes = 3;
     required int64 diffUsedNamespace = 4;
     required bool supportOldQuota = 5 [default=false];
+    optional int64 diffSnapshotUsedBytes = 6;
+    optional int64 diffSnapshotUsedNamespace = 7;
 }
 
 message QuotaRepairResponse {

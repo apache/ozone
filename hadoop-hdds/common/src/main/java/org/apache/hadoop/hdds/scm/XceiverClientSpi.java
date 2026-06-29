@@ -149,7 +149,8 @@ public abstract class XceiverClientSpi implements Closeable {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
 
-  public void streamRead(ContainerCommandRequestProto request, StreamingReadResponse streamObserver) {
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReadResponse streamObserver) throws IOException {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
 
