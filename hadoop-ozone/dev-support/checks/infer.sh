@@ -34,7 +34,11 @@ MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=tru
 git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 mkdir -p "$REPORT_DIR"
-infer run --keep-going -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
+infer run --keep-going \
+  --skip-analysis-in-path "src/test/" \
+  --skip-analysis-in-path "target/generated-test-sources/" \
+  --skip-analysis-in-path "target/generated-sources/" \
+  -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 infer_rc=$?
 
 mkdir -p "$REPORT_DIR"
