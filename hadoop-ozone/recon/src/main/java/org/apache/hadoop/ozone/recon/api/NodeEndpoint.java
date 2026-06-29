@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -161,6 +163,7 @@ public class NodeEndpoint {
           .setState(nodeState)
           .setPipelines(pipelines)
           .setLeaderCount(leaderCount.get())
+          .setDisks(getDisks(datanode))
           .build());
     });
 
@@ -190,6 +193,24 @@ public class NodeEndpoint {
           .setFilesystemUsed(fsUsage.getUsedSpace());
     }
     return builder.build();
+  }
+
+  private List<DatanodeDiskInfo> getDisks(DatanodeInfo datanode) {
+    List<DatanodeDiskInfo> disks = new ArrayList<>();
+    for (StorageReportProto report : datanode.getStorageReports()) {
+      DatanodeDiskInfo.Builder builder = DatanodeDiskInfo.newBuilder()
+          .setStorageUuid(report.getStorageUuid())
+          .setStorageLocation(report.getStorageLocation())
+          .setCapacity(report.getCapacity())
+          .setUsed(report.getScmUsed())
+          .setRemaining(report.getRemaining())
+          .setCommitted(report.getCommitted());
+      if (report.hasOpenContainerCount()) {
+        builder.setOpenContainerCount(report.getOpenContainerCount());
+      }
+      disks.add(builder.build());
+    }
+    return disks;
   }
 
   /**
