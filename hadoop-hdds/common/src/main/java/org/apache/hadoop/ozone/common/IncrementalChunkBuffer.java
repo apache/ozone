@@ -124,9 +124,13 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     }
 
     // allocate upto the given index
+    // Use heap buffer: UnsafeByteOperations.unsafeWrap on a heap ByteBuffer returns a
+    // BoundedByteString with a backing array, so gRPC serializes via a single
+    // System.arraycopy into the Netty wire buffer instead of the slow NioByteString
+    // direct-buffer path (temp-array allocation + byte-by-byte copy).
     ByteBuffer b = null;
     for (; i <= index; i++) {
-      final CodecBuffer c = CodecBuffer.allocateDirect(getBufferCapacityAtIndex(i));
+      final CodecBuffer c = CodecBuffer.allocateHeap(getBufferCapacityAtIndex(i));
       underlying.add(c);
       b = c.asWritableByteBuffer();
       buffers.add(b);

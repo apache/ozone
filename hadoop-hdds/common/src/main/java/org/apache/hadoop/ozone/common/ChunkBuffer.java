@@ -45,7 +45,10 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
     if (increment > 0 && increment < capacity) {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
-    CodecBuffer codecBuffer = CodecBuffer.allocateDirect(capacity);
+    // Heap buffer: UnsafeByteOperations.unsafeWrap() returns a BoundedByteString
+    // with a backing array, enabling a single System.arraycopy into the gRPC/Netty
+    // wire buffer instead of the slow byte-by-byte NioByteString path for direct buffers.
+    CodecBuffer codecBuffer = CodecBuffer.allocateHeap(capacity);
     return new ChunkBufferImplWithByteBuffer(codecBuffer.asWritableByteBuffer(), codecBuffer);
   }
 
