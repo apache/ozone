@@ -18,7 +18,7 @@
 
 import React from 'react';
 import {vi} from 'vitest';
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, within} from '@testing-library/react';
 
 import {DatanodeTableProps} from '@/v2/types/datanode.types';
 import DatanodesTable from '@/v2/components/tables/datanodesTable';
@@ -151,6 +151,41 @@ describe('DatanodesTable Component', () => {
     const checkboxes = document.querySelectorAll('input.ant-checkbox-input');
     expect(checkboxes[1]).toBeDisabled(); // HEALTHY node
     expect(checkboxes[2]).not.toBeDisabled(); // DEAD node
+  });
+
+  test('distinguishes unreported and zero open container counts', () => {
+    const datanode = {
+      ...getDataWith('ozone-datanode-1', 'HEALTHY', 1),
+      disks: [
+        {
+          storageUuid: 'disk-1',
+          storageLocation: '/disk1',
+          capacity: 1000,
+          used: 100,
+          remaining: 900,
+          committed: 0,
+          openContainerCount: null
+        },
+        {
+          storageUuid: 'disk-2',
+          storageLocation: '/disk2',
+          capacity: 1000,
+          used: 100,
+          remaining: 900,
+          committed: 0,
+          openContainerCount: 0
+        }
+      ]
+    };
+    render(<DatanodesTable {...defaultProps} data={[datanode]} />);
+
+    const expandButton = document.querySelector('.ant-table-row-expand-icon');
+    expect(expandButton).not.toBeNull();
+    fireEvent.click(expandButton as HTMLElement);
+
+    const diskTable = screen.getByTestId('dn-disks-1');
+    expect(within(diskTable).getByText('N/A')).toBeInTheDocument();
+    expect(within(diskTable).getByText('0')).toBeInTheDocument();
   });
 
   test('shows filesystem rows in storage tooltip when provided', async () => {
