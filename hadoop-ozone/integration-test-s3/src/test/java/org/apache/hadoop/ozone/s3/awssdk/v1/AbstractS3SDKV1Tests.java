@@ -1316,6 +1316,28 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     testListObjectsMany(true);
   }
 
+  @Test
+  public void testListObjectsSpecialKeyNames() throws Exception {
+    final String bucketName = getBucketName("special-keys");
+    final String content = "x";
+    s3Client.createBucket(bucketName);
+
+    for (String keyName : S3SDKTestUtils.S3_SPECIAL_KEY_NAMES) {
+      InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+      s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+      try (S3Object object = s3Client.getObject(bucketName, keyName)) {
+        assertEquals(content, IOUtils.toString(object.getObjectContent(), StandardCharsets.UTF_8));
+      }
+    }
+
+    ObjectListing listObjectsResponse = s3Client.listObjects(
+        new ListObjectsRequest().withBucketName(bucketName));
+    List<String> listedKeys = listObjectsResponse.getObjectSummaries().stream()
+        .map(S3ObjectSummary::getKey)
+        .collect(Collectors.toList());
+    assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
+  }
+
   private void testListObjectsMany(boolean isListV2) throws Exception {
     final String bucketName = getBucketName();
     s3Client.createBucket(bucketName);

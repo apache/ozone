@@ -25,6 +25,8 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -37,6 +39,13 @@ import org.apache.ozone.test.InputSubstream;
  * Utilities for S3 SDK tests.
  */
 public final class S3SDKTestUtils {
+
+  /**
+   * Key names from ceph s3-tests {@code test_bucket_create_special_key_names}.
+   */
+  public static final List<String> S3_SPECIAL_KEY_NAMES = Collections.unmodifiableList(
+      Arrays.asList(" ", "\"",
+          "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__"));
 
   public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
 

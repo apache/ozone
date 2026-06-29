@@ -640,7 +640,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     StringBuilder builder = new StringBuilder()
         .append(OM_KEY_PREFIX).append(volume)
         .append(OM_KEY_PREFIX).append(bucket); // TODO : Throw if the Bucket is null?
-    if (StringUtils.isNotBlank(key)) {
+    if (StringUtils.isNotEmpty(key)) {
       builder.append(OM_KEY_PREFIX);
       if (!key.equals(OM_KEY_PREFIX)) {
         builder.append(key);
