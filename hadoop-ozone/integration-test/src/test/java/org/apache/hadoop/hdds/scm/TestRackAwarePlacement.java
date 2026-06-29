@@ -106,7 +106,7 @@ public class TestRackAwarePlacement {
 
   @ParameterizedTest
   @MethodSource("rackAwarePolicies")
-  void testPipelineAndContainerPlacementWithPolicy(
+  void testContainerPlacementWithPolicy(
       String placementClassName) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -119,6 +119,11 @@ public class TestRackAwarePlacement {
         .build()) {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(ReplicationFactor.THREE, 60_000);
+
+      StorageContainerManager scm = cluster.getStorageContainerManager();
+      PlacementPolicy actualPolicy = scm.getContainerPlacementPolicy();
+      assertEquals(placementClassName, actualPolicy.getClass().getName(),
+          "Placement policy was not set correctly");
 
       assertPipelinesSpanMultipleRacks(cluster);
       assertContainerReplicationIsRackAware(cluster);
