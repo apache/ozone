@@ -283,20 +283,21 @@ public class TestS3GrpcOmTransport {
   }
 
   @Test
-  public void testFollowerReadSkipsKnownLeader() throws Exception {
+  public void testFollowerReadDoesNotFailoverFromKnownLeader() throws Exception {
     conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
     configureHaOmService("om0", "om1");
 
     AtomicInteger leaderRequestCount = new AtomicInteger();
     AtomicInteger followerRequestCount = new AtomicInteger();
-    AtomicReference<OMRequest> followerRequest = new AtomicReference<>();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
 
     client = new GrpcOmTransport(conf, ugi, omServiceId);
     client.startClient("om0", createNodeChannel("om0",
-        leaderRequestCount, new AtomicReference<>()));
+        leaderRequestCount, leaderRequest));
     client.startClient("om1", createNodeChannel("om1",
-        followerRequestCount, followerRequest));
+        followerRequestCount, new AtomicReference<>()));
     client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om0");
 
     OMRequest request = OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
@@ -306,10 +307,10 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(request);
 
-    assertEquals(0, leaderRequestCount.get());
-    assertEquals(1, followerRequestCount.get());
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(0, followerRequestCount.get());
     assertEquals(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER,
-        followerRequest.get().getReadConsistencyHint().getReadConsistency());
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
   }
 
   @Test

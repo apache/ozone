@@ -221,10 +221,6 @@ public class GrpcOmTransport implements OmTransport {
     for (int i = 0; useFollowerRead &&
         i < omFailoverProxyProvider.getOMProxyMap().getNodeIds().size(); i++) {
       String nodeId = getCurrentFollowerReadNodeId();
-      if (isCurrentLeaderNode(nodeId)) {
-        changeFollowerReadProxy(nodeId);
-        continue;
-      }
       String followerHost = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
       try {
         OMResponse response = submitRequestToHost(followerPayload, followerHost);
@@ -267,7 +263,6 @@ public class GrpcOmTransport implements OmTransport {
 
   private OMResponse submitRequestToLeader(OMRequest payload)
       throws IOException {
-    AtomicReference<OMResponse> resp = new AtomicReference<>();
     int requestFailoverCount = 0;
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
@@ -276,7 +271,7 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       expectedFailoverCount = globalFailoverCount.get();
       try {
-        resp.set(submitRequestToHost(payload, host.get()));
+        return submitRequestToHost(payload, host.get());
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -294,7 +289,7 @@ public class GrpcOmTransport implements OmTransport {
         }
       }
     }
-    return resp.get();
+    throw new OMException(resultCode);
   }
 
   private OMResponse submitRequestToHost(OMRequest payload, String targetHost)
@@ -335,10 +330,6 @@ public class GrpcOmTransport implements OmTransport {
       currentFollowerReadIndex = (currentFollowerReadIndex + 1) %
           omFailoverProxyProvider.getOMProxyMap().getNodeIds().size();
     }
-  }
-
-  private boolean isCurrentLeaderNode(String nodeId) {
-    return nodeId.equals(omFailoverProxyProvider.getCurrentProxyOMNodeId());
   }
 
   private Exception unwrapException(Exception ex) {
