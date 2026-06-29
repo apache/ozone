@@ -118,6 +118,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+      validateIfMatchETag(keyArgs, omKeyInfo);
       // New key format for the fileTable & dirTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores only the leaf node name, which is 'file1'.

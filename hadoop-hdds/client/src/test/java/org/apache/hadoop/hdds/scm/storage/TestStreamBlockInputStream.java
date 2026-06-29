@@ -33,11 +33,13 @@ import static org.mockito.Mockito.when;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -364,6 +366,109 @@ public class TestStreamBlockInputStream {
       int bytesRead = sbis.read(buf);
       assertEquals(length, bytesRead, "expected all bytes to be read");
       assertEquals(length, buf.position(), "buffer position should be at end of block");
+    }
+  }
+
+  @Test
+  public void testReadGetsFreshResponseTimeoutAfterStreamReadWait() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(500));
+    BlockID blockID = new BlockID(1L, 12L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    AtomicReference<Thread> responseThreadRef = new AtomicReference<>();
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    doAnswer(inv -> {
+      Thread.sleep(450);
+      Thread responseThread = new Thread(() -> {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException ignored) {
+          Thread.currentThread().interrupt();
+        }
+        readerRef.get().onNext(buildResponseProto(new byte[] {1}, 0));
+      });
+      responseThreadRef.set(responseThread);
+      responseThread.start();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 1L, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(1);
+      assertEquals(1, sbis.read(buf));
+      responseThreadRef.get().join();
+    }
+  }
+
+  @Test
+  public void testReadWithoutNewRequestGetsFreshTimeoutBudget() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadPreReadSize(10);
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(500));
+    BlockID blockID = new BlockID(1L, 13L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    AtomicInteger streamReads = new AtomicInteger();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    doAnswer(inv -> {
+      streamReads.incrementAndGet();
+      readerRef.get().onNext(buildResponseProto(new byte[] {1}, 0));
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 2L, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer first = ByteBuffer.allocate(1);
+      assertEquals(1, sbis.read(first));
+      Thread.sleep(600);
+
+      Thread delayedResponse = new Thread(() -> {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException ignored) {
+          Thread.currentThread().interrupt();
+        }
+        readerRef.get().onNext(buildResponseProto(new byte[] {2}, 1));
+      });
+      delayedResponse.start();
+
+      ByteBuffer second = ByteBuffer.allocate(1);
+      assertEquals(1, sbis.readFully(second, false));
+      delayedResponse.join();
+      assertEquals(1, streamReads.get(), "second read should use data from the existing request");
     }
   }
 

@@ -63,7 +63,6 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -478,14 +477,13 @@ public class PipelineManagerImpl implements PipelineManager {
     for (ContainerID containerID : containerIDs) {
       if (containerManager.getContainer(containerID).getState()
             == HddsProtos.LifeCycleState.OPEN) {
-        try {
-          containerManager.updateContainerState(containerID,
-              HddsProtos.LifeCycleEvent.FINALIZE);
-        } catch (InvalidStateTransitionException ex) {
-          throw new IOException(ex);
-        }
+        containerManager.updateContainerState(containerID,
+            HddsProtos.LifeCycleEvent.FINALIZE);
       }
-      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      if (containerManager.getContainer(containerID).getState() ==
+          HddsProtos.LifeCycleState.CLOSING) {
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      }
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
@@ -640,7 +638,8 @@ public class PipelineManagerImpl implements PipelineManager {
     final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
     final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
     for (DatanodeDetails dn : datanodeDetails) {
-      final DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+      // Refactored to use getNode instead of getDatanodeInfo
+      final DatanodeInfo info = nodeManager.getNode(dn.getID());
       if (info == null) {
         LOG.warn("DatanodeInfo not found for {}", dn.getID());
         return false;

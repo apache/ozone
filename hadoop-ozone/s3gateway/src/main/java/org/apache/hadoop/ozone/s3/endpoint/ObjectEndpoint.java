@@ -654,20 +654,32 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final long startNanos = context.getStartNanos();
+    S3ConditionalRequest.DeleteCondition deleteCondition = null;
 
     try {
       OzoneVolume volume = context.getVolume();
+      deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
+      if (!deleteCondition.hasIfMatch()) {
+        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
+      } else {
+        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false,
+            deleteCondition.getExpectedETag());
+      }
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
     } catch (OMException ex) {
       getMetrics().updateDeleteKeyFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        if (deleteCondition != null && deleteCondition.hasIfMatch()) {
+          throw newError(PRECOND_FAILED, keyPath, ex);
+        }
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
         return Response.status(Status.NO_CONTENT).build();
+      } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
         // With PREFIX metadata layout, a dir deletion without recursive flag
         // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.

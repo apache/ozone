@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.commontypes;
 
 import java.io.UnsupportedEncodingException;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 
 /**
@@ -27,6 +28,10 @@ import org.apache.hadoop.ozone.s3.util.S3Utils;
  */
 public class ObjectKeyNameAdapter extends
     XmlAdapter<String, EncodingTypeObject> {
+
+  private static final String[] URL_ENCODE_SEARCH_CHARS = new String[] {"%2F"};
+  private static final String[] URL_ENCODE_REPLACE_CHARS = new String[] {"/"};
+
   @Override
   public EncodingTypeObject unmarshal(String s) {
     throw new UnsupportedOperationException();
@@ -36,8 +41,7 @@ public class ObjectKeyNameAdapter extends
   public String marshal(EncodingTypeObject s)
       throws UnsupportedEncodingException {
     if (s.getEncodingType() != null && s.getEncodingType().equals("url")) {
-      return S3Utils.urlEncode(s.getName())
-          .replaceAll("%2F", "/");
+      return StringUtils.replaceEach(S3Utils.urlEncode(s.getName()), URL_ENCODE_SEARCH_CHARS, URL_ENCODE_REPLACE_CHARS);
     }
     return s.getName();
   }

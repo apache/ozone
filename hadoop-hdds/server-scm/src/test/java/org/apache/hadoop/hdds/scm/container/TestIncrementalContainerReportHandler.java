@@ -86,7 +86,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +109,7 @@ public class TestIncrementalContainerReportHandler {
   private DBStore dbStore;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException,
+  public void setup() throws IOException,
       TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     Path scmPath = Paths.get(testDir.getPath(), "scm-meta");

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
@@ -44,7 +43,6 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -257,7 +255,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setStateEnterTime(Time.now())
         .setOwner(owner)
         .setContainerID(containerID.getId())
-        .setDeleteTransactionId(0)
         .setReplicationType(pipeline.getType());
 
     if (pipeline.getReplicationConfig() instanceof ECReplicationConfig) {
@@ -275,8 +272,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void updateContainerState(final ContainerID cid,
-                                   final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+                                   final LifeCycleEvent event) throws IOException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
@@ -355,12 +351,6 @@ public class ContainerManagerImpl implements ContainerManager {
     } else {
       throw new ContainerNotFoundException(cid);
     }
-  }
-
-  @Override
-  public void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
   }
 
   @Override

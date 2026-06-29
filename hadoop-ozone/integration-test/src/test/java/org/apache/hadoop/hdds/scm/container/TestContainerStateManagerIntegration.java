@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.tag.Flaky;
@@ -145,8 +144,7 @@ public class TestContainerStateManagerIntegration {
 
   @Test
   public void testContainerStateManagerRestart() throws IOException,
-      TimeoutException, InterruptedException, AuthenticationException,
-      InvalidStateTransitionException {
+      TimeoutException, InterruptedException, AuthenticationException {
     // Allocate 5 containers in ALLOCATED state and 5 in CREATING state
 
     for (int i = 0; i < 10; i++) {
@@ -271,8 +269,7 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  public void testUpdateContainerState() throws IOException,
-      InvalidStateTransitionException {
+  public void testUpdateContainerState() throws IOException {
     assertContainerCount(LifeCycleState.OPEN, 0);
 
     // Allocate container1 and update its state from

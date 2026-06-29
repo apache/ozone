@@ -28,7 +28,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -70,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
@@ -112,16 +112,15 @@ public class StateContext {
   private final DatanodeStateMachine parentDatanodeStateMachine;
   private final AtomicLong stateExecutionCount;
   private final ConfigurationSource conf;
-  private final Set<InetSocketAddress> endpoints;
+  private final Set<HostAndPort> endpoints;
   // Only the latest full report of each type is kept
   private final AtomicReference<Message> containerReports;
   private final AtomicReference<Message> nodeReport;
   private final AtomicReference<Message> pipelineReports;
   // Incremental reports are queued in the map below
-  private final Map<InetSocketAddress, List<Message>>
-      incrementalReportsQueue;
-  private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
-  private final Map<InetSocketAddress, PipelineActionMap> pipelineActions;
+  private final Map<HostAndPort, List<Message>> incrementalReportsQueue;
+  private final Map<HostAndPort, Queue<ContainerAction>> containerActions;
+  private final Map<HostAndPort, PipelineActionMap> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -129,7 +128,7 @@ public class StateContext {
   private final AtomicLong lastHeartbeatSent;
   // Endpoint -> ReportType -> Boolean of whether the full report should be
   //  queued in getFullReports call.
-  private final Map<InetSocketAddress,
+  private final Map<HostAndPort,
       Map<String, AtomicBoolean>> isFullReportReadyToBeSent;
   // List of supported full report types.
   private final List<String> fullReportTypeList;
@@ -310,7 +309,7 @@ public class StateContext {
     // as an incremental message.
     // see XceiverServerRatis#sendPipelineReport
     synchronized (incrementalReportsQueue) {
-      for (InetSocketAddress endpoint : endpoints) {
+      for (HostAndPort endpoint : endpoints) {
         incrementalReportsQueue.get(endpoint).add(report);
       }
     }
@@ -349,7 +348,7 @@ public class StateContext {
    *                         heartbeat.
    */
   public void putBackReports(List<Message> reportsToPutBack,
-                             InetSocketAddress endpoint) {
+      HostAndPort endpoint) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("endpoint: {}, size of reportsToPutBack: {}",
           endpoint, reportsToPutBack.size());
@@ -375,8 +374,7 @@ public class StateContext {
    * @return List of reports
    */
   public List<Message> getAllAvailableReports(
-      InetSocketAddress endpoint
-  ) {
+      HostAndPort endpoint) {
     int maxLimit = Integer.MAX_VALUE;
     // TODO: It is highly unlikely that we will reach maxLimit for the number
     //       for the number of reports, specially as it does not apply to the
@@ -400,7 +398,7 @@ public class StateContext {
     synchronized (parentDatanodeStateMachine
         .getContainer()) {
       synchronized (incrementalReportsQueue) {
-        for (Map.Entry<InetSocketAddress, List<Message>>
+        for (Map.Entry<HostAndPort, List<Message>>
             entry : incrementalReportsQueue.entrySet()) {
           if (entry.getValue() != null) {
             entry.getValue().removeIf(
@@ -419,7 +417,7 @@ public class StateContext {
 
   @VisibleForTesting
   List<Message> getAllAvailableReportsUpToLimit(
-      InetSocketAddress endpoint,
+      HostAndPort endpoint,
       int limit) {
     List<Message> reports = getFullReports(endpoint, limit);
     List<Message> incrementalReports = getIncrementalReports(endpoint,
@@ -429,7 +427,7 @@ public class StateContext {
   }
 
   List<Message> getIncrementalReports(
-      InetSocketAddress endpoint, int maxLimit) {
+      HostAndPort endpoint, int maxLimit) {
     List<Message> reportsToReturn = new LinkedList<>();
     synchronized (incrementalReportsQueue) {
       List<Message> reportsForEndpoint =
@@ -445,7 +443,7 @@ public class StateContext {
   }
 
   List<Message> getFullReports(
-      InetSocketAddress endpoint, int maxLimit) {
+      HostAndPort endpoint, int maxLimit) {
     int count = 0;
     Map<String, AtomicBoolean> mp = isFullReportReadyToBeSent.get(endpoint);
     List<Message> fullReports = new LinkedList<>();
@@ -482,7 +480,7 @@ public class StateContext {
    */
   public void addContainerAction(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (InetSocketAddress endpoint : endpoints) {
+      for (HostAndPort endpoint : endpoints) {
         containerActions.get(endpoint).add(containerAction);
       }
     }
@@ -495,7 +493,7 @@ public class StateContext {
    */
   public void addContainerActionIfAbsent(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (InetSocketAddress endpoint : endpoints) {
+      for (HostAndPort endpoint : endpoints) {
         if (!containerActions.get(endpoint).contains(containerAction)) {
           containerActions.get(endpoint).add(containerAction);
         }
@@ -510,7 +508,7 @@ public class StateContext {
    * @return {@literal List<ContainerAction>}
    */
   public List<ContainerAction> getPendingContainerAction(
-      InetSocketAddress endpoint,
+      HostAndPort endpoint,
       int maxLimit) {
     List<ContainerAction> containerActionList = new ArrayList<>();
     synchronized (containerActions) {
@@ -538,7 +536,7 @@ public class StateContext {
     // Put only if the pipeline id with the same action is absent.
     final PipelineKey key = new PipelineKey(pipelineAction);
     boolean added = false;
-    for (InetSocketAddress endpoint : endpoints) {
+    for (HostAndPort endpoint : endpoints) {
       added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
     return added;
@@ -551,7 +549,7 @@ public class StateContext {
    * @return {@literal List<ContainerAction>}
    */
   public List<PipelineAction> getPendingPipelineAction(
-      InetSocketAddress endpoint,
+      HostAndPort endpoint,
       int maxLimit) {
     final PipelineActionMap map = pipelineActions.get(endpoint);
     if (map == null) {
@@ -894,7 +892,7 @@ public class StateContext {
     return heartbeatFrequency.get();
   }
 
-  public void addEndpoint(InetSocketAddress endpoint) {
+  public void addEndpoint(HostAndPort endpoint) {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
@@ -911,7 +909,7 @@ public class StateContext {
     }
   }
 
-  public void removeEndpoint(InetSocketAddress endpoint) {
+  public void removeEndpoint(HostAndPort endpoint) {
     this.endpoints.remove(endpoint);
     this.containerActions.remove(endpoint);
     this.pipelineActions.remove(endpoint);
@@ -948,17 +946,17 @@ public class StateContext {
     return reconHeartbeatFrequency.get();
   }
 
-  public Map<InetSocketAddress, Integer> getPipelineActionQueueSize() {
+  public Map<HostAndPort, Integer> getPipelineActionQueueSize() {
     return pipelineActions.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
   }
 
-  public Map<InetSocketAddress, Integer> getContainerActionQueueSize() {
+  public Map<HostAndPort, Integer> getContainerActionQueueSize() {
     return containerActions.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
   }
 
-  public Map<InetSocketAddress, Integer> getIncrementalReportQueueSize() {
+  public Map<HostAndPort, Integer> getIncrementalReportQueueSize() {
     return incrementalReportsQueue.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
   }

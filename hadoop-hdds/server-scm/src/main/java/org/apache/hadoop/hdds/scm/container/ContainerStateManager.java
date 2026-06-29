@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * A ContainerStateManager is responsible for keeping track of all the
@@ -179,7 +177,7 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
                                           HddsProtos.LifeCycleEvent event,
                                           Long sequenceId)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException;
 
 
   /**
@@ -191,13 +189,6 @@ public interface ContainerStateManager extends SCMHandler {
    */
   @Replicate
   void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
-      throws IOException;
-
-  /**
-   *
-   */
-  // Make this as @Replicate
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
       throws IOException;
 
   /**

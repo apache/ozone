@@ -1706,16 +1706,25 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive)
       throws IOException {
+    deleteKey(volumeName, bucketName, keyName, recursive, null);
+  }
+
+  @Override
+  public void deleteKey(
+      String volumeName, String bucketName, String keyName, boolean recursive,
+      String expectedETag) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+    OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive)
-        .build();
-    ozoneManagerClient.deleteKey(keyArgs);
+        .setRecursive(recursive);
+    if (expectedETag != null) {
+      keyArgs.setExpectedETag(expectedETag);
+    }
+    ozoneManagerClient.deleteKey(keyArgs.build());
   }
 
   @Override

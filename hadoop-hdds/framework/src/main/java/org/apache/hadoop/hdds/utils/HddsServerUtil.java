@@ -104,6 +104,7 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
@@ -863,18 +864,14 @@ public final class HddsServerUtil {
    * @return A collection of SCM addresses
    * @throws IllegalArgumentException If the configuration is invalid
    */
-  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
-      ConfigurationSource conf) {
-
+  public static Collection<HostAndPort> getSCMAddressForDatanodes(ConfigurationSource conf) {
     // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
 
     if (getScmServiceId(conf) != null) {
       List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-      Collection<InetSocketAddress> scmAddressList =
-          new HashSet<>(scmNodeInfoList.size());
+      final Collection<HostAndPort> scmAddressList = new HashSet<>(scmNodeInfoList.size());
       for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        scmAddressList.add(
-            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
+        scmAddressList.add(scmNodeInfo.getScmDatanodeHostPortAddress());
       }
       return scmAddressList;
     } else {
@@ -887,7 +884,7 @@ public final class HddsServerUtil {
             + " Empty address list found.");
       }
 
-      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
+      final Collection<HostAndPort> addresses = new HashSet<>(names.size());
       for (String address : names) {
         Optional<String> hostname = getHostName(address);
         if (!hostname.isPresent()) {
@@ -897,9 +894,7 @@ public final class HddsServerUtil {
         int port = getHostPort(address)
             .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
                 OZONE_SCM_DATANODE_PORT_DEFAULT));
-        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
-            port);
-        addresses.add(addr);
+        addresses.add(new HostAndPort(hostname.get(), port));
       }
 
       if (addresses.size() > 1) {
@@ -920,9 +915,9 @@ public final class HddsServerUtil {
    * Null if there is any wrongly configured SCM address. Note that the returned collection
    * might not be ordered the same way as the requested SCM node IDs
    */
-  public static Collection<Pair<String, InetSocketAddress>> getSCMAddressForDatanodes(
+  public static Collection<Pair<String, HostAndPort>> getSCMAddressForDatanodes(
       ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
-    Collection<Pair<String, InetSocketAddress>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
+    Collection<Pair<String, HostAndPort>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
     for (String scmNodeId : scmNodeIds) {
       String addressKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
@@ -936,9 +931,7 @@ public final class HddsServerUtil {
           OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
           OZONE_SCM_DATANODE_PORT_DEFAULT);
 
-      String scmDatanodeAddressStr = SCMNodeInfo.buildAddress(scmAddress, scmDatanodePort);
-      InetSocketAddress scmDatanodeAddress = NetUtils.createSocketAddr(scmDatanodeAddressStr);
-      scmNodeAddress.add(Pair.of(scmNodeId, scmDatanodeAddress));
+      scmNodeAddress.add(Pair.of(scmNodeId, new HostAndPort(scmAddress, scmDatanodePort)));
     }
     return scmNodeAddress;
   }
@@ -949,7 +942,7 @@ public final class HddsServerUtil {
    * @return Recon address
    * @throws IllegalArgumentException If the configuration is invalid
    */
-  public static InetSocketAddress getReconAddressForDatanodes(
+  public static HostAndPort getReconAddressForDatanodes(
       ConfigurationSource conf) {
     String name = conf.get(OZONE_RECON_ADDRESS_KEY);
     if (StringUtils.isEmpty(name)) {
@@ -961,6 +954,6 @@ public final class HddsServerUtil {
           + name);
     }
     int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
+    return new HostAndPort(hostname.get(), port);
   }
 }
