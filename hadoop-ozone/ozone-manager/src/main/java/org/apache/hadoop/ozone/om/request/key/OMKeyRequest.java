@@ -221,13 +221,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
+    // Cache the sorted order per pipeline so blocks sharing a pipeline are
+    // sorted once (mirrors the read path's per-pipeline caching).
+    final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes =
+        shouldSortDatanodes ? new HashMap<>() : null;
+    final String clientAddress = clientMachine;
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       Pipeline pipeline = allocatedBlock.getPipeline();
       if (shouldSortDatanodes) {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
-        final List<? extends DatanodeDetails> sorted =
-            keyManager.sortDatanodesForWrite(nodes, clientMachine);
+        final List<? extends DatanodeDetails> sorted = sortedByNodes
+            .computeIfAbsent(nodes,
+                n -> keyManager.sortDatanodesForWrite(n, clientAddress));
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }

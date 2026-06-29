@@ -2212,6 +2212,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      // No client address: keep the pipeline order (the first node is the write
+      // primary). Mirrors SCMBlockProtocolServer#getClientNode's empty guard.
+      return nodes;
+    }
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
           final Node client = getClientNode(clientMachine, nodes);

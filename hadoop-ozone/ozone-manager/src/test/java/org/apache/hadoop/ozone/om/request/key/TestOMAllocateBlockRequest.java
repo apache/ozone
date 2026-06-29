@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +34,7 @@ import jakarta.annotation.Nonnull;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -251,6 +254,27 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture());
     assertEquals("", clientMachine.getValue());
+  }
+
+  @Test
+  public void testAllocateBlockSortsSharedPipelineOnce() throws Exception {
+    // Multiple preallocated blocks that share one pipeline must be sorted once.
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    // requestedSize spans two scmBlockSize blocks; the SCM stub returns both on
+    // the same pipeline, so the OM-side sort must run only once.
+    request.allocateBlock(scmClient, ozoneBlockTokenSecretManager,
+        replicationConfig, new ExcludeList(), 2 * scmBlockSize, scmBlockSize,
+        2, false, "svc", omMetrics, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(),
+        mockKeyManager);
+
+    verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"));
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.
