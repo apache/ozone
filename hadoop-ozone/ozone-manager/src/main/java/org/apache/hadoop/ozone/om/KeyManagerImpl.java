@@ -2209,6 +2209,22 @@ public class KeyManagerImpl implements KeyManager {
         .sortByDistanceCost(client, nodes, nodes.size());
   }
 
+  @Override
+  public List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine) {
+    return captureLatencyNs(
+        metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
+          final Node client = getClientNode(clientMachine, nodes);
+          if (client == null) {
+            // Preserve pipeline order for writes: the first node is the write
+            // primary, so do not shuffle when the client cannot be resolved.
+            return nodes;
+          }
+          return ozoneManager.getClusterMap()
+              .sortByDistanceCost(client, nodes, nodes.size());
+        });
+  }
+
   private Node getClientNode(String clientMachine,
                              List<? extends DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();

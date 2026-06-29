@@ -176,6 +176,29 @@ public class TestOMSortDatanodes {
     }
   }
 
+  @Test
+  public void sortDatanodesForWritePicksNearestFirst() {
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      List<? extends DatanodeDetails> sorted =
+          keyManager.sortDatanodesForWrite(nodeManager.getAllNodes(), nodeAddress(dn));
+      assertEquals(dn, sorted.get(0),
+          "Source node should be sorted first for writes");
+      assertRackOrder(dn.getNetworkLocation(), sorted);
+    }
+  }
+
+  @Test
+  public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
+    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
+    List<DatanodeDetails> original = new ArrayList<>(nodes);
+    // A client that resolves to no known rack must NOT trigger a shuffle.
+    String unresolved = nodes.get(0).getIpAddress() + "X";
+    List<? extends DatanodeDetails> result =
+        keyManager.sortDatanodesForWrite(nodes, unresolved);
+    assertEquals(original, result,
+        "Write pipeline order must be preserved when client is unresolved");
+  }
+
   private String nodeAddress(DatanodeDetails dn) {
     boolean useHostname = config.getBoolean(
         HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,

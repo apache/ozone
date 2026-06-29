@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -363,4 +364,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return BackgroundService
    */
   CompactionService getCompactionService();
+
+  /**
+   * Sort the datanodes of a write pipeline by network-topology distance to the
+   * client, using OM's locally cached cluster map. Unlike the read-path sort,
+   * the original order is preserved when the client cannot be resolved, because
+   * the first node is used as the streaming-write primary.
+   *
+   * @param nodes the pipeline nodes to sort
+   * @param clientMachine client address (IP or hostname)
+   * @return nodes sorted nearest-first, or the input order if client is unresolved
+   */
+  List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine);
 }
