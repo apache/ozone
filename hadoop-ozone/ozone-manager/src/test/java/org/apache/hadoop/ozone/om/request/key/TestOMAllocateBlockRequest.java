@@ -253,6 +253,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     assertEquals("", clientMachine.getValue());
   }
 
+  // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.
   private OMRequest createAllocateBlockRequestWithSort(String clientAddress) {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)

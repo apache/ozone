@@ -249,7 +249,7 @@ public class OMPerformanceMetrics {
     return getKeyInfoSortDatanodesLatencyNs;
   }
 
-  public MutableRate getAllocateBlockSortDatanodesLatencyNs() {
+  MutableRate getAllocateBlockSortDatanodesLatencyNs() {
     return allocateBlockSortDatanodesLatencyNs;
   }
 
