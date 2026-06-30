@@ -40,6 +40,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -198,7 +199,7 @@ class TestGrpcReplicationService {
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
     ReplicationTask task =
-        new ReplicationTask(toTarget(CONTAINER_ID, datanode), pushReplicator);
+        new ReplicationTask(toTarget(CONTAINER_ID, datanode, HDDSVersion.SOFTWARE_VERSION), pushReplicator);
 
     pushReplicator.replicate(task);
 

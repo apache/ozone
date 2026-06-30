@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -78,6 +80,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealt
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -528,10 +531,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     DatanodeDetails source = selectAndOptionallyExcludeDatanode(
         1, sourceWithCmds);
 
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
-    cmd.setReplicaIndex(replicaIndex);
-    sendDatanodeCommand(cmd, containerInfo, source);
+    try {
+      ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
+          containerID, target, lowestApparentVersion(source, target));
+      cmd.setReplicaIndex(replicaIndex);
+      sendDatanodeCommand(cmd, containerInfo, source);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen", e);
+    }
   }
 
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
@@ -628,11 +635,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
-    final ReplicateContainerCommand command = ReplicateContainerCommand
-        .toTarget(container.getContainerID(), target);
-    command.setReplicaIndex(replicaIndex);
-    command.setPriority(ReplicationCommandPriority.LOW);
-    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
+    try {
+      final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+          container.getContainerID(), target,
+          lowestApparentVersion(source, target));
+      command.setReplicaIndex(replicaIndex);
+      command.setPriority(ReplicationCommandPriority.LOW);
+      sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen");
+    }
   }
 
   /**
@@ -673,6 +685,55 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
+  }
+
+  /**
+   * Computes the apparent version a replication should use as the lowest
+   * apparent version among the given nodes. SCM acts as the coordinator: it
+   * decides the version so the datanodes carrying out the replication can simply
+   * follow it. SCM's view may be slightly stale, but this is safe because an
+   * apparent version never goes backwards and older versions remain supported.
+   *
+   * <p>If SCM has no information for one of the nodes we must not send a
+   * replication command involving it, so this fails fast with an unchecked
+   * exception (the node lookup should always succeed on the replication path).
+   */
+  private HDDSVersion lowestApparentVersion(DatanodeDetails... nodes)
+      throws NodeNotFoundException {
+    HDDSVersion lowest = HDDSVersion.SOFTWARE_VERSION;
+    for (DatanodeDetails dn : nodes) {
+      HDDSVersion version = lookupApparentVersion(dn);
+      if (version.serialize() < lowest.serialize()) {
+        lowest = version;
+      }
+    }
+    return lowest;
+  }
+
+  private HDDSVersion lookupApparentVersion(DatanodeDetails dn)
+      throws NodeNotFoundException {
+    DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+    if (info == null) {
+      throw new NodeNotFoundException(dn.getID());
+    }
+    ComponentVersion apparentVersion = info.getLastKnownApparentVersion();
+    if (apparentVersion == null) {
+      // Datanodes are expected to report their version on every heartbeat.
+      // Warn rather than silently defaulting forever if reporting is broken.
+      LOG.warn("Datanode {} has no reported apparent version; falling back " +
+          "to {}.", dn, HDDSVersion.DEFAULT_VERSION);
+      return HDDSVersion.DEFAULT_VERSION;
+    }
+    if (apparentVersion == HDDSVersion.UNKNOWN_VERSION) {
+      // The datanode reported a version newer than this SCM recognizes. SCM
+      // must be upgraded before datanodes, so a newer datanode is illegal and
+      // should have been fenced out of the cluster. Fail fast to stop any
+      // further operations on it.
+      throw new IllegalStateException("Datanode " + dn + " reported an " +
+          "apparent version newer than SCM recognizes. SCM must be upgraded " +
+          "before datanodes.");
+    }
+    return HDDSVersion.deserialize(apparentVersion.serialize());
   }
 
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,

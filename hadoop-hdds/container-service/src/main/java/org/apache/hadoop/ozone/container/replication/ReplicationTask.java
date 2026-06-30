@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
@@ -30,6 +31,7 @@ public class ReplicationTask extends AbstractReplicationTask {
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
+  private final HDDSVersion apparentVersion;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
 
@@ -44,6 +46,7 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
+    this.apparentVersion = cmd.getApparentVersion();
     if (cmd.getTargetDatanode() != null) {
       // Only push replication will have a target datanode set, and it must be
       // sent to the source datanode to be executed. It is possible the source
@@ -123,6 +126,15 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   public void setTransferredBytes(long transferredBytes) {
     this.transferredBytes = transferredBytes;
+  }
+
+  /**
+   * @return the apparent version to use for this replication task. Replicators
+   *     can use this to gate version-dependent protocol features so that the
+   *     newer side downgrades to a behavior the older side understands.
+   */
+  public HDDSVersion getApparentVersion() {
+    return apparentVersion;
   }
 
   DatanodeDetails getTarget() {

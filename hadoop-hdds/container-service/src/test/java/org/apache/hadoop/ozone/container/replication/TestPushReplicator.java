@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -68,7 +69,7 @@ class TestPushReplicator {
     SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, compression);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(toTarget(containerID, target, HDDSVersion.SOFTWARE_VERSION),
         subject);
 
     // WHEN
@@ -89,7 +90,7 @@ class TestPushReplicator {
         fut -> fut.completeExceptionally(new Exception("testing"));
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(toTarget(containerID, target, HDDSVersion.SOFTWARE_VERSION),
         subject);
 
     // WHEN
@@ -111,7 +112,7 @@ class TestPushReplicator {
     };
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(toTarget(containerID, target, HDDSVersion.SOFTWARE_VERSION),
         subject);
 
     // WHEN

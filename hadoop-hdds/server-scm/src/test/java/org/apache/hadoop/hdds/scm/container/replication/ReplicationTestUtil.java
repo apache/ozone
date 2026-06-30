@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -459,7 +460,7 @@ public final class ReplicationTestUtil {
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       ReplicateContainerCommand command = ReplicateContainerCommand
           .toTarget(containerInfo.getContainerID(),
-              invocationOnMock.getArgument(2));
+              invocationOnMock.getArgument(2), HDDSVersion.SOFTWARE_VERSION);
       command.setReplicaIndex(invocationOnMock.getArgument(3));
       commandsSent.add(Pair.of(sources.get(0), command));
       return null;
