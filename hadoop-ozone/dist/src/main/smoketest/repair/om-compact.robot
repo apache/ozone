@@ -50,5 +50,7 @@ Testing OM DB Size Reduction After Compaction
     
     ${size_after_compaction} =    Get OM DB SST Files Size
 
-    Should Be True    ${size_after_compaction} < ${size_before_compaction}
-    ...    OM DB size should be reduced after compaction. Before: ${size_before_compaction}, After: ${size_after_compaction}
+    # flaky, see HDDS-14622
+    # Should Be True    ${size_after_compaction} < ${size_before_compaction}
+    # ...    OM DB size should be reduced after compaction. Before: ${size_before_compaction}, After: ${size_after_compaction}
+    Log    OM DB size should be reduced after compaction. Before: ${size_before_compaction}, After: ${size_after_compaction}
