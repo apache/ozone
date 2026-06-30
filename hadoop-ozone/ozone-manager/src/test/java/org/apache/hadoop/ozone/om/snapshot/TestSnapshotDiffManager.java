@@ -1213,9 +1213,13 @@ public class TestSnapshotDiffManager {
           }
 
           if (drainBetweenBatches && latchOpened) {
-            while (totalSubmitted - completedJobs.get() >= fullThreadPoolSize) {
-              Thread.sleep(10);
-            }
+            final int currentlySubmitted = totalSubmitted;
+            attempt(() -> {
+              if (currentlySubmitted - completedJobs.get() >= fullThreadPoolSize) {
+                throw new RuntimeException("Thread pool is still full");
+              }
+              return null;
+            }, 10000, TimeDuration.valueOf(1, TimeUnit.MILLISECONDS), null, null);
           }
 
           responses.add(submitJob(spy, fromSnapshotName, toSnapshotName));
