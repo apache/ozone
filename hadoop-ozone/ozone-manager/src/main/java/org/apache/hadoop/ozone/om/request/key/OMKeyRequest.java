@@ -200,10 +200,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    String clientMachine = "";
-    if (shouldSortDatanodes) {
-      clientMachine = userInfo.getRemoteAddress();
-    }
+    final String clientMachine =
+        shouldSortDatanodes ? userInfo.getRemoteAddress() : "";
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
@@ -225,7 +223,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // sorted once (mirrors the read path's per-pipeline caching).
     final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes =
         shouldSortDatanodes ? new HashMap<>() : null;
-    final String clientAddress = clientMachine;
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       Pipeline pipeline = allocatedBlock.getPipeline();
@@ -233,7 +230,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
         final List<? extends DatanodeDetails> sorted = sortedByNodes
             .computeIfAbsent(nodes,
-                n -> keyManager.sortDatanodesForWrite(n, clientAddress));
+                n -> keyManager.sortDatanodesForWrite(n, clientMachine));
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
