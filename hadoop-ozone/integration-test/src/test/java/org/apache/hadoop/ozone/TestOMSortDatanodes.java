@@ -188,6 +188,25 @@ public class TestOMSortDatanodes {
   }
 
   @Test
+  public void getClientNodeMatchesByIpAndHostnameInHostnameMode() {
+    // The client address is always an IP, so a client must match its datanode by
+    // IP even when use.datanode.hostname is enabled.
+    config.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
+    try {
+      List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
+      for (DatanodeDetails dn : nodes) {
+        assertEquals(dn, keyManager.getClientNode(dn.getIpAddress(), nodes),
+            "Client IP must resolve to its own datanode in hostname mode");
+        assertEquals(dn, keyManager.getClientNode(dn.getHostName(), nodes),
+            "Client hostname must resolve to its own datanode");
+      }
+    } finally {
+      config.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+          HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    }
+  }
+
+  @Test
   public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
     List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
     List<DatanodeDetails> original = new ArrayList<>(nodes);

@@ -115,7 +115,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -2230,15 +2229,15 @@ public class KeyManagerImpl implements KeyManager {
         });
   }
 
-  private Node getClientNode(String clientMachine,
-                             List<? extends DatanodeDetails> nodes) {
+  @VisibleForTesting
+  public Node getClientNode(String clientMachine,
+                            List<? extends DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
-    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     for (DatanodeDetails node : nodes) {
-      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
-          clientMachine)) {
+      // Match by either IP or hostname, like SCM's getNodesByAddress; the client
+      // address is always an IP even when use.datanode.hostname is enabled.
+      if (clientMachine.equals(node.getIpAddress())
+          || clientMachine.equals(node.getHostName())) {
         matchingNodes.add(node);
       }
     }
