@@ -103,6 +103,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -156,6 +157,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
@@ -169,6 +171,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.MultipartPartScanUtil;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -1138,6 +1141,40 @@ public class KeyManagerImpl implements KeyManager {
         throw new OMException("No Such Multipart upload exists for this key.",
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       } else {
+        if (multipartKeyInfo.getSchemaVersion()
+            == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+          SortedMap<Integer, OmMultipartPartInfo> parts =
+              MultipartPartScanUtil.scanParts(metadataManager, uploadID);
+          List<OmPartInfo> omPartInfoList = new ArrayList<>();
+          int count = 0;
+          for (Map.Entry<Integer, OmMultipartPartInfo> entry
+              : parts.entrySet()) {
+            int partNumber = entry.getKey();
+            if (partNumber <= partNumberMarker) {
+              continue;
+            }
+            if (count == maxParts) {
+              isTruncated = true;
+              break;
+            }
+            OmMultipartPartInfo partInfo = entry.getValue();
+            nextPartNumberMarker = partNumber;
+            omPartInfoList.add(new OmPartInfo(partNumber,
+                partInfo.getPartName(), partInfo.getModificationTime(),
+                partInfo.getDataSize(), partInfo.getETag()));
+            count++;
+          }
+          if (!isTruncated) {
+            nextPartNumberMarker = 0;
+          }
+          OmMultipartUploadListParts listParts =
+              new OmMultipartUploadListParts(
+                  multipartKeyInfo.getReplicationConfig(),
+                  nextPartNumberMarker, isTruncated);
+          listParts.addPartList(omPartInfoList);
+          return listParts;
+        }
+
         Iterator<PartKeyInfo> partKeyInfoMapIterator =
             multipartKeyInfo.getPartKeyInfoMap().iterator();
 

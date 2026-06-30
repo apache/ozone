@@ -24,6 +24,7 @@ import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -309,6 +310,27 @@ public final class OmMultipartPartInfo {
         .setEncInfo(omKeyInfo.getFileEncryptionInfo())
         .setFileChecksum(omKeyInfo.getFileChecksum())
         .setETag(omKeyInfo.getMetadata().get(OzoneConsts.ETAG));
+    return builder.build();
+  }
+
+  public OmKeyInfo toOmKeyInfo(String volumeName, String bucketName,
+      String keyName, ReplicationConfig replicationConfig) {
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(replicationConfig)
+        .setOmKeyLocationInfos(keyLocationInfos)
+        .setDataSize(dataSize)
+        .setCreationTime(modificationTime)
+        .setModificationTime(modificationTime)
+        .setObjectID(objectID)
+        .setUpdateID(updateID)
+        .setFileEncryptionInfo(encInfo)
+        .setFileChecksum(fileChecksum);
+    if (eTag != null) {
+      builder.addMetadata(OzoneConsts.ETAG, eTag);
+    }
     return builder.build();
   }
 

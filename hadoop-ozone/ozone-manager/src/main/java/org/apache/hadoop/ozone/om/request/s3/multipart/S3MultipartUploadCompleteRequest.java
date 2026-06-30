@@ -29,6 +29,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -51,6 +53,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
@@ -277,8 +281,20 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       validateIfMatchETag(keyArgs, existingKeyInfo);
 
       if (!partsList.isEmpty()) {
+        SortedMap<Integer, OmMultipartPartInfo> multipartPartInfoMap =
+            Collections.emptySortedMap();
+        List<OmMultipartPartKey> multipartPartKeysToDelete =
+            Collections.emptyList();
+        if (multipartKeyInfo.getSchemaVersion()
+            == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+          multipartPartInfoMap = MultipartPartScanUtil.scanParts(
+              omMetadataManager, uploadID);
+          multipartPartKeysToDelete = MultipartPartScanUtil.getPartKeys(
+              uploadID, multipartPartInfoMap);
+        }
         final OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap
-            = multipartKeyInfo.getPartKeyInfoMap();
+            = getPartKeyInfoMap(multipartKeyInfo, volumeName, bucketName,
+                keyName, multipartPartInfoMap);
         if (partKeyInfoMap.size() == 0) {
           LOG.error("Complete MultipartUpload failed for key {} , MPU Key has" +
                   " no parts in OM, parts given to upload are {}", ozoneKey,
@@ -296,7 +312,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         List<OmKeyLocationInfo> partLocationInfos = new ArrayList<>();
         long dataSize = getMultipartDataSize(requestedVolume, requestedBucket,
                 keyName, ozoneKey, partKeyInfoMap, partsListSize,
-                partLocationInfos, partsList, ozoneManager);
+                partLocationInfos, partsList, ozoneManager,
+                multipartPartInfoMap);
 
         // All parts have same replication information. Here getting from last
         // part.
@@ -347,6 +364,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         updateCache(omMetadataManager, dbBucketKey, omBucketInfo, dbOzoneKey,
             dbMultipartOpenKey, multipartKey, omKeyInfo, trxnLogIndex);
+        MultipartPartScanUtil.addPartCleanupCacheEntries(omMetadataManager,
+            multipartPartKeysToDelete, trxnLogIndex);
 
         omResponse.setCompleteMultiPartUploadResponse(
             MultipartUploadCompleteResponse.newBuilder()
@@ -360,7 +379,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         omClientResponse =
             getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
                 omKeyInfo, allKeyInfoToRemove, omBucketInfo,
-                volumeId, bucketId, missingParentInfos, multipartKeyInfo);
+                volumeId, bucketId, missingParentInfos, multipartKeyInfo,
+                multipartPartKeysToDelete);
 
         result = Result.SUCCESS;
       } else {
@@ -402,11 +422,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo omKeyInfo,  List<OmKeyInfo> allKeyInfoToRemove,
       OmBucketInfo omBucketInfo,
       long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
-      OmMultipartKeyInfo multipartKeyInfo) {
+      OmMultipartKeyInfo multipartKeyInfo,
+      List<OmMultipartPartKey> multipartPartKeysToDelete) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo, bucketId);
+        getBucketLayout(), omBucketInfo, bucketId, multipartPartKeysToDelete);
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
@@ -572,6 +593,29 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             CacheValue.get(transactionLogIndex, omKeyInfo));
   }
 
+  private OmMultipartKeyInfo.PartKeyInfoMap getPartKeyInfoMap(
+      OmMultipartKeyInfo multipartKeyInfo, String volumeName, String bucketName,
+      String keyName, SortedMap<Integer, OmMultipartPartInfo> multipartPartInfoMap) {
+    if (multipartKeyInfo.getSchemaVersion()
+        == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+      return multipartKeyInfo.getPartKeyInfoMap();
+    }
+
+    TreeMap<Integer, PartKeyInfo> partKeyInfos = new TreeMap<>();
+    for (Map.Entry<Integer, OmMultipartPartInfo> entry
+        : multipartPartInfoMap.entrySet()) {
+      OmMultipartPartInfo partInfo = entry.getValue();
+      OmKeyInfo partKeyInfo = partInfo.toOmKeyInfo(volumeName, bucketName,
+          keyName, multipartKeyInfo.getReplicationConfig());
+      partKeyInfos.put(entry.getKey(), PartKeyInfo.newBuilder()
+          .setPartName(partInfo.getPartName())
+          .setPartNumber(partInfo.getPartNumber())
+          .setPartKeyInfo(partKeyInfo.getProtobuf(getOmRequest().getVersion()))
+          .build());
+    }
+    return new OmMultipartKeyInfo.PartKeyInfoMap(partKeyInfos);
+  }
+
   private int getPartsListSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
       List<Integer> partNumbers,
@@ -603,7 +647,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
       int partsListSize, List<OmKeyLocationInfo> partLocationInfos,
       List<OzoneManagerProtocolProtos.Part> partsList,
-      OzoneManager ozoneManager) throws OMException {
+      OzoneManager ozoneManager,
+      SortedMap<Integer, OmMultipartPartInfo> multipartPartInfoMap) throws OMException {
     long dataSize = 0;
     int currentPartCount = 0;
     boolean eTagBasedValidationAvailable = partsList.stream().allMatch(OzoneManagerProtocolProtos.Part::hasETag);
@@ -612,8 +657,26 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       currentPartCount++;
       int partNumber = part.getPartNumber();
       PartKeyInfo partKeyInfo = partKeyInfoMap.get(partNumber);
-      MultipartCommitRequestPart requestPart = eTagBasedValidationAvailable ?
-          eTagBasedValidator.apply(part, partKeyInfo) : partNameBasedValidator.apply(part, partKeyInfo);
+      OmMultipartPartInfo multipartPartInfo =
+          multipartPartInfoMap.get(partNumber);
+      MultipartCommitRequestPart requestPart;
+      if (multipartPartInfo != null) {
+        String requestPartId;
+        String omPartId;
+        if (eTagBasedValidationAvailable) {
+          requestPartId = part.getETag();
+          omPartId = multipartPartInfo.getETag();
+        } else {
+          requestPartId = part.getPartName();
+          omPartId = multipartPartInfo.getPartName();
+        }
+        requestPart = new MultipartCommitRequestPart(
+            requestPartId, omPartId, StringUtils.equals(requestPartId, omPartId));
+      } else {
+        requestPart = eTagBasedValidationAvailable ?
+            eTagBasedValidator.apply(part, partKeyInfo) :
+            partNameBasedValidator.apply(part, partKeyInfo);
+      }
       if (!requestPart.isValid()) {
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName) +
