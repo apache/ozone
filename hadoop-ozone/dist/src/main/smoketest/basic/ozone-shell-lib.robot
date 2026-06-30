@@ -136,19 +136,19 @@ Test ozone shell errors
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh volume create ${protocol}${server}/${volume}
-    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
+    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume} 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
     Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh volume addacl ${protocol}${server}/${volume} -a user:superuser1:rwxy[DEFAULT]
-    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
+    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume} 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume removeacl ${protocol}${server}/${volume} -a user:superuser1:xy
-    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
+    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume} 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume setacl ${protocol}${server}/${volume} -al user:superuser1:rwxy[DEFAULT],group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
-    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
+    ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume} 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
@@ -157,19 +157,19 @@ Test Volume Acls
 Test Bucket Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh bucket create ${protocol}${server}/${volume}/bb1
-    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
     Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:rwxy
-    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket removeacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:xy
-    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket setacl ${protocol}${server}/${volume}/bb1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
-    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
@@ -213,19 +213,19 @@ Test key handling
 Test key Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/key2 /opt/hadoop/NOTICE.txt
-    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
     Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh key addacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:rwxy
-    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key removeacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:xy
-    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key setacl ${protocol}${server}/${volume}/bb1/key2 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc
-    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
@@ -234,21 +234,21 @@ Test key Acls
 Test prefix Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh prefix addacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:rwxy[DEFAULT]
-    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/ 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix removeacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:xy
-    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/ 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser:rwxyc
-    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
+    ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/ 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/prefix1/key1 /opt/hadoop/NOTICE.txt
-    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
+    ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1 2>/dev/null
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
     Should Be Equal    ${acl_check}    superuser1
     ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
@@ -298,7 +298,7 @@ Test Delete key with Trash
                    ...                   bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
                    ...                   key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
                    ...                   key delete ${protocol}${server}/${volume}/bfso/key3
-    ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
+    ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso 2>/dev/null
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
                    Should Contain Any    ${result}    .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}    key3

@@ -2243,6 +2243,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHostName;
   }
 
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
+  }
+
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
   }
