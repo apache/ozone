@@ -54,7 +54,7 @@ on:
         required: false
       java-version:
         description: Java version to use
-        default: '21'
+        default: '25'
         required: true
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
