@@ -2204,9 +2204,9 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
-    final Node client = getClientNode(clientMachine, nodes);
-    return ozoneManager.getClusterMap()
-        .sortByDistanceCost(client, nodes, nodes.size());
+    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+    final Node client = getClientNode(clientMachine, nodes, clusterMap);
+    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
   }
 
   @Override
@@ -2219,13 +2219,14 @@ public class KeyManagerImpl implements KeyManager {
     }
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
-          final Node client = getClientNode(clientMachine, nodes);
+          final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+          final Node client = getClientNode(clientMachine, nodes, clusterMap);
           if (client == null) {
             // Preserve pipeline order for writes: the first node is the write
             // primary, so do not shuffle when the client cannot be resolved.
             return nodes;
           }
-          return sortByClusterMapDistance(client, nodes);
+          return sortByClusterMapDistance(clusterMap, client, nodes);
         });
   }
 
@@ -2238,10 +2239,8 @@ public class KeyManagerImpl implements KeyManager {
    * map the sorted order back to the original pipeline nodes.
    */
   private List<? extends DatanodeDetails> sortByClusterMapDistance(
-      Node client, List<? extends DatanodeDetails> nodes) {
-    // Read the cluster map once: the topology poller may swap it, and resolving
-    // and sorting against the same instance keeps the parent pointers consistent.
-    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+      NetworkTopology clusterMap, Node client,
+      List<? extends DatanodeDetails> nodes) {
     final Node reader = toClusterMapNode(clusterMap, client);
     final List<Node> topologyNodes = new ArrayList<>(nodes.size());
     final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
@@ -2271,27 +2270,25 @@ public class KeyManagerImpl implements KeyManager {
     return resolved != null ? resolved : node;
   }
 
-  @VisibleForTesting
-  public Node getClientNode(String clientMachine,
-                            List<? extends DatanodeDetails> nodes) {
-    List<DatanodeDetails> matchingNodes = new ArrayList<>();
+  private Node getClientNode(String clientMachine,
+      List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
       // Match by either IP or hostname, like SCM's getNodesByAddress; the client
       // address is always an IP even when use.datanode.hostname is enabled.
       if (clientMachine.equals(node.getIpAddress())
           || clientMachine.equals(node.getHostName())) {
-        matchingNodes.add(node);
+        return node;
       }
     }
-    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
-        getOtherNode(clientMachine);
+    return getOtherNode(clientMachine, clusterMap);
   }
 
-  private Node getOtherNode(String clientMachine) {
+  private Node getOtherNode(String clientMachine,
+                            NetworkTopology clusterMap) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
       if (clientLocation != null) {
-        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        Node rack = clusterMap.getNode(clientLocation);
         if (rack instanceof InnerNode) {
           return new NodeImpl(clientMachine, clientLocation,
               (InnerNode) rack, rack.getLevel() + 1,
