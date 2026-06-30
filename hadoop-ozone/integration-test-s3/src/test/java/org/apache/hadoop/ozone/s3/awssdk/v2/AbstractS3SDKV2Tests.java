@@ -116,10 +116,13 @@ import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
@@ -139,6 +142,7 @@ import software.amazon.awssdk.services.s3.model.ListPartsRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest;
@@ -303,6 +307,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("val", tagSet.get(0).value());
     assertEquals("key2", tagSet.get(1).key());
     assertEquals("val2", tagSet.get(1).value());
+  }
+
+  @Test
+  public void testBucketTaggingPutGetDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception noTags = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, noTags.statusCode());
+    assertEquals("NoSuchTagSet", noTags.awsErrorDetails().errorCode());
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("tag-key1").value("tag-value1").build(),
+        Tag.builder().key("tag-key2").value("tag-value2").build());
+    s3Client.putBucketTagging(PutBucketTaggingRequest.builder()
+        .bucket(bucketName)
+        .tagging(Tagging.builder().tagSet(tags).build())
+        .build());
+
+    GetBucketTaggingResponse taggingResult = s3Client.getBucketTagging(
+        GetBucketTaggingRequest.builder().bucket(bucketName).build());
+    Map<String, String> actualTags = taggingResult.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals(2, actualTags.size());
+    assertEquals("tag-value1", actualTags.get("tag-key1"));
+    assertEquals("tag-value2", actualTags.get("tag-key2"));
+
+    s3Client.deleteBucketTagging(DeleteBucketTaggingRequest.builder().bucket(bucketName).build());
+
+    S3Exception afterDelete = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, afterDelete.statusCode());
+    assertEquals("NoSuchTagSet", afterDelete.awsErrorDetails().errorCode());
   }
 
   @Test

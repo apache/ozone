@@ -20,27 +20,18 @@ Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Suite Setup         Setup bucket tagging tests
 
 *** Variables ***
 ${ENDPOINT_URL}     http://s3g:9878
 ${OZONE_TEST}       true
 ${BUCKET}           generated
+${LINK_BUCKET}      link-bucket-tagging
 
 *** Keywords ***
-Setup link bucket for tagging
-    ${exists} =               Bucket Exists              o3://${OM_SERVICE_ID}/s3v/link-bucket-tagging
-    Run Keyword If            ${exists}                  Set Link Bucket Variable
-    Return From Keyword If    ${exists}
-    ${output} =               Execute And Ignore Error   ozone sh volume info o3://${OM_SERVICE_ID}/legacy
-    Run Keyword If            'VOLUME_NOT_FOUND' in '''${output}'''    Execute    ozone sh volume create o3://${OM_SERVICE_ID}/legacy
-    ${source_exists} =        Bucket Exists              o3://${OM_SERVICE_ID}/legacy/source-bucket
-    Run Keyword If            not ${source_exists}       Execute    ozone sh bucket create --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/legacy/source-bucket
-    Create link               link-bucket-tagging
-    Set Link Bucket Variable
-
-Set Link Bucket Variable
-    Set Suite Variable    ${LINK_BUCKET}    link-bucket-tagging
+Setup bucket tagging tests
+    Setup s3 tests
+    Setup link bucket for tagging    ${LINK_BUCKET}
 
 *** Test Cases ***
 
@@ -78,7 +69,6 @@ Get bucket tagging after delete returns NoSuchTagSet
                     Should contain                     ${result}                         NoSuchTagSet
 
 Get bucket tagging on link bucket without tags
-    Setup link bucket for tagging
     ${result} =     Execute AWSS3APICli and checkrc    get-bucket-tagging --bucket ${LINK_BUCKET}    255
                     Should contain                     ${result}                      NoSuchTagSet
 
