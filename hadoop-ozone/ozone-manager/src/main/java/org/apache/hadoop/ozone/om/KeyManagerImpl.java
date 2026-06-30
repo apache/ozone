@@ -123,6 +123,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -2224,9 +2225,50 @@ public class KeyManagerImpl implements KeyManager {
             // primary, so do not shuffle when the client cannot be resolved.
             return nodes;
           }
-          return ozoneManager.getClusterMap()
-              .sortByDistanceCost(client, nodes, nodes.size());
+          return sortByClusterMapDistance(client, nodes);
         });
+  }
+
+  /**
+   * Sort a pipeline's nodes by topology distance to the client. The nodes come
+   * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
+   * parent/level and would be treated as outside the topology (distance
+   * {@link Integer#MAX_VALUE}) and shuffled. Resolve each node (and a co-located
+   * client) to its canonical instance in OM's cluster map before sorting, then
+   * map the sorted order back to the original pipeline nodes.
+   */
+  private List<? extends DatanodeDetails> sortByClusterMapDistance(
+      Node client, List<? extends DatanodeDetails> nodes) {
+    // Read the cluster map once: the topology poller may swap it, and resolving
+    // and sorting against the same instance keeps the parent pointers consistent.
+    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+    final Node reader = toClusterMapNode(clusterMap, client);
+    final List<Node> topologyNodes = new ArrayList<>(nodes.size());
+    final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
+    for (DatanodeDetails node : nodes) {
+      final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+      if (resolved == null) {
+        return nodes;
+      }
+      topologyNodes.add(resolved);
+      nodeByPath.put(resolved.getNetworkFullPath(), node);
+    }
+    final List<Node> sorted =
+        clusterMap.sortByDistanceCost(reader, topologyNodes, topologyNodes.size());
+    final List<DatanodeDetails> result = new ArrayList<>(sorted.size());
+    for (Node node : sorted) {
+      result.add(nodeByPath.get(node.getNetworkFullPath()));
+    }
+    return result;
+  }
+
+  /**
+   * Resolve a node to its canonical, topology-linked instance in the given
+   * cluster map, or return the input node if it is not in the map.
+   */
+  private Node toClusterMapNode(NetworkTopology clusterMap, Node node) {
+    final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+    return resolved != null ? resolved : node;
   }
 
   @VisibleForTesting

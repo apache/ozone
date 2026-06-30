@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableMap;
@@ -185,6 +186,37 @@ public class TestOMSortDatanodes {
           "Source node should be sorted first for writes");
       assertRackOrder(dn.getNetworkLocation(), sorted);
     }
+  }
+
+  @Test
+  public void sortDatanodesForWriteSortsRpcDeserializedPipeline() {
+    // Pipeline nodes arrive from SCM over RPC as deserialized DatanodeDetails
+    // with no topology linkage; the write sort must resolve them to OM's cluster
+    // map, otherwise every node is equidistant (MAX) and the order is random.
+    List<DatanodeDetails> rpcNodes = new ArrayList<>();
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      rpcNodes.add(DatanodeDetails.getFromProtoBuf(dn.getProtoBufMessage()));
+    }
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      List<? extends DatanodeDetails> sorted =
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress());
+      assertEquals(dn, sorted.get(0),
+          "Source node should be sorted first for writes");
+      assertRackOrder(dn.getNetworkLocation(), sorted);
+    }
+  }
+
+  @Test
+  public void sortDatanodesForWriteKeepsOrderForStaleTopology() {
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(randomDatanodeDetails());
+    nodes.addAll(nodeManager.getAllNodes());
+
+    List<? extends DatanodeDetails> sorted =
+        keyManager.sortDatanodesForWrite(nodes, "edge0");
+
+    assertSame(nodes, sorted,
+        "Pipeline order should be preserved when a node is missing from the OM topology");
   }
 
   @Test
