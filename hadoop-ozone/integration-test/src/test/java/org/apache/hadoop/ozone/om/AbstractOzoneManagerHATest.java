@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -158,6 +159,7 @@ public abstract class AbstractOzoneManagerHATest {
       // Enable the OM follower read.
       omHAConfig.setReadOption("LINEARIZABLE");
       omHAConfig.setReadLeaderLeaseEnabled(true);
+      conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
     }
 
     conf.setFromObject(omHAConfig);
