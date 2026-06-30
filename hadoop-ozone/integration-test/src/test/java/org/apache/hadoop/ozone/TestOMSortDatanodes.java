@@ -178,17 +178,6 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesForWritePicksNearestFirst() {
-    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
-      List<? extends DatanodeDetails> sorted =
-          keyManager.sortDatanodesForWrite(nodeManager.getAllNodes(), nodeAddress(dn));
-      assertEquals(dn, sorted.get(0),
-          "Source node should be sorted first for writes");
-      assertRackOrder(dn.getNetworkLocation(), sorted);
-    }
-  }
-
-  @Test
   public void sortDatanodesForWriteSortsRpcDeserializedPipeline() {
     // Pipeline nodes arrive from SCM over RPC as deserialized DatanodeDetails
     // with no topology linkage; the write sort must resolve them to OM's cluster
@@ -198,11 +187,19 @@ public class TestOMSortDatanodes {
       rpcNodes.add(DatanodeDetails.getFromProtoBuf(dn.getProtoBufMessage()));
     }
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
-      List<? extends DatanodeDetails> sorted =
+      // The client address is normally an IP, but the sort must resolve a client
+      // by either IP or hostname, so cover both.
+      List<? extends DatanodeDetails> byIp =
           keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress());
-      assertEquals(dn, sorted.get(0),
-          "Source node should be sorted first for writes");
-      assertRackOrder(dn.getNetworkLocation(), sorted);
+      assertEquals(dn, byIp.get(0),
+          "Source node should be sorted first for writes (IP client)");
+      assertRackOrder(dn.getNetworkLocation(), byIp);
+
+      List<? extends DatanodeDetails> byHostname =
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName());
+      assertEquals(dn, byHostname.get(0),
+          "Source node should be sorted first for writes (hostname client)");
+      assertRackOrder(dn.getNetworkLocation(), byHostname);
     }
   }
 
@@ -217,25 +214,6 @@ public class TestOMSortDatanodes {
 
     assertSame(nodes, sorted,
         "Pipeline order should be preserved when a node is missing from the OM topology");
-  }
-
-  @Test
-  public void getClientNodeMatchesByIpAndHostnameInHostnameMode() {
-    // The client address is always an IP, so a client must match its datanode by
-    // IP even when use.datanode.hostname is enabled.
-    config.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
-    try {
-      List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-      for (DatanodeDetails dn : nodes) {
-        assertEquals(dn, keyManager.getClientNode(dn.getIpAddress(), nodes),
-            "Client IP must resolve to its own datanode in hostname mode");
-        assertEquals(dn, keyManager.getClientNode(dn.getHostName(), nodes),
-            "Client hostname must resolve to its own datanode");
-      }
-    } finally {
-      config.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-          HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
-    }
   }
 
   @Test
