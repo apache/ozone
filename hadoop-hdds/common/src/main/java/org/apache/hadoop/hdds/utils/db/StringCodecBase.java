@@ -78,7 +78,7 @@ abstract class StringCodecBase implements Codec<String> {
    * <p>
    * For a fixed-length {@link Codec},
    * each character is encoded to the same number of bytes and
-   * {@link #getSerializedSizeUpperBound(String)} equals to the serialized size.
+   * {@code getSerializedSizeUpperBound(String)} equals to the serialized size.
    */
   public boolean isFixedLength() {
     return fixedLength;
