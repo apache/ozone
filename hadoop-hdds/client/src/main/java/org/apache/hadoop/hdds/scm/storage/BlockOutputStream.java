@@ -31,7 +31,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -381,6 +380,10 @@ public class BlockOutputStream extends OutputStream {
       return;
     }
     synchronized (this) {
+      if (canUseReadOnlyWrite(len)) {
+        writeReadOnlyChunk(b, off, len);
+        return;
+      }
       while (len > 0) {
         allocateNewBufferIfNeeded();
         final int writeLen = Math.min(currentBufferRemaining, len);
@@ -392,6 +395,44 @@ public class BlockOutputStream extends OutputStream {
         len -= writeLen;
         doFlushOrWatchIfNeeded();
       }
+    }
+  }
+
+  /**
+   * @return true when a single {@code write(byte[])} can reference caller
+   *     memory as one chunk without copying into the {@link BufferPool}.
+   */
+  private boolean canUseReadOnlyWrite(int len) {
+    return config.getStreamBufferReferenceWrite()
+        && currentBuffer == null
+        && len >= config.getStreamBufferReferenceWriteMinSize()
+        && len <= streamBufferArgs.getStreamBufferSize();
+  }
+
+  private void writeReadOnlyChunk(byte[] b, int off, int len)
+      throws IOException {
+    final ChunkBuffer chunk = ChunkBuffer.wrapReadOnly(b, off, len);
+    updateWrittenDataLength(len);
+    writeChunk(chunk);
+    updateWriteChunkLength();
+    currentBuffer = null;
+    currentBufferRemaining = 0;
+    flushAndWaitForCommit();
+  }
+
+  /**
+   * Flush pending chunks with putBlock and block until Ratis commits them.
+   * Caller-owned read-only buffers are safe to reuse once this returns.
+   */
+  private void flushAndWaitForCommit() throws IOException {
+    try {
+      updatePutBlockLength();
+      final PutBlockResult putBlockResult = executePutBlock(false, false).get();
+      watchForCommit(putBlockResult.commitIndex).get();
+    } catch (InterruptedException e) {
+      handleInterruptedException(e, false);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
     }
   }
 
@@ -574,10 +615,10 @@ public class BlockOutputStream extends OutputStream {
     long flushPos = totalWriteChunkLength;
     final List<ChunkBuffer> byteBufferList;
     if (!force) {
-      Objects.requireNonNull(bufferList, "bufferList == null");
+      Preconditions.checkNotNull(bufferList);
       byteBufferList = bufferList;
       bufferList = null;
-      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
+      Preconditions.checkNotNull(byteBufferList);
     } else {
       byteBufferList = null;
     }
@@ -740,7 +781,7 @@ public class BlockOutputStream extends OutputStream {
     long start = Time.monotonicNowNanos();
     CompletableFuture<PutBlockResult> putBlockResultFuture = null;
     // flush the last chunk data residing on the currentBuffer
-    if (totalWriteChunkLength < writtenDataLength) {
+    if (totalWriteChunkLength < writtenDataLength && currentBuffer != null) {
       Preconditions.checkArgument(currentBuffer.position() > 0);
 
       // This can be a partially filled chunk. Since we are flushing the buffer
@@ -946,10 +987,10 @@ public class BlockOutputStream extends OutputStream {
         containerBlockData.addChunks(chunkInfo);
       }
       if (putBlockPiggybacking) {
-        Objects.requireNonNull(bufferList, "bufferList == null");
+        Preconditions.checkNotNull(bufferList);
         byteBufferList = bufferList;
         bufferList = null;
-        Objects.requireNonNull(byteBufferList, "byteBufferList == null");
+        Preconditions.checkNotNull(byteBufferList);
 
         blockData = containerBlockData.build();
         LOG.debug("piggyback chunk list {}", blockData);

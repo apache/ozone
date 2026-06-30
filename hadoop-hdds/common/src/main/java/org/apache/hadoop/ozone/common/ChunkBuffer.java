@@ -64,6 +64,24 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
     return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
+  /**
+   * Wrap a caller-owned {@code byte[]} slice without copying.
+   *
+   * <p>The returned buffer is read-only. The caller must not modify the array
+   * until the buffer is released from the write pipeline.
+   */
+  static ChunkBuffer wrapReadOnly(byte[] array, int offset, int length) {
+    return new ReadOnlyChunkBuffer(array, offset, length);
+  }
+
+  /**
+   * @return true if this buffer is a read-only view over caller-owned memory
+   *     rather than a pooled copy.
+   */
+  default boolean isReadOnly() {
+    return false;
+  }
+
   /** Similar to {@link ByteBuffer#position()}. */
   int position();
 
