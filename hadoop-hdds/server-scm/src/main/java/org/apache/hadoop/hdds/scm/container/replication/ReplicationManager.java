@@ -537,7 +537,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       cmd.setReplicaIndex(replicaIndex);
       sendDatanodeCommand(cmd, containerInfo, source);
     } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen");
+      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen", e);
     }
   }
 
