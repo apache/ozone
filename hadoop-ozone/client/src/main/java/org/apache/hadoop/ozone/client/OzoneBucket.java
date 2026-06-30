@@ -1214,6 +1214,33 @@ public class OzoneBucket extends WithMetadata {
     proxy.deleteObjectTagging(volumeName, name, keyName);
   }
 
+  /**
+   * Gets the bucketTags for this bucket.
+   * @return Tags for this bucket.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public Map<String, String> getBucketTagging() throws IOException {
+    return proxy.getBucketTagging(volumeName, name);
+  }
+
+  /**
+   * Sets bucketTags on this bucket (replaces existing tag set).
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    proxy.putBucketTagging(volumeName, name, tags);
+  }
+
+  /**
+   * Removes all bucketTags from this bucket.
+   * @throws IOException
+   */
+  public void deleteBucketTagging() throws IOException {
+    proxy.deleteBucketTagging(volumeName, name);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }

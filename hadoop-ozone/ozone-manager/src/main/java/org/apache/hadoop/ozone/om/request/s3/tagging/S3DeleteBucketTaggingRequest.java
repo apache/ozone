@@ -17,171 +17,116 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketSetPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles DeleteBucketTagging (S3 bucket tagging).
  */
-public class S3DeleteBucketTaggingRequest extends OMClientRequest {
+public class S3DeleteBucketTaggingRequest extends S3BucketTaggingRequestBase {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3DeleteBucketTaggingRequest.class);
-
+  /**
+   * Creates a delete-bucket-tagging request from the incoming OM RPC payload.
+   */
   public S3DeleteBucketTaggingRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  /**
+   * Returns bucket args from the delete-bucket-tagging sub-request.
+   */
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager)
-      throws IOException {
+  protected BucketArgs getRequestBucketArgs(OMRequest omRequest) {
     DeleteBucketTaggingRequest deleteBucketTaggingRequest =
-        getOmRequest().getDeleteBucketTaggingRequest();
+        omRequest.getDeleteBucketTaggingRequest();
     Objects.requireNonNull(deleteBucketTaggingRequest,
         "deleteBucketTaggingRequest == null");
+    return deleteBucketTaggingRequest.getBucketArgs();
+  }
 
-    BucketArgs bucketArgs = deleteBucketTaggingRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
-    String volumeName = bucketArgs.getVolumeName();
-    String bucketName = bucketArgs.getBucketName();
+  /**
+   *  Returns the modification time stamped during preExecute.
+   */
+  @Override
+  protected long getModificationTime(OMRequest omRequest) {
+    return omRequest.getDeleteBucketTaggingRequest().getModificationTime();
+  }
 
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(volumeName, bucketName), this);
-
-    if (ozoneManager.getAclsEnabled()) {
-      try {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
-            resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
-      } catch (IOException ex) {
-        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-            OMAction.DELETE_BUCKET_TAGGING,
-            resolvedBucket.audit(omBucketArgs.toAuditMap()), ex,
-            getOmRequest().getUserInfo()));
-        throw ex;
-      }
-    }
+  /**
+   * Rebuilds the OM request with resolved bucket args and modification time.
+   */
+  @Override
+  protected OMRequest buildUpdatedOMRequest(OMRequest baseRequest,
+      BucketArgs bucketArgs, long modificationTime) throws IOException {
+    DeleteBucketTaggingRequest deleteBucketTaggingRequest =
+        baseRequest.getDeleteBucketTaggingRequest();
 
     DeleteBucketTaggingRequest.Builder req =
         deleteBucketTaggingRequest.toBuilder();
-    req.setModificationTime(Time.now());
-    req.setBucketArgs(resolvedBucket.update(bucketArgs));
+    req.setModificationTime(modificationTime);
+    req.setBucketArgs(bucketArgs);
 
-    return getOmRequest().toBuilder()
+    return baseRequest.toBuilder()
         .setDeleteBucketTaggingRequest(req.build())
         .setUserInfo(getUserInfo())
         .build();
   }
 
+  /**
+   * Clears all tags when deleting bucket tagging.
+   */
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+  protected Map<String, String> getTagsToApply(BucketArgs bucketArgs) {
+    return Collections.emptyMap();
+  }
 
-    DeleteBucketTaggingRequest deleteBucketTaggingRequest =
-        getOmRequest().getDeleteBucketTaggingRequest();
-    Objects.requireNonNull(deleteBucketTaggingRequest,
-        "deleteBucketTaggingRequest == null");
+  /**
+   * Sets the successful delete-bucket-tagging response on the OM response.
+   */
+  @Override
+  protected void setSuccessResponse(OMResponse.Builder omResponse) {
+    omResponse.setDeleteBucketTaggingResponse(
+        DeleteBucketTaggingResponse.newBuilder().build());
+  }
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OMMetrics omMetrics = ozoneManager.getMetrics();
+  /**
+   * Returns the audit action for delete bucket tagging.
+   */
+  @Override
+  protected OMAction getAuditAction() {
+    return OMAction.DELETE_BUCKET_TAGGING;
+  }
+
+  /**
+   * Increments the delete-bucket-tagging request metric.
+   */
+  @Override
+  protected void incRequestMetric(OMMetrics omMetrics) {
     omMetrics.incNumDeleteBucketTagging();
+  }
 
-    BucketArgs bucketArgs = deleteBucketTaggingRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
-
-    String volumeName = bucketArgs.getVolumeName();
-    String bucketName = bucketArgs.getBucketName();
-
-    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
-        getOmRequest());
-    OmBucketInfo omBucketInfo = null;
-
-    Exception exception = null;
-    boolean acquiredBucketLock = false;
-    boolean success = true;
-    OMClientResponse omClientResponse = null;
-    try {
-      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName));
-      acquiredBucketLock = getOmLockDetails().isLockAcquired();
-
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo dbBucketInfo = OzoneManagerUtils.getBucketInfo(
-          omMetadataManager, volumeName, bucketName);
-
-      omBucketInfo = dbBucketInfo.toBuilder()
-          .setTags(Collections.emptyMap())
-          .setUpdateID(transactionLogIndex)
-          .setModificationTime(deleteBucketTaggingRequest.getModificationTime())
-          .build();
-
-      omMetadataManager.getBucketTable().addCacheEntry(
-          new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
-
-      omResponse.setDeleteBucketTaggingResponse(
-          DeleteBucketTaggingResponse.newBuilder().build());
-      omClientResponse = new OMBucketSetPropertyResponse(
-          omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
-      success = false;
-      exception = ex;
-      omClientResponse = new OMBucketSetPropertyResponse(
-          createErrorOMResponse(omResponse, exception));
-    } finally {
-      if (acquiredBucketLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      }
-      if (omClientResponse != null) {
-        omClientResponse.setOmLockDetails(getOmLockDetails());
-      }
-    }
-
-    Map<String, String> auditMap = omBucketArgs.toAuditMap();
-    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.DELETE_BUCKET_TAGGING, auditMap, exception,
-        getOmRequest().getUserInfo()));
-
-    if (success) {
-      LOG.debug("Delete bucket tagging for bucket:{} in volume:{}",
-          bucketName, volumeName);
-      return omClientResponse;
-    }
+  /**
+   * Increments the delete-bucket-tagging failure metric.
+   */
+  @Override
+  protected void incRequestFailMetric(OMMetrics omMetrics) {
     omMetrics.incNumDeleteBucketTaggingFails();
-    LOG.error("Delete bucket tagging failed for bucket:{} in volume:{}",
-        bucketName, volumeName, exception);
-    return omClientResponse;
+  }
+
+  /**
+   * Returns the operation label used in debug and error logs.
+   */
+  @Override
+  protected String getOperationName() {
+    return "Delete";
   }
 }

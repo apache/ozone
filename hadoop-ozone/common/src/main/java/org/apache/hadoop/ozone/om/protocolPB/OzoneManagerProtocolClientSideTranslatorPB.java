@@ -120,6 +120,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
@@ -136,6 +137,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
@@ -191,6 +194,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
@@ -2753,6 +2757,67 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .build();
+
+    GetBucketTaggingRequest req =
+        GetBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.GetBucketTagging)
+        .setGetBucketTaggingRequest(req)
+        .build();
+
+    GetBucketTaggingResponse resp =
+        handleError(submitRequest(omRequest)).getGetBucketTaggingResponse();
+
+    return KeyValueUtil.getFromProtobuf(resp.getTagsList());
+  }
+
+  @Override
+  public void putBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
+        .build();
+
+    PutBucketTaggingRequest req =
+        PutBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
+        .setPutBucketTaggingRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void deleteBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .build();
+
+    DeleteBucketTaggingRequest req =
+        DeleteBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
+        .setDeleteBucketTaggingRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {

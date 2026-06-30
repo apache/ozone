@@ -5710,4 +5710,100 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
     assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
   }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testPutBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+
+    // initially bucket has no tags
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertTrue(bucket.getBucketTagging().isEmpty());
+    Instant modificationTimeBeforePut = bucket.getModificationTime();
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
+    assertThat(updatedBucket.getModificationTime())
+        .isAfterOrEqualTo(modificationTimeBeforePut);
+
+    // 2nd put should replace the previous tags
+    Map<String, String> secondTags = new HashMap<>();
+    secondTags.put("tag-key-3", "tag-value-3");
+
+    bucket.putBucketTagging(secondTags);
+
+    OzoneBucket updatedBucket2 = volume.getBucket(bucketName);
+    assertEquals(secondTags.size(), updatedBucket2.getBucketTagging().size());
+    assertThat(updatedBucket2.getBucketTagging()).containsAllEntriesOf(secondTags);
+    assertThat(updatedBucket2.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
+    assertThat(updatedBucket2.getModificationTime())
+        .isAfterOrEqualTo(updatedBucket.getModificationTime());
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+    OzoneBucket bucketAfterPut = volume.getBucket(bucketName);
+    assertFalse(bucketAfterPut.getBucketTagging().isEmpty());
+
+    bucket.deleteBucketTagging();
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertTrue(updatedBucket.getBucketTagging().isEmpty());
+    assertThat(updatedBucket.getModificationTime())
+        .isAfterOrEqualTo(bucketAfterPut.getModificationTime());
+    assertThat(updatedBucket.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
+  }
 }

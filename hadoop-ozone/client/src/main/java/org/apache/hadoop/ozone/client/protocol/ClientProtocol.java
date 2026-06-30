@@ -1507,4 +1507,31 @@ public interface ClientProtocol {
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
+  /**
+   * Gets the tags for an existing bucket.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @return Tags for the specified bucket.
+   * @throws IOException
+   */
+  Map<String, String> getBucketTagging(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
+   * Sets tags on an existing bucket (replaces existing tag set).
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  void putBucketTagging(String volumeName, String bucketName,
+      Map<String, String> tags) throws IOException;
+
+  /**
+   * Removes all tags from the specified bucket.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @throws IOException
+   */
+  void deleteBucketTagging(String volumeName, String bucketName) throws IOException;
 }
