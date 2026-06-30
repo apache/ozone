@@ -1340,7 +1340,6 @@ public class RpcClient implements ClientProtocol {
         .setBucketLayout(bucketInfo.getBucketLayout())
         .setOwner(bucketInfo.getOwner())
         .setDefaultReplicationConfig(bucketInfo.getDefaultReplicationConfig())
-        .setTags(bucketInfo.getTags())
         .build();
   }
 
@@ -1375,7 +1374,6 @@ public class RpcClient implements ClientProtocol {
                 .setOwner(bucket.getOwner())
                 .setDefaultReplicationConfig(
                     bucket.getDefaultReplicationConfig())
-                .setTags(bucket.getTags())
                 .build())
         .collect(Collectors.toList());
   }

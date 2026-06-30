@@ -5735,8 +5735,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     bucket.putBucketTagging(tags);
 
     OzoneBucket updatedBucket = volume.getBucket(bucketName);
-    assertEquals(tags.size(), updatedBucket.getBucketTags().size());
-    assertThat(updatedBucket.getBucketTags()).containsAllEntriesOf(tags);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
     assertThat(updatedBucket.getModificationTime())
         .isAfterOrEqualTo(modificationTimeBeforePut);
 
@@ -5747,9 +5747,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     bucket.putBucketTagging(secondTags);
 
     OzoneBucket updatedBucket2 = volume.getBucket(bucketName);
-    assertEquals(secondTags.size(), updatedBucket2.getBucketTags().size());
-    assertThat(updatedBucket2.getBucketTags()).containsAllEntriesOf(secondTags);
-    assertThat(updatedBucket2.getBucketTags()).doesNotContainKeys("tag-key-1", "tag-key-2");
+    assertEquals(secondTags.size(), updatedBucket2.getBucketTagging().size());
+    assertThat(updatedBucket2.getBucketTagging()).containsAllEntriesOf(secondTags);
+    assertThat(updatedBucket2.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
     assertThat(updatedBucket2.getModificationTime())
         .isAfterOrEqualTo(updatedBucket.getModificationTime());
   }
@@ -5773,14 +5773,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     bucket.putBucketTagging(tags);
     OzoneBucket bucketAfterPut = volume.getBucket(bucketName);
-    assertFalse(bucketAfterPut.getBucketTags().isEmpty());
+    assertFalse(bucketAfterPut.getBucketTagging().isEmpty());
 
     bucket.deleteBucketTagging();
     OzoneBucket updatedBucket = volume.getBucket(bucketName);
-    assertTrue(updatedBucket.getBucketTags().isEmpty());
+    assertTrue(updatedBucket.getBucketTagging().isEmpty());
     assertThat(updatedBucket.getModificationTime())
         .isAfterOrEqualTo(bucketAfterPut.getModificationTime());
-    assertThat(updatedBucket.getBucketTags()).doesNotContainKeys("tag-key-1", "tag-key-2");
+    assertThat(updatedBucket.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
   }
 
   @ParameterizedTest
@@ -5803,7 +5803,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     bucket.putBucketTagging(tags);
 
     OzoneBucket updatedBucket = volume.getBucket(bucketName);
-    assertEquals(tags.size(), updatedBucket.getBucketTags().size());
-    assertThat(updatedBucket.getBucketTags()).containsAllEntriesOf(tags);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
   }
 }
