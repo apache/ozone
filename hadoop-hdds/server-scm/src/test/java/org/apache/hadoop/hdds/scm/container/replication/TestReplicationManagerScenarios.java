@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -63,6 +64,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -200,6 +202,14 @@ public class TestReplicationManagerScenarios {
           DatanodeDetails dn = invocation.getArgument(0);
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
         });
+
+    // Replication commands look up each involved datanode's apparent version,
+    // so return an info reporting the current version for every node.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getDatanodeInfo(any(DatanodeDetails.class)))
+        .thenReturn(defaultNodeInfo);
 
     final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {

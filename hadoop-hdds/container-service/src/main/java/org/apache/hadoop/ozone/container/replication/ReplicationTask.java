@@ -31,10 +31,9 @@ public class ReplicationTask extends AbstractReplicationTask {
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
+  private final HDDSVersion apparentVersion;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
-
-  private int lowestCommonApparentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
 
   /**
    * Counter for the transferred bytes.
@@ -47,6 +46,7 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
+    this.apparentVersion = cmd.getApparentVersion();
     if (cmd.getTargetDatanode() != null) {
       // Only push replication will have a target datanode set, and it must be
       // sent to the source datanode to be executed. It is possible the source
@@ -129,18 +129,12 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   /**
-   * @return the lowest apparent version supported by both this datanode and
-   *     the replication peer, computed as {@code min(localApparentVersion,
-   *     peerApparentVersion)}. Replicators can use this to gate
-   *     version-dependent protocol features so that the newer side downgrades
-   *     to a behavior the older side understands.
+   * @return the apparent version to use for this replication task. Replicators
+   *     can use this to gate version-dependent protocol features so that the
+   *     newer side downgrades to a behavior the older side understands.
    */
-  public int getLowestCommonApparentVersion() {
-    return lowestCommonApparentVersion;
-  }
-
-  public void setLowestCommonApparentVersion(int lowestCommonApparentVersion) {
-    this.lowestCommonApparentVersion = lowestCommonApparentVersion;
+  public HDDSVersion getApparentVersion() {
+    return apparentVersion;
   }
 
   DatanodeDetails getTarget() {

@@ -36,6 +36,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -84,7 +85,8 @@ public class TestContainerReplicaPendingOps {
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
 
-    addCmd = ReplicateContainerCommand.toTarget(1, dn3);
+    addCmd = ReplicateContainerCommand.toTarget(1, dn3,
+        HDDSVersion.SOFTWARE_VERSION);
     deleteCmd =  new DeleteContainerCommand(1, false);
   }
 

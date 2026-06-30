@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.protocol.commands;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Collections;
-import java.util.List;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -34,29 +32,29 @@ import org.junit.jupiter.api.Test;
 public class TestReplicateContainerCommand {
 
   @Test
-  public void testPeerApparentVersionRoundTrip() {
-    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
-    List<DatanodeDetails> sources = Collections.singletonList(source);
+  public void testApparentVersionRoundTrip() {
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.fromSources(1L, sources);
-    cmd.setPeerApparentVersion(
-        HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
+        ReplicateContainerCommand.toTarget(1L, target,
+            HDDSVersion.STREAM_BLOCK_SUPPORT);
 
     ReplicateContainerCommandProto proto = cmd.getProto();
     ReplicateContainerCommand deserialized =
         ReplicateContainerCommand.getFromProtobuf(proto);
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
-        deserialized.getPeerApparentVersion());
+    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
+        deserialized.getApparentVersion());
+    assertEquals(target.getUuid(),
+        deserialized.getTargetDatanode().getUuid());
   }
 
   @Test
-  public void testPeerApparentVersionDefaultWhenAbsent() {
+  public void testApparentVersionDefaultWhenAbsent() {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(1L, target);
+        ReplicateContainerCommand.toTarget(1L, target, HDDSVersion.ZDU);
 
     ReplicateContainerCommandProto proto =
         ReplicateContainerCommandProto.newBuilder()
@@ -68,37 +66,16 @@ public class TestReplicateContainerCommand {
     ReplicateContainerCommand deserialized =
         ReplicateContainerCommand.getFromProtobuf(proto);
 
-    assertEquals(HDDSVersion.DEFAULT_VERSION.serialize(),
-        deserialized.getPeerApparentVersion());
+    assertEquals(HDDSVersion.DEFAULT_VERSION,
+        deserialized.getApparentVersion());
   }
 
   @Test
-  public void testPeerApparentVersionInPushMode() {
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(1L, target);
-    cmd.setPeerApparentVersion(HDDSVersion.ZDU.serialize());
-
-    ReplicateContainerCommandProto proto = cmd.getProto();
-    ReplicateContainerCommand deserialized =
-        ReplicateContainerCommand.getFromProtobuf(proto);
-
-    assertEquals(HDDSVersion.ZDU.serialize(),
-        deserialized.getPeerApparentVersion());
-    assertEquals(target.getUuid(),
-        deserialized.getTargetDatanode().getUuid());
-  }
-
-  @Test
-  public void testToStringIncludesPeerApparentVersion() {
+  public void testToStringIncludesApparentVersion() {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.forTest(1L);
-    cmd.setPeerApparentVersion(
-        HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
 
     String str = cmd.toString();
-    assertTrue(str.contains("peerApparentVersion="
-        + HDDSVersion.STREAM_BLOCK_SUPPORT.serialize()));
+    assertTrue(str.contains("apparentVersion=" + HDDSVersion.SOFTWARE_VERSION));
   }
 }

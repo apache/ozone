@@ -73,6 +73,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -528,7 +529,8 @@ public class TestReplicationSupervisor {
         HddsProtos.NodeOperationalState.DECOMMISSIONING);
 
     ReplicateContainerCommand pushCmd = ReplicateContainerCommand.toTarget(
-        1, MockDatanodeDetails.randomDatanodeDetails());
+        1, MockDatanodeDetails.randomDatanodeDetails(),
+        HDDSVersion.SOFTWARE_VERSION);
     pushCmd.setTerm(CURRENT_TERM);
     ReplicateContainerCommand pullCmd = createCommand(2);
 

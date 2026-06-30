@@ -43,7 +43,7 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
-  private int peerApparentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
+  private HDDSVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
 
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -51,12 +51,18 @@ public final class ReplicateContainerCommand
   }
 
   public static ReplicateContainerCommand toTarget(long containerID,
-      DatanodeDetails target) {
-    return new ReplicateContainerCommand(containerID, emptyList(), target);
+      DatanodeDetails target, HDDSVersion apparentVersion) {
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(containerID, emptyList(), target);
+    cmd.apparentVersion = apparentVersion;
+    return cmd;
   }
 
   public static ReplicateContainerCommand forTest(long containerID) {
-    return new ReplicateContainerCommand(containerID, emptyList(), null);
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(containerID, emptyList(), null);
+    cmd.apparentVersion = HDDSVersion.SOFTWARE_VERSION;
+    return cmd;
   }
 
   private ReplicateContainerCommand(long containerID,
@@ -84,12 +90,13 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
-  public void setPeerApparentVersion(int version) {
-    this.peerApparentVersion = version;
-  }
-
-  public int getPeerApparentVersion() {
-    return peerApparentVersion;
+  /**
+   * @return the apparent version that should be used to carry out this
+   *     replication. SCM computes this as the lowest apparent version among the
+   *     nodes involved.
+   */
+  public HDDSVersion getApparentVersion() {
+    return apparentVersion;
   }
 
   @Override
@@ -115,7 +122,7 @@ public final class ReplicateContainerCommand
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
     builder.setPriority(priority);
-    builder.setPeerApparentVersion(peerApparentVersion);
+    builder.setApparentVersion(apparentVersion.serialize());
     return builder.build();
   }
 
@@ -142,9 +149,9 @@ public final class ReplicateContainerCommand
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
     }
-    if (protoMessage.hasPeerApparentVersion()) {
-      cmd.setPeerApparentVersion(
-          protoMessage.getPeerApparentVersion());
+    if (protoMessage.hasApparentVersion()) {
+      cmd.apparentVersion =
+          HDDSVersion.deserialize(protoMessage.getApparentVersion());
     }
     return cmd;
   }
@@ -185,7 +192,7 @@ public final class ReplicateContainerCommand
       sb.append(", sourceNodes=").append(sourceDatanodes);
     }
     sb.append(", priority=").append(priority)
-        .append(", peerApparentVersion=").append(peerApparentVersion);
+        .append(", apparentVersion=").append(apparentVersion);
     return sb.toString();
   }
 }

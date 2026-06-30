@@ -977,7 +977,8 @@ public class TestSCMNodeManager {
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
       nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
-          .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
+          .toTarget(1, MockDatanodeDetails.randomDatanodeDetails(),
+              HDDSVersion.SOFTWARE_VERSION));
     }
     for (int i = 0; i < 5; i++) {
       nodeManager.addDatanodeCommand(node1.getID(),

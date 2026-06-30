@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToLongFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -111,7 +112,8 @@ class TestContainerReplication {
     long containerID = createNewClosedContainer(source);
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
+        ReplicateContainerCommand.toTarget(containerID, target,
+            HDDSVersion.SOFTWARE_VERSION);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
@@ -165,7 +167,7 @@ class TestContainerReplication {
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(CONTAINER_ID.incrementAndGet(),
-            target);
+            target, HDDSVersion.SOFTWARE_VERSION);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationFailureCount);
@@ -211,7 +213,8 @@ class TestContainerReplication {
     
     // Create replication command to push container to target
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
+        ReplicateContainerCommand.toTarget(containerID, target,
+            HDDSVersion.SOFTWARE_VERSION);
 
     // Execute push replication
     queueAndWaitForCompletion(cmd, source,
