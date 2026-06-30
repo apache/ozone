@@ -188,17 +188,6 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesForWriteIgnoresEmptyClient() {
-    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-    List<DatanodeDetails> original = new ArrayList<>(nodes);
-    // An empty client address must never reorder the write pipeline.
-    List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, "");
-    assertEquals(original, result,
-        "Empty client must leave the write pipeline order unchanged");
-  }
-
-  @Test
   public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
     List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
     List<DatanodeDetails> original = new ArrayList<>(nodes);

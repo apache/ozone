@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -31,10 +32,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -258,23 +270,70 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   @Test
   public void testAllocateBlockSortsSharedPipelineOnce() throws Exception {
-    // Multiple preallocated blocks that share one pipeline must be sorted once.
+    // Two blocks on the same 3-node pipeline must be sorted once, and the
+    // sorted order must land in every block's pipeline.
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .build();
+    AllocatedBlock.Builder blockBuilder =
+        new AllocatedBlock.Builder().setPipeline(pipeline);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString())).thenAnswer(inv -> {
+          int num = inv.getArgument(1);
+          List<AllocatedBlock> blocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            blocks.add(blockBuilder.build());
+          }
+          return blocks;
+        });
+
+    List<DatanodeDetails> sortedOrder = new ArrayList<>(nodes);
+    Collections.reverse(sortedOrder);
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.sortDatanodesForWrite(any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
+        .thenAnswer(inv -> sortedOrder);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
 
     OMAllocateBlockRequest request =
         getOmAllocateBlockRequest(createAllocateBlockRequest());
-    // requestedSize spans two scmBlockSize blocks; the SCM stub returns both on
-    // the same pipeline, so the OM-side sort must run only once.
-    request.allocateBlock(scmClient, ozoneBlockTokenSecretManager,
-        replicationConfig, new ExcludeList(), 2 * scmBlockSize, scmBlockSize,
-        2, false, "svc", omMetrics, true,
+    // requestedSize spans two scmBlockSize blocks on the same pipeline.
+    List<OmKeyLocationInfo> locations = request.allocateBlock(scmClient,
+        ozoneBlockTokenSecretManager, replicationConfig, new ExcludeList(),
+        2 * scmBlockSize, scmBlockSize, 2, false, "svc", omMetrics, true,
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(),
         mockKeyManager);
 
+    // Sorted once for the shared pipeline...
     verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"));
+    // ...and the sorted order is applied to every block's pipeline.
+    assertEquals(2, locations.size());
+    for (OmKeyLocationInfo location : locations) {
+      assertEquals(sortedOrder, location.getPipeline().getNodesInOrder());
+    }
+  }
+
+  @Test
+  public void sortDatanodesForWriteSkipsEmptyClient() {
+    // An empty client address must short-circuit and return the input order
+    // unchanged; without the guard the timed sort path runs against the
+    // fixture's mock metric and throws, so this returning cleanly is the test.
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    List<? extends DatanodeDetails> result =
+        keyManager.sortDatanodesForWrite(nodes, "");
+    assertEquals(nodes, result);
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.
