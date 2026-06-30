@@ -1095,11 +1095,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seekKey = getOzoneKey(volumeName, bucketName,
-          (keyPrefix != null && !keyPrefix.isEmpty()) ? keyPrefix : OM_KEY_PREFIX);
+          StringUtils.isNotEmpty(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
     }
 
     String seekPrefix;
-    if (keyPrefix != null && !keyPrefix.isEmpty()) {
+    if (StringUtils.isNotEmpty(keyPrefix)) {
       seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;

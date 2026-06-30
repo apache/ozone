@@ -167,7 +167,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     ListObjectResponse response = new ListObjectResponse();
     // AWS omits Delimiter from the response when the client passes delimiter= or does not specify delimiter at all.
-    if (delimiter != null && !delimiter.isEmpty()) {
+    if (StringUtils.isNotEmpty(delimiter)) {
       response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
     }
     response.setName(bucketName);
