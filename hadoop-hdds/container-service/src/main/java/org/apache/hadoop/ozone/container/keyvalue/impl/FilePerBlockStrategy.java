@@ -244,7 +244,8 @@ public class FilePerBlockStrategy implements ChunkManager {
       return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume, dispatcherContext);
     }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager,
+        dispatcherContext);
   }
 
   @Override

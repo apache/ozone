@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +36,21 @@ public final class BufferUtils {
 
   private static final ByteBuffer[] EMPTY_BYTE_BUFFER_ARRAY = {};
 
+  /** Pool for reusing direct {@link ByteBuffer}s allocated by {@link #assignByteBuffers}. */
+  public static final DirectBufferPool BUFFER_POOL = new DirectBufferPool();
+
   /** Utility classes should not be constructed. **/
   private BufferUtils() {
 
   }
 
   /**
-   * Assign an array of ByteBuffers.
+   * Allocate an array of direct {@link ByteBuffer}s drawn from
+   * {@link #BUFFER_POOL}, sized to hold {@code totalLen} bytes split into
+   * slices of at most {@code bufferCapacity} bytes each.  Callers are
+   * responsible for returning each buffer via
+   * {@link DirectBufferPool#returnBuffer} when finished.
+   *
    * @param totalLen total length of all ByteBuffers
    * @param bufferCapacity max capacity of each ByteBuffer
    */
@@ -58,13 +67,15 @@ public final class BufferUtils {
     long allocatedLen = 0;
     // For each ByteBuffer (except the last) allocate bufferLen of capacity
     for (int i = 0; i < numBuffers - 1; i++) {
-      dataBuffers[i] = ByteBuffer.allocate(bufferCapacity);
+      dataBuffers[i] = BUFFER_POOL.getBuffer(bufferCapacity);
+      dataBuffers[i].limit(bufferCapacity);
       allocatedLen += bufferCapacity;
     }
     // For the last ByteBuffer, allocate as much space as is needed to fit
     // remaining bytes
-    dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
-        Math.toIntExact(totalLen - allocatedLen));
+    final int lastLen = Math.toIntExact(totalLen - allocatedLen);
+    dataBuffers[numBuffers - 1] = BUFFER_POOL.getBuffer(lastLen);
+    dataBuffers[numBuffers - 1].limit(lastLen);
     return dataBuffers;
   }
 

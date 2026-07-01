@@ -78,7 +78,7 @@ class TestChunkUtils {
       throws StorageContainerException {
     LOG.info("off={}, len={}", off, len);
     return ChunkUtils.readData(len, BUFFER_CAPACITY, file, off, null,
-        MAPPED_BUFFER_THRESHOLD, true, MAPPED_BUFFER_MANAGER);
+        MAPPED_BUFFER_THRESHOLD, true, MAPPED_BUFFER_MANAGER, null);
   }
 
   @Test
@@ -169,12 +169,15 @@ class TestChunkUtils {
             assertEquals(1, buffers.size());
             final ByteBuffer readBuffer = buffers.get(0);
 
+            int remaining = readBuffer.remaining();
+            byte[] readArray = new byte[remaining];
+            readBuffer.get(readArray);
             LOG.info("Read data ({}): {}", threadNumber,
-                new String(readBuffer.array(), UTF_8));
-            if (!Arrays.equals(array, readBuffer.array())) {
+                new String(readArray, UTF_8));
+            if (!Arrays.equals(array, readArray)) {
               fail.getAndIncrement();
             }
-            assertEquals(len, readBuffer.remaining());
+            assertEquals(len, remaining);
           } catch (Exception ee) {
             LOG.error("Failed to read data ({})", threadNumber, ee);
             fail.getAndIncrement();
