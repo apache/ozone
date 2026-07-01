@@ -64,6 +64,8 @@ public class ReplicationServer {
 
   private ContainerController controller;
 
+  private ReplicationConfig replicationConfig;
+
   private int port;
   private final ContainerImporter importer;
 
@@ -76,6 +78,7 @@ public class ReplicationServer {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
+    this.replicationConfig = replicationConfig;
     this.importer = importer;
     this.port = replicationConfig.getPort();
 
@@ -104,7 +107,8 @@ public class ReplicationServer {
 
   public void init() {
     GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
-        new OnDemandContainerReplicationSource(controller), importer);
+        new OnDemandContainerReplicationSource(controller, replicationConfig),
+        importer);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(
@@ -230,8 +234,25 @@ public class ReplicationServer {
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
 
+    @Config(key = "hdds.datanode.replication.volume.outbound.limit",
+        type = ConfigType.INT,
+        defaultValue = "2",
+        tags = {DATANODE},
+        description = "The maximum number of concurrent replication reads " +
+            "allowed per physical disk volume."
+    )
+    private int volumeOutboundLimit = 2;
+
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
+    }
+
+    public int getVolumeOutboundLimit() {
+      return volumeOutboundLimit;
+    }
+
+    public void setVolumeOutboundLimit(int limit) {
+      this.volumeOutboundLimit = limit;
     }
 
     public int scaleOutOfServiceLimit(int original) {
