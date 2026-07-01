@@ -37,10 +37,11 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
  * Available metrics:
  * <ul>
  *   <li>Bytes used in bucket.
- *   <li>Bucket quote in bytes.
+ *   <li>Bucket quota in bytes.
  *   <li>Bucket quota in namespace.
+ *   <li>Bucket used namespace (number of keys/directories in bucket).
  *   <li>Bucket available space. Calculated from difference between used bytes in bucket and bucket quota.
- *   If bucket quote is not set then this metric show -1 as value.
+ *   If bucket quota is not set then this metric shows -1 as value.
  * </ul>
  */
 @InterfaceAudience.Private
@@ -87,6 +88,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
           .addGauge(BucketMetricsInfo.BucketSnapshotUsedBytes, bucketInfo.getSnapshotUsedBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaBytes, bucketInfo.getQuotaInBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaNamespace, bucketInfo.getQuotaInNamespace())
+          .addGauge(BucketMetricsInfo.BucketUsedNamespace, bucketInfo.getUsedNamespace())
           .addGauge(BucketMetricsInfo.BucketAvailableBytes, availableSpace);
     }
   }
@@ -103,6 +105,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
     BucketQuotaBytes("Bucket quota in bytes"),
     BucketSnapshotUsedBytes("Bucket quota bytes held in snapshots"),
     BucketQuotaNamespace("Bucket quota in namespace."),
+    BucketUsedNamespace("Bucket used namespace."),
     BucketAvailableBytes("Bucket available space.");
 
     private final String desc;

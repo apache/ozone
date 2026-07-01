@@ -561,6 +561,9 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator();
 
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator();
+
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
       getKeyIterator() throws IOException;
 
