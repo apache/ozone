@@ -381,8 +381,8 @@ public class TestReplicationSupervisor {
         .clock(clock)
         .build();
 
-    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(), conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
+    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(),
+        "test", conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     long containerId = 1;
     // create container

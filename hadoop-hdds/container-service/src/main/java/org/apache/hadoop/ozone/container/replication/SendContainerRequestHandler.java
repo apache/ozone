@@ -142,7 +142,8 @@ class SendContainerRequestHandler
       closeOutput();
 
       try {
-        importer.importContainer(containerId, path, volume, compression);
+        importer.importContainerWithVolumeRetry(containerId, path, volume,
+            compression, spaceToReserve);
         LOG.info("Container {} is replicated successfully", containerId);
         responseObserver.onNext(SendContainerResponse.newBuilder().build());
         responseObserver.onCompleted();
