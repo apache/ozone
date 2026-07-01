@@ -62,6 +62,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // been modified.
   private Long expectedDataGeneration = null;
   private final String expectedETag;
+  private final boolean isSignedInputStream;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -84,6 +85,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.expectedETag = b.expectedETag;
+    this.isSignedInputStream = b.isSignedInputStream;
   }
 
   public boolean getIsMultipartKey() {
@@ -170,6 +172,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedETag;
   }
 
+  public boolean isSignedInputStream() {
+    return isSignedInputStream;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -244,6 +250,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String expectedETag;
+    private boolean isSignedInputStream;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -290,6 +297,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.isSignedInputStream = obj.isSignedInputStream;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
     }
@@ -427,6 +435,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setIsSignedInputStream(boolean isSignedInputStream) {
+      this.isSignedInputStream = isSignedInputStream;
       return this;
     }
 

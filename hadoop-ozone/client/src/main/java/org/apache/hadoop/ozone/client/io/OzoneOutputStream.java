@@ -37,6 +37,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   private final OutputStream outputStream;
   private final Syncable syncable;
   private boolean enableHsync;
+  private byte[] derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -180,5 +181,13 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
       return ((CipherOutputStreamOzone) out).getWrappedStream();
     }
     return out;
+  }
+
+  public byte[] getDerivedKey() {
+    return derivedKey == null ? null : derivedKey.clone();
+  }
+
+  public void setDerivedKey(byte[] derivedKey) {
+    this.derivedKey = derivedKey == null ? null : derivedKey.clone();
   }
 }

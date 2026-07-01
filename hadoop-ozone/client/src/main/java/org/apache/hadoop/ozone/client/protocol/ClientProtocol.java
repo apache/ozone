@@ -505,6 +505,82 @@ public interface ClientProtocol {
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags) throws IOException;
 
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean isSignedInputStream) throws IOException {
+    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean isSignedInputStream) throws IOException {
+    return createKeyIfNotExists(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+    return rewriteKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createMultipartKey(String volumeName, String bucketName,
+                                       String keyName, long size,
+                                       int partNumber, String uploadID,
+                                       boolean isSignedInputStream)
+      throws IOException {
+    return createMultipartKey(volumeName, bucketName, keyName, size, partNumber,
+        uploadID);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean isSignedInputStream) throws IOException {
+    return createStreamKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+    return createStreamKeyIfNotExists(volumeName, bucketName, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+    return rewriteStreamKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createMultipartStreamKey(String volumeName,
+                                                 String bucketName,
+                                                 String keyName, long size,
+                                                 int partNumber,
+                                                 String uploadID,
+                                                 boolean isSignedInputStream)
+      throws IOException {
+    return createMultipartStreamKey(volumeName, bucketName, keyName, size,
+        partNumber, uploadID);
+  }
+
   /**
    * Reads a key from an existing bucket.
    * @param volumeName Name of the Volume
@@ -1493,4 +1569,5 @@ public interface ClientProtocol {
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
+  boolean isS3AuthCheck();
 }
