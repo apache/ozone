@@ -86,8 +86,8 @@ public class ContainerHealthSchemaManager {
    * Insert unhealthy container records in UNHEALTHY_CONTAINERS table using
    * true batch insert.
    *
-   * <p>In the health-task flow, inserts are preceded by delete in the same
-   * transaction via {@link #replaceUnhealthyContainerRecordsAtomically(List, List)}.
+   * <p>In the health-task flow, inserts are usually part of
+   * {@link #syncUnhealthyContainerRecordsAtomically(Map, List)}.
    * Therefore duplicate-key fallback is not expected and this method fails fast
    * on any insert error.</p>
    */
@@ -180,6 +180,70 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
+   * Atomically syncs unhealthy rows for a scan chunk: insert new
+   * (container_id, state) pairs, update existing pairs, and delete only stale
+   * pairs that are no longer unhealthy.
+   *
+   * <p>Unlike {@link #replaceUnhealthyContainerRecordsAtomically}, this does not
+   * delete all SCM states for every container that previously had a row. It
+   * removes only keys present in {@code existingByKey} but absent from the
+   * desired scan result (containers that recovered or changed state).</p>
+   *
+   * @param existingByKey prior rows for this chunk, keyed by
+   *                      (container_id, container_state)
+   * @param desiredRecords unhealthy rows produced by the current scan
+   */
+  public void syncUnhealthyContainerRecordsAtomically(
+      Map<ContainerStateKey, Long> existingByKey,
+      List<UnhealthyContainerRecord> desiredRecords) {
+    if ((existingByKey == null || existingByKey.isEmpty())
+        && (desiredRecords == null || desiredRecords.isEmpty())) {
+      return;
+    }
+
+    Map<ContainerStateKey, UnhealthyContainerRecord> desiredByKey = new HashMap<>();
+    if (desiredRecords != null) {
+      for (UnhealthyContainerRecord record : desiredRecords) {
+        desiredByKey.put(new ContainerStateKey(record.getContainerId(),
+            record.getContainerState()), record);
+      }
+    }
+
+    Map<ContainerStateKey, Long> existing =
+        existingByKey == null ? new HashMap<>() : existingByKey;
+
+    List<ContainerStateKey> staleKeys = new ArrayList<>();
+    List<UnhealthyContainerRecord> toInsert = new ArrayList<>();
+    List<UnhealthyContainerRecord> toUpdate = new ArrayList<>();
+
+    for (ContainerStateKey key : existing.keySet()) {
+      if (!desiredByKey.containsKey(key)) {
+        staleKeys.add(key);
+      }
+    }
+    for (UnhealthyContainerRecord record : desiredByKey.values()) {
+      ContainerStateKey key = new ContainerStateKey(record.getContainerId(),
+          record.getContainerState());
+      if (existing.containsKey(key)) {
+        toUpdate.add(record);
+      } else {
+        toInsert.add(record);
+      }
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    dslContext.transaction(configuration -> {
+      DSLContext txContext = configuration.dsl();
+      deleteStaleUnhealthyRecords(txContext, staleKeys);
+      batchInsertInChunks(txContext, toInsert);
+      batchUpdateInChunks(txContext, toUpdate);
+    });
+
+    LOG.debug("Synced unhealthy container records: deleted {} stale, inserted {}, updated {}",
+        staleKeys.size(), toInsert.size(), toUpdate.size());
+  }
+
+  /**
    * Atomically replaces unhealthy rows for a given set of containers.
    * Delete and insert happen in the same DB transaction.
    */
@@ -225,6 +289,43 @@ public class ContainerHealthSchemaManager {
       totalDeleted += deleted;
     }
     return totalDeleted;
+  }
+
+  private void deleteStaleUnhealthyRecords(DSLContext dslContext,
+      List<ContainerStateKey> staleKeys) {
+    if (staleKeys.isEmpty()) {
+      return;
+    }
+    for (ContainerStateKey key : staleKeys) {
+      dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(key.getContainerId()))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(key.getContainerState()))
+          .execute();
+    }
+  }
+
+  private void batchUpdateInChunks(DSLContext dslContext,
+      List<UnhealthyContainerRecord> recs) {
+    if (recs.isEmpty()) {
+      return;
+    }
+    for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+      int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+      for (int i = from; i < to; i++) {
+        UnhealthyContainerRecord rec = recs.get(i);
+        dslContext.update(UNHEALTHY_CONTAINERS)
+            .set(UNHEALTHY_CONTAINERS.IN_STATE_SINCE, rec.getInStateSince())
+            .set(UNHEALTHY_CONTAINERS.EXPECTED_REPLICA_COUNT,
+                rec.getExpectedReplicaCount())
+            .set(UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT,
+                rec.getActualReplicaCount())
+            .set(UNHEALTHY_CONTAINERS.REPLICA_DELTA, rec.getReplicaDelta())
+            .set(UNHEALTHY_CONTAINERS.REASON, rec.getReason())
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(rec.getContainerId()))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(rec.getContainerState()))
+            .execute();
+      }
+    }
   }
 
   /**
@@ -286,10 +387,20 @@ public class ContainerHealthSchemaManager {
         || containerIds == null || containerIds.isEmpty()) {
       return records;
     }
+    return applyExistingInStateSince(records,
+        getExistingInStateSinceByContainerIds(containerIds));
+  }
 
-    Map<ContainerStateKey, Long> existingByContainerAndState =
-        getExistingInStateSinceByContainerIds(containerIds);
-    if (existingByContainerAndState.isEmpty()) {
+  /**
+   * Preserve existing inStateSince values for records that remain in the
+   * same unhealthy state across scan cycles, using a pre-loaded existing map.
+   */
+  public List<UnhealthyContainerRecord> applyExistingInStateSince(
+      List<UnhealthyContainerRecord> records,
+      Map<ContainerStateKey, Long> existingByContainerAndState) {
+    if (records == null || records.isEmpty()
+        || existingByContainerAndState == null
+        || existingByContainerAndState.isEmpty()) {
       return records;
     }
 
@@ -567,6 +678,10 @@ public class ContainerHealthSchemaManager {
 
     public long getContainerId() {
       return containerId;
+    }
+
+    public String getContainerState() {
+      return state;
     }
 
     @Override

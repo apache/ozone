@@ -609,10 +609,10 @@ public class TestUnhealthyContainersDerbyPerformance {
 
   /**
    * Exercises the same persistence pattern used by Recon health scan chunks:
-   * delete and insert in a single transaction.
+   * sync existing rows with the current scan result in a single transaction.
    *
-   * <p>This validates that {@link ContainerHealthSchemaManager#replaceUnhealthyContainerRecordsAtomically}
-   * can safely replace a large chunk without changing total row count and
+   * <p>This validates that {@link ContainerHealthSchemaManager#syncUnhealthyContainerRecordsAtomically}
+   * can safely refresh a large chunk without changing total row count and
    * that rewritten records are visible with the new timestamp.</p>
    */
   @Test
@@ -622,28 +622,30 @@ public class TestUnhealthyContainersDerbyPerformance {
     long replacementTimestamp = System.currentTimeMillis() + 10_000;
     int expectedRowsReplaced = replaceContainerCount * STATE_COUNT;
 
-    LOG.info("--- Test 7: Atomic replace — {} IDs × {} states = {} rows in one tx ---",
+    LOG.info("--- Test 7: Atomic sync — {} IDs × {} states = {} rows in one tx ---",
         replaceContainerCount, STATE_COUNT, expectedRowsReplaced);
 
     List<Long> idsToReplace = new ArrayList<>(replaceContainerCount);
     for (long id = 1; id <= replaceContainerCount; id++) {
       idsToReplace.add(id);
     }
+    Map<ContainerHealthSchemaManager.ContainerStateKey, Long> existing =
+        schemaManager.getExistingInStateSinceByContainerIds(idsToReplace);
     List<UnhealthyContainerRecord> replacementRecords =
         generateRecordsForRange(1, replaceContainerCount, replacementTimestamp);
 
     long start = System.nanoTime();
-    schemaManager.replaceUnhealthyContainerRecordsAtomically(idsToReplace, replacementRecords);
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, replacementRecords);
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-    LOG.info("Atomic replace completed in {} ms", elapsedMs);
+    LOG.info("Atomic sync completed in {} ms", elapsedMs);
 
     assertTrue(elapsedMs <= TimeUnit.SECONDS.toMillis(MAX_ATOMIC_REPLACE_SECONDS),
-        String.format("Atomic replace took %d ms, exceeded %d s threshold",
+        String.format("Atomic sync took %d ms, exceeded %d s threshold",
             elapsedMs, MAX_ATOMIC_REPLACE_SECONDS));
 
     long totalCount = dao.count();
     assertEquals(TOTAL_RECORDS, totalCount,
-        "Atomic replace should not change total row count");
+        "Atomic sync should not change total row count");
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> firstPage =
         schemaManager.getUnhealthyContainers(
