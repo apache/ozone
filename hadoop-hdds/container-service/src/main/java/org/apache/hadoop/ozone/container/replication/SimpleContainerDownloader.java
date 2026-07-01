@@ -25,12 +25,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +63,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   @Override
   public Path getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes,
-      Path downloadDir, CopyContainerCompression compression) {
+      Path downloadDir, CopyContainerCompression compression)
+      throws IOException {
 
     if (downloadDir == null) {
       downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
@@ -68,6 +74,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
 
+    int resourceExhaustedCount = 0;
     for (int i = 0; i < shuffledDatanodes.size(); i++) {
       DatanodeDetails datanode = shuffledDatanodes.get(i);
       GrpcReplicationClient client = null;
@@ -79,12 +86,27 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       } catch (InterruptedException e) {
         logError(e, containerId, datanode, i, shuffledDatanodes.size());
         Thread.currentThread().interrupt();
+        throw new IOException("Interrupted during container download", e);
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof StatusRuntimeException &&
+            ((StatusRuntimeException) e.getCause()).getStatus().getCode() ==
+                Status.Code.RESOURCE_EXHAUSTED) {
+          resourceExhaustedCount++;
+        }
+        logError(e, containerId, datanode, i, shuffledDatanodes.size());
       } catch (Exception e) {
         logError(e, containerId, datanode, i, shuffledDatanodes.size());
       } finally {
         IOUtils.close(LOG, client);
       }
     }
+
+    if (resourceExhaustedCount > 0) {
+      throw new StorageContainerException("All sources are busy or failed " +
+          "for container " + containerId,
+          ContainerProtos.Result.REPLICATION_LIMIT_REACHED);
+    }
+
     LOG.error("Container {} could not be downloaded from any datanode",
         containerId);
     return null;

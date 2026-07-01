@@ -191,7 +191,8 @@ class TestGrpcReplicationService {
   @Test
   public void testUpload() {
     ContainerReplicationSource source =
-        new OnDemandContainerReplicationSource(containerController);
+        new OnDemandContainerReplicationSource(containerController,
+            new ReplicationServer.ReplicationConfig());
 
     GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null, containerController);
 

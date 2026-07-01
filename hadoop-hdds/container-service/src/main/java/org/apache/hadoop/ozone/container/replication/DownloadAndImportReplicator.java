@@ -23,6 +23,8 @@ import java.nio.file.Path;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -70,11 +72,13 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     LOG.info("Starting replication of container {} from {} using {}",
         containerID, sourceDatanodes, compression);
-    HddsVolume targetVolume = null;
-
+    HddsVolume targetVolume = task.getVolume();
     try {
-      targetVolume = containerImporter.chooseNextVolume(
-          containerImporter.getDefaultReplicationSpace());
+      if (targetVolume == null) {
+        targetVolume = containerImporter.chooseNextVolume(
+            containerImporter.getDefaultReplicationSpace());
+        task.setVolume(targetVolume);
+      }
 
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
@@ -96,8 +100,16 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
     } catch (IOException e) {
-      LOG.error("Container {} replication was unsuccessful.", containerID, e);
-      task.setStatus(Status.FAILED);
+      if (e instanceof StorageContainerException &&
+          ((StorageContainerException) e).getResult() ==
+              ContainerProtos.Result.REPLICATION_LIMIT_REACHED) {
+        LOG.info("Container {} replication will be retried as the " +
+            "replication limit was reached.", containerID);
+        task.setStatus(Status.QUEUED);
+      } else {
+        LOG.error("Container {} replication was unsuccessful.", containerID, e);
+        task.setStatus(Status.FAILED);
+      }
     } finally {
       if (targetVolume != null) {
         targetVolume.incCommittedBytes(-containerImporter.getDefaultReplicationSpace());
