@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,6 +42,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec.ListContainerQuery;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 
 /**
@@ -116,6 +119,21 @@ public interface ScmClient extends Closeable {
   void deleteContainer(long containerId, boolean force) throws IOException;
 
   /**
+   * Lists containers using decoded list parameters.
+   *
+   * @param query start container id, count and optional filters
+   * @return containers matching the query
+   */
+  ContainerListResult listContainer(ListContainerQuery query) throws IOException;
+
+  /**
+   * Same as {@link #listContainer(ListContainerQuery)} after decoding {@code request}.
+   */
+  default ContainerListResult listContainer(SCMListContainerRequestProto request) throws IOException {
+    return listContainer(ScmListContainerRequestCodec.fromProto(request));
+  }
+
+  /**
    * Lists a range of containers and get their info.
    *
    * @param startContainerID start containerID.
@@ -125,6 +143,7 @@ public interface ScmClient extends Closeable {
    * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
+  @Deprecated
   ContainerListResult listContainer(long startContainerID,
       int count) throws IOException;
 
@@ -139,6 +158,7 @@ public interface ScmClient extends Closeable {
    * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
+  @Deprecated
   ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
@@ -157,6 +177,7 @@ public interface ScmClient extends Closeable {
    * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
+  @Deprecated
   ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,

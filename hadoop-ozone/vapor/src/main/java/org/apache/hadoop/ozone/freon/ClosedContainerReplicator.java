@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec.ListContainerQuery;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -127,7 +128,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
+        containerOperationClient.listContainer(ListContainerQuery.newBuilder(0L, 1_000_000).build())
+            .getContainerInfoList();
 
     //logic same as the download+import on the destination datanode
     initializeReplicationSupervisor(conf, containerInfos.size() * 2);

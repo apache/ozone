@@ -99,6 +99,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec.ListContainerQuery;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -452,63 +453,25 @@ public class SCMClientProtocolServer implements
   }
 
   /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   *
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
-  public ContainerListResult listContainer(long startContainerID,
-      int count) throws IOException {
-    return listContainer(startContainerID, count, null, null, null, null);
+  public ContainerListResult listContainer(ListContainerQuery query) {
+    return listContainerWithQuery(query);
   }
 
   /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   *
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
+   * Applies filters from {@link ListContainerQuery}.
    */
-  @Override
-  public ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null, null, null);
-  }
+  private ContainerListResult listContainerWithQuery(ListContainerQuery query) {
+    long startContainerID = query.getStartContainerID();
+    int count = query.getCount();
+    HddsProtos.LifeCycleState state = query.getState();
+    HddsProtos.ReplicationFactor factor = query.getFactor();
+    HddsProtos.ReplicationType replicationType = query.getReplicationType();
+    ReplicationConfig repConfig = query.getReplicationConfig();
+    Boolean suppressed = query.getSuppressed();
 
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param factor Container factor.
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  @Override
-  @Deprecated
-  public ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException {
-    return listContainerInternal(startContainerID, count, state, factor, null, null, null);
-  }
-
-  private ContainerListResult listContainerInternal(long startContainerID, int count,
-      HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig,
-      Boolean suppressed) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, 
         replicationType, repConfig, suppressed);
@@ -595,46 +558,6 @@ public class SCMClientProtocolServer implements
     }
 
     return auditMap;
-  }
-
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param repConfig Replication Config for the container.
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  @Override
-  public ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) throws IOException {
-    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, null);
-  }
-
-  /**
-   * Lists a range of containers and get their info.
-   *
-   * @param startContainerID start containerID.
-   * @param count count must be {@literal >} 0.
-   * @param state Container with this state will be returned.
-   * @param repConfig Replication Config for the container.
-   * @param suppressed container to be suppressed/unsuppressed from report
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  @Override
-  public ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig,
-      Boolean suppressed) throws IOException {
-    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, suppressed);
   }
 
   @Override

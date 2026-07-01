@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmListContainerRequestCodec.ListContainerQuery;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
@@ -147,110 +149,19 @@ public interface StorageContainerLocationProtocol extends Closeable {
       List<Long> containerIDs);
 
   /**
-   * Ask SCM a list of containers with a range of container names
-   * and the limit of count.
-   * Search container names between start name(exclusive), and
-   * use prefix name to filter the result. the max size of the
-   * searching range cannot exceed the value of count.
+   * Lists containers using decoded list parameters.
    *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   *
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
+   * @param query start container id, count and optional filters
+   * @return containers matching the query
    */
-  ContainerListResult listContainer(long startContainerID,
-      int count) throws IOException;
-
+  ContainerListResult listContainer(ListContainerQuery query) throws IOException;
+  
   /**
-   * Ask SCM a list of containers with a range of container names
-   * and the limit of count.
-   * Search container names between start name(exclusive), and
-   * use prefix name to filter the result. the max size of the
-   * searching range cannot exceed the value of count.
-   *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   * @param state Container with this state will be returned.
-   *
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
+   * Same as {@link #listContainer(ListContainerQuery)} after decoding {@code request}.
    */
-  ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException;
-
-  /**
-   * Ask SCM a list of containers with a range of container names
-   * and the limit of count.
-   * Search container names between start name(exclusive), and
-   * use prefix name to filter the result. the max size of the
-   * searching range cannot exceed the value of count.
-   *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   * @param state Container with this state will be returned.
-   * @param factor Container factor
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException;
-
-  /**
-   * Ask SCM for a list of containers with a range of container ID, state
-   * and replication config, and the limit of count.
-   * The containers are returned from startID (exclusive), and
-   * filtered by state and replication config. The returned list is limited to
-   * count entries.
-   *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   * @param state Container with this state will be returned.
-   * @param replicationConfig Replication config for the containers
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig replicationConfig) throws IOException;
-
-  /**
-   * Ask SCM for a list of containers with a range of container ID, state
-   * and replication config, and the limit of count.
-   * The containers are returned from startID (exclusive), and
-   * filtered by state and replication config. The returned list is limited to
-   * count entries.
-   *
-   * @param startContainerID start container ID.
-   * @param count count, if count {@literal <} 0, the max size is unlimited.(
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big)
-   * @param state Container with this state will be returned.
-   * @param replicationConfig Replication config for the containers
-   * @param suppressed container to be suppressed/unsuppressed from report
-   * @return a list of containers capped by max count allowed
-   * in "ozone.scm.container.list.max.count" and total number of containers.
-   * @throws IOException
-   */
-  ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType replicationType,
-      ReplicationConfig replicationConfig,
-      Boolean suppressed) throws IOException;
+  default ContainerListResult listContainer(SCMListContainerRequestProto request) throws IOException {
+    return listContainer(ScmListContainerRequestCodec.fromProto(request));
+  }
 
   /**
    * Deletes a container in SCM.
