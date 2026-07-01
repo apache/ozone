@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,6 +103,30 @@ public class TestSendContainerRequestHandler {
         Arguments.of("Normal 2GB", 2L * 1024L * 1024L * 1024L),
         Arguments.of("Overallocated 20GB", 20L * 1024L * 1024L * 1024L)
     );
+  }
+
+  @Test
+  void testNoSpaceOnTargetVolume() throws Exception {
+    long containerId = 1;
+
+    // Simulate the target datanode having no volume with enough space to
+    // import the incoming container by having the volume chooser throw.
+    DiskOutOfSpaceException noSpace =
+        new DiskOutOfSpaceException("No volumes have enough space for a new container");
+    doThrow(noSpace).when(importer).chooseNextVolume(anyLong());
+
+    doAnswer(invocation -> {
+      Object arg = invocation.getArgument(0);
+      assertEquals(noSpace, arg);
+      return null;
+    }).when(responseObserver).onError(any());
+
+    sendContainerRequestHandler.onNext(createRequest(containerId,
+        ByteString.copyFromUtf8("test"), 0, null));
+
+    // No volume was reserved, so no committed bytes should change on any volume.
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    assertEquals(0, volume.getCommittedBytes());
   }
 
   @Test

@@ -240,7 +240,6 @@ public class OzoneContainer {
         context);
 
     replicationServer = new ReplicationServer(
-        controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
         certClient,

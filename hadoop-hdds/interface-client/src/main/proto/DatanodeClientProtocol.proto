@@ -521,6 +521,9 @@ enum CopyContainerCompressProto {
   ZSTD = 5;
 }
 
+// Deprecated: pull-based container replication has been removed. Retained for
+// protolock compatibility only; no longer implemented by datanodes.
+// Use SendContainerRequest / SendContainerResponse (push) instead.
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
@@ -529,6 +532,7 @@ message CopyContainerRequestProto {
   optional CopyContainerCompressProto compression = 5;
 }
 
+// Deprecated: see CopyContainerRequestProto.
 message CopyContainerResponseProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
@@ -583,8 +587,10 @@ service XceiverClientProtocolService {
 }
 
 service IntraDatanodeProtocolService {
-  // An intradatanode service to copy the raw container data between nodes
+  // Deprecated: pull-based replication has been removed; this RPC is no longer
+  // implemented and will return UNIMPLEMENTED if called.
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  // Push a container tar from a source datanode to a target datanode.
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }
 

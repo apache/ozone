@@ -21,8 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,7 +30,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -43,8 +40,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -59,7 +54,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -155,7 +150,7 @@ class TestGrpcReplicationService {
         conf).build());
 
     replicationServer =
-        new ReplicationServer(containerController, replicationConfig, secConf,
+        new ReplicationServer(replicationConfig, secConf,
             null, importer, datanode.threadNamePrefix());
     replicationServer.start();
   }
@@ -163,29 +158,6 @@ class TestGrpcReplicationService {
   @AfterEach
   public void cleanup() {
     replicationServer.stop();
-  }
-
-  @Test
-  public void testDownload() throws IOException {
-    SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(conf, null);
-    Path downloadDir = Files.createDirectory(tempDir.resolve("DownloadDir"));
-    Path result = downloader.getContainerDataFromReplicas(
-        CONTAINER_ID,
-        Collections.singletonList(datanode), downloadDir,
-        CopyContainerCompression.NO_COMPRESSION);
-
-    assertTrue(result.toString().startsWith(downloadDir.toString()));
-
-    File[] files = downloadDir.toFile().listFiles();
-
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-
-    assertTrue(files[0].getName().startsWith("container-" +
-        CONTAINER_ID + "-"));
-
-    downloader.close();
   }
 
   @Test
@@ -206,8 +178,8 @@ class TestGrpcReplicationService {
   }
 
   @Test
-  void closesStreamOnError() {
-    // GIVEN
+  void closesStreamOnError() throws Exception {
+    // GIVEN: a source whose copyData always fails
     ContainerReplicationSource source = new ContainerReplicationSource() {
       @Override
       public void prepare(long containerId) {
@@ -220,26 +192,22 @@ class TestGrpcReplicationService {
         throw new IOException("testing");
       }
     };
-    ContainerImporter importer = mock(ContainerImporter.class);
-    GrpcReplicationService subject =
-        new GrpcReplicationService(source, importer);
 
-    CopyContainerRequestProto request = CopyContainerRequestProto.newBuilder()
-        .setContainerID(1)
-        .setReadOffset(0)
-        .setLen(123)
-        .build();
-    CallStreamObserver<CopyContainerResponseProto> observer =
-        mock(CallStreamObserver.class);
-    when(observer.isReady()).thenReturn(true);
+    OutputStream uploadStream = mock(OutputStream.class);
+    ContainerUploader uploader = mock(ContainerUploader.class);
+    when(uploader.startUpload(anyLong(), any(), any(), any()))
+        .thenReturn(uploadStream);
+
+    PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
+    ReplicationTask task = new ReplicationTask(
+        toTarget(CONTAINER_ID, datanode), pushReplicator);
 
     // WHEN
-    subject.download(request, observer);
+    pushReplicator.replicate(task);
 
-    // THEN
-    // onCompleted is called by GrpcOutputStream#close
-    // so we indirectly verify that the stream is closed
-    verify(observer).onCompleted();
+    // THEN: task is failed and the upload stream was closed despite the error
+    assertEquals(Status.FAILED, task.getStatus());
+    verify(uploadStream).close();
   }
 
 }

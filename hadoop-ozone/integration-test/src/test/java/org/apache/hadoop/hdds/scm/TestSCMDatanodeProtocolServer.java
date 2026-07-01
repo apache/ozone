@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -39,7 +40,7 @@ public class TestSCMDatanodeProtocolServer {
     OzoneStorageContainerManager scm =
         mock(OzoneStorageContainerManager.class);
 
-    ReplicateContainerCommand command = ReplicateContainerCommand.forTest(1);
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(1, randomDatanodeDetails());
     command.setTerm(5L);
     command.setDeadline(1234L);
     StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =

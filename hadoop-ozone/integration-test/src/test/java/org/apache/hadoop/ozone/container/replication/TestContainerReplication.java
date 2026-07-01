@@ -27,7 +27,6 @@ import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -41,7 +40,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -120,44 +118,6 @@ class TestContainerReplication {
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
-  }
-
-  @ParameterizedTest
-  @EnumSource
-  void testPull(CopyContainerCompression compression) throws Exception {
-    final int index = compression.ordinal();
-    DatanodeDetails target = cluster.getHddsDatanodes().get(index)
-        .getDatanodeDetails();
-    DatanodeDetails source = selectOtherNode(target);
-    long containerID = createNewClosedContainer(source);
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.fromSources(containerID,
-            ImmutableList.of(source));
-
-    queueAndWaitForCompletion(cmd, target,
-        ReplicationSupervisor::getReplicationSuccessCount);
-  }
-
-  /**
-   * Replication fails because target tries to pull the container from wrong
-   * port at source datanode.
-   */
-  @Test
-  void targetPullsFromWrongService() throws Exception {
-    DatanodeDetails source = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-    DatanodeDetails target = cluster.getHddsDatanodes().get(1)
-        .getDatanodeDetails();
-    long containerID = createNewClosedContainer(source);
-    DatanodeDetails invalidPort = new DatanodeDetails(source);
-    invalidPort.setPort(Port.Name.REPLICATION,
-        source.getStandalonePort().getValue());
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.fromSources(containerID,
-            ImmutableList.of(invalidPort));
-
-    queueAndWaitForCompletion(cmd, target,
-        ReplicationSupervisor::getReplicationFailureCount);
   }
 
   /**

@@ -1190,68 +1190,6 @@ public class TestReplicationManager {
         .getEcReconstructionCmdsSentTotal());
   }
 
-  @Test
-  public void testSendDatanodeReplicateCommand() throws NotLeaderException {
-    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
-    ContainerInfo containerInfo =
-        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
-            HddsProtos.LifeCycleState.CLOSED, 10, 20);
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-
-    List<DatanodeDetails> sources = new ArrayList<>();
-    sources.add(MockDatanodeDetails.randomDatanodeDetails());
-    sources.add(MockDatanodeDetails.randomDatanodeDetails());
-
-
-    ReplicateContainerCommand command = ReplicateContainerCommand.fromSources(
-        containerInfo.getContainerID(), sources);
-    command.setReplicaIndex(1);
-
-    replicationManager.sendDatanodeCommand(command, containerInfo, target);
-
-    // Ensure that the command deadline is set to current time
-    // + evenTime * factor
-    long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
-            rmConf.getDatanodeTimeoutOffset();
-    assertEquals(expectedDeadline, command.getDeadline());
-
-    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
-        containerInfo.containerID());
-    verify(nodeManager).addDatanodeCommand(any(), any());
-    assertEquals(1, ops.size());
-    assertEquals(ContainerReplicaOp.PendingOpType.ADD,
-        ops.get(0).getOpType());
-    assertEquals(target, ops.get(0).getTarget());
-    assertEquals(1, ops.get(0).getReplicaIndex());
-    assertEquals(1, replicationManager.getMetrics()
-        .getEcReplicationCmdsSentTotal());
-    assertEquals(0, replicationManager.getMetrics()
-        .getReplicationCmdsSentTotal());
-
-    // Repeat with Ratis container, as different metrics should be incremented
-    clearInvocations(nodeManager);
-    RatisReplicationConfig ratisRepConfig =
-        RatisReplicationConfig.getInstance(THREE);
-    containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
-        HddsProtos.LifeCycleState.CLOSED, 10, 20);
-
-    command = ReplicateContainerCommand.fromSources(
-        containerInfo.getContainerID(), sources);
-    replicationManager.sendDatanodeCommand(command, containerInfo, target);
-
-    ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
-    verify(nodeManager).addDatanodeCommand(any(), any());
-    assertEquals(1, ops.size());
-    assertEquals(ContainerReplicaOp.PendingOpType.ADD,
-        ops.get(0).getOpType());
-    assertEquals(target, ops.get(0).getTarget());
-    assertEquals(0, ops.get(0).getReplicaIndex());
-    assertEquals(1, replicationManager.getMetrics()
-        .getEcReplicationCmdsSentTotal());
-    assertEquals(1, replicationManager.getMetrics()
-        .getReplicationCmdsSentTotal());
-  }
-
   /**
    * Tests that a ReplicateContainerCommand that is sent from source to
    * target has the correct deadline and that ContainerReplicaOp for
