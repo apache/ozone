@@ -101,3 +101,23 @@ Get key names from output
         Append To List    ${key_names}    ${key_name}
     END
     [Return]       ${key_names}
+
+Get chunk-info block sizes by group
+    ${output} =    Execute          ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} | jq -c '[.keyLocations[] | [.[] | {i: .replicaIndex, s: .blockData.size}] | sort_by(.i) | map(.s)]'
+    [Return]       ${output}
+
+Verify chunk-info block sizes
+    [Arguments]    ${expected_json}
+    ${actual_json} =    Get chunk-info block sizes by group
+    ${actual} =    Evaluate    json.dumps(json.loads('''${actual_json}'''.strip()))    json, json
+    ${expected} =    Evaluate    json.dumps(json.loads('''${expected_json}'''))    json, json
+    Should Be Equal As Strings    ${actual}    ${expected}
+
+Create EC key
+    [Arguments]    ${ec_data}    ${ec_parity}    ${file_size}
+    Execute    dd if=/dev/urandom of=${TEMP_DIR}/testfile bs=1 count=${file_size}
+    Execute    ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${ec_data}-${ec_parity}-1024k -t EC
+
+Create Volume Bucket
+    Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
+    Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}
