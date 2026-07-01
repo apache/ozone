@@ -127,6 +127,9 @@ const Capacity: React.FC<object> = () => {
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
       ?? storageDistribution.data.dataNodeUsage[0];
+    const dnPendingEntry = dnPendingDeletes.data.pendingDeletionPerDataNode?.find(
+      dn => dn.hostName === (selected?.hostName ?? selectedDatanode)
+    ) ?? { hostName: "unknown-host", datanodeUuid: "unknown-uuid", pendingBlockSize: 0 };
     return {
       ...(selected ?? {
         datanodeUuid: "unknown-uuid",
@@ -138,11 +141,8 @@ const Capacity: React.FC<object> = () => {
         minimumFreeSpace: 0,
         reserved: 0
       }),
-      ...dnPendingDeletes.data.pendingDeletionPerDataNode?.find(dn => dn.hostName === (selected?.hostName ?? selectedDatanode)) ?? {
-        hostName: "unknown-host",
-        datanodeUuid: "unknown-uuid",
-        pendingBlockSize: 0
-      }
+      ...dnPendingEntry,
+      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize)
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
