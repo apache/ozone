@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -30,21 +28,15 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Response for OMSnapshotPurgeRequest.
  */
-@CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotPurgeResponse extends OMClientResponse {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
   private final Map<String, SnapshotInfo> updatedSnapInfos;
   private final TransactionInfo transactionInfo;

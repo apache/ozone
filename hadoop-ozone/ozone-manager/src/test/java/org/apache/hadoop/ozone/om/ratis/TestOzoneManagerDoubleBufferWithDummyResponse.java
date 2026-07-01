@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
@@ -146,11 +146,9 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
             .build());
   }
 
-
   /**
    * DummyCreatedBucket Response class used in testing.
    */
-  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
   private static class OMDummyCreateBucketResponse extends OMClientResponse {
     private final OmBucketInfo omBucketInfo;
 
@@ -158,6 +156,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         OMResponse omResponse) {
       super(omResponse);
       this.omBucketInfo = omBucketInfo;
+      setCleanupTables(Collections.singleton(BUCKET_TABLE));
     }
 
     @Override

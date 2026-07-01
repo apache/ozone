@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -47,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -57,8 +51,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
-    DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);

@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 /**
  * A dummy OMClientResponse implementation.
  */
-@CleanupTableInfo
 public class DummyOMClientResponse extends OMClientResponse {
 
   public DummyOMClientResponse(@Nonnull OMResponse omResponse) {

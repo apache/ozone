@@ -44,6 +44,7 @@ Testing OM DB Size Reduction After Compaction
     
     ${size_before_compaction} =    Get OM DB SST Files Size
 
+    Compact OM DB Column Family    keyTable
     Compact OM DB Column Family    fileTable
     Compact OM DB Column Family    deletedTable
     Compact OM DB Column Family    deletedDirectoryTable
