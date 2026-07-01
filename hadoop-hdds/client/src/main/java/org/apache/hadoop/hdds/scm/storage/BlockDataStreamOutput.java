@@ -215,7 +215,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.StreamInit)
             .setContainerID(blockID.get().getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest)
+            .setWritePipelineVersion(pipeline.getFirstNode().getCurrentVersion());
 
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);

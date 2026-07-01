@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.util.Time;
@@ -52,6 +53,11 @@ public final class DispatcherContext {
   private final long logIndex;
 
   private final Map<Long, Long> container2BCSIDMap;
+
+  // the component version the client asked the datanode to execute this write at
+  // defaults to HDDSVersion.STREAM_BLOCK_SUPPORT (pre-ZDU behavior) when the client
+  // did not supply one
+  private final int writeVersion;
 
   private final boolean releaseSupported;
   private volatile Runnable releaseMethod;
@@ -137,6 +143,7 @@ public final class DispatcherContext {
     this.logIndex = b.logIndex;
     this.stage = b.stage;
     this.container2BCSIDMap = b.container2BCSIDMap;
+    this.writeVersion = b.writeVersion;
     this.releaseSupported = b.releaseSupported;
   }
 
@@ -159,6 +166,15 @@ public final class DispatcherContext {
 
   public Map<Long, Long> getContainer2BCSIDMap() {
     return container2BCSIDMap;
+  }
+
+  /**
+   * @return the component version the client requested this write be executed at
+   *     Defaults to {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last
+   *     component version before ZDU, when the client did not supply one.
+   */
+  public int getWriteVersion() {
+    return writeVersion;
   }
 
   public long getStartTime() {
@@ -198,6 +214,7 @@ public final class DispatcherContext {
     private long term;
     private long logIndex;
     private Map<Long, Long> container2BCSIDMap;
+    private int writeVersion = HDDSVersion.STREAM_BLOCK_SUPPORT.serialize();
     private boolean releaseSupported;
 
     private Builder(Op op) {
@@ -245,6 +262,17 @@ public final class DispatcherContext {
      */
     public Builder setContainer2BCSIDMap(Map<Long, Long> map) {
       this.container2BCSIDMap = map;
+      return this;
+    }
+
+    /**
+     * Sets the component version the client requested this write be executed at
+     *
+     * @param version the write pipeline (component) version
+     * @return Builder
+     */
+    public Builder setWriteVersion(int version) {
+      this.writeVersion = version;
       return this;
     }
 
