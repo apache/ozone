@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -445,7 +446,7 @@ public final class SCMContainerPlacementRackScatter
       }
       Node node = null;
       try {
-        node = networkTopology.chooseRandom(scope, excludedNodes);
+        node = chooseLessUtilizedNode(scope, excludedNodes);
       } catch (Exception e) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Error while choosing Node: Scope: {}, Excluded Nodes: " +
@@ -479,6 +480,39 @@ public final class SCMContainerPlacementRackScatter
         return null;
       }
     }
+  }
+
+  /**
+   * Pick two distinct candidate nodes within the rack and return the one with
+   * lower space utilization, so a nearly-full datanode is not chosen as often
+   * as an emptier peer in the same rack.
+   *
+   * @param scope - the rack we are searching nodes under
+   * @param excludedNodes - list of the datanodes to exclude. Can be null.
+   * @return the chosen datanode, or null if none is available.
+   */
+  private Node chooseLessUtilizedNode(String scope, List<Node> excludedNodes) {
+    Node first = networkTopology.chooseRandom(scope, excludedNodes);
+    if (first == null) {
+      return null;
+    }
+    // Exclude the first pick so the second candidate is a distinct node.
+    // Otherwise a small rack often draws the same node twice and the capacity
+    // comparison below is skipped.
+    List<Node> secondExcludedNodes = new ArrayList<>(excludedNodes);
+    secondExcludedNodes.add(first);
+    Node second = networkTopology.chooseRandom(scope, secondExcludedNodes);
+    if (second == null) {
+      return first;
+    }
+    SCMNodeMetric firstMetric =
+        getNodeManager().getNodeStat((DatanodeDetails) first);
+    SCMNodeMetric secondMetric =
+        getNodeManager().getNodeStat((DatanodeDetails) second);
+    if (firstMetric == null || secondMetric == null) {
+      return first;
+    }
+    return firstMetric.isGreater(secondMetric.get()) ? second : first;
   }
 
   /**

@@ -40,8 +40,10 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -253,6 +256,22 @@ public class TestSCMContainerPlacementRackScatter {
     when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
       DatanodeInfo di = invocation.getArgument(0);
       return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() > 1L);
+    });
+    when(nodeManager.getNodeStat(any(DatanodeDetails.class))).thenAnswer(invocation -> {
+      DatanodeDetails dd = invocation.getArgument(0);
+      DatanodeInfo di = dnInfos.stream()
+          .filter(d -> d.getID().equals(dd.getID()))
+          .findFirst().orElse(null);
+      if (di == null) {
+        return null;
+      }
+      long capacity = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getCapacity).sum();
+      long used = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getScmUsed).sum();
+      long remaining = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getRemaining).sum();
+      return new SCMNodeMetric(capacity, used, remaining, 0, remaining, 0);
     });
 
     // create placement policy instances
@@ -898,6 +917,34 @@ public class TestSCMContainerPlacementRackScatter {
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 1, 0, 5);
     assertEquals(1, chosenNodes.size());
+  }
+
+  /**
+   * Within a single rack holding an emptier and a fuller datanode, the intra
+   * rack selection should prefer the less utilized node instead of choosing
+   * uniformly at random.
+   */
+  @Test
+  public void chooseNodeWithinRackPrefersLessUtilized() throws SCMException {
+    // Single rack with two datanodes.
+    setup(2, 2);
+    updateStorageInDatanode(0, 10, 90);   // emptier node
+    updateStorageInDatanode(1, 90, 10);   // fuller node
+
+    Map<DatanodeDetails, Integer> selectedCount = new HashMap<>();
+    selectedCount.put(datanodes.get(0), 0);
+    selectedCount.put(datanodes.get(1), 0);
+
+    for (int i = 0; i < 1000; i++) {
+      List<DatanodeDetails> chosen = policy.chooseDatanodes(
+          new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
+      assertEquals(1, chosen.size());
+      DatanodeDetails dn = chosen.get(0);
+      selectedCount.put(dn, selectedCount.get(dn) + 1);
+    }
+
+    assertThat(selectedCount.get(datanodes.get(0)))
+        .isGreaterThan(selectedCount.get(datanodes.get(1)));
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {
