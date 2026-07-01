@@ -54,6 +54,7 @@ public class CompactionService extends BackgroundService {
   private final AtomicBoolean suspended;
   // list of tables that can be compacted
   private final List<String> compactableTables;
+  private final ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction;
 
   public CompactionService(OzoneManager ozoneManager, TimeUnit unit, long interval, long timeout,
                            List<String> tables) {
@@ -66,6 +67,7 @@ public class CompactionService extends BackgroundService {
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.compactableTables = validateTables(tables);
+    this.bottommostLevelCompaction = CompactDBUtil.getBottommostLevelCompaction(ozoneManager.getConfiguration());
   }
 
   private List<String> validateTables(List<String> tables) {
@@ -109,6 +111,11 @@ public class CompactionService extends BackgroundService {
     return compactableTables;
   }
 
+  @VisibleForTesting
+  public ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction() {
+    return bottommostLevelCompaction;
+  }
+
   /**
    * Returns the number of manual compactions performed.
    *
@@ -142,13 +149,11 @@ public class CompactionService extends BackgroundService {
    * @return CompletableFuture that completes when compaction finishes
    */
   public CompletableFuture<Void> compactTableAsync(String tableName) {
-    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName, bottommostLevelCompaction);
   }
 
   protected void compactFully(String tableName) throws IOException {
-    CompactDBUtil.compactTable(omMetadataManager, tableName,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+    CompactDBUtil.compactTable(omMetadataManager, tableName, bottommostLevelCompaction);
   }
 
   private class CompactTask implements BackgroundTask {

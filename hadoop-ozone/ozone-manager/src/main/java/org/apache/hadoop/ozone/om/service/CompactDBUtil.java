@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -72,6 +74,21 @@ public final class CompactDBUtil {
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
+  }
+
+  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
+      OzoneConfiguration configuration) {
+    int compactionType = configuration.getInt(
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+    ManagedCompactRangeOptions.BottommostLevelCompaction level =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    if (level == null) {
+      compactionType = OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
+      level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+      LOG.warn("Invalid bottommost level compaction type. Using default value: {}", level);
+    }
+    return level;
   }
 
   /**
