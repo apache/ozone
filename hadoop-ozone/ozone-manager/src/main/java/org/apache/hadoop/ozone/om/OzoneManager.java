@@ -50,6 +50,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -60,6 +61,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -4110,6 +4113,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
+      if (OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(ex)) {
+        LOG.error(
+            "Failed to download snapshot from leader {}: local disk appears full or over quota "
+                + "on the OM ratis snapshot volume (see previous ERROR for path/usable space). "
+                + "Free disk or adjust {}, {}, or {} before bootstrap can succeed.",
+            leaderId,
+            OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+            OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
+            OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER);
+      }
       LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
       cleanupCheckpoint(omDBCheckpoint);
       return null;
