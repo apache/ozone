@@ -18,11 +18,15 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 
 /**
  * Shared classifier for exceptions where the cached peer IP is no longer
@@ -99,5 +103,29 @@ public final class ConnectionFailureUtils {
       cause = next;
     }
     return false;
+  }
+
+  /**
+   * Returns the first {@link StorageContainerException} or
+   * {@link TimeoutIOException} in {@code ex}'s cause chain (through
+   * {@link ExecutionException} and nested {@link IOException} wrappers).
+   */
+  public static IOException unwrapCause(IOException ex) {
+    Throwable t = ex;
+    while (t != null) {
+      if (t instanceof TimeoutIOException || t instanceof StorageContainerException) {
+        return (IOException) t;
+      }
+      if (t instanceof ExecutionException && t.getCause() != null) {
+        t = t.getCause();
+        continue;
+      }
+      if (t.getCause() instanceof IOException) {
+        t = t.getCause();
+        continue;
+      }
+      break;
+    }
+    return ex;
   }
 }

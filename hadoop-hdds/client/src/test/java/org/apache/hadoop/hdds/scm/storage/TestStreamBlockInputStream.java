@@ -304,7 +304,7 @@ public class TestStreamBlockInputStream {
           .setReadBlock(readBlock)
           .build());
       return null;
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
 
     return xceiverClient;
   }
