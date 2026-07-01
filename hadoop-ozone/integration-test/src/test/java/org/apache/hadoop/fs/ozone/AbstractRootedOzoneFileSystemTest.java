@@ -76,6 +76,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -1857,6 +1858,56 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     assertEquals(expectDiskUsage, spaceConsumed);
     //clean up
     fs.delete(filePath, true);
+  }
+
+  @Test
+  void testContentSummaryErasureCodingPolicy() throws Exception {
+    String ratisKey = "ratis-ec-policy-key";
+    String ecKey = "ec-policy-key";
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    Path parentDir = new Path(bucketPath, "ec-policy-mixed");
+    Path ratisFile = new Path(parentDir, ratisKey);
+    Path ecFile = new Path(parentDir, ecKey);
+
+    fs.mkdirs(parentDir);
+    OzoneBucket bucket = objectStore.getVolume(volumeName).getBucket(bucketName);
+    String ratisRelKey = "ec-policy-mixed/" + ratisKey;
+    String ecRelKey = "ec-policy-mixed/" + ecKey;
+    TestDataUtil.createKey(bucket, ratisRelKey,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new byte[]{0});
+    TestDataUtil.createKey(bucket, ecRelKey, ecConfig,
+        new byte[]{0});
+
+    try {
+      assertEquals("",
+          fs.getContentSummary(new Path(OZONE_URI_DELIMITER))
+              .getErasureCodingPolicy());
+      assertEquals("",
+          fs.getContentSummary(volumePath).getErasureCodingPolicy());
+      assertEquals("",
+          fs.getContentSummary(bucketPath).getErasureCodingPolicy());
+      assertEquals("Replicated",
+          fs.getContentSummary(ratisFile).getErasureCodingPolicy());
+      assertEquals(ecConfig.getReplication(),
+          fs.getContentSummary(ecFile).getErasureCodingPolicy());
+      assertEquals("",
+          fs.getContentSummary(parentDir).getErasureCodingPolicy());
+    } finally {
+      fs.delete(parentDir, true);
+    }
+  }
+
+  @Test
+  void testLsDashEDoesNotThrow() throws Exception {
+    FsShell shell = new FsShell(conf);
+    try {
+      int exitCode = shell.run(new String[]{"-ls", "-R", "-e",
+          OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + bucketName});
+      assertEquals(0, exitCode);
+    } finally {
+      shell.close();
+    }
   }
 
   @Test

@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
@@ -182,5 +183,12 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   public boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException {
     return setSafeModeUtil(action, isChecked);
+  }
+
+  @Override
+  protected void applyEcPolicy(ContentSummary.Builder builder, String ecPolicy) {
+    if (ecPolicy != null) {
+      builder.erasureCodingPolicy(ecPolicy);
+    }
   }
 }

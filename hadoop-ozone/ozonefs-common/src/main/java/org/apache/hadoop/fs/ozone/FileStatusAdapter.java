@@ -53,6 +53,8 @@ public final class FileStatusAdapter {
 
   private final boolean isErasureCoded;
 
+  private final String erasureCodingPolicy;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public FileStatusAdapter(long length, long diskConsumed, Path path,
       boolean isdir, short blockReplication, long blocksize,
@@ -60,6 +62,18 @@ public final class FileStatusAdapter {
       String owner, String group, Path symlink,
       BlockLocation[] locations, boolean isEncrypted,
       boolean isErasureCoded) {
+    this(length, diskConsumed, path, isdir, blockReplication, blocksize,
+        modificationTime, accessTime, permission, owner, group, symlink,
+        locations, isEncrypted, isErasureCoded, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public FileStatusAdapter(long length, long diskConsumed, Path path,
+      boolean isdir, short blockReplication, long blocksize,
+      long modificationTime, long accessTime, short permission,
+      String owner, String group, Path symlink,
+      BlockLocation[] locations, boolean isEncrypted,
+      boolean isErasureCoded, String erasureCodingPolicy) {
     this.length = length;
     this.diskConsumed = diskConsumed;
     this.path = path;
@@ -75,6 +89,7 @@ public final class FileStatusAdapter {
     this.blockLocations = new ArrayList<>(Arrays.asList(locations));
     this.isEncrypted = isEncrypted;
     this.isErasureCoded = isErasureCoded;
+    this.erasureCodingPolicy = erasureCodingPolicy;
   }
 
   public Path getPath() {
@@ -137,6 +152,10 @@ public final class FileStatusAdapter {
     return isErasureCoded;
   }
 
+  public String getErasureCodingPolicy() {
+    return erasureCodingPolicy;
+  }
+
   public BlockLocation[] getBlockLocations() {
     return blockLocations.toArray(new BlockLocation[0]);
   }
@@ -159,6 +178,7 @@ public final class FileStatusAdapter {
         .append("; group=").append(group)
         .append("; permission=").append(permission)
         .append("; isSymlink=").append(getSymlink())
+        .append("; erasureCodingPolicy=").append(erasureCodingPolicy)
         .append('}');
     
     return sb.toString();

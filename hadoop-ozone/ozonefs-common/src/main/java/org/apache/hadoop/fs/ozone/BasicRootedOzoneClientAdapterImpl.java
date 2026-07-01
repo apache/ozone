@@ -1035,6 +1035,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
+    boolean isEc = OzoneClientUtils.isKeyErasureCode(keyInfo);
+    String ecPolicy;
+    if (isEc) {
+      ecPolicy = keyInfo.getReplicationConfig().getReplication();
+    } else {
+      ecPolicy = status.isFile() ? "Replicated" : "";
+    }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         keyInfo.getReplicatedSize(),
@@ -1051,7 +1058,8 @@ public class BasicRootedOzoneClientAdapterImpl
         null,
         getBlockLocations(status),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
-        OzoneClientUtils.isKeyErasureCode(keyInfo)
+        isEc,
+        ecPolicy
     );
   }
 
@@ -1060,6 +1068,13 @@ public class BasicRootedOzoneClientAdapterImpl
     BasicOmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
+    boolean isEc = OzoneClientUtils.isKeyErasureCode(keyInfo);
+    String ecPolicy;
+    if (isEc) {
+      ecPolicy = keyInfo.getReplicationConfig().getReplication();
+    } else {
+      ecPolicy = status.isFile() ? "Replicated" : "";
+    }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         keyInfo.getReplicatedSize(),
@@ -1076,7 +1091,8 @@ public class BasicRootedOzoneClientAdapterImpl
         null,
         getBlockLocations(null),
         keyInfo.isEncrypted(),
-        OzoneClientUtils.isKeyErasureCode(keyInfo)
+        isEc,
+        ecPolicy
     );
   }
 
@@ -1169,7 +1185,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, null, new BlockLocation[0], false, false
+        owner, group, null, new BlockLocation[0], false, false, ""
     );
   }
 
@@ -1192,14 +1208,16 @@ public class BasicRootedOzoneClientAdapterImpl
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
+    ReplicationConfig rc = ozoneBucket.getReplicationConfig();
+    boolean isEc = rc != null && rc.getReplicationType() == HddsProtos.ReplicationType.EC;
+    String ecPolicy = isEc ? rc.getReplication() : "";
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
         owner, group, null, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
-        ozoneBucket.getReplicationConfig() != null &&
-                    ozoneBucket.getReplicationConfig().getReplicationType() ==
-                    HddsProtos.ReplicationType.EC);
+        isEc,
+        ecPolicy);
   }
 
   /**
@@ -1225,6 +1243,9 @@ public class BasicRootedOzoneClientAdapterImpl
           ozoneSnapshot.getName(), pathStr);
     }
     Path path = new Path(pathStr);
+    ReplicationConfig rc = ozoneBucket.getReplicationConfig();
+    boolean isEc = rc != null && rc.getReplicationType() == HddsProtos.ReplicationType.EC;
+    String ecPolicy = isEc ? rc.getReplication() : "";
     return new FileStatusAdapter(
         ozoneSnapshot.getReferencedSize(),
         ozoneSnapshot.getReferencedReplicatedSize(),
@@ -1233,9 +1254,8 @@ public class BasicRootedOzoneClientAdapterImpl
         FsPermission.getDirDefault().toShort(),
         owner, group, null, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
-        ozoneBucket.getReplicationConfig() != null &&
-            ozoneBucket.getReplicationConfig().getReplicationType() ==
-                HddsProtos.ReplicationType.EC);
+        isEc,
+        ecPolicy);
   }
 
   /**
@@ -1264,14 +1284,15 @@ public class BasicRootedOzoneClientAdapterImpl
               ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
+    boolean isEc = false;
+    String ecPolicy = "";
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
         owner, group, null, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
-        ozoneBucket.getReplicationConfig() != null &&
-            ozoneBucket.getReplicationConfig().getReplicationType() ==
-                HddsProtos.ReplicationType.EC);
+        isEc,
+        ecPolicy);
   }
 
   /**
@@ -1286,7 +1307,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         System.currentTimeMillis(), 0L,
         FsPermission.getDirDefault().toShort(),
-        null, null, null, new BlockLocation[0], false, false);
+        null, null, null, new BlockLocation[0], false, false, "");
   }
 
   @Override
