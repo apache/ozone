@@ -22,11 +22,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
@@ -65,13 +67,17 @@ public final class OMLayoutVersionManager
    * @throws OMException on error.
    */
   private void init(int layoutVersion) throws OMException {
+    int slv = Arrays.stream(OMLayoutFeature.values())
+        .mapToInt(LayoutFeature::layoutVersion)
+        .max()
+        .orElse(0);
     try {
       init(layoutVersion, OMLayoutFeature.values());
     } catch (IOException e) {
       throw new OMException(
           String.format("Cannot initialize VersionManager. Metadata " +
                   "layout version (%d) > software layout version (%d)",
-              getMetadataLayoutVersion(), getSoftwareLayoutVersion()),
+              layoutVersion, slv),
           e,
           NOT_SUPPORTED_OPERATION);
     }
