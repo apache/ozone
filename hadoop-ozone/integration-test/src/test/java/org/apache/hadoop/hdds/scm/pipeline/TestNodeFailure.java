@@ -62,6 +62,8 @@ public class TestNodeFailure {
     conf.set(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, "2s");
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000, MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10 * 1000, MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 20 * 1000, MILLISECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(6)
