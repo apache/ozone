@@ -19,14 +19,22 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import javax.ws.rs.WebApplicationException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +67,59 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   @Test
+  public void fromStreamWhereAvailableReturnsZero() throws IOException {
+    // Simulates a request body stream (e.g. with Expect: 100-continue) where
+    // InputStream#available() returns 0 even though the body has not been
+    // fully buffered yet.  See HDDS-14760.
+    InputStream inputBody = new FilterInputStream(new ByteArrayInputStream(
+        ("<CompleteMultipartUpload xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
+            "<Part><ETag>" + part1 + "</ETag><PartNumber>1" +
+            "</PartNumber></Part><Part><ETag>" + part2 +
+            "</ETag><PartNumber>2</PartNumber></Part>" +
+            "</CompleteMultipartUpload>").getBytes(UTF_8))) {
+      @Override
+      public int available() {
+        return 0;
+      }
+    };
+
+    //WHEN
+    CompleteMultipartUploadRequest completeMultipartUploadRequest =
+        new CompleteMultipartUploadRequestUnmarshaller()
+            .readFrom(null, null, null, null, null, inputBody);
+
+    //THEN
+    checkContent(completeMultipartUploadRequest);
+  }
+
+  @Test
+  public void emptyBodyIsRejectedAsInvalidRequest() {
+    InputStream emptyBody = new ByteArrayInputStream(new byte[0]);
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> new CompleteMultipartUploadRequestUnmarshaller()
+            .readFrom(null, null, null, null, null, emptyBody));
+
+    // Assert on the stable S3 error code rather than the human-readable message.
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), cause.getCode());
+  }
+
+  @Test
+  public void wellFormedBodyWithZeroPartsReturnsEmptyList() throws IOException {
+    // The fix lets a non-empty body through, so a well-formed request with no
+    // <Part> elements (a shape a chunked SDK can send) is parsed into an empty
+    // part list; rejecting the empty list is deferred to the endpoint.
+    ByteArrayInputStream inputBody = new ByteArrayInputStream(
+        "<CompleteMultipartUpload></CompleteMultipartUpload>".getBytes(UTF_8));
+
+    CompleteMultipartUploadRequest request = unmarshall(inputBody);
+
+    assertNotNull(request);
+    assertTrue(request.getPartList().isEmpty());
+  }
+
+  @Test
   public void fromStreamWithoutNamespace() throws IOException {
     //GIVEN
     ByteArrayInputStream inputBody =
@@ -85,7 +146,9 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
         request.getPartList();
 
     assertEquals(part1, parts.get(0).getETag());
+    assertEquals(1, parts.get(0).getPartNumber());
     assertEquals(part2, parts.get(1).getETag());
+    assertEquals(2, parts.get(1).getPartNumber());
   }
 
   private CompleteMultipartUploadRequest unmarshall(
