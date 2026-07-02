@@ -32,7 +32,6 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.collections4.CollectionUtils;
@@ -77,7 +76,6 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -199,11 +197,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       bucketReplicationConfig = this.bucket.getReplicationConfig();
       nextReplicationConfigRefreshTime = clock.millis() + bucketRepConfigRefreshPeriodMS;
 
-      // resolve the bucket layout in case of Link Bucket
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore, new HashSet<>());
-
-      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), bucket.getBucketLayout());
     } catch (IOException | RuntimeException exception) {
       // in case of exception, the adapter object will not be
       // initialised making the client object unreachable, close the client

@@ -1319,7 +1319,26 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
-    return OzoneBucket.newBuilder(conf, this)
+    return toOzoneBucket(bucketInfo);
+  }
+
+  @Override
+  public List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
+                                       String prevBucket, int maxListResult,
+                                       boolean hasSnapshot)
+      throws IOException {
+    List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
+        volumeName, prevBucket, bucketPrefix, maxListResult, hasSnapshot);
+
+    List<OzoneBucket> result = new ArrayList<>(buckets.size());
+    for (OmBucketInfo bucket : buckets) {
+      result.add(toOzoneBucket(bucket));
+    }
+    return result;
+  }
+
+  private OzoneBucket toOzoneBucket(OmBucketInfo bucketInfo) throws IOException {
+    OzoneBucket bucket = OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
         .setStorageType(bucketInfo.getStorageType())
@@ -1341,41 +1360,8 @@ public class RpcClient implements ClientProtocol {
         .setOwner(bucketInfo.getOwner())
         .setDefaultReplicationConfig(bucketInfo.getDefaultReplicationConfig())
         .build();
-  }
 
-  @Override
-  public List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                       String prevBucket, int maxListResult,
-                                       boolean hasSnapshot)
-      throws IOException {
-    List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
-        volumeName, prevBucket, bucketPrefix, maxListResult, hasSnapshot);
-
-    return buckets.stream().map(bucket ->
-            OzoneBucket.newBuilder(conf, this)
-                .setVolumeName(bucket.getVolumeName())
-                .setName(bucket.getBucketName())
-                .setStorageType(bucket.getStorageType())
-                .setVersioning(bucket.getIsVersionEnabled())
-                .setCreationTime(bucket.getCreationTime())
-                .setModificationTime(bucket.getModificationTime())
-                .setMetadata(bucket.getMetadata())
-                .setEncryptionKeyName(bucket.getEncryptionKeyInfo() != null ?
-                    bucket.getEncryptionKeyInfo().getKeyName() : null)
-                .setSourceVolume(bucket.getSourceVolume())
-                .setSourceBucket(bucket.getSourceBucket())
-                .setUsedBytes(bucket.getTotalBucketSpace())
-                .setUsedNamespace(bucket.getTotalBucketNamespace())
-                .setPendingDeleteBytes(bucket.getSnapshotUsedBytes())
-                .setPendingDeleteNamespace(bucket.getSnapshotUsedNamespace())
-                .setQuotaInBytes(bucket.getQuotaInBytes())
-                .setQuotaInNamespace(bucket.getQuotaInNamespace())
-                .setBucketLayout(bucket.getBucketLayout())
-                .setOwner(bucket.getOwner())
-                .setDefaultReplicationConfig(
-                    bucket.getDefaultReplicationConfig())
-                .build())
-        .collect(Collectors.toList());
+    return bucket;
   }
 
   @Override

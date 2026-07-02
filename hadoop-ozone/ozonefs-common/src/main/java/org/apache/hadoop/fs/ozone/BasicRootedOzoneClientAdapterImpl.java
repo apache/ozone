@@ -37,7 +37,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -298,12 +297,7 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
-      // resolve the bucket layout in case of Link Bucket
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-              new HashSet<>());
-
-      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), bucket.getBucketLayout());
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
