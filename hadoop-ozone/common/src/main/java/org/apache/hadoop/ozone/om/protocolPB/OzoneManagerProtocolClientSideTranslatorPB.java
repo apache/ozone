@@ -752,7 +752,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     req.setKeyArgs(keyArgs.build());
-    req.setIsSignedInputStream(args.isSignedInputStream());
+    req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
 
     OMRequest omRequest = createOMRequest(Type.CreateKey)
         .setCreateKeyRequest(req)

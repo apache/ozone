@@ -1544,7 +1544,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     CreateKeyRequest createKeyRequest = CreateKeyRequest.newBuilder()
         .setKeyArgs(keyArgs)
-        .setIsSignedInputStream(true)
+        .setDerivedKeyPiggyBacking(true)
         .build();
 
     OMRequest omRequest = OMRequest.newBuilder()
@@ -1596,7 +1596,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     CreateKeyRequest createKeyRequest = CreateKeyRequest.newBuilder()
         .setKeyArgs(keyArgs)
-        .setIsSignedInputStream(false)
+        .setDerivedKeyPiggyBacking(false)
         .build();
 
     OMRequest omRequest = OMRequest.newBuilder()

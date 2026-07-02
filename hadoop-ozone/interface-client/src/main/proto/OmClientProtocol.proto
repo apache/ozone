@@ -1348,7 +1348,7 @@ message CreateKeyRequest {
     // Set in OM HA during preExecute step. This way all OM's use same ID in
     // OM HA.
     optional uint64 clientID = 2;
-    optional bool isSignedInputStream = 3;
+    optional bool derivedKeyPiggyBacking = 3;
 }
 
 message CreateKeyResponse {

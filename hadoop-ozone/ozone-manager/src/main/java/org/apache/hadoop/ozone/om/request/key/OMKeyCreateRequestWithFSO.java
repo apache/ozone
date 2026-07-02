@@ -212,8 +212,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .setID(clientID)
               .setOpenVersion(openVersion);
       if (getOmRequest().hasS3Authentication() && ozoneManager.isSecurityEnabled()
-          && createKeyRequest.hasIsSignedInputStream()
-          && createKeyRequest.getIsSignedInputStream()
+          && createKeyRequest.hasDerivedKeyPiggyBacking()
+          && createKeyRequest.getDerivedKeyPiggyBacking()
       ) {
         OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(getOmRequest());
         if (s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {

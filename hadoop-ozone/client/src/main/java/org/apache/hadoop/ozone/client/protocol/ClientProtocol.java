@@ -509,7 +509,7 @@ public interface ClientProtocol {
   default OzoneOutputStream createKey(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
-      boolean isSignedInputStream) throws IOException {
+      boolean derivedKeyPiggyBacking) throws IOException {
     return createKey(volumeName, bucketName, keyName, size, replicationConfig,
         metadata, tags);
   }
@@ -518,7 +518,7 @@ public interface ClientProtocol {
   default OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
-      boolean isSignedInputStream) throws IOException {
+      boolean derivedKeyPiggyBacking) throws IOException {
     return createKeyIfNotExists(volumeName, bucketName, keyName, size, replicationConfig,
         metadata, tags);
   }
@@ -527,7 +527,7 @@ public interface ClientProtocol {
   default OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
       String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
-      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return rewriteKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
         replicationConfig, metadata, tags);
   }
@@ -536,7 +536,7 @@ public interface ClientProtocol {
   default OzoneOutputStream createMultipartKey(String volumeName, String bucketName,
                                        String keyName, long size,
                                        int partNumber, String uploadID,
-                                       boolean isSignedInputStream)
+                                       boolean derivedKeyPiggyBacking)
       throws IOException {
     return createMultipartKey(volumeName, bucketName, keyName, size, partNumber,
         uploadID);
@@ -546,7 +546,7 @@ public interface ClientProtocol {
   default OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
-      boolean isSignedInputStream) throws IOException {
+      boolean derivedKeyPiggyBacking) throws IOException {
     return createStreamKey(volumeName, bucketName, keyName, size, replicationConfig,
         metadata, tags);
   }
@@ -555,7 +555,7 @@ public interface ClientProtocol {
   default OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
-      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return createStreamKeyIfNotExists(volumeName, bucketName, keyName, size,
         replicationConfig, metadata, tags);
   }
@@ -564,7 +564,7 @@ public interface ClientProtocol {
   default OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
-      Map<String, String> tags, boolean isSignedInputStream) throws IOException {
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return rewriteStreamKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
         replicationConfig, metadata, tags);
   }
@@ -575,7 +575,7 @@ public interface ClientProtocol {
                                                  String keyName, long size,
                                                  int partNumber,
                                                  String uploadID,
-                                                 boolean isSignedInputStream)
+                                                 boolean derivedKeyPiggyBacking)
       throws IOException {
     return createMultipartStreamKey(volumeName, bucketName, keyName, size,
         partNumber, uploadID);
