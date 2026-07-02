@@ -100,10 +100,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, ACLType.CREATE);
+    int schemaVersion = resolveMultipartSchemaVersion(multipartInfoInitiateRequest);
+    MultipartInfoInitiateRequest.Builder requestBuilder =
+        multipartInfoInitiateRequest.toBuilder()
+            .setKeyArgs(resolvedArgs)
+            .setSchemaVersion(schemaVersion);
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
-        .setInitiateMultiPartUploadRequest(
-            multipartInfoInitiateRequest.toBuilder().setKeyArgs(resolvedArgs))
+        .setInitiateMultiPartUploadRequest(requestBuilder)
         .build();
   }
 
@@ -195,6 +199,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          .setSchemaVersion(
+              resolveMultipartSchemaVersion(multipartInfoInitiateRequest))
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -282,6 +288,32 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
+  }
+
+  protected int resolveMultipartSchemaVersion(
+      MultipartInfoInitiateRequest multipartInfoInitiateRequest) {
+    if (!multipartInfoInitiateRequest.hasSchemaVersion()) {
+      return OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION;
+    }
+    return (int) multipartInfoInitiateRequest.getSchemaVersion();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.InitiateMultiPartUpload
+  )
+  public static OMRequest setSchemaVersionOnInitiateMultipartUpload(
+      OMRequest req, ValidationContext ctx) {
+    MultipartInfoInitiateRequest initiateRequest =
+        req.getInitiateMultiPartUploadRequest();
+
+    // Keep newly initiated MPUs on legacy schema until split parts-table
+    // write/read paths are fully implemented.
+    return req.toBuilder()
+        .setInitiateMultiPartUploadRequest(initiateRequest.toBuilder()
+            .setSchemaVersion(OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION))
+        .build();
   }
 
   @RequestFeatureValidator(

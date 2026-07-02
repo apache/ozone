@@ -161,6 +161,18 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             openKey + "entry is not found in the openKey table",
             KEY_NOT_FOUND);
       }
+
+      if (multipartKeyInfo == null) {
+        // This can occur when user started uploading part by the time commit
+        // of that part happens, in between the user might have requested
+        // abort multipart upload. If we just throw exception, then the data
+        // will not be garbage collected, so move this part to delete table
+        // and throw error.
+        throw new OMException("No such Multipart upload is with specified " +
+            "uploadId " + uploadID,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+
       // Add/Update user defined metadata.
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
@@ -180,18 +192,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       int partNumber = keyArgs.getMultipartNumber();
       partName = getPartName(ozoneKey, uploadID, partNumber);
-
-      if (multipartKeyInfo == null) {
-        // This can occur when user started uploading part by the time commit
-        // of that part happens, in between the user might have requested
-        // abort multipart upload. If we just throw exception, then the data
-        // will not be garbage collected, so move this part to delete table
-        // and throw error
-        // Move this part to delete table.
-        throw new OMException("No such Multipart upload is with specified " +
-            "uploadId " + uploadID,
-            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-      }
 
       oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
 

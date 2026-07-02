@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,9 +38,11 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
@@ -204,6 +207,80 @@ public class TestS3MultipartUploadCompleteRequest
     assertEquals(getNamespaceCount(),
         omBucketInfo.getUsedNamespace());
     return multipartUploadID;
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheUsesSchemaVersionOneBeforeFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    // The base test fixture is pre-finalized by default.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    String multipartUploadID =
+        initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
+            keyName, 1);
+
+    OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
+        bucketName, keyName, multipartUploadID, new ArrayList<>());
+
+    S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
+        getS3MultipartUploadCompleteReq(completeMultipartRequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
+            3L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheAllowsSchemaVersionZeroAfterFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    // Tests must explicitly bump metadata layout version to simulate finalized OM.
+    when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
+        .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+    OMClientResponse initiateResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
+    String multipartUploadID = initiateResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(0, multipartKeyInfo.getSchemaVersion());
+
+    OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
+        bucketName, keyName, multipartUploadID, new ArrayList<>());
+
+    S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
+        getS3MultipartUploadCompleteReq(completeMultipartRequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
+            3L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        omClientResponse.getOMResponse().getStatus());
   }
 
   protected void addVolumeAndBucket(String volumeName, String bucketName)
