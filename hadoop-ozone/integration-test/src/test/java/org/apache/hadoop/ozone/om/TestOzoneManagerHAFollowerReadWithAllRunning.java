@@ -178,26 +178,20 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
    */
   @Test
   public void testFailoverWithSuggestedLeader() throws Exception {
-    HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
-        OmTestUtil.getFailoverProxyProvider(getObjectStore());
-
     // Make sure All OMs are ready.
     createVolumeTest(true);
 
-    String leaderOMNodeId = null;
+    OzoneManager leaderOM = null;
     OzoneManager followerOM = null;
     for (OzoneManager om: getCluster().getOzoneManagersList()) {
       if (om.isLeaderReady()) {
-        leaderOMNodeId = om.getOMNodeId();
+        leaderOM = om;
       } else if (followerOM == null) {
         followerOM = om;
       }
     }
     assertNotNull(followerOM);
-    assertNotNull(leaderOMNodeId);
-    String leaderOMAddress = ((OMProxyInfo)
-        omFailoverProxyProvider.getOMProxyMap().get(leaderOMNodeId))
-        .getAddress().getAddress().toString();
+    assertNotNull(leaderOM);
     assertSame(OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER,
         followerOM.getOmRatisServer().getLeaderStatus());
 
@@ -222,8 +216,16 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
         followerOM.getOmServerProtocol();
     ServiceException ex = assertThrows(ServiceException.class,
         () -> omServerProtocol.submitRequest(null, writeRequest));
-    assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class)
-        .hasMessageEndingWith("Suggested leader is OM:" + leaderOMNodeId + "[" + leaderOMAddress + "].");
+
+    // In-process path: cause is the actual OMNotLeaderException with all
+    // structured fields populated by the producer ctor (no RPC stripping).
+    assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class);
+    OMNotLeaderException notLeader = (OMNotLeaderException) ex.getCause();
+    assertEquals(leaderOM.getOMNodeId(), notLeader.getSuggestedLeaderNodeId());
+    assertEquals(leaderOM.getNodeDetails().getRpcAddressString(),
+        notLeader.getSuggestedLeaderAddress());
+    assertNotNull(notLeader.getSuggestedLeaderIpAddress(),
+        "leader IP must be populated when DNS resolution succeeded at startup");
   }
 
   /**
