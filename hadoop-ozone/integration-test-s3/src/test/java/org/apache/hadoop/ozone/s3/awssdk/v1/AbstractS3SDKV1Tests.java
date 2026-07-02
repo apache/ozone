@@ -39,13 +39,16 @@ import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.BucketTaggingConfiguration;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.DeleteBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingResult;
@@ -72,9 +75,11 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.SetBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.Tag;
+import com.amazonaws.services.s3.model.TagSet;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.amazonaws.services.s3.transfer.TransferManager;
@@ -1263,6 +1268,34 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("val", tagSet.get(0).getValue());
     assertEquals("key2", tagSet.get(1).getKey());
     assertEquals("val2", tagSet.get(1).getValue());
+  }
+
+  @Test
+  public void testBucketTaggingPutGetDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    // AWS SDK v1 returns null when no bucket tagging is configured.
+    assertNull(s3Client.getBucketTaggingConfiguration(
+        new GetBucketTaggingConfigurationRequest(bucketName)));
+
+    TagSet tagSet = new TagSet();
+    tagSet.setTag("tag-key1", "tag-value1");
+    tagSet.setTag("tag-key2", "tag-value2");
+    s3Client.setBucketTaggingConfiguration(new SetBucketTaggingConfigurationRequest(bucketName,
+        new BucketTaggingConfiguration(Collections.singletonList(tagSet))));
+
+    BucketTaggingConfiguration taggingConfiguration =
+        s3Client.getBucketTaggingConfiguration(new GetBucketTaggingConfigurationRequest(bucketName));
+    Map<String, String> actualTags = taggingConfiguration.getTagSet().getAllTags();
+    assertEquals(2, actualTags.size());
+    assertEquals("tag-value1", actualTags.get("tag-key1"));
+    assertEquals("tag-value2", actualTags.get("tag-key2"));
+
+    s3Client.deleteBucketTaggingConfiguration(new DeleteBucketTaggingConfigurationRequest(bucketName));
+
+    assertNull(s3Client.getBucketTaggingConfiguration(
+        new GetBucketTaggingConfigurationRequest(bucketName)));
   }
 
   @Test

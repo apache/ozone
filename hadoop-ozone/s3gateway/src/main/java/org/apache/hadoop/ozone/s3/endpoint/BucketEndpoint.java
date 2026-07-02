@@ -424,6 +424,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new BucketGetLocationHandler())
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
+        .add(new BucketTaggingHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();
