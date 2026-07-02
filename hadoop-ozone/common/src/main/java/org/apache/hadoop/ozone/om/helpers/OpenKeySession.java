@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * This class represents a open key "session". A session here means a key is
@@ -32,7 +33,7 @@ public class OpenKeySession {
   // a block that has a create version equals to open version means it will
   // be committed only when this open session is closed.
   private long openVersion;
-  private byte[] derivedKey;
+  private ByteString derivedKey;
 
   public OpenKeySession(long id, OmKeyInfo info, long version) {
     this.id = id;
@@ -40,12 +41,12 @@ public class OpenKeySession {
     this.openVersion = version;
   }
 
-  public void setDerivedKey(byte[] derivedKey) {
-    this.derivedKey = derivedKey == null ? null : derivedKey.clone();
+  public void setDerivedKey(ByteString derivedKey) {
+    this.derivedKey = derivedKey;
   }
 
-  public byte[] getDerivedKey() {
-    return derivedKey == null ? null : derivedKey.clone();
+  public ByteString getDerivedKey() {
+    return derivedKey;
   }
 
   public long getOpenVersion() {

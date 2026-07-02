@@ -26,6 +26,7 @@ import java.util.Optional;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
@@ -37,7 +38,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   private final OutputStream outputStream;
   private final Syncable syncable;
   private boolean enableHsync;
-  private byte[] derivedKey;
+  private ByteString derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -183,11 +184,11 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     return out;
   }
 
-  public byte[] getDerivedKey() {
-    return derivedKey == null ? null : derivedKey.clone();
+  public ByteString getDerivedKey() {
+    return derivedKey;
   }
 
-  public void setDerivedKey(byte[] derivedKey) {
-    this.derivedKey = derivedKey == null ? null : derivedKey.clone();
+  public void setDerivedKey(ByteString derivedKey) {
+    this.derivedKey = derivedKey;
   }
 }
