@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -471,7 +472,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   private void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
-    Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
+    NavigableSet<ContainerID> containerIDs = new TreeSet<>(stateManager.getContainers(pipelineId));
     ContainerManager containerManager = scmContext.getScm()
         .getContainerManager();
     for (ContainerID containerID : containerIDs) {
