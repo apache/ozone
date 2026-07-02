@@ -21,7 +21,11 @@ on:
       - 'dependabot/**'
     tags:
       - '**'
+    paths:
+      - '.github/workflows/**'
   pull_request:
+    paths:
+      - '.github/workflows/**'
 
 permissions: { }
 
