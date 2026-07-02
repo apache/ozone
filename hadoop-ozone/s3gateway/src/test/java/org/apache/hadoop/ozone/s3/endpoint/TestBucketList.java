@@ -403,7 +403,7 @@ public class TestBucketList {
         <?xml version="1.0" encoding="UTF-8"?>
           <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
               ...
-              <Prefix>data=</Prefix>
+               <Prefix>data%3D</Prefix>
               <StartAfter>data%3D</StartAfter>
               <Delimiter>%3D</Delimiter>
               <EncodingType>url</EncodingType>
@@ -417,8 +417,7 @@ public class TestBucketList {
               </CommonPrefixes>
           </ListBucketResult>
 
-      Echoed Prefix is not URL-encoded. Delimiter, StartAfter, Key, and
-      CommonPrefixes are encoded when encodingType == url.
+      if encodingType == null , the = will not be encoded to "%3D
     * */
 
     OzoneClient ozoneClient =
@@ -440,8 +439,9 @@ public class TestBucketList {
     // The Object name will be encoded by ObjectKeyNameAdapter
     // if encodingType == url
     assertEncodingTypeObject(delimiter, encodingType, response.getDelimiter());
-    assertEncodingTypeObject(prefix, null, response.getPrefix());
-    assertEncodingTypeObject(startAfter, encodingType, response.getStartAfter());
+    assertEncodingTypeObject(prefix, encodingType, response.getPrefix());
+    assertEncodingTypeObject(startAfter, encodingType,
+        response.getStartAfter());
     assertNotNull(response.getCommonPrefixes());
     assertNotNull(response.getContents());
     assertEncodingTypeObject(prefix + delimiter, encodingType,
@@ -597,24 +597,6 @@ public class TestBucketList {
 
     assertNull(response.getDelimiter());
     assertEquals(4, response.getContents().size());
-    assertEquals(0, response.getCommonPrefixes().size());
-  }
-
-  @Test
-  public void testListObjectsPrefixWithNewline() throws Exception {
-    OzoneClient client = createClientWithKeys("foo/bar", "foo/baz", "quux");
-    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
-
-    String prefix = String.valueOf((char) 0x0a);
-    endpoint.queryParamsForTest().set(QueryParams.PREFIX, prefix);
-    endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, ENCODING_TYPE);
-    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
-
-    assertNotNull(response.getPrefix());
-    assertEquals(prefix, response.getPrefix().getName());
-    assertNull(response.getPrefix().getEncodingType());
-    assertEquals(prefix, new ObjectKeyNameAdapter().marshal(response.getPrefix()));
-    assertEquals(0, response.getContents().size());
     assertEquals(0, response.getCommonPrefixes().size());
   }
 

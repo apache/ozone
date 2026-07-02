@@ -111,8 +111,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
-    final boolean prefixSpecified = queryParams().containsKey(QueryParams.PREFIX);
-    final String prefix = prefixSpecified ? queryParams().get(QueryParams.PREFIX) : "";
+    String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
@@ -160,8 +159,8 @@ public class BucketEndpoint extends BucketOperationHandler {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
     // If you specify the encoding-type request parameter,should return
-    // encoded key name values in the following response elements: Delimiter,
-    // Key, and StartAfter. The echoed Prefix request parameter is returned without URL encoding.
+    // encoded key name values in the following response elements:
+    //  Delimiter, Prefix, Key, and StartAfter
     //
     // For detail refer:
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
@@ -171,9 +170,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
     }
     response.setName(bucketName);
-    if (prefixSpecified) {
-      response.setPrefix(EncodingTypeObject.createNullable(prefix, null));
-    }
+    response.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
     response.setMarker(marker == null ? "" : marker);
     response.setMaxKeys(maxKeys);
     response.setEncodingType(encodingType);
