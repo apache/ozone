@@ -31,7 +31,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -841,8 +840,6 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
         value instanceof ByteString) {
       try {
         return HddsProtos.DeletedBlocksTransactionSummary.parseFrom((ByteString) value);
-      } catch (InvalidProtocolBufferException e) {
-        LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), SERVICE_NAME, e);
       } catch (IOException e) {
         LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), SERVICE_NAME, e);
       }
