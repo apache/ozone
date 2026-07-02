@@ -163,7 +163,9 @@ import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -179,36 +181,61 @@ final class TestSecureOzoneCluster {
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecureOzoneCluster.class);
+  private static final int CERT_GRACE_TIME_MS = 10 * 1000; // 10s
+  private static final int DELEGATION_TOKEN_MAX_TIME_MS = 9 * 1000; // 9s
+
+  @TempDir
+  private static File workDir;
+  private static MiniKdc miniKdc;
+  private static OzoneConfiguration kdcConf;
+  private static File scmKeytab;
+  private static File spnegoKeytab;
+  private static File omKeyTab;
+  private static File testUserKeytab;
+  private static String testUserPrincipal;
+  private static String host;
+  private static String realm;
 
   @TempDir
   private File tempDir;
-
-  private MiniKdc miniKdc;
   private OzoneConfiguration conf;
-  private File workDir;
-  private File scmKeytab;
-  private File spnegoKeytab;
-  private File omKeyTab;
-  private File testUserKeytab;
-  private String testUserPrincipal;
   private StorageContainerManager scm;
   private ScmBlockLocationProtocol scmBlockClient;
   private OzoneManager om;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
-  private String host;
   private String clusterId;
   private String scmId;
   private String omId;
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
   private KeyPair keyPair;
   private Path omMetaDirPath;
-  private int certGraceTime = 10 * 1000; // 10s
-  private int delegationTokenMaxTime = 9 * 1000; // 9s
+
+  @BeforeAll
+  static void setupKdc() throws Exception {
+    ExitUtils.disableSystemExit();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
+    startMiniKdc();
+    realm = miniKdc.getRealm();
+    testUserPrincipal = "test@" + realm;
+    scmKeytab = new File(workDir, "scm.keytab");
+    spnegoKeytab = new File(workDir, "http.keytab");
+    omKeyTab = new File(workDir, "om.keytab");
+    testUserKeytab = new File(workDir, "testuser.keytab");
+    kdcConf = new OzoneConfiguration();
+    setSecureConfig(kdcConf);
+    createCredentialsInKDC(kdcConf);
+  }
+
+  @AfterAll
+  static void tearDownKdc() throws Exception {
+    stopMiniKdc();
+  }
 
   @BeforeEach
   void init() {
     try {
-      conf = new OzoneConfiguration();
+      conf = new OzoneConfiguration(kdcConf);
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY, getFreePort());
@@ -220,34 +247,27 @@ final class TestSecureOzoneCluster {
       conf.set(OZONE_OM_ADDRESS_KEY,
           InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
 
-      DefaultMetricsSystem.setMiniClusterMode(true);
-      ExitUtils.disableSystemExit();
       final String path = tempDir.getAbsolutePath();
       omMetaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, omMetaDirPath.toString());
-      conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-      conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
+
       conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
-          Duration.ofMillis(certGraceTime - 1000).toString());
+          Duration.ofMillis(CERT_GRACE_TIME_MS - 1000).toString());
       conf.set(HDDS_X509_RENEW_GRACE_DURATION,
-          Duration.ofMillis(certGraceTime).toString());
+          Duration.ofMillis(CERT_GRACE_TIME_MS).toString());
       conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
       conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
-          Duration.ofMillis(certGraceTime - 1000).toString());
+          Duration.ofMillis(CERT_GRACE_TIME_MS - 1000).toString());
       conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
-          Duration.ofMillis(certGraceTime - 1000).toString());
+          Duration.ofMillis(CERT_GRACE_TIME_MS - 1000).toString());
       conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
-          delegationTokenMaxTime);
+          DELEGATION_TOKEN_MAX_TIME_MS);
 
-      workDir = new File(tempDir, "workdir");
       clusterId = UUID.randomUUID().toString();
       scmId = UUID.randomUUID().toString();
       omId = UUID.randomUUID().toString();
       scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0);
 
-      startMiniKdc();
-      setSecureConfig();
-      createCredentialsInKDC();
       generateKeyPair();
       omInfo = OzoneManager.getOmDetailsProto(conf, omId);
     } catch (Exception e) {
@@ -258,94 +278,73 @@ final class TestSecureOzoneCluster {
   @AfterEach
   void stop() throws Exception {
     try {
-      stopMiniKdc();
       if (scm != null) {
         scm.stop();
         scm.join();
       }
-      if (om != null) {
-        om.stop();
-        om.join();
-      }
-      IOUtils.closeQuietly(om);
-      IOUtils.closeQuietly(omClient);
     } catch (Exception e) {
       LOG.error("Failed to stop TestSecureOzoneCluster", e);
+    } finally {
+      IOUtils.closeQuietly(om);
+      IOUtils.closeQuietly(omClient);
     }
   }
 
-  private void createCredentialsInKDC() throws Exception {
+  private static void createCredentialsInKDC(OzoneConfiguration conf) throws Exception {
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    SCMHTTPServerConfig httpServerConfig =
-          conf.getObject(SCMHTTPServerConfig.class);
+    SCMHTTPServerConfig httpServerConfig = conf.getObject(SCMHTTPServerConfig.class);
     createPrincipal(scmKeytab, scmConfig.getKerberosPrincipal());
     createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
+    createPrincipal(omKeyTab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
     createPrincipal(testUserKeytab, testUserPrincipal);
-    createPrincipal(omKeyTab,
-        conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
   }
 
-  private void createPrincipal(File keytab, String... principal)
+  private static void createPrincipal(File keytab, String... principal)
       throws Exception {
     miniKdc.createPrincipal(keytab, principal);
   }
 
-  private void startMiniKdc() throws Exception {
+  private static void startMiniKdc() throws Exception {
     Properties securityProperties = MiniKdc.createConf();
     miniKdc = new MiniKdc(securityProperties, workDir);
     miniKdc.start();
   }
 
-  private void stopMiniKdc() {
-    miniKdc.stop();
+  private static void stopMiniKdc() {
+    if (miniKdc != null) {
+      miniKdc.stop();
+    }
   }
 
-  private void setSecureConfig() throws IOException {
+  private static void setSecureConfig(OzoneConfiguration conf) throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
-
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
 
     String curUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(OZONE_ADMINISTRATORS, curUser);
 
-    String realm = miniKdc.getRealm();
     String hostAndRealm = host + "@" + realm;
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + hostAndRealm);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
 
-    scmKeytab = new File(workDir, "scm.keytab");
-    spnegoKeytab = new File(workDir, "http.keytab");
-    omKeyTab = new File(workDir, "om.keytab");
-    testUserKeytab = new File(workDir, "testuser.keytab");
-    testUserPrincipal = "test@" + realm;
-
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        scmKeytab.getAbsolutePath());
-    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
-        spnegoKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        omKeyTab.getAbsolutePath());
-    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
-        spnegoKeytab.getAbsolutePath());
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, scmKeytab.getAbsolutePath());
+    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeyTab.getAbsolutePath());
+    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
   }
 
   @Test
   void testSecureScmStartupSuccess() throws Exception {
-
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
-
     scm.start();
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
     assertEquals(scmId, scmInfo.getScmId());
     assertEquals(2, scm.getScmCertificateClient().getTrustChain().size());
-
   }
 
   @Test
@@ -354,7 +353,6 @@ final class TestSecureOzoneCluster {
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
-
     scm.start();
 
     // Case 1: User with Kerberos credentials should succeed.
@@ -421,7 +419,6 @@ final class TestSecureOzoneCluster {
     ioException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
     assertThat(ioException).hasMessageContaining(cannotAuthMessage);
-
   }
 
   private void initSCM() throws IOException {
@@ -505,7 +502,6 @@ final class TestSecureOzoneCluster {
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "non-existent-user@EXAMPLE.com");
     testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
-
   }
 
   /**
@@ -517,7 +513,6 @@ final class TestSecureOzoneCluster {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
-
     scm.start();
     conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
     conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
@@ -526,7 +521,6 @@ final class TestSecureOzoneCluster {
     assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
         "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
         "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
-
   }
 
   /**
@@ -1054,7 +1048,6 @@ final class TestSecureOzoneCluster {
     ExitUtil.disableSystemExit();
     LogCapturer certClientLogs = LogCapturer.captureLogs(OMCertificateClient.class);
     LogCapturer exitUtilLog = LogCapturer.captureLogs(ExitUtil.class);
-
 
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
