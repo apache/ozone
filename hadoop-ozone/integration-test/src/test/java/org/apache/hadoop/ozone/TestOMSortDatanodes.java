@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableMap;
@@ -174,6 +175,57 @@ public class TestOMSortDatanodes {
       assertNotEquals(rack, list.get(i).getNetworkLocation(),
           "Nodes in the other rack should be sorted last");
     }
+  }
+
+  @Test
+  public void sortDatanodesForWriteSortsRpcDeserializedPipeline() {
+    // Pipeline nodes arrive from SCM over RPC as deserialized DatanodeDetails
+    // with no topology linkage; the write sort must resolve them to OM's cluster
+    // map, otherwise every node is equidistant (MAX) and the order is random.
+    List<DatanodeDetails> rpcNodes = new ArrayList<>();
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      rpcNodes.add(DatanodeDetails.getFromProtoBuf(dn.getProtoBufMessage()));
+    }
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      // The client address is normally an IP, but the sort must resolve a client
+      // by either IP or hostname, so cover both.
+      List<? extends DatanodeDetails> byIp =
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress());
+      assertEquals(dn, byIp.get(0),
+          "Source node should be sorted first for writes (IP client)");
+      assertRackOrder(dn.getNetworkLocation(), byIp);
+
+      List<? extends DatanodeDetails> byHostname =
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName());
+      assertEquals(dn, byHostname.get(0),
+          "Source node should be sorted first for writes (hostname client)");
+      assertRackOrder(dn.getNetworkLocation(), byHostname);
+    }
+  }
+
+  @Test
+  public void sortDatanodesForWriteKeepsOrderForStaleTopology() {
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(randomDatanodeDetails());
+    nodes.addAll(nodeManager.getAllNodes());
+
+    List<? extends DatanodeDetails> sorted =
+        keyManager.sortDatanodesForWrite(nodes, "edge0");
+
+    assertSame(nodes, sorted,
+        "Pipeline order should be preserved when a node is missing from the OM topology");
+  }
+
+  @Test
+  public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
+    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
+    List<DatanodeDetails> original = new ArrayList<>(nodes);
+    // A client that resolves to no known rack must NOT trigger a shuffle.
+    String unresolved = nodes.get(0).getIpAddress() + "X";
+    List<? extends DatanodeDetails> result =
+        keyManager.sortDatanodesForWrite(nodes, unresolved);
+    assertEquals(original, result,
+        "Write pipeline order must be preserved when client is unresolved");
   }
 
   private String nodeAddress(DatanodeDetails dn) {

@@ -170,7 +170,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 ozoneManager.getOMServiceId(),
                 ozoneManager.getMetrics(),
                 keyArgs.getSortDatanodes(),
-                userInfo));
+                userInfo, ozoneManager.getKeyManager()));
         effectiveDataSize = requestedSize;
       }
 

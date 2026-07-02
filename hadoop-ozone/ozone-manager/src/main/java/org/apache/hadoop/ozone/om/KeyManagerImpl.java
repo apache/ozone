@@ -115,7 +115,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -124,6 +123,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -2204,32 +2204,91 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
-    final Node client = getClientNode(clientMachine, nodes);
-    return ozoneManager.getClusterMap()
-        .sortByDistanceCost(client, nodes, nodes.size());
+    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+    final Node client = getClientNode(clientMachine, nodes, clusterMap);
+    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  @Override
+  public List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      // No client address: keep the pipeline order (the first node is the write
+      // primary). Mirrors SCMBlockProtocolServer#getClientNode's empty guard.
+      return nodes;
+    }
+    return captureLatencyNs(
+        metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
+          final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+          final Node client = getClientNode(clientMachine, nodes, clusterMap);
+          if (client == null) {
+            // Preserve pipeline order for writes: the first node is the write
+            // primary, so do not shuffle when the client cannot be resolved.
+            return nodes;
+          }
+          return sortByClusterMapDistance(clusterMap, client, nodes);
+        });
+  }
+
+  /**
+   * Sort a pipeline's nodes by topology distance to the client. The nodes come
+   * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
+   * parent/level and would be treated as outside the topology (distance
+   * {@link Integer#MAX_VALUE}) and shuffled. Resolve each node (and a co-located
+   * client) to its canonical instance in OM's cluster map before sorting, then
+   * map the sorted order back to the original pipeline nodes.
+   */
+  private List<? extends DatanodeDetails> sortByClusterMapDistance(
+      NetworkTopology clusterMap, Node client,
+      List<? extends DatanodeDetails> nodes) {
+    final Node reader = toClusterMapNode(clusterMap, client);
+    final List<Node> topologyNodes = new ArrayList<>(nodes.size());
+    final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
+    for (DatanodeDetails node : nodes) {
+      final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+      if (resolved == null) {
+        return nodes;
+      }
+      topologyNodes.add(resolved);
+      nodeByPath.put(resolved.getNetworkFullPath(), node);
+    }
+    final List<Node> sorted =
+        clusterMap.sortByDistanceCost(reader, topologyNodes, topologyNodes.size());
+    final List<DatanodeDetails> result = new ArrayList<>(sorted.size());
+    for (Node node : sorted) {
+      result.add(nodeByPath.get(node.getNetworkFullPath()));
+    }
+    return result;
+  }
+
+  /**
+   * Resolve a node to its canonical, topology-linked instance in the given
+   * cluster map, or return the input node if it is not in the map.
+   */
+  private Node toClusterMapNode(NetworkTopology clusterMap, Node node) {
+    final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+    return resolved != null ? resolved : node;
   }
 
   private Node getClientNode(String clientMachine,
-                             List<? extends DatanodeDetails> nodes) {
-    List<DatanodeDetails> matchingNodes = new ArrayList<>();
-    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+      List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
-      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
-          clientMachine)) {
-        matchingNodes.add(node);
+      // Match by either IP or hostname, like SCM's getNodesByAddress; the client
+      // address is always an IP even when use.datanode.hostname is enabled.
+      if (clientMachine.equals(node.getIpAddress())
+          || clientMachine.equals(node.getHostName())) {
+        return node;
       }
     }
-    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
-        getOtherNode(clientMachine);
+    return getOtherNode(clientMachine, clusterMap);
   }
 
-  private Node getOtherNode(String clientMachine) {
+  private Node getOtherNode(String clientMachine,
+                            NetworkTopology clusterMap) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
       if (clientLocation != null) {
-        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        Node rack = clusterMap.getNode(clientLocation);
         if (rack instanceof InnerNode) {
           return new NodeImpl(clientMachine, clientLocation,
               (InnerNode) rack, rack.getLevel() + 1,
