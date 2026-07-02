@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.util.Time;
@@ -60,6 +62,65 @@ public class TestS3MultipartUploadCompleteRequest
 
     doPreExecuteCompleteMPU(volumeName, bucketName, keyName,
         UUID.randomUUID().toString(), new ArrayList<>());
+  }
+
+  @Test
+  public void testPreExecuteRewritesExpectedETagToGeneration()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String expectedETag = "matching-etag";
+    long expectedGeneration = 10L;
+
+    addVolumeAndBucket(volumeName, bucketName);
+    addCommittedKeyToTable(volumeName, bucketName, keyName, expectedGeneration,
+        expectedETag);
+
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(
+        initiateMPURequest).validateAndUpdateCache(ozoneManager, 1L);
+    String uploadID = initiateResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    OMRequest request = withCompleteKeyArgs(
+        OMRequestTestUtils.createCompleteMPURequest(volumeName, bucketName,
+            keyName, uploadID, new ArrayList<>()),
+        keyArgs -> keyArgs.setExpectedETag(expectedETag));
+
+    OMRequest modifiedRequest = getS3MultipartUploadCompleteReq(request)
+        .preExecute(ozoneManager);
+    KeyArgs resolvedKeyArgs = modifiedRequest
+        .getCompleteMultiPartUploadRequest().getKeyArgs();
+
+    assertFalse(resolvedKeyArgs.hasExpectedETag());
+    assertTrue(resolvedKeyArgs.hasExpectedDataGeneration());
+    assertEquals(expectedGeneration,
+        resolvedKeyArgs.getExpectedDataGeneration());
+  }
+
+  @Test
+  public void testConditionalCompleteReturnsConflictBeforeMissingUpload()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    addVolumeAndBucket(volumeName, bucketName);
+    addCommittedKeyToTable(volumeName, bucketName, keyName, 20L,
+        "new-etag");
+
+    OMRequest request = withCompleteKeyArgs(
+        OMRequestTestUtils.createCompleteMPURequest(volumeName, bucketName,
+            keyName, UUID.randomUUID().toString(), new ArrayList<>()),
+        keyArgs -> keyArgs.setExpectedDataGeneration(10L));
+
+    OMClientResponse response = getS3MultipartUploadCompleteReq(request)
+        .validateAndUpdateCache(ozoneManager, 3L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.ATOMIC_WRITE_CONFLICT,
+        response.getOMResponse().getStatus());
   }
 
   @Test
@@ -210,6 +271,20 @@ public class TestS3MultipartUploadCompleteRequest
       throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
+  }
+
+  protected OmKeyInfo addCommittedKeyToTable(String volumeName,
+      String bucketName, String keyName, long updateID, String eTag)
+      throws Exception {
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName,
+        RatisReplicationConfig.getInstance(ONE))
+        .setUpdateID(updateID)
+        .addMetadata(OzoneConsts.ETAG, eTag)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzoneDBKey(volumeName, bucketName, keyName), keyInfo);
+    return keyInfo;
   }
 
   @Test
@@ -373,5 +448,20 @@ public class TestS3MultipartUploadCompleteRequest
   protected long getNamespaceCount() {
     return 1L;
   }
-}
 
+  private OMRequest withCompleteKeyArgs(OMRequest request,
+      KeyArgsUpdater updater) {
+    OzoneManagerProtocolProtos.MultipartUploadCompleteRequest completeRequest =
+        request.getCompleteMultiPartUploadRequest();
+    KeyArgs.Builder keyArgs = completeRequest.getKeyArgs().toBuilder();
+    updater.update(keyArgs);
+    return request.toBuilder()
+        .setCompleteMultiPartUploadRequest(completeRequest.toBuilder()
+            .setKeyArgs(keyArgs))
+        .build();
+  }
+
+  private interface KeyArgsUpdater {
+    void update(KeyArgs.Builder keyArgs);
+  }
+}

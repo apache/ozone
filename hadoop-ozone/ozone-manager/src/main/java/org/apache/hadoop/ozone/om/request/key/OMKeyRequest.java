@@ -1308,38 +1308,89 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Validates atomic rewrite conditions for conditional writes.
-   * <p>
-   * For If-None-Match: * (expectedDataGeneration = EXPECTED_GEN_CREATE_IF_NOT_EXISTS),
-   * the key must NOT exist.
-   * <p>
-   * For If-Match with a specific generation, the key must exist with matching updateID.
+   * Resolves conditional write state at request admission time.
    *
-   * @param dbKeyInfo the existing key info from the database (null if key doesn't exist)
-   * @param keyArgs the key arguments containing expected generation
-   * @throws OMException if validation fails
+   * This validates expected generations as admission-time preconditions and
+   * rewrites matching ETags into expected generations for commit-time checks.
    */
-  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
-      throws OMException {
+  protected KeyArgs resolveConditionalWriteAtAdmission(OmKeyInfo dbKeyInfo,
+      KeyArgs keyArgs, Map<String, String> auditMap) throws OMException {
     if (keyArgs.hasExpectedDataGeneration()) {
-      long expectedGen = keyArgs.getExpectedDataGeneration();
-      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        if (dbKeyInfo != null) {
-          throw new OMException("Key already exists",
-              OMException.ResultCodes.KEY_ALREADY_EXISTS);
-        }
-      } else {
-        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
-        if (dbKeyInfo == null) {
-          throw new OMException("Key not found during expected rewrite",
-              OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-        if (dbKeyInfo.getUpdateID() != expectedGen) {
-          throw new OMException("Generation mismatch during expected rewrite",
-              OMException.ResultCodes.KEY_NOT_FOUND);
-        }
+      validateAtomicRewriteAtAdmission(dbKeyInfo, keyArgs.getExpectedDataGeneration(), auditMap);
+      return keyArgs;
+    }
+
+    return validateAndResolveIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo, auditMap);
+  }
+
+  /**
+   * Validates the condition at request admission time.
+   *
+   * This form is for callers that resolve the admitted generation from
+   * persisted open-key state rather than from request key arguments.
+   */
+  protected void validateAtomicRewriteAtAdmission(OmKeyInfo dbKeyInfo,
+      Long expectedGen, Map<String, String> auditMap) throws OMException {
+    if (expectedGen == null) {
+      return;
+    }
+    addRewriteGenerationToAuditMap(expectedGen, auditMap);
+
+    if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      if (dbKeyInfo != null) {
+        throw new OMException("Key already exists", OMException.ResultCodes.KEY_ALREADY_EXISTS);
       }
+      return;
+    }
+
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (expectedGen != dbKeyInfo.getUpdateID()) {
+      throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Validates an already admitted condition at serialized commit time.
+   *
+   * This form is for callers that must check the admitted generation before
+   * building the final key info to commit.
+   */
+  protected void validateAtomicRewriteAtCommit(OmKeyInfo existing,
+      Long expectedGen, Map<String, String> auditMap) throws OMException {
+    if (expectedGen == null) {
+      return;
+    }
+    addRewriteGenerationToAuditMap(expectedGen, auditMap);
+
+    if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      if (existing != null) {
+        throw new OMException("Atomic create-if-not-exists conflicted with "
+            + "an existing key",
+            OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
+      }
+      return;
+    }
+
+    if (existing == null) {
+      throw new OMException("Atomic rewrite conflicted because the key no "
+          + "longer exists",
+          OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
+    }
+    if (expectedGen != existing.getUpdateID()) {
+      throw new OMException("Cannot commit as current generation ("
+          + existing.getUpdateID() + ") does not match the expected "
+          + "generation to rewrite (" + expectedGen + ")",
+          OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
+    }
+  }
+
+  private void addRewriteGenerationToAuditMap(long expectedGen,
+      Map<String, String> auditMap) {
+    if (auditMap != null) {
+      auditMap.put(OzoneConsts.REWRITE_GENERATION,
+          String.valueOf(expectedGen));
     }
   }
 
@@ -1347,7 +1398,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Validates If-Match ETag condition.
    * <p>
    * This method checks if the existing key's ETag matches the expected ETag.
-   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
    *
    * @param keyArgs the key arguments containing expected ETag
    * @param dbKeyInfo the existing key info from the database
@@ -1378,24 +1428,28 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Validates If-Match ETag condition and converts it to expectedDataGeneration.
    * <p>
    * This method checks if the existing key's ETag matches the expected ETag.
-   * If it matches, the ETag condition is converted to a generation-based condition
-   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   * If it matches, the ETag condition is converted to a generation-based
+   * condition for commit-time atomic rewrite validation.
    *
    * @param keyArgs the key arguments containing expected ETag
    * @param dbKeyInfo the existing key info from the database
+   * @param auditMap the audit map to update with the resolved generation
    * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
    * @throws OMException if validation fails
    */
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
-      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+  private KeyArgs validateAndResolveIfMatchAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo, Map<String, String> auditMap) throws OMException {
     validateIfMatchETag(keyArgs, dbKeyInfo);
 
-    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+    if (!keyArgs.hasExpectedETag()) {
       return keyArgs;
     }
 
+    long expectedGen = dbKeyInfo.getUpdateID();
+    addRewriteGenerationToAuditMap(expectedGen, auditMap);
+
     return keyArgs.toBuilder()
-        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .setExpectedDataGeneration(expectedGen)
         .clearExpectedETag()
         .build();
   }

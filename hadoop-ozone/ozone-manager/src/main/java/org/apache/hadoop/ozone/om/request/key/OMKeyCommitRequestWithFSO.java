@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -71,6 +74,60 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
   public OMKeyCommitRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  protected OmKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
+      throws IOException {
+    try {
+      OmFSOFile fsoFile = getOmFSOFileForCommitAdmission(
+          omMetadataManager, keyArgs);
+      return OMFileRequest.getOmKeyInfoFromFileTable(true,
+          omMetadataManager, fsoFile.getOpenFileName(clientId),
+          keyArgs.getKeyName());
+    } catch (OMException ex) {
+      if (isMissingNamespaceForCommitAdmission(ex)) {
+        return null;
+      }
+      throw ex;
+    }
+  }
+
+  @Override
+  protected OmKeyInfo getKeyInfo(OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    try {
+      OmFSOFile fsoFile = getOmFSOFileForCommitAdmission(
+          omMetadataManager, keyArgs);
+      return omMetadataManager.getKeyTable(getBucketLayout())
+          .get(fsoFile.getOzonePathKey());
+    } catch (OMException ex) {
+      if (isMissingNamespaceForCommitAdmission(ex)) {
+        return null;
+      }
+      throw ex;
+    }
+  }
+
+  private OmFSOFile getOmFSOFileForCommitAdmission(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    String keyName = keyArgs.getKeyName();
+    String errMsg = "Cannot create file : " + keyName
+        + " as parent directory doesn't exist";
+    return new OmFSOFile.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyName)
+        .setOmMetadataManager(omMetadataManager)
+        .setErrMsg(errMsg)
+        .build();
+  }
+
+  private boolean isMissingNamespaceForCommitAdmission(OMException ex) {
+    return ex.getResult() == VOLUME_NOT_FOUND
+        || ex.getResult() == BUCKET_NOT_FOUND
+        || ex.getResult() == DIRECTORY_NOT_FOUND;
   }
 
   @Override
@@ -242,7 +299,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation after the knob turned on.
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
 
-      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo.getExpectedDataGeneration(), auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
       omKeyInfo.setExpectedDataGeneration(null);

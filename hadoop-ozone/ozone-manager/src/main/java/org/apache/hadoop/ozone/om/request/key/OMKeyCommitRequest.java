@@ -130,9 +130,35 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmKeyInfo openKeyInfo = getOpenKeyInfo(omMetadataManager, resolvedKeyArgs, commitKeyRequest.getClientID());
+    if (openKeyInfo != null) {
+      OmKeyInfo keyInfo = getKeyInfo(omMetadataManager, resolvedKeyArgs);
+      validateAtomicRewriteAtAdmission(keyInfo, openKeyInfo.getExpectedDataGeneration(), null);
+    }
+
     return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
             .setKeyArgs(resolvedKeyArgs)).build();
+  }
+
+  protected OmKeyInfo getOpenKeyInfo(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
+      throws IOException {
+    String dbOpenKey = omMetadataManager.getOpenKey(
+        keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getKeyName(), clientId);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbOpenKey);
+  }
+
+  protected OmKeyInfo getKeyInfo(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    String dbOzoneKey = omMetadataManager.getOzoneKey(
+        keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getKeyName());
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
   }
 
   @Override
@@ -302,7 +328,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo.getExpectedDataGeneration(), auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
       // Combination
@@ -616,32 +642,4 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     return req;
   }
-
-  protected void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
-      throws OMException {
-    if (toCommit.getExpectedDataGeneration() != null) {
-      // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
-      // in the open key entry.
-      Long expectedGen = toCommit.getExpectedDataGeneration();
-      auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
-
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        if (existing != null) {
-          throw new OMException("Atomic create-if-not-exists conflicted with an existing key",
-              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
-        }
-      } else {
-        if (existing == null) {
-          throw new OMException("Atomic rewrite conflicted because the key no longer exists",
-              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
-        }
-        if (expectedGen != existing.getUpdateID()) {
-          throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
-              ") does not match the expected generation to rewrite (" + expectedGen + ")",
-              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
-        }
-      }
-    }
-  }
-
 }

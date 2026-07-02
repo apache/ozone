@@ -89,6 +89,35 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             omMetadataManager);
   }
 
+  @Override
+  protected OmKeyInfo addCommittedKeyToTable(String volumeName,
+      String bucketName, String keyName, long updateID, String eTag)
+      throws Exception {
+    String parentDir = OzoneFSUtils.getParentDir(keyName);
+    assertNotEquals("Parent doesn't exists!", parentDir, keyName);
+
+    long parentID = OMRequestTestUtils.addParentsToDirTable(volumeName,
+        bucketName, parentDir, omMetadataManager);
+    long objectId = parentID + 1;
+
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(ONE),
+                new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(updateID)
+            .addMetadata(OzoneConsts.ETAG, eTag)
+            .build();
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(false, false,
+        fileName, omKeyInfoFSO, 0L, omKeyInfoFSO.getObjectID(),
+        omMetadataManager);
+    return omKeyInfoFSO;
+  }
+
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
