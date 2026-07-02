@@ -39,11 +39,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalInt;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +62,10 @@ public class SCMNodeInfo {
   private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
   private final String serviceId;
   private final String nodeId;
-  private final String blockClientAddress;
-  private final String scmClientAddress;
-  private final String scmSecurityAddress;
-  private final String scmDatanodeAddress;
+  private final HostAndPort blockClientAddress;
+  private final HostAndPort scmClientAddress;
+  private final HostAndPort scmSecurityAddress;
+  private final HostAndPort scmDatanodeAddress;
 
   /**
    * Build SCM Node information from configuration.
@@ -130,6 +132,9 @@ public class SCMNodeInfo {
       String scmClientAddress = getHostNameFromConfigKeys(conf,
           OZONE_SCM_CLIENT_ADDRESS_KEY,
           OZONE_SCM_NAMES).orElse(null);
+      if (scmClientAddress == null) {
+        throw new ConfigurationException(OZONE_SCM_CLIENT_ADDRESS_KEY + " is not set");
+      }
       
       String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY).orElse(scmClientAddress);
@@ -162,14 +167,10 @@ public class SCMNodeInfo {
 
       scmNodeInfoList.add(new SCMNodeInfo(scmServiceId,
           SCM_DUMMY_NODEID,
-          scmBlockClientAddress == null ? null :
-              buildAddress(scmBlockClientAddress, scmBlockClientPort),
-          scmClientAddress == null ? null :
-              buildAddress(scmClientAddress, scmClientPort),
-          scmSecurityClientAddress == null ? null :
-              buildAddress(scmSecurityClientAddress, scmSecurityPort),
-          scmDatanodeAddress == null ? null :
-              buildAddress(scmDatanodeAddress, scmDatanodePort)));
+          buildAddress(scmBlockClientAddress, scmBlockClientPort),
+          buildAddress(scmClientAddress, scmClientPort),
+          buildAddress(scmSecurityClientAddress, scmSecurityPort),
+          buildAddress(scmDatanodeAddress, scmDatanodePort)));
 
       return scmNodeInfoList;
 
@@ -177,8 +178,8 @@ public class SCMNodeInfo {
 
   }
 
-  public static String buildAddress(String address, int port) {
-    return address + ':' + port;
+  private static HostAndPort buildAddress(String address, int port) {
+    return new HostAndPort(address, port);
   }
 
   public static int getPort(ConfigurationSource conf,
@@ -209,14 +210,14 @@ public class SCMNodeInfo {
    * @param scmDatanodeAddress
    */
   public SCMNodeInfo(String serviceId, String nodeId,
-      String blockClientAddress, String scmClientAddress,
-      String scmSecurityAddress, String scmDatanodeAddress) {
+      HostAndPort blockClientAddress, HostAndPort scmClientAddress,
+      HostAndPort scmSecurityAddress, HostAndPort scmDatanodeAddress) {
     this.serviceId = serviceId;
     this.nodeId = nodeId;
-    this.blockClientAddress = blockClientAddress;
-    this.scmClientAddress = scmClientAddress;
-    this.scmSecurityAddress = scmSecurityAddress;
-    this.scmDatanodeAddress = scmDatanodeAddress;
+    this.blockClientAddress = Objects.requireNonNull(blockClientAddress, "blockClientAddress == null");
+    this.scmClientAddress = Objects.requireNonNull(scmClientAddress, "scmClientAddress == null");
+    this.scmSecurityAddress = Objects.requireNonNull(scmSecurityAddress, "scmSecurityAddress == null");
+    this.scmDatanodeAddress = Objects.requireNonNull(scmDatanodeAddress, "scmDatanodeAddress == null");
   }
 
   public String getServiceId() {
@@ -228,18 +229,22 @@ public class SCMNodeInfo {
   }
 
   public String getBlockClientAddress() {
-    return blockClientAddress;
+    return blockClientAddress.getHostAndPortString();
   }
 
   public String getScmClientAddress() {
-    return scmClientAddress;
+    return scmClientAddress.getHostAndPortString();
   }
 
   public String getScmSecurityAddress() {
-    return scmSecurityAddress;
+    return scmSecurityAddress.getHostAndPortString();
+  }
+
+  public HostAndPort getScmDatanodeHostPortAddress() {
+    return scmDatanodeAddress;
   }
 
   public String getScmDatanodeAddress() {
-    return scmDatanodeAddress;
+    return scmDatanodeAddress.getHostAndPortString();
   }
 }

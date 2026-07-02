@@ -250,7 +250,7 @@ public class TestBlockDeletion {
     // Delete transactionIds for the containers should be 0.
     // NOTE: this test assumes that all the container is KetValueContainer. If
     // other container types is going to be added, this test should be checked.
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(0L,
         metrics.getNumBlockDeletionTransactionCreated());
@@ -293,8 +293,9 @@ public class TestBlockDeletion {
 
     // Few containers with deleted blocks
     assertThat(containerIdsWithDeletedBlocks).isNotEmpty();
-    // Containers in the DN and SCM should have same delete transactionIds
-    matchContainerTransactionIds();
+    // DN-side delete transactionIds should advance after deletion. SCM-side
+    // ContainerInfo deleteTransactionId is not updated by DeletedBlockLog.
+    verifyDeleteTransactionIds();
 
     // Verify transactions committed
     GenericTestUtils.waitFor(() -> {
@@ -308,11 +309,10 @@ public class TestBlockDeletion {
       }
     }, 500, 10000);
 
-    // After DN restart, containers in the DN and SCM should have same delete
-    // transactionIds. The assertion verifies that the state of containerInfos
-    // in DN and SCM is consistent after DN restart.
+    // After DN restart, delete transactionIds should remain persisted on DN.
+    // SCM-side ContainerInfo deleteTransactionId should remain unchanged.
     cluster.restartHddsDatanode(0, true);
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
@@ -716,7 +716,7 @@ public class TestBlockDeletion {
     }
   }
 
-  private void matchContainerTransactionIds() throws IOException {
+  private void verifyDeleteTransactionIds() throws IOException {
     for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
@@ -724,19 +724,17 @@ public class TestBlockDeletion {
       dnContainerSet.listContainer(0, 10000, containerDataList);
       for (ContainerData containerData : containerDataList) {
         long containerId = containerData.getContainerID();
-        if (containerIdsWithDeletedBlocks.contains(containerId)) {
-          assertThat(scm.getContainerInfo(containerId).getDeleteTransactionId())
-              .isGreaterThan(0);
-          maxTransactionId = max(maxTransactionId,
-              scm.getContainerInfo(containerId).getDeleteTransactionId());
-        } else {
-          assertEquals(
-              scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
-        }
-        assertEquals(
+        long dnDeleteTransactionId =
             ((KeyValueContainerData) dnContainerSet.getContainer(containerId)
-                .getContainerData()).getDeleteTransactionId(),
+                .getContainerData()).getDeleteTransactionId();
+        assertEquals(0,
             scm.getContainerInfo(containerId).getDeleteTransactionId());
+        if (containerIdsWithDeletedBlocks.contains(containerId)) {
+          assertThat(dnDeleteTransactionId).isGreaterThan(0);
+          maxTransactionId = max(maxTransactionId, dnDeleteTransactionId);
+        } else {
+          assertEquals(0, dnDeleteTransactionId);
+        }
       }
     }
   }

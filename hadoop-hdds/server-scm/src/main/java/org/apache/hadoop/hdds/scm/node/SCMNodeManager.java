@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -74,6 +73,8 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -117,7 +118,7 @@ import org.slf4j.LoggerFactory;
  * get functions in this file as a snap-shot of information that is inconsistent
  * as soon as you read it.
  */
-public class SCMNodeManager implements NodeManager {
+public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSubscriber {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
@@ -268,11 +269,9 @@ public class SCMNodeManager implements NodeManager {
    * @return List of Datanodes that are known to SCM in the requested states.
    */
   @Override
-  public List<DatanodeDetails> getNodes(
+  public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
-    return nodeStateManager.getNodes(opState, health)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(opState, health);
   }
 
   @Override
@@ -1013,8 +1012,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
-    List<DatanodeDetails> healthyNodes =
-        getNodes(IN_SERVICE, NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyNodes = getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -1061,29 +1059,16 @@ public class SCMNodeManager implements NodeManager {
     return usageInfo;
   }
 
-  /**
-   * Get the usage info of a specified datanode.
-   *
-   * @param dn the usage of which we want to get
-   * @return DatanodeUsageInfo of the specified datanode
-   */
-  @Override
-  @Nullable
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
-    try {
-      return nodeStateManager.getNode(dn);
-    } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getID());
-      return null;
-    }
-  }
-
   @Override
   public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
     return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
   }
 
+  @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+  }
+  
   @Override
   public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
     return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
@@ -1093,6 +1078,26 @@ public class SCMNodeManager implements NodeManager {
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
+  }
+
+  @Override
+  public void opAdded(ContainerReplicaOp op, ContainerID containerID) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        recordAllocationForDatanode(dnInfo, containerID);
+      }
+    }
+  }
+
+  @Override
+  public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD && !timedOut) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        removePendingAllocationForDatanode(dnInfo, containerID);
+      }
+    }
   }
 
   /**

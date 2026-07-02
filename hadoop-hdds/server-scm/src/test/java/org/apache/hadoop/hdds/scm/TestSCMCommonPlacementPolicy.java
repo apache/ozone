@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,11 +85,15 @@ public class TestSCMCommonPlacementPolicy {
     conf = SCMTestUtils.getConf(testDir);
   }
 
+  static List<DatanodeDetails> getAllNodes(NodeManager nm) {
+    return new ArrayList<>(nm.getAllNodes());
+  }
+
   @Test
   public void testGetResultSet() throws SCMException {
     DummyPlacementPolicy dummyPlacementPolicy =
         new DummyPlacementPolicy(nodeManager, conf, 5);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
     Set<DatanodeDetails> resultSet = new HashSet<>(result);
     assertNotEquals(1, resultSet.size());
@@ -136,7 +141,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 5)
                     .map(list::get).collect(Collectors.toList());
     List<ContainerReplica> replicas =
@@ -157,7 +162,7 @@ public class TestSCMCommonPlacementPolicy {
                             3, ImmutableList.of(3, 8),
                             4, ImmutableList.of(4, 9))), 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 5)
                     .map(list::get).collect(Collectors.toList());
     List<ContainerReplica> replicas =
@@ -178,7 +183,7 @@ public class TestSCMCommonPlacementPolicy {
                             3, ImmutableList.of(3, 8),
                             4, ImmutableList.of(4, 9))), 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 5)
                     .map(list::get).collect(Collectors.toList());
     List<ContainerReplica> replicas =
@@ -200,7 +205,7 @@ public class TestSCMCommonPlacementPolicy {
                             3, ImmutableList.of(3, 4, 8),
                             4, ImmutableList.of(9))), 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
     //Creating Replicas without replica Index
@@ -223,7 +228,7 @@ public class TestSCMCommonPlacementPolicy {
                             3, ImmutableList.of(3, 4, 8),
                             4, ImmutableList.of(9))), 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 3, 4)
                     .map(list::get).collect(Collectors.toList());
     //Creating Replicas without replica Index for replicas < number of racks
@@ -246,7 +251,7 @@ public class TestSCMCommonPlacementPolicy {
                             3, ImmutableList.of(3, 4, 8),
                             4, ImmutableList.of(9))), 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 4, 6)
                     .map(list::get).collect(Collectors.toList());
     //Creating Replicas without replica Index for replicas >number of racks
@@ -261,7 +266,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 2);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 2, 4, 6, 8)
                     .map(list::get).collect(Collectors.toList());
     List<ContainerReplica> replicas =
@@ -277,7 +282,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 2);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 2, 4, 6, 8)
             .map(list::get).collect(Collectors.toList());
     List<ContainerReplica> replicas =
@@ -296,7 +301,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasWithoutMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
     Map<ContainerReplica, Boolean> replicas =
@@ -313,7 +318,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWithOneOverreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     Set<ContainerReplica> replicas = Sets.newHashSet(
             HddsTestUtils.getReplicasWithReplicaIndex(
                     ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
@@ -334,7 +339,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWithTwoOverreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
 
     Set<ContainerReplica> replicas = Sets.newHashSet(
             HddsTestUtils.getReplicasWithReplicaIndex(
@@ -355,7 +360,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWith2CountPerUniqueReplica() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 3);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
 
     Set<ContainerReplica> replicas = Sets.newHashSet(
             HddsTestUtils.getReplicasWithReplicaIndex(
@@ -381,7 +386,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWithoutReplicaIndex() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 3);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
 
     Set<ContainerReplica> replicas = Sets.newHashSet(HddsTestUtils.getReplicas(
                     ContainerID.valueOf(1), CLOSED, 0, list.subList(0, 5)));
@@ -401,7 +406,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWithOverreplicationWithinSameRack() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 3);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
 
     Set<ContainerReplica> replicas = Sets.newHashSet(
             HddsTestUtils.getReplicasWithReplicaIndex(
@@ -440,7 +445,7 @@ public class TestSCMCommonPlacementPolicy {
   public void testReplicasToRemoveWithNoOverreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
-    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> list = getAllNodes(nodeManager);
     Set<ContainerReplica> replicas = Sets.newHashSet(
             HddsTestUtils.getReplicasWithReplicaIndex(
                     ContainerID.valueOf(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
@@ -617,8 +622,9 @@ public class TestSCMCommonPlacementPolicy {
         when(node.getNetworkFullPath()).thenReturn(String.valueOf(i));
         return node;
       }).collect(Collectors.toList());
-      final List<? extends DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-      rackMap = datanodeRackMap.entrySet().stream()
+      final List<DatanodeDetails> datanodeDetails = getAllNodes(nodeManager);
+      rackMap = datanodeRackMap
+          .entrySet().stream()
               .collect(Collectors.toMap(
                       entry -> datanodeDetails.get(entry.getKey()),
                       entry -> racks.get(entry.getValue())));

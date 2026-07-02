@@ -227,6 +227,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public List<StorageContainerManager> getStorageContainerManagers() {
+    return singletonList(scm);
+  }
+
+  @Override
   public OzoneManager getOzoneManager() {
     return this.ozoneManager;
   }
