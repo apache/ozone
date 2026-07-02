@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import com.google.protobuf.ByteString;
 
 /**
  * This class represents a open key "session". A session here means a key is

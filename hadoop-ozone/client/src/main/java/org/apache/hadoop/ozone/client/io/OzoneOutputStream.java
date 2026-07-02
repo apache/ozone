@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -26,7 +27,6 @@ import java.util.Optional;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
