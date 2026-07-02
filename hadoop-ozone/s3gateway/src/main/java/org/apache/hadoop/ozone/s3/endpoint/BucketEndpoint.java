@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -349,25 +351,35 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
-      for (DeleteObject keyToDelete : request.getObjects()) {
-        deleteKeys.add(keyToDelete.getKey());
-      }
+      boolean hasConditionalDeletes = request.getObjects().stream()
+          .anyMatch(d -> StringUtils.isNotBlank(d.getIfMatch()));
       long startNanos = Time.monotonicNowNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
-        for (DeleteObject d : request.getObjects()) {
-          ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
-          boolean deleted = error == null ||
-              // if the key is not found, it is assumed to be successfully deleted
-              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
-          if (deleted) {
-            deleteKeys.remove(d.getKey());
-            if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(d.getKey()));
+        if (hasConditionalDeletes) {
+          for (DeleteObject keyToDelete : request.getObjects()) {
+            deleteKeys.add(keyToDelete.getKey());
+            deleteSingleObject(bucket, keyToDelete, result, request.isQuiet(),
+                deleteKeys);
+          }
+        } else {
+          for (DeleteObject keyToDelete : request.getObjects()) {
+            deleteKeys.add(keyToDelete.getKey());
+          }
+          undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
+          for (DeleteObject d : request.getObjects()) {
+            ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+            boolean deleted = error == null ||
+                // if the key is not found, it is assumed to be successfully deleted
+                ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+            if (deleted) {
+              deleteKeys.remove(d.getKey());
+              if (!request.isQuiet()) {
+                result.addDeleted(new DeletedObject(d.getKey()));
+              }
+            } else {
+              result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
             }
-          } else {
-            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
@@ -391,6 +403,48 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     return result;
+  }
+
+  private void deleteSingleObject(OzoneBucket bucket, DeleteObject deleteObject,
+      MultiDeleteResponse result, boolean quiet, List<String> failedDeletes)
+      throws IOException {
+    String key = deleteObject.getKey();
+    if (StringUtils.isNotBlank(deleteObject.getIfMatch())) {
+      try {
+        OzoneKeyDetails keyDetails = bucket.getKey(key);
+        String currentETag = keyDetails.getMetadata().get(ETAG);
+        if (!S3ConditionalRequest.eTagMatches(deleteObject.getIfMatch(), currentETag)) {
+          addPreconditionFailedError(result, key);
+          return;
+        }
+      } catch (OMException ex) {
+        if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+          addPreconditionFailedError(result, key);
+          return;
+        }
+        throw ex;
+      }
+    }
+
+    Map<String, ErrorInfo> undeletedKeyResultMap =
+        bucket.deleteKeys(Collections.singletonList(key), true);
+    ErrorInfo error = undeletedKeyResultMap.get(key);
+    boolean deleted = error == null ||
+        ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+    if (deleted) {
+      failedDeletes.remove(key);
+      if (!quiet) {
+        result.addDeleted(new DeletedObject(key));
+      }
+    } else {
+      result.addError(new Error(key, error.getCode(), error.getMessage()));
+    }
+  }
+
+  private static void addPreconditionFailedError(MultiDeleteResponse result,
+      String key) {
+    result.addError(new Error(key, S3ErrorTable.PRECOND_FAILED.getCode(),
+        S3ErrorTable.PRECOND_FAILED.getErrorMessage()));
   }
 
   private void addKey(ListObjectResponse response, OzoneKey next) {
