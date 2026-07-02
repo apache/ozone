@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.eventlistener;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +76,11 @@ public class OMEventListenerLedgerPollerSeekPosition {
 
   public void set(String val) {
     LOG.debug("Setting seek position {}", val);
+    String current = seekPosition.get();
+    if (Objects.equals(current, val)) {
+      checkpointVerified = true;
+      return;
+    }
     try {
       if (checkpointStrategy != null) {
         checkpointStrategy.save(val);

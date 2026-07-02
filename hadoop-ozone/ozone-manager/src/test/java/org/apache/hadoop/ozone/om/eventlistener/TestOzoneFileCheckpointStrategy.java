@@ -23,7 +23,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -47,8 +46,6 @@ public class TestOzoneFileCheckpointStrategy {
   @Mock
   private OzoneManager mockOzoneManager;
   @Mock
-  private IOmMetadataReader mockOmMetadataReader;
-  @Mock
   private OzoneManagerProtocolProtos.OMResponse mockOmResponse;
   @Mock
   private OmBucketInfo mockBucketInfo;
@@ -57,7 +54,7 @@ public class TestOzoneFileCheckpointStrategy {
 
   @BeforeEach
   public void setup() {
-    ozoneFileCheckpointStrategy = new OzoneFileCheckpointStrategy(mockOzoneManager, mockOmMetadataReader,
+    ozoneFileCheckpointStrategy = new OzoneFileCheckpointStrategy(mockOzoneManager,
         new org.apache.hadoop.hdds.conf.OzoneConfiguration());
   }
 

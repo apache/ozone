@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -69,7 +68,7 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
       "ozone.om.plugin.kafka.checkpoint.save.interval";
   public static final int OZONE_OM_PLUGIN_CHECKPOINT_SAVE_INTERVAL_DEFAULT = 100;
 
-  private static final String METDATA_KEY = "notification-checkpoint";
+  private static final String METADATA_KEY = "notification-checkpoint";
 
   private final AtomicLong callId = new AtomicLong(0);
   private final ClientId clientId = ClientId.randomId();
@@ -80,7 +79,7 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
   private final String bucket;
   private final int saveInterval;
 
-  public OzoneFileCheckpointStrategy(OzoneManager ozoneManager, final IOmMetadataReader omMetadataReader,
+  public OzoneFileCheckpointStrategy(OzoneManager ozoneManager,
       OzoneConfiguration conf) {
     this.ozoneManager = ozoneManager;
     this.volume = conf.get(OZONE_OM_PLUGIN_CHECKPOINT_VOLUME, OZONE_OM_PLUGIN_CHECKPOINT_VOLUME_DEFAULT);
@@ -99,7 +98,7 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
   public String load() throws IOException {
     OmBucketInfo bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
     if (bucketInfo != null && bucketInfo.getMetadata() != null) {
-      return bucketInfo.getMetadata().get(METDATA_KEY);
+      return bucketInfo.getMetadata().get(METADATA_KEY);
     }
     return null;
   }
@@ -128,7 +127,7 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
         .setVolumeName(volume)
         .setBucketName(bucket)
         .addMetadata(HddsProtos.KeyValue.newBuilder()
-            .setKey(METDATA_KEY)
+            .setKey(METADATA_KEY)
             .setValue(val)
             .build())
         .build();
@@ -145,7 +144,7 @@ public class OzoneFileCheckpointStrategy implements NotificationCheckpointStrate
         .build();
 
     submitRequest(omRequest);
-    LOG.info("Persisted {} = {} directly as metadata on bucket /{}/{}", METDATA_KEY, val, volume, bucket);
+    LOG.info("Persisted {} = {} directly as metadata on bucket /{}/{}", METADATA_KEY, val, volume, bucket);
   }
 
   private UserInfo getUserInfo() {

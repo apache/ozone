@@ -93,9 +93,8 @@ public class OMEventListenerPluginManager {
     }
 
     NotificationCheckpointStrategy checkpointStrategy = null;
-    if (ozoneManager != null && ozoneManager.getOmMetadataReader() != null) {
-      checkpointStrategy = new OzoneFileCheckpointStrategy(ozoneManager,
-          ozoneManager.getOmMetadataReader().get(), conf);
+    if (ozoneManager != null) {
+      checkpointStrategy = new OzoneFileCheckpointStrategy(ozoneManager, conf);
     }
     OMEventListenerPluginContext pluginContext = new OMEventListenerPluginContextImpl(ozoneManager, checkpointStrategy);
 

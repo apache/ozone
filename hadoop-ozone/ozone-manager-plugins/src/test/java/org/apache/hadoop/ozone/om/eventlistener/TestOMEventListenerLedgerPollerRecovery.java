@@ -164,4 +164,24 @@ public class TestOMEventListenerLedgerPollerRecovery {
     doThrow(new IOException("Failed to verify")).when(checkpointStrategy).load();
     Assertions.assertFalse(seekPosition.verifyCheckpointAccess());
   }
+
+  @Test
+  public void testSetToSameValueDoesNotTriggerSave() throws Exception {
+    doReturn("10").when(checkpointStrategy).load();
+
+    OMEventListenerLedgerPollerSeekPosition seekPosition =
+        new OMEventListenerLedgerPollerSeekPosition(checkpointStrategy);
+
+    // Initial position in memory should be "10"
+    Assertions.assertEquals("10", seekPosition.get());
+
+    // Setting to the same value "10" should skip calling save on checkpointStrategy
+    seekPosition.set("10");
+
+    // Verify checkpointStrategy.save("10") was never called
+    verify(checkpointStrategy, never()).save("10");
+
+    // It should remain verified
+    Assertions.assertTrue(seekPosition.verifyCheckpointAccess());
+  }
 }
