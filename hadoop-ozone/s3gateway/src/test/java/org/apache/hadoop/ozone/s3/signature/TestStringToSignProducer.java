@@ -297,4 +297,45 @@ public class TestStringToSignProducer {
 
     assertEquals(expectedResult, actualResult);
   }
+
+  @Test
+  public void testUnsignedPayloadBypassesXAmzHeaderCheck() throws Exception {
+    // We add an x-amz-acl header that is NOT in SignedHeaders
+    String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
+        + DATE_FORMATTER.format(LocalDate.now())
+        + "/us-east-1/s3/aws4_request, "
+        + "SignedHeaders=host, "
+        + "Signature=db81b057718d7c1b3b" +
+        "8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
+
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    headerMap.putSingle("Authorization", authHeader);
+    headerMap.putSingle("host", "0.0.0.0:9878");
+    // Extra unsigned header
+    headerMap.putSingle("x-amz-acl", "public-read");
+
+    ContainerRequestContext context = setupContext(
+        new URI("https://0.0.0.0:9878/"),
+        "PUT",
+        headerMap,
+        new MultivaluedHashMap<>());
+
+    // Simulate query parameter authentication where signPayload is false
+    SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setDate(LocalDate.now().format(DATE_FORMATTER))
+        .setDateTime(DATETIME)
+        .setAwsAccessId("ozone")
+        .setSignature("dummy")
+        .setSignedHeaders("host")
+        .setCredentialScope("ozone/" + DATE_FORMATTER.format(LocalDate.now()) + "/us-east-1/s3/aws4_request")
+        .setAlgorithm(SignatureProcessor.AWS4_SIGNING_ALGORITHM)
+        // This makes unsignedPayload = true in createSignatureBase
+        .setSignPayload(false) 
+        .build();
+    signatureInfo.setUnfilteredURI("/");
+
+    // This should NOT throw an exception bypasses the strict
+    // x-amz-* header validation.
+    StringToSignProducer.createSignatureBase(signatureInfo, context);
+  }
 }
