@@ -18,10 +18,15 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +71,97 @@ public class TestRootList {
     assertEquals(10, response.getBucketsNum());
     assertEquals("root", response.getOwner().getDisplayName());
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, response.getOwner().getId());
+  }
+
+  @Test
+  public void testListAllBucketsPaginated() throws Exception {
+    ListBucketResponse response = listWithMaxBuckets(1);
+    assertEquals(0, response.getBucketsNum());
+    assertNull(response.getContinuationToken());
+
+    clientStub.getObjectStore().createS3Bucket("bucket-a");
+    response = listWithMaxBuckets(1);
+    assertEquals(1, response.getBucketsNum());
+    assertEquals("bucket-a", response.getBuckets().get(0).getName());
+    assertNull(response.getContinuationToken());
+
+    clientStub.getObjectStore().createS3Bucket("bucket-b");
+    response = listWithMaxBuckets(1);
+    assertEquals(1, response.getBucketsNum());
+    assertEquals("bucket-a", response.getBuckets().get(0).getName());
+    assertNotNull(response.getContinuationToken());
+
+    rootEndpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN,
+        response.getContinuationToken());
+    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, 1);
+    response = (ListBucketResponse) rootEndpoint.get().getEntity();
+    assertEquals(1, response.getBucketsNum());
+    assertEquals("bucket-b", response.getBuckets().get(0).getName());
+    assertNull(response.getContinuationToken());
+  }
+
+  @Test
+  public void testListAllBucketsPaginationMultiplePages() throws Exception {
+    String bucketBaseName = "bucket-" + getClass().getName();
+    for (int i = 0; i < 5; i++) {
+      clientStub.getObjectStore().createS3Bucket(bucketBaseName + i);
+    }
+
+    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, 2);
+    ListBucketResponse response =
+        (ListBucketResponse) rootEndpoint.get().getEntity();
+
+    assertEquals(2, response.getBucketsNum());
+    assertEquals(bucketBaseName + 0, response.getBuckets().get(0).getName());
+    assertEquals(bucketBaseName + 1, response.getBuckets().get(1).getName());
+    assertNotNull(response.getContinuationToken());
+
+    rootEndpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN,
+        response.getContinuationToken());
+    response = (ListBucketResponse) rootEndpoint.get().getEntity();
+
+    assertEquals(2, response.getBucketsNum());
+    assertEquals(bucketBaseName + 2, response.getBuckets().get(0).getName());
+    assertEquals(bucketBaseName + 3, response.getBuckets().get(1).getName());
+    assertNotNull(response.getContinuationToken());
+
+    rootEndpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN,
+        response.getContinuationToken());
+    response = (ListBucketResponse) rootEndpoint.get().getEntity();
+
+    assertEquals(1, response.getBucketsNum());
+    assertEquals(bucketBaseName + 4, response.getBuckets().get(0).getName());
+    assertNull(response.getContinuationToken());
+  }
+
+  @Test
+  public void testListAllBucketsInvalidMaxBuckets() {
+    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, 0);
+    assertThrows(OS3Exception.class, () -> rootEndpoint.get());
+
+    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, -1);
+    assertThrows(OS3Exception.class, () -> rootEndpoint.get());
+  }
+
+  @Test
+  public void testListAllBucketsUnpaginatedReturnsAll() throws Exception {
+    for (int i = 0; i < 3; i++) {
+      clientStub.getObjectStore().createS3Bucket("unpaginated-bucket-" + i);
+    }
+
+    rootEndpoint.queryParamsForTest().unset(QueryParams.MAX_BUCKETS);
+    rootEndpoint.queryParamsForTest().unset(QueryParams.CONTINUATION_TOKEN);
+    ListBucketResponse response =
+        (ListBucketResponse) rootEndpoint.get().getEntity();
+
+    assertEquals(3, response.getBucketsNum());
+    assertNull(response.getContinuationToken());
+  }
+
+  private ListBucketResponse listWithMaxBuckets(int maxBuckets) throws Exception {
+    rootEndpoint.queryParamsForTest().unset(QueryParams.CONTINUATION_TOKEN);
+    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, maxBuckets);
+    return (ListBucketResponse) rootEndpoint.get().getEntity();
   }
 
 }

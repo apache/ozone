@@ -127,6 +127,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
@@ -2793,6 +2794,144 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
+    }
+  }
+
+  /**
+   * Integration tests for paginated ListBuckets (GET / ListAllMyBuckets).
+   */
+  @Nested
+  class ListBucketsPaginationTests {
+
+    /**
+     * Verifies {@code maxBuckets=1} returns one bucket per page and a continuation token
+     * when more buckets exist.
+     */
+    @Test
+    public void testListBucketsPaginatedMaxBucketsOne() throws Exception {
+      final String bucketA = uniqueObjectName("bucket-a");
+      final String bucketB = uniqueObjectName("bucket-b");
+      s3Client.createBucket(b -> b.bucket(bucketA));
+      s3Client.createBucket(b -> b.bucket(bucketB));
+      try {
+        List<String> found = new ArrayList<>();
+        String continuationToken = null;
+
+        do {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder()
+              .maxBuckets(1);
+          if (continuationToken != null) {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListBucketsResponse page = s3Client.listBuckets(reqBuilder.build());
+          assertEquals(1, page.buckets().size());
+          found.add(page.buckets().get(0).name());
+          continuationToken = page.continuationToken();
+        } while (continuationToken != null
+            && !(found.contains(bucketA) && found.contains(bucketB)));
+
+        assertThat(found).contains(bucketA, bucketB);
+      } finally {
+        s3Client.deleteBucket(b -> b.bucket(bucketA));
+        s3Client.deleteBucket(b -> b.bucket(bucketB));
+      }
+    }
+
+    /**
+     * Verifies pagination: listing buckets page-by-page using {@code maxBuckets}
+     * and the returned continuation token, until all buckets are retrieved.
+     */
+    @Test
+    public void testListBucketsPaginationReturnsAllBuckets() throws Exception {
+      final int totalBuckets = 5;
+      final int pageSize = 2;
+      List<String> created = new ArrayList<>();
+
+      for (int i = 0; i < totalBuckets; i++) {
+        String name = uniqueObjectName("paginated-" + i);
+        s3Client.createBucket(b -> b.bucket(name));
+        created.add(name);
+      }
+
+      try {
+        List<String> retrieved = new ArrayList<>();
+        String continuationToken = null;
+
+        do {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder()
+              .maxBuckets(pageSize);
+          if (continuationToken != null) {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListBucketsResponse response = s3Client.listBuckets(reqBuilder.build());
+
+          response.buckets().stream()
+              .map(Bucket::name)
+              .filter(created::contains)
+              .forEach(retrieved::add);
+
+          continuationToken = response.continuationToken();
+        } while (continuationToken != null);
+
+        assertThat(retrieved).containsExactlyInAnyOrderElementsOf(created);
+      } finally {
+        for (String name : created) {
+          s3Client.deleteBucket(b -> b.bucket(name));
+        }
+      }
+    }
+
+    /**
+     * Verifies that page 2 can use only {@code continuationToken} without {@code maxBuckets}.
+     * The first page uses {@code maxBuckets=1}; subsequent pages send only the token.
+     */
+    @Test
+    public void testListBucketsContinuationTokenWithoutMaxBuckets() throws Exception {
+      List<String> created = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        String name = uniqueObjectName("token-only-" + i);
+        s3Client.createBucket(b -> b.bucket(name));
+        created.add(name);
+      }
+
+      try {
+        List<String> retrieved = new ArrayList<>();
+        String continuationToken = null;
+        boolean firstPage = true;
+
+        do {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder();
+          if (firstPage) {
+            reqBuilder.maxBuckets(1);
+            firstPage = false;
+          } else {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListBucketsResponse response = s3Client.listBuckets(reqBuilder.build());
+          if (continuationToken == null) {
+            assertEquals(1, response.buckets().size());
+            assertNotNull(response.continuationToken());
+          } else {
+            assertFalse(response.buckets().isEmpty());
+          }
+
+          response.buckets().stream()
+              .map(Bucket::name)
+              .filter(created::contains)
+              .forEach(retrieved::add);
+
+          continuationToken = response.continuationToken();
+        } while (continuationToken != null);
+
+        assertThat(retrieved).containsExactlyInAnyOrderElementsOf(created);
+      } finally {
+        for (String name : created) {
+          s3Client.deleteBucket(b -> b.bucket(name));
+        }
+      }
     }
   }
 

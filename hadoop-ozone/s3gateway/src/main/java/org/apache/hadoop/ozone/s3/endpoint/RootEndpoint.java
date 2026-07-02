@@ -153,22 +153,49 @@ public class RootEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     boolean auditSuccess = true;
     try {
+      final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+      final String maxBucketsParam = queryParams().get(QueryParams.MAX_BUCKETS);
+      final boolean paginated = maxBucketsParam != null || continueToken != null;
+      final int maxBuckets = paginated
+          ? validateMaxBuckets(queryParams().getInt(QueryParams.MAX_BUCKETS,
+              S3Consts.MAX_BUCKETS_LIMIT))
+          : Integer.MAX_VALUE;
+
       ListBucketResponse response = new ListBucketResponse();
+      String previousBucket = null;
+      if (continueToken != null) {
+        previousBucket = ContinueToken.decodeFromString(continueToken).getLastKey();
+      }
+
       Iterator<? extends OzoneBucket> bucketIterator;
       try {
-        bucketIterator =
-            listS3Buckets(null, volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        if (previousBucket == null) {
+          bucketIterator = listS3Buckets(null,
+              volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        } else {
+          bucketIterator = listS3Buckets(null, previousBucket,
+              volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        }
       } catch (Exception e) {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
 
-      while (bucketIterator.hasNext()) {
+      int count = 0;
+      String lastBucketName = null;
+      while (bucketIterator.hasNext() && count < maxBuckets) {
         OzoneBucket next = bucketIterator.next();
         BucketMetadata bucketMetadata = new BucketMetadata();
         bucketMetadata.setName(next.getName());
         bucketMetadata.setCreationDate(next.getCreationTime());
         response.addBucket(bucketMetadata);
+        lastBucketName = next.getName();
+        count++;
+      }
+
+      if (paginated && lastBucketName != null && bucketIterator.hasNext()) {
+        response.setContinuationToken(
+            new ContinueToken(lastBucketName, null).encodeToString());
       }
 
       getMetrics().updateListS3BucketsSuccessStats(startNanos);
@@ -182,6 +209,13 @@ public class RootEndpoint extends EndpointBase {
         auditReadSuccess(S3GAction.LIST_S3_BUCKETS);
       }
     }
+  }
+
+  private int validateMaxBuckets(int maxBuckets) throws OS3Exception {
+    if (maxBuckets < 1) {
+      throw newError(INVALID_ARGUMENT, "max-buckets must be >= 1");
+    }
+    return Math.min(maxBuckets, S3Consts.MAX_BUCKETS_LIMIT);
   }
 
   private int validateMaxDirectoryBuckets(int maxDirectoryBuckets) throws OS3Exception {
