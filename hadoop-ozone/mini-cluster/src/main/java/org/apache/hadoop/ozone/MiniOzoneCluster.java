@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -263,6 +265,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
+    protected String[] racks;
+    protected String[] hosts;
     private final List<Service> services = new ArrayList<>();
 
     protected Builder(OzoneConfiguration conf) {
@@ -288,6 +292,15 @@ public interface MiniOzoneCluster extends AutoCloseable {
       conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
       conf.unset(OMConfigKeys.OZONE_OM_DB_DIRS);
       conf.unset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
+
+      // dn rack configs
+      if (racks != null) {
+        conf.unset(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY);
+        conf.unset(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME);
+        conf.unset("hadoop.configured.node.mapping");
+        racks = null;
+        hosts = null;
+      }
 
       setClusterId();
     }
@@ -366,6 +379,36 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
+      return this;
+    }
+
+    /**
+     * Sets the rack location for each datanode.  The length of the array
+     * determines the number of datanodes to start.  Each entry is a rack
+     * path such as {@code "/rack0"}.
+     *
+     * @param racks rack path per datanode
+     * @return this Builder
+     */
+    public Builder setRacks(String[] racks) {
+      this.racks = Arrays.copyOf(racks, racks.length);
+      this.numOfDatanodes = racks.length;
+      return this;
+    }
+
+    /**
+     * Sets the hostname for each datanode.  When used together with
+     * {@link #setRacks}, the hostnames are used as keys in the
+     * {@code StaticMapping} instead of the default synthetic names
+     * ({@code "dn-0"}, {@code "dn-1"}, …).  The length of the array must
+     * match the number of datanodes.
+     *
+     * @param hosts hostname per datanode
+     * @return this Builder
+     */
+    public Builder setHosts(String[] hosts) {
+      this.hosts = Arrays.copyOf(hosts, hosts.length);
+      this.numOfDatanodes = hosts.length;
       return this;
     }
 
