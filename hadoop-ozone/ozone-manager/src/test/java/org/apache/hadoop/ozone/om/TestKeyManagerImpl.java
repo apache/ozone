@@ -42,52 +42,51 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * Test class for unit tests KeyManagerImpl.
  */
 public class TestKeyManagerImpl {
-  private static Stream<TableIteratorTestCase> getSuccessfulTableIteratorParameters() {
+  private static Stream<TestCase> getSuccessfulTableIteratorParameters() {
     return Stream.of(
-        TableIteratorTestCase.newBuilder("Fetch first 50 entries for volume 0, bucket 0")
+        TestCase.newBuilder("Fetch first 50 entries for volume 0, bucket 0")
             .volumeBucket(0, 0)
             .start(0, 0, 0)
             .entries(50)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch first 50 entries for any volume/bucket")
+        TestCase.newBuilder("Fetch first 50 entries for any volume/bucket")
             .start(0, 0, 0)
             .entries(50)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch first 30 entries for volume 1, bucket 1")
+        TestCase.newBuilder("Fetch first 30 entries for volume 1, bucket 1")
             .volumeBucket(1, 1)
             .start(0, 0, 0)
             .entries(30)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch 20 entries from offset (2,2,10) for volume 2, bucket 2")
+        TestCase.newBuilder("Fetch 20 entries from offset (2,2,10) for volume 2, bucket 2")
             .volumeBucket(2, 2)
             .start(2, 2, 10)
             .entries(20)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch 40 entries from offset (2,2,50) for volume 3, bucket 3")
+        TestCase.newBuilder("Fetch 40 entries from offset (2,2,50) for volume 3, bucket 3")
             .volumeBucket(3, 3)
             .start(3, 3, 50)
             .entries(40)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch 200 entries from the very beginning (null start offsets)")
+        TestCase.newBuilder("Fetch 200 entries from the very beginning (null start offsets)")
             .start(null, null, null)
             .entries(200)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch 200 entries starting from bucket 3, key 50, spanning 3 buckets")
+        TestCase.newBuilder("Fetch 200 entries starting from bucket 3, key 50, spanning 3 buckets")
             .start(0, 3, 50)
             .entries(200)
             .build(),
-        TableIteratorTestCase.newBuilder("Fetch 50 entries from volume 2, bucket 5, but only 31 exist")
+        TestCase.newBuilder("Fetch 50 entries from volume 2, bucket 5, but only 31 exist")
             .volumeBucket(2, 5)
             .start(2, 5, 70)
             .entries(50)
             .build(),
-        TableIteratorTestCase.newBuilder("Start from last volume (4), second-last bucket (8), key 80 "
+        TestCase.newBuilder("Start from last volume (4), second-last bucket (8), key 80 "
             + "but only 131 entries exist")
             .start(4, 8, 80)
             .entries(200)
@@ -95,14 +94,14 @@ public class TestKeyManagerImpl {
     );
   }
 
-  private static Stream<TableIteratorTestCase> getInvalidTableIteratorParameters() {
+  private static Stream<TestCase> getInvalidTableIteratorParameters() {
     return Stream.of(
-        TableIteratorTestCase.newBuilder("Invalid: bucket is set but volume is null")
+        TestCase.newBuilder("Invalid: bucket is set but volume is null")
             .volumeBucket(null, 1)
             .start(0, 0, 0)
             .entries(10)
             .build(),
-        TableIteratorTestCase.newBuilder("Invalid: volume is set but bucket is null")
+        TestCase.newBuilder("Invalid: volume is set but bucket is null")
             .volumeBucket(1, null)
             .start(0, 0, 0)
             .entries(10)
@@ -110,9 +109,8 @@ public class TestKeyManagerImpl {
     );
   }
 
-  @SuppressWarnings("unchecked")
   private <V> List<Table.KeyValue<String, V>> mockTableIterator(
-      Class<V> valueClass, Table<String, V> table, TableIteratorTestCase testCase, String volumeNamePrefix,
+      Class<V> valueClass, Table<String, V> table, TestCase testCase, String volumeNamePrefix,
       String bucketNamePrefix, String keyPrefix,
       CheckedFunction<Table.KeyValue<String, V>, Boolean, IOException> filter) throws IOException {
     TreeMap<String, V> values = new TreeMap<>();
@@ -123,7 +121,7 @@ public class TestKeyManagerImpl {
       for (int j = 0; j < testCase.getNumberOfBucketsPerVolume(); j++) {
         for (int k = 0; k < testCase.getNumberOfKeysPerBucket(); k++) {
           String key = getTableKey(volumeNamePrefix, i, bucketNamePrefix, j, keyPrefix, k);
-          V value = valueClass == String.class ? (V) key : mock(valueClass);
+          V value = valueClass == String.class ? valueClass.cast(key) : mock(valueClass);
           values.put(key, value);
 
           if ((testCase.getVolumeNumber() == null || i == testCase.getVolumeNumber()) &&
@@ -147,14 +145,14 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getSuccessfulTableIteratorParameters")
-  public void testGetDeletedKeyEntries(TableIteratorTestCase testCase) throws IOException {
+  void testGetDeletedKeyEntries(TestCase testCase) throws IOException {
     String volumeNamePrefix = "volume";
     String bucketNamePrefix = "bucket";
     String keyPrefix = "key";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, RepeatedOmKeyInfo> mockedDeletedTable = Mockito.mock(Table.class);
+    Table<String, RepeatedOmKeyInfo> mockedDeletedTable = mock(Table.class);
     when(mockedDeletedTable.getName()).thenReturn(DELETED_TABLE);
     when(metadataManager.getDeletedTable()).thenReturn(mockedDeletedTable);
     when(metadataManager.getTableBucketPrefix(eq(DELETED_TABLE), anyString(), anyString()))
@@ -167,7 +165,7 @@ public class TestKeyManagerImpl {
         .map(kv -> {
           String key = kv.getKey();
           RepeatedOmKeyInfo value = kv.getValue();
-          List<OmKeyInfo> omKeyInfos = Collections.singletonList(Mockito.mock(OmKeyInfo.class));
+          List<OmKeyInfo> omKeyInfos = Collections.singletonList(mock(OmKeyInfo.class));
           when(value.cloneOmKeyInfoList()).thenReturn(omKeyInfos);
           return Table.newKeyValue(key, omKeyInfos);
         }).collect(Collectors.toList());
@@ -181,14 +179,14 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getInvalidTableIteratorParameters")
-  public void testGetDeletedKeyEntriesFails(TableIteratorTestCase testCase) throws IOException {
+  void testGetDeletedKeyEntriesFails(TestCase testCase) throws IOException {
     String volumeNamePrefix = "volume";
     String bucketNamePrefix = "bucket";
     String keyPrefix = "key";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, RepeatedOmKeyInfo> mockedDeletedTable = Mockito.mock(Table.class);
+    Table<String, RepeatedOmKeyInfo> mockedDeletedTable = mock(Table.class);
     when(mockedDeletedTable.getName()).thenReturn(DELETED_TABLE);
     when(metadataManager.getDeletedTable()).thenReturn(mockedDeletedTable);
     when(metadataManager.getTableBucketPrefix(eq(DELETED_TABLE), anyString(), anyString()))
@@ -206,14 +204,14 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getSuccessfulTableIteratorParameters")
-  public void testGetRenameKeyEntries(TableIteratorTestCase testCase) throws IOException {
+  void testGetRenameKeyEntries(TestCase testCase) throws IOException {
     String volumeNamePrefix = "volume";
     String bucketNamePrefix = "bucket";
     String keyPrefix = "";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, String> mockedRenameTable = Mockito.mock(Table.class);
+    Table<String, String> mockedRenameTable = mock(Table.class);
     when(mockedRenameTable.getName()).thenReturn(SNAPSHOT_RENAMED_TABLE);
     when(metadataManager.getSnapshotRenamedTable()).thenReturn(mockedRenameTable);
     when(metadataManager.getTableBucketPrefix(eq(SNAPSHOT_RENAMED_TABLE), anyString(), anyString()))
@@ -232,14 +230,14 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getInvalidTableIteratorParameters")
-  public void testGetRenameKeyEntriesFails(TableIteratorTestCase testCase) throws IOException {
+  void testGetRenameKeyEntriesFails(TestCase testCase) throws IOException {
     String volumeNamePrefix = "volume";
     String bucketNamePrefix = "bucket";
     String keyPrefix = "";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, String> mockedRenameTable = Mockito.mock(Table.class);
+    Table<String, String> mockedRenameTable = mock(Table.class);
     when(mockedRenameTable.getName()).thenReturn(SNAPSHOT_RENAMED_TABLE);
     when(metadataManager.getSnapshotRenamedTable()).thenReturn(mockedRenameTable);
     when(metadataManager.getTableBucketPrefix(eq(SNAPSHOT_RENAMED_TABLE), anyString(), anyString()))
@@ -257,14 +255,14 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getSuccessfulTableIteratorParameters")
-  public void testGetDeletedDirEntries(TableIteratorTestCase testCase) throws IOException {
+  void testGetDeletedDirEntries(TestCase testCase) throws IOException {
     String volumeNamePrefix = "";
     String bucketNamePrefix = "";
     String keyPrefix = "key";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, OmKeyInfo> mockedDeletedDirTable = Mockito.mock(Table.class);
+    Table<String, OmKeyInfo> mockedDeletedDirTable = mock(Table.class);
     when(mockedDeletedDirTable.getName()).thenReturn(DELETED_DIR_TABLE);
     when(metadataManager.getDeletedDirTable()).thenReturn(mockedDeletedDirTable);
     when(metadataManager.getTableBucketPrefix(eq(DELETED_DIR_TABLE), anyString(), anyString()))
@@ -279,13 +277,13 @@ public class TestKeyManagerImpl {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("getInvalidTableIteratorParameters")
-  public void testGetDeletedDirEntriesFails(TableIteratorTestCase testCase) throws IOException {
+  void testGetDeletedDirEntriesFails(TestCase testCase) throws IOException {
     String volumeNamePrefix = "";
     String bucketNamePrefix = "";
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
-    Table<String, OmKeyInfo> mockedDeletedDirTable = Mockito.mock(Table.class);
+    Table<String, OmKeyInfo> mockedDeletedDirTable = mock(Table.class);
     when(mockedDeletedDirTable.getName()).thenReturn(DELETED_DIR_TABLE);
     when(metadataManager.getDeletedDirTable()).thenReturn(mockedDeletedDirTable);
     when(metadataManager.getTableBucketPrefix(eq(DELETED_DIR_TABLE), anyString(), anyString()))
@@ -322,7 +320,7 @@ public class TestKeyManagerImpl {
     return Long.parseLong(key.split("/")[3]);
   }
 
-  private static final class TableIteratorTestCase {
+  private static final class TestCase {
     private final String name;
     private final int numberOfVolumes;
     private final int numberOfBucketsPerVolume;
@@ -334,7 +332,7 @@ public class TestKeyManagerImpl {
     private final Integer startKeyNumber;
     private final int numberOfEntries;
 
-    private TableIteratorTestCase(Builder builder) {
+    private TestCase(Builder builder) {
       name = builder.name;
       numberOfVolumes = builder.numberOfVolumes;
       numberOfBucketsPerVolume = builder.numberOfBucketsPerVolume;
@@ -351,7 +349,7 @@ public class TestKeyManagerImpl {
       return new Builder(name);
     }
 
-    TableIteratorTestCase withoutStartKey() {
+    TestCase withoutStartKey() {
       return newBuilder(name)
           .tableSize(numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket)
           .volumeBucket(volumeNumber, bucketNumber)
@@ -442,8 +440,8 @@ public class TestKeyManagerImpl {
         return this;
       }
 
-      TableIteratorTestCase build() {
-        return new TableIteratorTestCase(this);
+      TestCase build() {
+        return new TestCase(this);
       }
     }
   }
