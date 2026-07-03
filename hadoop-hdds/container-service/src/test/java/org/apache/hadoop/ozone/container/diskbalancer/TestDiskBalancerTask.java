@@ -506,7 +506,7 @@ public class TestDiskBalancerTask {
   }
 
   /**
-   * HDDS-15651. When markContainerForDelete fails after import and ContainerSet update,
+   * When markContainerForDelete fails after import and ContainerSet update,
    * the move is still reported as success, the destination replica is active, the source
    * replica is queued for lazy deletion, and cleanup removes it after the delay.
    */
@@ -548,8 +548,7 @@ public class TestDiskBalancerTask {
     assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
 
     Container activeReplica = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(activeReplica);
-    assertNotEquals(spyContainer, activeReplica);
+    assertThat(activeReplica).isNotSameAs(spyContainer);
     assertEquals(destVolume, activeReplica.getContainerData().getVolume());
     assertThat(new File(activeReplica.getContainerData().getContainerPath())).exists();
     assertThat(oldContainerDir)
@@ -568,7 +567,7 @@ public class TestDiskBalancerTask {
   }
 
   /**
-   * HDDS-15651. When lazy deletion fails, the pending queue entry is dropped and
+   * When lazy deletion fails, the pending queue entry is dropped and
    * the source replica is not retried for deletion.
    */
   @ContainerTestVersionInfo.ContainerTest
