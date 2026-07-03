@@ -18,6 +18,7 @@ Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
 Library             DateTime
+Library             ./presigned_url_helper.py
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Resource            mpu_lib.robot
@@ -60,6 +61,38 @@ ${BUCKET}             generated
 Test Multipart Upload With Adjusted Length
     Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
+
+Test Multipart Upload Complete With Chunked Transfer Encoding
+    [Documentation]    Regression test for HDDS-14760. When CompleteMultipartUpload
+    ...                is sent with chunked transfer encoding (no Content-Length, as
+    ...                e.g. the AWS C++ SDK does with Expect: 100-continue), it must
+    ...                not be rejected with "You must specify at least one part".
+    ${access_key} =     Execute    aws configure get aws_access_key_id
+    ${secret_key} =     Execute    aws configure get aws_secret_access_key
+    ${key} =            Set Variable    ${PREFIX}/chunkedCompleteKey
+    ${uploadID} =       Set Variable    ${EMPTY}
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${key}
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    1    /tmp/part1
+    ${eTag2} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    2    /tmp/part2
+    ${body} =           Catenate    SEPARATOR=
+    ...                 <CompleteMultipartUpload>
+    ...                 <Part><PartNumber>1</PartNumber><ETag>${eTag1}</ETag></Part>
+    ...                 <Part><PartNumber>2</PartNumber><ETag>${eTag2}</ETag></Part>
+    ...                 </CompleteMultipartUpload>
+    Create File         /tmp/${PREFIX}-complete.xml    ${body}
+    ${presigned_url} =  Generate Presigned Complete Multipart Upload Url    ${access_key}    ${secret_key}    ${BUCKET}    ${key}    ${uploadID}    us-east-1    3600    ${ENDPOINT_URL}
+    ${result} =         Execute    curl -sS -v -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}" 2>&1
+    Should Contain      ${result}    > Transfer-Encoding: chunked
+    Should Not Contain  ${result}    > Content-Length:
+    # A success response carries <CompleteMultipartUploadResult>/<ETag>; the
+    # error response would instead contain the "must specify at least one part"
+    # message (the bucket/key alone are not success discriminators, since the
+    # key also appears in the <Resource> element of an error response).
+    Should Not Contain  ${result}    must specify at least one part
+    Should Contain      ${result}    CompleteMultipartUploadResult
+    Should Contain      ${result}    ETag
+    [Teardown]          Run Keywords    Remove File    /tmp/${PREFIX}-complete.xml
+    ...                 AND    Run Keyword And Ignore Error    Abort MPU    ${BUCKET}    ${key}    ${uploadID}
 
 Overwrite Empty File
     Execute                     touch ${TEMP_DIR}/empty
@@ -456,4 +489,3 @@ Test Multipart Upload Part with wrong Content-MD5 header
 
     # Abort the multipart upload (cleanup)
                                 Abort MPU                  ${BUCKET}    ${PREFIX}/mpu/md5test/key2    ${uploadID}
-
