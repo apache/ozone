@@ -252,7 +252,7 @@ function ozonecmd_case
     repair)
       check_running_ozone_services
       OZONE_CLASSNAME=org.apache.hadoop.ozone.repair.OzoneRepair
-      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_REPAIR_OPTS="${OZONE_REPAIR_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-cli-repair"
     ;;
     ratis)
