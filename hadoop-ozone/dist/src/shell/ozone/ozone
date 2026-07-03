@@ -162,7 +162,7 @@ function ozonecmd_case
       OZONE_OM_OPTS="${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
-    sh | shell)
+    sh)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
       OZONE_SH_OPTS="${OZONE_SH_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
@@ -354,6 +354,10 @@ else
   shift
 fi
 
+# needed for accepting `ozone shell` but still picking up OZONE_SH_OPTS
+if [[ "${OZONE_SUBCMD}" == "shell" ]]; then
+  OZONE_SUBCMD=sh
+fi
 
 if ozone_need_reexec ozone "${OZONE_SUBCMD}"; then
   ozone_uservar_su ozone "${OZONE_SUBCMD}" \
