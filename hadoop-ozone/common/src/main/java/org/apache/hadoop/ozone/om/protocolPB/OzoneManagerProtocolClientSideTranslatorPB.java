@@ -767,7 +767,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         OmKeyInfo.getFromProtobuf(keyResponse.getKeyInfo()),
         keyResponse.getOpenVersion());
     if (keyResponse.hasDerivedKey()) {
-      openKeySession.setDerivedKey(keyResponse.getDerivedKey());
+      openKeySession.setDerivedKey(keyResponse.getDerivedKey().asReadOnlyByteBuffer());
     }
     return openKeySession;
   }

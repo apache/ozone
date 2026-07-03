@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -40,7 +39,7 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
   private final ByteBufferStreamOutput byteBufferStreamOutput;
   private boolean enableHsync;
   private final Syncable syncable;
-  private ByteString derivedKey;
+  private ByteBuffer derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -197,11 +196,11 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
     return ((KeyMetadataAware)this.byteBufferStreamOutput).getMetadata();
   }
 
-  public ByteString getDerivedKey() {
+  public ByteBuffer getDerivedKey() {
     return derivedKey;
   }
 
-  public void setDerivedKey(ByteString derivedKey) {
+  public void setDerivedKey(ByteBuffer derivedKey) {
     this.derivedKey = derivedKey;
   }
 }
