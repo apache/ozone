@@ -78,6 +78,8 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, MultipartInfoStub> keyToMultipartUpload = new HashMap<>();
 
+  private final Map<String, String> bucketTags = new HashMap<>();
+
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
@@ -479,6 +481,29 @@ public final class OzoneBucketStub extends OzoneBucket {
     keyDetails.remove(key);
   }
 
+  public void deleteKey(String key, String expectedETag) throws IOException {
+    if (expectedETag == null) {
+      deleteKey(key);
+      return;
+    }
+    OzoneKeyDetails existing = keyDetails.get(key);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!"*".equals(expectedETag)) {
+      if (!existing.hasEtag()) {
+        throw new OMException("Key does not have an ETag",
+            ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!existing.isEtagEquals(expectedETag)) {
+        throw new OMException("ETag mismatch",
+            ResultCodes.ETAG_MISMATCH);
+      }
+    }
+    deleteKey(key);
+  }
+
   @Override
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
@@ -740,6 +765,24 @@ public final class OzoneBucketStub extends OzoneBucket {
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging() throws IOException {
+    return Collections.unmodifiableMap(bucketTags);
+  }
+
+  @Override
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    bucketTags.clear();
+    if (tags != null) {
+      bucketTags.putAll(tags);
+    }
+  }
+
+  @Override
+  public void deleteBucketTagging() throws IOException {
+    bucketTags.clear();
   }
 
   /**

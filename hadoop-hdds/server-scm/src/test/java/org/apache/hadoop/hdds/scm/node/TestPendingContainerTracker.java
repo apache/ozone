@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -376,7 +377,71 @@ public class TestPendingContainerTracker {
     assertFalse(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(1)));
   }
 
+  /**
+   * Pending in-flight replications recorded via checkSpaceAndRecordAllocation count against
+   * slots, same as write-path containers. hasAvailableSpace reflects the combined total.
+   */
+  @Test
+  public void testInFlightReplicationCountsAgainstAvailableSlots() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+
+    // Two slots of usable space
+    List<StorageReportProto> twoSlotReports = new ArrayList<>();
+    twoSlotReports.add(createStorageReport(dnInfo, 10 * containerSize, 2 * containerSize, 0));
+    dnInfo.updateStorageReports(twoSlotReports);
+
+    assertTrue(tracker.hasAvailableSpace(dnInfo)); // 2 slots free
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(0)));  // slot 1 used
+    assertTrue(tracker.hasAvailableSpace(dnInfo));               // 1 slot free
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(1)));  // slot 2 used
+    assertFalse(tracker.hasAvailableSpace(dnInfo));              // 0 slots free
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(2))); // rejected
+  }
+
+  /**
+   * hasAvailableSpace on a DN with no storage reports returns false.
+   */
+  @Test
+  public void testHasAvailableSpaceWithNoStorageReports() {
+    DatanodeInfo emptyDn = new DatanodeInfo(
+        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    // No storage reports set
+    assertFalse(tracker.hasAvailableSpace(emptyDn));
+  }
+
+  /**
+   * A failed volume has remaining=0 by DN convention, but the tracker should
+   * explicitly skip it (report.getFailed() == true) so a stale non-zero
+   * remaining value on a failed volume can never grant spurious slots.
+   */
+  @Test
+  public void testFailedVolumeNotCountedAsAllocatableSlot() {
+    StorageReportProto failed = createFailedStorageReport(dn1);
+    StorageReportProto healthy = createStorageReport(dn1,
+        10 * MAX_CONTAINER_SIZE, MAX_CONTAINER_SIZE, 0); // 1 real slot
+    dn1.updateStorageReports(new ArrayList<>(Arrays.asList(failed, healthy)));
+    assertTrue(tracker.hasAvailableSpace(dn1));                          // healthy vol → 1 slot
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dn1, container1));  // consumes it
+    assertFalse(tracker.hasAvailableSpace(dn1));                         // 0 slots left
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container2)); // rejected
+  }
+
+  @Test
+  public void testAllVolumesFailedReturnsFalse() {
+    dn1.updateStorageReports(new ArrayList<>(Arrays.asList((
+        createFailedStorageReport(dn1)),
+        createFailedStorageReport(dn1))));
+    assertFalse(tracker.hasAvailableSpace(dn1));
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container1));
+  }
+
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
+  }
+
+  private StorageReportProto createFailedStorageReport(DatanodeInfo dn) {
+    return HddsTestUtils.createStorageReport(dn.getID(), "", 0, 0, 0, null, true);
   }
 }

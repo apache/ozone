@@ -312,6 +312,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
   }
 
   @Test
+  @Order(Integer.MAX_VALUE)
   void testOMRetryProxy() {
     int maxFailoverAttempts = getOzoneClientFailoverMaxAttempts();
     // Stop all the OMs.

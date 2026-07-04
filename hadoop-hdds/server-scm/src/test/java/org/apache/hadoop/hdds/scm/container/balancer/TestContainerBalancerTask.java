@@ -25,9 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
@@ -79,6 +81,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -351,51 +356,17 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * Tests if balancer is adding the polled source datanode back to potentialSources queue
-   * if a move has failed due to a container related failure, like REPLICATION_FAIL_NOT_EXIST_IN_SOURCE.
+   * Tests if balancer adds a source DN back for all four MoveResult failures,
+   * with REPLICATION_NOT_HEALTHY_AFTER_MOVE additionally excluding the container.
    */
-  @Test
-  public void testSourceDatanodeAddedBack()
-      throws NodeNotFoundException, IOException, IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, TimeoutException, InterruptedException {
-
-    when(moveManager.move(any(ContainerID.class),
-        any(DatanodeDetails.class),
-        any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE))
-        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
-        nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails().getHostName();
-    balancerConfiguration.setIncludeNodes(includeNodes);
-
-    startBalancer(balancerConfiguration);
-    GenericTestUtils.waitFor(() -> ContainerBalancerTask.IterationResult.ITERATION_COMPLETED ==
-        containerBalancerTask.getIterationResult(), 10, 50);
-
-    assertEquals(2, containerBalancerTask.getCountDatanodesInvolvedPerIteration());
-    assertTrue(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration() >= 1);
-    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed()).isEqualTo(1);
-    assertTrue(containerBalancerTask.getSelectedTargets().contains(nodesInCluster.get(0)
-        .getDatanodeDetails()));
-    assertTrue(containerBalancerTask.getSelectedSources().contains(nodesInCluster.get(nodesInCluster.size() - 1)
-        .getDatanodeDetails()));
-    stopBalancer();
-  }
-
-  /**
-   * Tests if balancer adds a source DN back when move fails with
-   * REPLICATION_NOT_HEALTHY_BEFORE_MOVE so another container can be tried.
-   */
-  @Test
-  public void testSourceDatanodeAddedBackForReplicationNotHealthyBeforeMove()
+  @ParameterizedTest
+  @EnumSource(value = MoveManager.MoveResult.class,
+      names = {"REPLICATION_FAIL_NOT_EXIST_IN_SOURCE", "REPLICATION_NOT_HEALTHY_BEFORE_MOVE", 
+          "FAIL_CONTAINER_ALREADY_BEING_MOVED", "REPLICATION_NOT_HEALTHY_AFTER_MOVE"})
+  public void testSourceDatanodeAddedBack(MoveManager.MoveResult moveResult)
       throws Exception {
     when(moveManager.move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE))
+        .thenReturn(CompletableFuture.completedFuture(moveResult))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
 
     balancerConfiguration.setThreshold(10);
@@ -418,6 +389,18 @@ public class TestContainerBalancerTask {
         .getDatanodeDetails()));
     assertTrue(containerBalancerTask.getSelectedSources().contains(
         nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails()));
+
+    ArgumentCaptor<ContainerID> containerCaptor = ArgumentCaptor.forClass(ContainerID.class);
+    verify(moveManager, atLeast(1)).move(containerCaptor.capture(),
+        any(DatanodeDetails.class), any(DatanodeDetails.class));
+    ContainerID failedContainerId = containerCaptor.getAllValues().get(0);
+    if (moveResult == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE) {
+      assertTrue(containerBalancerTask.getSelectionCriteria()
+          .getExcludeDueToFailContainers().contains(failedContainerId));
+    } else {
+      assertFalse(containerBalancerTask.getSelectionCriteria()
+          .getExcludeDueToFailContainers().contains(failedContainerId));
+    }
     stopBalancer();
   }
 

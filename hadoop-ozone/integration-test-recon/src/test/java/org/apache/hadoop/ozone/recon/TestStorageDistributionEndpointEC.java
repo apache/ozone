@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.Test;
  * <p>Common infrastructure and verification helpers are provided by
  * {@link AbstractTestStorageDistributionEndpoint}.
  */
+@Unhealthy("HDDS-15519")
 public class TestStorageDistributionEndpointEC extends AbstractTestStorageDistributionEndpoint {
 
   private static final int NUM_DATANODES = 5;
