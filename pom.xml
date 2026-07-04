@@ -122,7 +122,7 @@
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.14.4</junit5.version>
-    <kerby.version>1.0.1</kerby.version>
+    <kerby.version>2.1.2</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
