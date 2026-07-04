@@ -246,7 +246,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
-  @Flaky("HDDS-11093")
   public void testMetrics(@Nonnull MockedSCM mockedSCM) throws IOException, NodeNotFoundException {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("hdds.datanode.du.refresh.period", "1ms");
@@ -265,7 +264,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
     assertEquals(mockedSCM.getCluster().getUnBalancedNodes(config.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
     assertThat(metrics.getDataSizeMovedGBInLatestIteration()).isLessThanOrEqualTo(6);
-    assertThat(metrics.getDataSizeMovedGB()).isGreaterThan(0);
+    // On small clusters the random layout may allow only one move, which is the mocked failure, so data
+    // moved cannot be asserted to be positive. Each container is a whole number of GB, so the size moved
+    // must be at least 1 GB per completed move.
+    assertThat(metrics.getDataSizeMovedGB()).isGreaterThanOrEqualTo(metrics.getNumContainerMovesCompleted());
     assertEquals(1, metrics.getNumIterations());
     assertThat(metrics.getNumContainerMovesScheduledInLatestIteration()).isGreaterThan(0);
     assertEquals(metrics.getNumContainerMovesScheduled(), metrics.getNumContainerMovesScheduledInLatestIteration());
