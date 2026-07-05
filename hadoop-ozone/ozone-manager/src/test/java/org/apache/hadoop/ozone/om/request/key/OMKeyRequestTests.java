@@ -101,7 +101,7 @@ import org.slf4j.event.Level;
  * Base test class for key request.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMKeyRequest {
+public class OMKeyRequestTests {
   @TempDir
   private Path folder;
 
