@@ -30,7 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Base test class for OM volume response.
  */
-public class TestOMVolumeResponse {
+public class OMVolumeResponseTests {
   @TempDir
   private Path folder;
 
