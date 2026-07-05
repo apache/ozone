@@ -48,7 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Base test class for key response.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMKeyResponse {
+public class OMKeyResponseTests {
   @TempDir
   private Path folder;
 
