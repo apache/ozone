@@ -36,7 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Base class for testing OM delegation token request.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMDelegationTokenRequest {
+public class OMDelegationTokenRequestTests {
 
   @TempDir
   private Path folder;
