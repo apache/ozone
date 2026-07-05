@@ -60,6 +60,8 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Prepares local filesystem state and configuration for {@code ozone local}.
@@ -69,6 +71,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  * HDDS-15084/HDDS-15086 work.</p>
  */
 public final class LocalOzoneCluster implements LocalOzoneRuntime {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(LocalOzoneCluster.class);
 
   static final String PORTS_STATE_FILE_NAME = "ports.properties";
 
@@ -84,6 +89,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private static final String OM_RPC_PORT_KEY = "om.rpc";
   private static final String OM_HTTP_PORT_KEY = "om.http";
   private static final String OM_RATIS_PORT_KEY = "om.ratis";
+
+  private static final int MAX_PORT = 65_535;
 
   private static final String[] REQUIRED_PERSISTED_PORT_KEYS = {
       SCM_CLIENT_PORT_KEY,
@@ -327,7 +334,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     return host + ":" + port;
   }
 
-  private static void deleteDirectory(Path directory) throws IOException {
+  private static void deleteDirectory(Path directory) {
     if (!Files.exists(directory)) {
       return;
     }
@@ -337,6 +344,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       for (Path path : deleteOrder) {
         Files.deleteIfExists(path);
       }
+    } catch (IOException ex) {
+      LOG.error("Failed to delete local Ozone directory {}", directory, ex);
     }
   }
 
@@ -386,7 +395,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     }
 
     private int reserveConfiguredPort(int port) throws IOException {
-      if (port > 65_535) {
+      if (port > MAX_PORT) {
         throw new IOException("Port " + port + " is outside the valid range.");
       }
       if (!reserved.add(port)) {
@@ -443,7 +452,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       }
       try {
         int port = Integer.parseInt(trimmedValue);
-        if (port < 0 || port > 65_535) {
+        if (port < 0 || port > MAX_PORT) {
           throw invalidPortValue(key, value);
         }
         return port;
