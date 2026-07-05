@@ -26,9 +26,9 @@ import org.junit.jupiter.api.Assertions;
 /**
  * Utility class with helper methods for testing node state and status.
  */
-public final class TestNodeUtil {
+public final class NodeTestUtil {
 
-  private TestNodeUtil() {
+  private NodeTestUtil() {
   }
 
   /**
