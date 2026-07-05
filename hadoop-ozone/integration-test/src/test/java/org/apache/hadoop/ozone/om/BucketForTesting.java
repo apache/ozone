@@ -39,11 +39,11 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
  * Wrapper for {@code OzoneBucket} for testing.  Can create random keys,
  * verify content, etc.
  */
-public final class TestBucket {
+public final class BucketForTesting {
 
   private final OzoneBucket bucket;
 
-  private TestBucket(OzoneBucket bucket) {
+  private BucketForTesting(OzoneBucket bucket) {
     this.bucket = bucket;
   }
 
@@ -105,7 +105,7 @@ public final class TestBucket {
   }
 
   /**
-   * Builder for {@code TestBucket}.
+   * Builder for {@code BucketForTesting}.
    */
   public static class Builder {
     private final OzoneClient client;
@@ -117,7 +117,7 @@ public final class TestBucket {
       this.client = client;
     }
 
-    public TestBucket build() throws IOException {
+    public BucketForTesting build() throws IOException {
       ObjectStore objectStore = client.getObjectStore();
       if (volume == null) { // TODO add setVolume
         if (volumeName == null) { // TODO add setVolumeName
@@ -130,7 +130,7 @@ public final class TestBucket {
         bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(10);
       }
       volume.createBucket(bucketName);
-      return new TestBucket(volume.getBucket(bucketName));
+      return new BucketForTesting(volume.getBucket(bucketName));
     }
   }
 }
