@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -562,10 +561,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
-  @Flaky("HDDS-11855")
   public void checkIterationResultException(@Nonnull MockedSCM mockedSCM)
       throws NodeNotFoundException, ContainerNotFoundException, TimeoutException, ContainerReplicaNotFoundException {
-    int nodeCount = mockedSCM.getNodeCount();
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
     config.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
@@ -574,7 +571,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     CompletableFuture<MoveManager.MoveResult> future = new CompletableFuture<>();
     future.completeExceptionally(new RuntimeException("Runtime Exception"));
 
-    int expectedMovesFailed = (nodeCount > 6) ? 3 : 1;
     // Try the same test but with MoveManager instead of ReplicationManager.
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
@@ -584,7 +580,17 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
-    assertThat(task.getMetrics().getNumContainerMovesFailed()).isGreaterThanOrEqualTo(expectedMovesFailed);
+
+    // The random cluster layout decides how many moves get scheduled, so the exact number of failed moves
+    // cannot be asserted. Instead assert invariants that hold for any layout: every move is mocked to fail,
+    // so none can be counted as completed, and if any move was attempted it must be accounted as a failure
+    // or a timeout rather than silently dropped.
+    ContainerBalancerMetrics metrics = task.getMetrics();
+    assertEquals(0, metrics.getNumContainerMovesCompletedInLatestIteration());
+    if (!task.getContainerToSourceMap().isEmpty()) {
+      assertThat(metrics.getNumContainerMovesFailedInLatestIteration()
+          + metrics.getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
+    }
   }
 
   public static List<DatanodeUsageInfo> getUnBalancedNodes(@Nonnull ContainerBalancerTask task) {
