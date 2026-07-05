@@ -108,6 +108,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "integration and unit: java change" {
@@ -117,8 +118,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/hadoop/fs/ozone/TestOzoneFileInterfaces.java,org/apache/hadoop/fs/ozone/TestOzoneFileInterfacesWithFSO.java,org/apache/hadoop/ozone/om/request/key/TestOMKeyCreateRequestWithFSO.java
 }
 
 @test "integration and unit: script change" {
@@ -130,6 +132,19 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
+}
+
+@test "integration and unit: test-only change" {
+  run dev-support/ci/selective_ci_checks.sh bf59f31a7e5fcad1acc85e1228d77c22ee7f036c
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/hadoop/ozone/container/TestContainerReportHandling.java,org/apache/hadoop/ozone/container/TestContainerReportHandlingWithHA.java,org/apache/hadoop/ozone/container/TestHelper.java
 }
 
 @test "script change including javadoc.sh" {
@@ -152,6 +167,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "unit only" {
@@ -161,8 +177,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequest.java
 }
 
 @test "unit helper" {
@@ -174,6 +191,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "integration only" {
@@ -183,8 +201,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/hadoop/ozone/om/TestOMRatisSnapshots.java
 }
 
 @test "mini-cluster" {
@@ -196,6 +215,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "test-utils" {
@@ -207,6 +227,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=
 }
 
 @test "native only" {
@@ -227,8 +248,9 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=true
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
+  assert_output -p test-classes=org/apache/hadoop/ozone/om/snapshot/TestOmSnapshotFsoWithNativeLib.java
 }
 
 @test "kubernetes only" {
