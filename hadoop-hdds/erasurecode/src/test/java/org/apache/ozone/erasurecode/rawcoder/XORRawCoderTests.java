@@ -22,9 +22,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Test base for raw XOR coders.
  */
-public abstract class TestXORRawCoderBase extends TestRawCoderBase {
+public abstract class XORRawCoderTests extends RawCoderTests {
 
-  public TestXORRawCoderBase(
+  public XORRawCoderTests(
       Class<? extends RawErasureCoderFactory> encoderFactoryClass,
       Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
     super(encoderFactoryClass, decoderFactoryClass);
