@@ -345,7 +345,7 @@ class TestReconAndAdminContainerCLI {
 
     try {
       rmReport = scmClient.getReplicationManagerReport();
-      reconResponse = TestReconEndpointUtil
+      reconResponse = ReconEndpointTestUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
       assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
@@ -400,7 +400,7 @@ class TestReconAndAdminContainerCLI {
         RatisReplicationConfig.getInstance(replicationFactor));
 
     // Sync Recon with OM, to force it to get the new key entries.
-    TestReconEndpointUtil.triggerReconDbSyncWithOm(CONF);
+    ReconEndpointTestUtil.triggerReconDbSyncWithOm(CONF);
 
     List<Long> containerIDs = getContainerIdsForKey(omKeyInfo);
     // The list has only 1 containerID.
