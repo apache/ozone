@@ -60,7 +60,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 
 @SuppressWarnings("VisibilityModifier")
-public class TestS3MultipartResponse {
+public class S3MultipartResponseTests {
 
   @TempDir
   private Path folder;
