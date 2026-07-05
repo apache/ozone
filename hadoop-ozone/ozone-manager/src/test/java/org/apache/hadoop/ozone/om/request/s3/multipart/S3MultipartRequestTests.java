@@ -65,7 +65,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Base test class for S3 Multipart upload request.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestS3MultipartRequest {
+public class S3MultipartRequestTests {
   @TempDir
   private Path folder;
 
