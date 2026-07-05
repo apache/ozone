@@ -67,7 +67,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 /**
  * Tests the MisReplicationHandling functionalities to test implementations.
  */
-public abstract class TestMisReplicationHandler {
+public abstract class MisReplicationHandlerTests {
 
   private ContainerInfo container;
   private OzoneConfiguration conf;
