@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,7 +34,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link ContainerStateManager}.  Do not modify. */
@@ -181,14 +179,9 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
 
       @Override
       public void updateContainerStateWithSequenceId(HddsProtos.ContainerID arg0, LifeCycleEvent arg1, Long arg2) throws
-          IOException, InvalidStateTransitionException {
+          IOException {
         final Object[] args = {arg0, arg1, arg2};
         invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
-      }
-
-      @Override
-      public void updateDeleteTransactionId(Map arg0) throws IOException {
-        invoker.getImpl().updateDeleteTransactionId(arg0);
       }
     };
   }
@@ -312,11 +305,6 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       final LifeCycleEvent arg27 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
       final Long arg28 = p.length > 2 ? (Long) p[2] : null;
       getImpl().updateContainerStateWithSequenceId(arg26, arg27, arg28);
-      return Message.EMPTY;
-
-    case "updateDeleteTransactionId":
-      final Map arg29 = p.length > 0 ? (Map) p[0] : null;
-      getImpl().updateDeleteTransactionId(arg29);
       return Message.EMPTY;
 
     default:

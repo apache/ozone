@@ -382,7 +382,7 @@ class TestReconAndAdminContainerCLI {
     List<ContainerID> rmContainerIDs = rmReport.getSample(rmState);
     List<Long> rmIDsToLong = new ArrayList<>();
     for (ContainerID id : rmContainerIDs) {
-      rmIDsToLong.add(id.getId());
+      rmIDsToLong.add(id.getIdForTesting());
     }
     List<Long> reconContainerIDs =
         reconResponse.getContainers()

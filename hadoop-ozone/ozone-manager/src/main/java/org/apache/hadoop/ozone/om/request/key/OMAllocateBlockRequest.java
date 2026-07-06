@@ -105,7 +105,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-    UserInfo userInfo = getUserIfNotExists(ozoneManager);
+    UserInfo userInfo = getOmRequest().getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
@@ -142,7 +142,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder().setUserInfo(userInfo)
+    return getOmRequest().toBuilder()
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }

@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -462,6 +463,25 @@ public final class TestHelper {
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         200, 30000);
+  }
+
+  /**
+   * Wait until SCM reports exactly {@code count} replicas for the container and every replica is in {@code state}.
+   * Unlike {@link #waitForContainerStateInSCM}, which checks the container's aggregate state (it flips as soon as the
+   * first replica reaches the state), this requires all replicas to have settled, so a lagging replica cannot trip
+   * later report handling.
+   */
+  public static void waitForReplicaState(ContainerManager containerManager, ContainerID containerID,
+      int count, ContainerReplicaProto.State state) throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerID);
+        return replicas.size() == count
+            && replicas.stream().allMatch(replica -> replica.getState() == state);
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 100, 60000);
   }
 
   /** Helper to set config even if {@code value} is null, which

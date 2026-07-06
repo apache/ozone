@@ -120,6 +120,9 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   StorageContainerManager getStorageContainerManager();
 
+  /** @return all SCMs */
+  List<StorageContainerManager> getStorageContainerManagers();
+
   /**
    * Returns {@link OzoneManager} associated with this
    * {@link MiniOzoneCluster} instance.

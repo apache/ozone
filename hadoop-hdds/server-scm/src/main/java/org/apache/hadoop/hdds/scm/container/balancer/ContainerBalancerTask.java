@@ -93,7 +93,6 @@ public class ContainerBalancerTask implements Runnable {
   private long sizeActuallyMovedInLatestIteration;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
-  private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
   private Set<String> excludeNodes;
   private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
@@ -154,7 +153,6 @@ public class ContainerBalancerTask implements Runnable {
     this.scmContext = scm.getScmContext();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
-    this.withinThresholdUtilizedNodes = new ArrayList<>();
     PlacementPolicyValidateProxy placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
     NetworkTopology networkTopology = scm.getClusterMap();
     this.nextIterationIndex = nextIterationIndex;
@@ -533,8 +531,6 @@ public class ContainerBalancerTask implements Runnable {
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             utilization);
         totalUnderUtilizedBytes += underUtilizedBytes;
-      } else {
-        withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
     metrics.incrementDataSizeUnbalancedGB(
@@ -586,8 +582,6 @@ public class ContainerBalancerTask implements Runnable {
   private IterationResult doIteration() {
     // note that potential and selected targets are updated in the following
     // loop
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
     List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
     findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
@@ -1082,25 +1076,21 @@ public class ContainerBalancerTask implements Runnable {
 
   /**
    * Get potential targets for container move. Potential targets are under
-   * utilized and within threshold utilized nodes.
+   * utilized nodes.
    *
    * @return A list of potential target DatanodeUsageInfo.
    */
   private List<DatanodeUsageInfo> getPotentialTargets() {
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
     return underUtilizedNodes;
   }
 
   /**
    * Get potential sourecs for container move. Potential sourecs are over
-   * utilized and within threshold utilized nodes.
+   * utilized nodes.
    *
    * @return A list of potential source DatanodeUsageInfo.
    */
   private List<DatanodeUsageInfo> getPotentialSources() {
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
     return overUtilizedNodes;
   }
 

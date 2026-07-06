@@ -1294,4 +1294,29 @@ public class TestOmMetadataManager {
 
     assertEquals(25, noPagination.size());
   }
+
+  @Test
+  public void testListKeysSpecialKeyNames() throws Exception {
+    List<String> keyNames = Arrays.asList(" ", "\"",
+        "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__");
+
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    assertEquals("/volumeA/bucketA/ ",
+        omMetadataManager.getOzoneKey(volumeName, bucketName, " "));
+
+    for (int i = 0; i < keyNames.size(); i++) {
+      addKeysToOM(volumeName, bucketName, keyNames.get(i), i);
+    }
+
+    List<String> listedKeys = omMetadataManager.listKeys(volumeName, bucketName,
+        null, null, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+
+    assertEquals(keyNames, listedKeys);
+  }
 }

@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,11 +136,12 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
-    final DatanodeDetails datanodeDetails = getNodeManager().getNode(dnFromReport.getID());
-    if (datanodeDetails == null) {
+    final DatanodeInfo datanodeInfo = getNodeManager().getNode(dnFromReport.getID());
+    if (datanodeInfo == null) {
       getLogger().warn("Datanode not found: {}", dnFromReport);
       return;
     }
+    final DatanodeDetails datanodeDetails = datanodeInfo;
     final ContainerReportsProto containerReport =
         reportFromDatanode.getReport();
     try {
@@ -154,7 +154,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             containerReport.getReportsList();
         final Set<ContainerID> expectedContainersInDatanode =
             getNodeManager().getContainers(datanodeDetails);
-        DatanodeInfo datanodeInfo = datanodeDetails instanceof DatanodeInfo ? (DatanodeInfo) datanodeDetails : null;
 
         for (ContainerReplicaProto replica : replicas) {
           ContainerID cid = ContainerID.valueOf(replica.getContainerID());
@@ -179,9 +178,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             getNodeManager().addContainer(datanodeDetails, cid);
             // Remove from pending tracker when container is added to DN
             // This container was just confirmed for the first time on this DN
-            if (datanodeInfo != null) {
-              getNodeManager().removePendingAllocationForDatanode(datanodeInfo, cid);
-            }
+            getNodeManager().removePendingAllocationForDatanode(datanodeInfo, cid);
           }
           if (container == null || ContainerReportValidator
                   .validate(container, datanodeDetails, replica)) {
@@ -234,7 +231,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     try {
       processContainerReplica(datanodeDetails, container, replicaProto, publisher, detailsForLogging);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException e) {
       getLogger().error("Failed to process {}", detailsForLogging, e);
     }
   }
