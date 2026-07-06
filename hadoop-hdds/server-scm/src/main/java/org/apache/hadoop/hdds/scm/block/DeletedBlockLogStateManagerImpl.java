@@ -55,8 +55,8 @@ public class DeletedBlockLogStateManagerImpl
   private volatile Set<Long> deletingTxIDs;
   public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
-  public static final StatefulServiceDefinition<DeletedBlocksTransaction> SERVICE_DEFINITION =
-      new StatefulServiceDefinition<>(SERVICE_NAME, DeletedBlocksTransaction.parser());
+  public static final StatefulServiceDefinition<DeletedBlocksTransactionSummary> SERVICE_DEFINITION =
+      new StatefulServiceDefinition<>(SERVICE_NAME, DeletedBlocksTransactionSummary.parser());
 
   public DeletedBlockLogStateManagerImpl(Table<Long, DeletedBlocksTransaction> deletedTable,
              Table<String, ByteString> statefulServiceConfigTable,
