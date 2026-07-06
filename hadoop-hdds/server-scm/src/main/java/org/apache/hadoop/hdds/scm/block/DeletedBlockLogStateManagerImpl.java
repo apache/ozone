@@ -53,7 +53,7 @@ public class DeletedBlockLogStateManagerImpl
   private Table<String, ByteString> statefulConfigTable;
   private final SCMHADBTransactionBuffer transactionBuffer;
   private volatile Set<Long> deletingTxIDs;
-  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
+  private static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
   public static final StatefulServiceDefinition<DeletedBlocksTransactionSummary> SERVICE_DEFINITION =
       new StatefulServiceDefinition<>(SERVICE_NAME, DeletedBlocksTransactionSummary.parser());
