@@ -267,9 +267,29 @@ function get_changed_test_classes() {
     start_end::group_start "List changed test classes"
     local pattern_array=(
         "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
     )
     filter_changed_files true
-    CHANGED_TEST_CLASSES=$(echo "${new_matched_files}" | sed -e 's@.*/src/test/java/@@' | xargs | sed -e 's/ /,/g')
+
+    local test_classes=""
+
+    if [[ -n "${new_matched_files}" ]]; then
+      # always run grouped integration tests
+      test_classes="org/apache/ozone/test/Test*"
+
+      local f
+      for f in ${new_matched_files}; do
+        if echo "$f" | grep -q -e '/fs/contract/' -e '/fs/ozone/contract/'; then
+          # run all contract tests
+          test_classes="${test_classes},org/apache/hadoop/fs/ozone/contract/Test*"
+        else
+          test_classes="${test_classes},${f}"
+        fi
+      done
+    fi
+
+    CHANGED_TEST_CLASSES=$(echo "${test_classes}" | sed -e 's@[^,]*/src/test/java/@@g')
     readonly CHANGED_TEST_CLASSES
     start_end::group_end
 }
@@ -289,6 +309,8 @@ function get_count_integration_files() {
     )
     local ignore_array=(
         "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
