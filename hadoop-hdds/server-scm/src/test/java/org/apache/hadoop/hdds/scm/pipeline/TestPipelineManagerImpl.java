@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
@@ -50,7 +49,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -66,11 +64,9 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -116,7 +112,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -933,48 +928,6 @@ public class TestPipelineManagerImpl {
     for (DatanodeDetails dn : pipeline.getNodes())  {
       assertThat(dns).contains(dn);
     }
-  }
-
-  /**
-   * {@link PipelineManager#hasEnoughSpace(Pipeline)} should return false if all the
-   * volumes on any Datanode in the pipeline have space less than or equal to the configured container size.
-   */
-  @Test
-  public void testHasEnoughSpace() throws IOException {
-    NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
-    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
-        SCMHAManagerStub.getInstance(true),
-        mockedNodeManager,
-        SCMDBDefinition.PIPELINES.getTable(dbStore),
-        new EventQueue(),
-        scmContext,
-        serviceManager,
-        testClock);
-
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setNodes(ImmutableList.of(dn1, dn2, dn3))
-        .setState(OPEN)
-        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
-        .build();
-
-    // Case 1: All nodes have enough space.
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
-    assertTrue(pipelineManager.hasEnoughSpace(pipeline));
-
-    // Case 2: One node does not have enough space — pipeline should be rejected.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
-
-    // Case 3: All nodes do not have enough space.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
   }
 
   private Set<ContainerReplica> createContainerReplicasList(

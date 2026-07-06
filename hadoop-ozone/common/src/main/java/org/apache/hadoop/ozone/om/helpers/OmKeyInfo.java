@@ -59,8 +59,7 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  private static final Codec<OmKeyInfo> CODEC = newCodec();
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
    * The flag is set when a committed key is deleted from AOS but still held in
@@ -131,17 +130,16 @@ public final class OmKeyInfo extends WithParentObjectId
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+  private static Codec<OmKeyInfo> newCodec() {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
         OmKeyInfo.class);
   }
 
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  public static Codec<OmKeyInfo> getCodec() {
+    return CODEC;
   }
 
   public String getVolumeName() {

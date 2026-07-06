@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
@@ -52,6 +54,11 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotCancelResponse;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotStatusResponse;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotSyncPhase;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotSyncStatus;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotTriggerResponse;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -133,7 +140,7 @@ public class TestTriggerDBSyncEndpoint {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(OzoneStorageContainerManager.class,
-                ReconStorageContainerManagerFacade.class)
+                mock(ReconStorageContainerManagerFacade.class))
             .withContainerDB()
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
@@ -150,5 +157,96 @@ public class TestTriggerDBSyncEndpoint {
     Response response = triggerDBSyncEndpoint.triggerOMDBSync();
     assertEquals(200, response.getStatus());
     assertEquals(true, response.getEntity());
+  }
+
+  @Test
+  public void testTriggerSCMDBSnapshotSyncAccepted() {
+    OzoneManagerServiceProviderImpl omProvider =
+        mock(OzoneManagerServiceProviderImpl.class);
+    ReconStorageContainerManagerFacade reconScm =
+        mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.triggerScmDbSnapshotSync()).thenReturn(
+        new ScmDbSnapshotTriggerResponse(true,
+            ScmDbSnapshotSyncStatus.IN_PROGRESS,
+            "SCM DB snapshot sync started."));
+
+    TriggerDBSyncEndpoint endpoint =
+        new TriggerDBSyncEndpoint(omProvider, reconScm);
+    Response response = endpoint.triggerSCMDBSnapshotSync();
+
+    assertEquals(202, response.getStatus());
+    ScmDbSnapshotTriggerResponse entity =
+        (ScmDbSnapshotTriggerResponse) response.getEntity();
+    assertTrue(entity.isAccepted());
+    assertEquals(ScmDbSnapshotSyncStatus.IN_PROGRESS, entity.getStatus());
+  }
+
+  @Test
+  public void testTriggerSCMDBSnapshotSyncConflict() {
+    OzoneManagerServiceProviderImpl omProvider =
+        mock(OzoneManagerServiceProviderImpl.class);
+    ReconStorageContainerManagerFacade reconScm =
+        mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.triggerScmDbSnapshotSync()).thenReturn(
+        new ScmDbSnapshotTriggerResponse(false,
+            ScmDbSnapshotSyncStatus.IN_PROGRESS,
+            "SCM DB sync is already running."));
+
+    TriggerDBSyncEndpoint endpoint =
+        new TriggerDBSyncEndpoint(omProvider, reconScm);
+    Response response = endpoint.triggerSCMDBSnapshotSync();
+
+    assertEquals(409, response.getStatus());
+    ScmDbSnapshotTriggerResponse entity =
+        (ScmDbSnapshotTriggerResponse) response.getEntity();
+    assertFalse(entity.isAccepted());
+  }
+
+  @Test
+  public void testGetSCMDBSnapshotSyncStatus() {
+    OzoneManagerServiceProviderImpl omProvider =
+        mock(OzoneManagerServiceProviderImpl.class);
+    ReconStorageContainerManagerFacade reconScm =
+        mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.getScmDbSnapshotSyncStatus()).thenReturn(
+        new ScmDbSnapshotStatusResponse(
+            ScmDbSnapshotSyncStatus.IN_PROGRESS,
+            ScmDbSnapshotSyncPhase.DOWNLOADING_CHECKPOINT,
+            1L, 0L, true, null));
+
+    TriggerDBSyncEndpoint endpoint =
+        new TriggerDBSyncEndpoint(omProvider, reconScm);
+    Response response = endpoint.getSCMDBSnapshotSyncStatus();
+
+    assertEquals(200, response.getStatus());
+    ScmDbSnapshotStatusResponse entity =
+        (ScmDbSnapshotStatusResponse) response.getEntity();
+    assertEquals(ScmDbSnapshotSyncStatus.IN_PROGRESS, entity.getStatus());
+    assertEquals(ScmDbSnapshotSyncPhase.DOWNLOADING_CHECKPOINT,
+        entity.getPhase());
+    assertTrue(entity.isCancelAllowed());
+  }
+
+  @Test
+  public void testCancelSCMDBSnapshotSync() {
+    OzoneManagerServiceProviderImpl omProvider =
+        mock(OzoneManagerServiceProviderImpl.class);
+    ReconStorageContainerManagerFacade reconScm =
+        mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.cancelScmDbSnapshotSync()).thenReturn(
+        new ScmDbSnapshotCancelResponse(true,
+            ScmDbSnapshotSyncStatus.CANCELLED,
+            ScmDbSnapshotSyncPhase.CANCELLED,
+            "SCM DB snapshot sync cancelled."));
+
+    TriggerDBSyncEndpoint endpoint =
+        new TriggerDBSyncEndpoint(omProvider, reconScm);
+    Response response = endpoint.cancelSCMDBSnapshotSync();
+
+    assertEquals(200, response.getStatus());
+    ScmDbSnapshotCancelResponse entity =
+        (ScmDbSnapshotCancelResponse) response.getEntity();
+    assertTrue(entity.isCancelled());
+    assertEquals(ScmDbSnapshotSyncStatus.CANCELLED, entity.getStatus());
   }
 }

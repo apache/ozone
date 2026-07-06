@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
@@ -124,12 +125,27 @@ public final class EndpointTestUtils {
       String uploadID,
       String content
   ) throws IOException, OS3Exception {
+    return put(subject, bucket, key, partNumber, uploadID,
+        contentLength(content), content);
+  }
+
+  /** Put with content, part number, upload ID, and explicit Content-Length. */
+  public static Response put(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      int partNumber,
+      String uploadID,
+      long contentLength,
+      String content
+  ) throws IOException, OS3Exception {
     if (uploadID != null) {
       subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     }
     subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
     when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
-    setLengthHeader(subject, content);
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(contentLength));
 
     if (content == null) {
       return subject.put(bucket, key, null);
@@ -159,6 +175,47 @@ public final class EndpointTestUtils {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
     when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
     return subject.delete(bucket, key);
+  }
+
+  /**
+   * Get bucket tags (?tagging).
+   */
+  public static Response getBucketTagging(
+      BucketEndpoint subject,
+      String bucket
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    return subject.get(bucket);
+  }
+
+  /**
+   * Add tagging on bucket (?tagging).
+   */
+  public static Response putBucketTagging(
+      BucketEndpoint subject, String bucket, String content)
+      throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
+
+    if (content == null) {
+      return subject.put(bucket, null);
+    } else {
+      try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
+        return subject.put(bucket, body);
+      }
+    }
+  }
+
+  /**
+   * Delete bucket tags (?tagging).
+   */
+  public static Response deleteBucketTagging(
+      BucketEndpoint subject, String bucket) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
+    return subject.delete(bucket);
   }
 
   /** Initiate multipart upload.
@@ -263,10 +320,45 @@ public final class EndpointTestUtils {
     return actual;
   }
 
-  private static void setLengthHeader(ObjectEndpoint subject, String content) {
-    final long length = content != null ? content.length() : 0;
+  private static void setLengthHeader(EndpointBase subject, String content) {
     when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
-        .thenReturn(String.valueOf(length));
+        .thenReturn(String.valueOf(contentLength(content)));
+  }
+
+  private static long contentLength(String content) {
+    return content != null ? content.getBytes(UTF_8).length : 0;
+  }
+
+  static final class FailingInputStream extends InputStream {
+
+    private final byte[] content;
+    private final int failAfterBytes;
+    private int position;
+
+    FailingInputStream(byte[] content, int failAfterBytes) {
+      this.content = content;
+      this.failAfterBytes = failAfterBytes;
+    }
+
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+
+      int bytesToRead = Math.min(length, failAfterBytes - position);
+      System.arraycopy(content, position, buffer, offset, bytesToRead);
+      position += bytesToRead;
+      return bytesToRead;
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+      return content[position++];
+    }
   }
 
   private EndpointTestUtils() {

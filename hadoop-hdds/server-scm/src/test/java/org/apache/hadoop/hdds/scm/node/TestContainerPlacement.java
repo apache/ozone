@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -159,7 +161,8 @@ public class TestContainerPlacement {
   ContainerManager createContainerManager()
       throws IOException {
     pipelineManager = spy(pipelineManager);
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any());
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,

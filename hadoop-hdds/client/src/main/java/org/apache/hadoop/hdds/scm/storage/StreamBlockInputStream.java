@@ -411,9 +411,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         checkError();
-        if (future.isDone()) {
-          return null; // Stream ended
-        }
 
         final ReadBlockResponseProto proto;
         try {
@@ -424,6 +421,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         if (proto != null) {
           return proto;
+        }
+
+        // Check isDone only after confirming the queue is empty. If isDone() were
+        // checked first, an item delivered by onNext() just before onCompleted()
+        // fired would be silently dropped, causing data corruption.
+        if (future.isDone()) {
+          return null; // Stream ended, queue is empty
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
@@ -438,7 +442,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     private ByteBuffer read(int length, boolean preRead) throws IOException {
       checkError();
       if (future.isDone()) {
-        return null; // Stream ended
+        // Don't return null while items remain in the queue. onNext() may have delivered items just before
+        // onCompleted() fired.
+        return responseQueue.isEmpty() ? null : readFromQueue();
       }
 
       readBlock(length, preRead);

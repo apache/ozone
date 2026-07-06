@@ -182,10 +182,10 @@ public class ReplicationServer {
     public static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
     private static final String OUTOFSERVICE_FACTOR_KEY =
         "outofservice.limit.factor";
-    private static final double OUTOFSERVICE_FACTOR_MIN = 1;
+    static final double OUTOFSERVICE_FACTOR_MIN = 1;
     static final double OUTOFSERVICE_FACTOR_DEFAULT = 2;
     private static final String OUTOFSERVICE_FACTOR_DEFAULT_VALUE = "2.0";
-    private static final double OUTOFSERVICE_FACTOR_MAX = 10;
+    static final double OUTOFSERVICE_FACTOR_MAX = 10;
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
@@ -274,14 +274,16 @@ public class ReplicationServer {
 
       if (outOfServiceFactor < OUTOFSERVICE_FACTOR_MIN ||
           outOfServiceFactor > OUTOFSERVICE_FACTOR_MAX) {
+        double clamped = Math.min(OUTOFSERVICE_FACTOR_MAX,
+            Math.max(OUTOFSERVICE_FACTOR_MIN, outOfServiceFactor));
         LOG.warn(
-            "{} must be between {} and {} but was set to {}. Defaulting to {}",
+            "{} must be between {} and {} but was set to {}. Clamping to {}",
             REPLICATION_OUTOFSERVICE_FACTOR_KEY,
             OUTOFSERVICE_FACTOR_MIN,
             OUTOFSERVICE_FACTOR_MAX,
             outOfServiceFactor,
-            OUTOFSERVICE_FACTOR_DEFAULT);
-        outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
+            clamped);
+        outOfServiceFactor = clamped;
       }
     }
 

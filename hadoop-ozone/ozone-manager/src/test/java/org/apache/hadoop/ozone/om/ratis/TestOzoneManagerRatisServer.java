@@ -145,6 +145,46 @@ public class TestOzoneManagerRatisServer {
         "Ratis Server should be in running state");
   }
 
+  /**
+   * RaftPeer.address must preserve the configured host string
+   * verbatim -- not a Java-resolved {@code InetSocketAddress} form. When
+   * the operator configured a hostname, the hostname must survive into
+   * RaftPeer.address so gRPC's {@code DnsNameResolver} can re-resolve it
+   * on connection failure (Kubernetes pod restarts). When the operator
+   * configured an IP literal, that literal must survive too. The
+   * regression this test guards is "{@code createRaftPeer} pre-resolved
+   * a hostname into a numeric IP and handed the resolved form to
+   * RaftPeer," which would freeze the gRPC channel at that IP for the
+   * channel's lifetime.
+   */
+  @Test
+  public void testCreateRaftPeerUsesHostnameAddress() {
+    String hostname = "om-2.om.example.svc.cluster.local";
+    int rpcPort = 9862;
+    int ratisPort = 9872;
+    OMNodeDetails peer = new OMNodeDetails.Builder()
+        .setOMServiceId("test-service")
+        .setOMNodeId("om2")
+        .setHostAddress(hostname)
+        .setRpcPort(rpcPort)
+        .setRatisPort(ratisPort)
+        .build();
+
+    org.apache.ratis.protocol.RaftPeer raftPeer =
+        OzoneManagerRatisServer.createRaftPeer(peer);
+    String addr = raftPeer.getAddress();
+    assertEquals(hostname + ":" + ratisPort, addr,
+        "RaftPeer address must preserve the configured host string "
+            + "verbatim. The configured hostname must survive into "
+            + "RaftPeer so gRPC can re-resolve it -- pre-resolving into a "
+            + "numeric IP would freeze the channel at that IP for its "
+            + "lifetime.");
+    // Defensive: the configured hostname must not have been pre-resolved
+    // into a numeric IPv4 octet form before reaching RaftPeer.
+    String host = addr.substring(0, addr.lastIndexOf(':'));
+    assertThat(host).doesNotMatch("^\\d{1,3}(\\.\\d{1,3}){3}$");
+  }
+
   @Test
   public void testLoadSnapshotInfoOnStart() throws Exception {
     // Stop the Ratis server and manually update the snapshotInfo.

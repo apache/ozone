@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -43,12 +45,52 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
+  // Cache OmBucketInfo lookups across process() calls so the Legacy and OBS
+  // sub-tasks don't pay a RocksDB point read per event. A bucket's objectID and
+  // layout are stable while the bucket exists, but a bucket can be deleted and
+  // recreated under the same volume/bucket name with a new objectID (same DB
+  // key, different identity). A recreate is always preceded by a delete, so the
+  // sub-tasks call invalidateBucketCache() when they observe a bucketTable
+  // delete event; a recreated bucket is then re-read instead of served stale.
+  //
+  // Single-thread access only (each sub-task runs on its own thread and owns
+  // its own cache instance). HashMap is fine.
+  private final Map<String, OmBucketInfo> bucketInfoCache = new HashMap<>();
+
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
                                      reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+  }
+
+  /** Look up an {@link OmBucketInfo} via {@code getBucketTable().getSkipCache}
+   *  and cache the result. Bucket layout/object-id are stable while a bucket
+   *  exists, so a field-level cache avoids one RocksDB point read per event in
+   *  the per-event sub-task loops. Entries are dropped via
+   *  {@link #invalidateBucketCache(String)} when a bucketTable delete event is
+   *  seen, so a bucket deleted and recreated under the same name is not served
+   *  stale. */
+  protected OmBucketInfo lookupBucketCached(String bucketDBKey) throws IOException {
+    OmBucketInfo cached = bucketInfoCache.get(bucketDBKey);
+    if (cached != null) {
+      return cached;
+    }
+    OmBucketInfo info = reconOMMetadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    if (info != null) {
+      bucketInfoCache.put(bucketDBKey, info);
+    }
+    return info;
+  }
+
+  /** Drop the cached {@link OmBucketInfo} for the given bucket DB key. Invoked
+   *  when a bucketTable delete event is observed so the next key event re-reads
+   *  the current bucket info. This matters when a bucket is deleted and
+   *  recreated under the same volume/bucket name, which assigns a new objectID;
+   *  the recreate always follows the delete, so invalidating on delete suffices. */
+  protected void invalidateBucketCache(String bucketDBKey) {
+    bucketInfoCache.remove(bucketDBKey);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {

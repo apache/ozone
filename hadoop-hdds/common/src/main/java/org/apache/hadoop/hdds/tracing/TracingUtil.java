@@ -26,6 +26,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -36,6 +37,7 @@ import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -386,5 +388,47 @@ public final class TracingUtil {
     } else {
       return tracer.spanBuilder(spanName).setNoParent().startSpan();
     }
+  }
+
+  /**
+   * A TextMapGetter implementation to extract tracing info from getHeader.
+   */
+  public static class HttpHeaderGetter implements TextMapGetter<Function<String, String>> {
+
+    @Override
+    public Iterable<String> keys(Function<String, String> carrier) {
+      // Not used during the extract call, so returning an empty list.
+      return Collections.emptyList();
+    }
+
+    @Override
+    public String get(Function<String, String> carrier, String key) {
+      return carrier == null ? null : carrier.apply(key);
+    }
+  }
+
+  public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
+      String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
+    if (conf == null || !isTracingEnabled(conf)) {
+      return () -> { };
+    }
+
+    Context remote = W3CTraceContextPropagator.getInstance()
+        .extract(Context.current(), getHeader, new HttpHeaderGetter());
+
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
+      return createActivatedSpan(spanName);
+    }
+
+    Span span = tracer.spanBuilder(spanName)
+        .setParent(remote)
+        .startSpan();
+
+    Scope scope = span.makeCurrent();
+
+    return () -> {
+      scope.close();
+      span.end();
+    };
   }
 }
