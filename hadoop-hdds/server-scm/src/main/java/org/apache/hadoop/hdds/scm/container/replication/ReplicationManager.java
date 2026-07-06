@@ -643,7 +643,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       command.setPriority(ReplicationCommandPriority.LOW);
       sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
     } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen");
+      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen", e);
     }
   }
 
