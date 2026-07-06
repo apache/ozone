@@ -288,8 +288,28 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
+    addVersionNodeWithDependents(snapshotLocalData, null);
+  }
+
+  /**
+   * Adds version nodes for the supplied snapshot local data and any unloaded previous snapshots it depends on.
+   * The graph must contain the previous snapshot's version node before the current snapshot's version node can be
+   * added. This method walks the previous-snapshot chain using persisted YAML metadata and processes the stack in
+   * dependency order.
+   *
+   * @param snapshotLocalData snapshot local data to add to the version graph
+   * @param failedFilePaths when non-null, a previous snapshot YAML that cannot be loaded or whose snapshotId does not
+   *     match its path is skipped instead of thrown, and the offending paths are recorded here so they are neither
+   *     reloaded nor re-logged during startup
+   * @return true if the snapshot local data was added or was already present, false if skipped due to an unloadable or
+   *     mismatched previous snapshot
+   * @throws IOException if a required YAML load fails, or the loaded snapshotId does not match, when failedFilePaths is
+   *     null
+   */
+  private boolean addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData, Set<String> failedFilePaths)
+      throws IOException {
     if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
-      return;
+      return true;
     }
     Set<UUID> visitedSnapshotIds = new HashSet<>();
     Stack<Pair<UUID, SnapshotVersionsMeta>> stack = new Stack<>();
@@ -305,16 +325,50 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         UUID prevSnapId = snapshotVersionsMeta.getPreviousSnapshotId();
         if (prevSnapId != null && !versionNodeMap.containsKey(prevSnapId)) {
           File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(prevSnapId));
-          OmSnapshotLocalData prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+          OmSnapshotLocalData prevSnapshotLocalData;
+          if (failedFilePaths != null) {
+            Optional<OmSnapshotLocalData> loadedLocalData =
+                tryLoadSnapshotLocalData(previousSnapshotLocalDataFile, failedFilePaths);
+            if (!loadedLocalData.isPresent()) {
+              // tryLoadSnapshotLocalData already logged (and recorded) the underlying load failure.
+              return false;
+            }
+            prevSnapshotLocalData = loadedLocalData.get();
+          } else {
+            prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+          }
           if (!prevSnapId.equals(prevSnapshotLocalData.getSnapshotId())) {
-            throw new IOException("SnapshotId mismatch: expected " + prevSnapId +
+            String mismatch = "Expected SnapshotId " + prevSnapId +
                 " but found " + prevSnapshotLocalData.getSnapshotId() +
-                " in file " + previousSnapshotLocalDataFile.getAbsolutePath());
+                " in file " + previousSnapshotLocalDataFile.getAbsolutePath();
+            if (failedFilePaths != null) {
+              failedFilePaths.add(previousSnapshotLocalDataFile.getAbsolutePath());
+              LOG.error("Skipping snapshot local data for snapshot {} because previous snapshot local data yaml {} " +
+                  "has a mismatched snapshotId: {}", snapId, previousSnapshotLocalDataFile.getAbsolutePath(), mismatch);
+              return false;
+            }
+            throw new IOException(mismatch);
           }
           stack.push(Pair.of(prevSnapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(prevSnapshotLocalData)));
         }
         visitedSnapshotIds.add(snapId);
       }
+    }
+    return true;
+  }
+
+  private Optional<OmSnapshotLocalData> tryLoadSnapshotLocalData(File localDataFile, Set<String> failedFilePaths) {
+    String path = localDataFile.getAbsolutePath();
+    if (failedFilePaths.contains(path)) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(snapshotLocalDataSerializer.load(localDataFile));
+    } catch (IOException e) {
+      failedFilePaths.add(path);
+      LOG.error("Skipping snapshot local data file {} because it could not be loaded. " +
+          "Snapshot defrag and snapshot diff may be unavailable for the affected snapshot.", path, e);
+      return Optional.empty();
     }
   }
 
@@ -360,16 +414,23 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       throw new IOException("Error while listing yaml files inside directory: " + snapshotDir.getAbsolutePath());
     }
     Arrays.sort(localDataFiles, Comparator.comparing(File::getName));
+    Set<String> failedFilePaths = new HashSet<>();
     for (File localDataFile : localDataFiles) {
-      OmSnapshotLocalData snapshotLocalData = snapshotLocalDataSerializer.load(localDataFile);
+      Optional<OmSnapshotLocalData> loadedLocalData = tryLoadSnapshotLocalData(localDataFile, failedFilePaths);
+      if (!loadedLocalData.isPresent()) {
+        continue;
+      }
+      OmSnapshotLocalData snapshotLocalData = loadedLocalData.get();
       File file = new File(getSnapshotLocalPropertyYamlPath(snapshotLocalData.getSnapshotId()));
       String expectedPath = file.getAbsolutePath();
       String actualPath = localDataFile.getAbsolutePath();
       if (!expectedPath.equals(actualPath)) {
-        throw new IOException("Unexpected path for local data file with snapshotId:" + snapshotLocalData.getSnapshotId()
-            + " : " + actualPath + ". " + "Expected: " + expectedPath);
+        failedFilePaths.add(actualPath);
+        LOG.error("Skipping snapshot local data file {} because its stored snapshotId {} does not match its path. " +
+            "Expected path: {}.", actualPath, snapshotLocalData.getSnapshotId(), expectedPath);
+        continue;
       }
-      addVersionNodeWithDependents(snapshotLocalData);
+      addVersionNodeWithDependents(snapshotLocalData, failedFilePaths);
     }
     for (UUID snapshotId : versionNodeMap.keySet()) {
       incrementOrphanCheckCount(snapshotId);
