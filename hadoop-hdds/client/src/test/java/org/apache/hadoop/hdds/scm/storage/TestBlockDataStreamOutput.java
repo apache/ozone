@@ -76,7 +76,8 @@ class TestBlockDataStreamOutput {
       byte[] data = randomBytes(50);
       stream.write(ByteBuffer.wrap(data), 0, data.length);
       // No chunk shipped yet — data is in currentBuffer
-      assertEquals(0, pipeline.getReceivedChunks().size(), "No chunk should be shipped before close for sub-chunk write");
+      assertEquals(0, pipeline.getReceivedChunks().size(),
+          "No chunk should be shipped before close for sub-chunk write");
     }
     // After close: 1 chunk flushed + 1 putBlock
     assertEquals(1, pipeline.getReceivedChunks().size());
@@ -119,7 +120,7 @@ class TestBlockDataStreamOutput {
       stream.write(ByteBuffer.wrap(data), 0, data.length);
       // 5 chunks written, putBlock at 400B boundary, back-pressure at 500B
       // should have triggered watchForCommit
-      assertEquals(1,pipeline.getWatchForCommitCount(), "watchForCommit should be called for back-pressure");
+      assertEquals(1, pipeline.getWatchForCommitCount(), "watchForCommit should be called for back-pressure");
     }
     assertArrayEquals(data, pipeline.getAllReceivedData());
   }
@@ -133,8 +134,8 @@ class TestBlockDataStreamOutput {
       stream.hsync();
       // 2 chunks, 1 putBlock (from hsync), watch called
       assertEquals(2, pipeline.getReceivedChunks().size());
-      assertEquals(1,pipeline.getReceivedPutBlocks().size());
-      assertEquals(1,pipeline.getWatchForCommitCount());
+      assertEquals(1, pipeline.getReceivedPutBlocks().size());
+      assertEquals(1, pipeline.getWatchForCommitCount());
     }
   }
 
