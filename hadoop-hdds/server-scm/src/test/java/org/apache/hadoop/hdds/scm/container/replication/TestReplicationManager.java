@@ -1742,6 +1742,14 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testReconstructionGlobalLimitDisabledByDefault() throws IOException {
+    assertEquals(0, rmConf.getReconstructionGlobalLimit());
+    ReplicationManager rm = createReplicationManager();
+    assertEquals(0, rm.getReconstructionInFlightLimit());
+    assertFalse(rm.isReconstructionLimitReached());
+  }
+
+  @Test
   public void testInflightReconstructionLimit() throws IOException, NodeNotFoundException {
     rmConf.setReconstructionGlobalLimit(2);
     ReplicationManager rm = createReplicationManager();
