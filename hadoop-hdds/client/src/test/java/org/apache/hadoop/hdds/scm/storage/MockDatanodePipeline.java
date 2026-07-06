@@ -22,7 +22,9 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Iterables;
@@ -70,7 +72,7 @@ import org.apache.ratis.protocol.RoutingTable;
  * <p>Tracks all chunks written, putBlock calls, and watchForCommit calls.
  * Configurable failure injection for each operation.
  */
-public class FakeDatanodePipeline {
+public class MockDatanodePipeline {
 
   private final Pipeline pipeline;
   private final XceiverClientRatis xceiverClient;
@@ -97,11 +99,11 @@ public class FakeDatanodePipeline {
   private volatile Supplier<Throwable> watchFailure = null;
   private volatile int watchFailAfter = Integer.MAX_VALUE;
 
-  public FakeDatanodePipeline() throws IOException {
+  public MockDatanodePipeline() throws IOException {
     this(new BlockID(1, 1));
   }
 
-  public FakeDatanodePipeline(BlockID blockID) throws IOException {
+  public MockDatanodePipeline(BlockID blockID) throws IOException {
     this.blockID = blockID;
     this.pipeline = MockPipeline.createRatisPipeline();
 
@@ -109,7 +111,12 @@ public class FakeDatanodePipeline {
     XceiverClientManager.getXceiverClientMetrics();
 
     // Create concrete DataStreamOutput
-    FakeDataStreamOutput fakeOut = new FakeDataStreamOutput();
+    DataStreamOutput mockDataStreamOutput = spy(DataStreamOutput.class);
+    doThrow(new UnsupportedOperationException()).
+        when(mockDataStreamOutput).writeAsync(any(FilePositionCount.class), any(WriteOption[].class));
+    doThrow(new UnsupportedOperationException()).when(mockDataStreamOutput).getRaftClientReplyFuture();
+    doThrow(new UnsupportedOperationException()).when(mockDataStreamOutput).getWritableByteChannel();
+    doReturn(CompletableFuture.completedFuture(dataStreamReply(0))).when(mockDataStreamOutput).closeAsync();
 
     // Mock XceiverClientRatis
     this.xceiverClient = mock(XceiverClientRatis.class);
@@ -120,8 +127,8 @@ public class FakeDatanodePipeline {
     // Both overloads must be stubbed: stream(ByteBuffer) and stream(ByteBuffer, RoutingTable) — the pipeline-mode
     // default is true, so the 2-arg overload is what BlockDataStreamOutput.setupStream calls.
     DataStreamApi dataStreamApi = mock(DataStreamApi.class);
-    doReturn(fakeOut).when(dataStreamApi).stream(any(ByteBuffer.class));
-    doReturn(fakeOut).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
+    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class));
+    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
     doReturn(dataStreamApi).when(xceiverClient).getDataStreamApi();
 
     // Setup sendCommandAsync (putBlock) behavior
@@ -168,7 +175,30 @@ public class FakeDatanodePipeline {
     }).when(xceiverClient).watchForCommit(anyLong());
 
     // Setup updateCommitInfosMap — no-op
-    doReturn(0L).when(xceiverClient).updateCommitInfosMap(any(Collection.class));
+    doAnswer(invocation -> {
+      ByteBuffer src = invocation.getArgument(0);
+      Iterable<WriteOption> options = invocation.getArgument(1);
+      int size = src.remaining();
+      for (WriteOption option : options) {
+        if (option == StandardWriteOption.CLOSE) {
+          if (!receivedChunks.isEmpty()) {
+            receivedChunks.remove(receivedChunks.size() - 1);
+          }
+          src.position(src.limit());
+          return CompletableFuture.completedFuture(dataStreamReply(size));
+        }
+      }
+      int count = chunkCount.incrementAndGet();
+      if (count > chunkFailAfter && chunkFailure != null) {
+        CompletableFuture<DataStreamReply> failed = new CompletableFuture<>();
+        failed.completeExceptionally(chunkFailure.get());
+        return failed;
+      }
+      byte[] data = new byte[size];
+      src.get(data);
+      receivedChunks.add(data);
+      return CompletableFuture.completedFuture(dataStreamReply(data.length));
+    }).when(mockDataStreamOutput).writeAsync(any(ByteBuffer.class), any(Iterable.class));
 
     // Mock XceiverClientFactory
     this.clientFactory = mock(XceiverClientFactory.class);
@@ -220,19 +250,19 @@ public class FakeDatanodePipeline {
 
   // --- Failure injection ---
 
-  public FakeDatanodePipeline failChunkAfter(int n, Supplier<Throwable> err) {
+  public MockDatanodePipeline failChunkAfter(int n, Supplier<Throwable> err) {
     this.chunkFailAfter = n;
     this.chunkFailure = err;
     return this;
   }
 
-  public FakeDatanodePipeline failPutBlockAfter(int n, Supplier<Throwable> err) {
+  public MockDatanodePipeline failPutBlockAfter(int n, Supplier<Throwable> err) {
     this.putBlockFailAfter = n;
     this.putBlockFailure = err;
     return this;
   }
 
-  public FakeDatanodePipeline failWatchAfter(int n, Supplier<Throwable> err) {
+  public MockDatanodePipeline failWatchAfter(int n, Supplier<Throwable> err) {
     this.watchFailAfter = n;
     this.watchFailure = err;
     return this;
@@ -254,119 +284,12 @@ public class FakeDatanodePipeline {
         .build();
   }
 
-  /**
-   * Concrete DataStreamOutput implementation that records data chunks and supports failure injection.
-   *
-   * <p>Filters out close-protocol writes from {@code executePutBlockClose}, which sends 2 writes:
-   * a putBlock protobuf (no special option) followed by a proto-length trailer with {@link StandardWriteOption#CLOSE}.
-   * When we see CLOSE, we remove the preceding putBlock write and skip the current one, so only real data chunks are
-   * recorded.
-   */
-  private class FakeDataStreamOutput implements DataStreamOutput {
-
-    private boolean containsCloseOption(Iterable<WriteOption> options) {
-      return Iterables.any(options, opt -> opt == StandardWriteOption.CLOSE);
-    }
-
-    @Override
-    public CompletableFuture<DataStreamReply> writeAsync(ByteBuffer src, Iterable<WriteOption> options) {
-      int size = src.remaining();
-      if (containsCloseOption(options)) {
-        // CLOSE write (proto-length trailer from executePutBlockClose).
-        // Remove the preceding putBlock write that was recorded, then skip recording this one too.
-        if (!receivedChunks.isEmpty()) {
-          receivedChunks.remove(receivedChunks.size() - 1);
-        }
-        // Consume the buffer to advance its position
-        src.position(src.limit());
-        DataStreamReply reply = new SimpleDataStreamReply(true, size);
-        return CompletableFuture.completedFuture(reply);
-      }
-
-      int count = chunkCount.incrementAndGet();
-      if (count > chunkFailAfter && chunkFailure != null) {
-        CompletableFuture<DataStreamReply> f = new CompletableFuture<>();
-        f.completeExceptionally(chunkFailure.get());
-        return f;
-      }
-      byte[] data = new byte[size];
-      src.get(data);
-      receivedChunks.add(data);
-      DataStreamReply reply = new SimpleDataStreamReply(true, data.length);
-      return CompletableFuture.completedFuture(reply);
-    }
-
-    @Override
-    public CompletableFuture<DataStreamReply> writeAsync(FilePositionCount filePositionCount, WriteOption... options) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public CompletableFuture<RaftClientReply> getRaftClientReplyFuture() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public WritableByteChannel getWritableByteChannel() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public CompletableFuture<DataStreamReply> closeAsync() {
-      return CompletableFuture.completedFuture(new SimpleDataStreamReply(true, 0));
-    }
-  }
-
-  /**
-   * Minimal DataStreamReply implementation for test purposes.
-   */
-  static class SimpleDataStreamReply implements DataStreamReply {
-    private final boolean success;
-    private final long bytesWritten;
-
-    SimpleDataStreamReply(boolean success, long bytesWritten) {
-      this.success = success;
-      this.bytesWritten = bytesWritten;
-    }
-
-    @Override
-    public boolean isSuccess() {
-      return success;
-    }
-
-    @Override
-    public long getBytesWritten() {
-      return bytesWritten;
-    }
-
-    @Override
-    public Collection<CommitInfoProto> getCommitInfos() {
-      return Collections.emptyList();
-    }
-
-    @Override
-    public ClientId getClientId() {
-      return ClientId.randomId();
-    }
-
-    @Override
-    public DataStreamPacketHeaderProto.Type getType() {
-      return DataStreamPacketHeaderProto.Type.STREAM_DATA;
-    }
-
-    @Override
-    public long getStreamId() {
-      return 0;
-    }
-
-    @Override
-    public long getStreamOffset() {
-      return 0;
-    }
-
-    @Override
-    public long getDataLength() {
-      return bytesWritten;
-    }
+  private static DataStreamReply dataStreamReply(long bytesWritten) {
+    DataStreamReply reply = mock(DataStreamReply.class);
+    when(reply.isSuccess()).thenReturn(true);
+    when(reply.getBytesWritten()).thenReturn(bytesWritten);
+    when(reply.getDataLength()).thenReturn(bytesWritten);
+    when(reply.getCommitInfos()).thenReturn(Collections.emptyList());
+    return reply;
   }
 }
