@@ -156,6 +156,7 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  SetEventNotificationCheckpoint = 144;
 }
 
 enum SafeMode {
@@ -304,6 +305,7 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+  optional SetEventNotificationCheckpointRequest setEventNotificationCheckpointRequest = 144;
 }
 
 message OMResponse {
@@ -437,6 +439,7 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+  optional SetEventNotificationCheckpointResponse setEventNotificationCheckpointResponse = 144;
 }
 
 enum Status {
@@ -2003,6 +2006,11 @@ message SetRangerServiceVersionRequest {
     required uint64 rangerServiceVersion = 1;
 }
 
+message SetEventNotificationCheckpointRequest {
+    required string checkpointKey = 1;
+    required string checkpointValue = 2;
+}
+
 message CreateSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -2154,6 +2162,9 @@ message CreateTenantResponse {
 }
 
 message SetRangerServiceVersionResponse {
+}
+
+message SetEventNotificationCheckpointResponse {
 }
 
 message CreateSnapshotResponse {

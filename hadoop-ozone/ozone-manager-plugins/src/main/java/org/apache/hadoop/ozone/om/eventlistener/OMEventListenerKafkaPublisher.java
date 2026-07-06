@@ -84,7 +84,8 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
       exception.initCause(ex);
       throw exception;
     }
-    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
+    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition(
+        pluginContext.getNotificationCheckpointStrategy());
 
     LOG.info("Creating OMEventListenerLedgerPoller with serviceInterval={}," +
         "serviceTimeout={}, seekPosition={}",

@@ -28,9 +28,12 @@ import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
  */
 public final class OMEventListenerPluginContextImpl implements OMEventListenerPluginContext {
   private final OzoneManager ozoneManager;
+  private final NotificationCheckpointStrategy checkpointStrategy;
 
-  public OMEventListenerPluginContextImpl(OzoneManager ozoneManager) {
+  public OMEventListenerPluginContextImpl(OzoneManager ozoneManager,
+                                          NotificationCheckpointStrategy checkpointStrategy) {
     this.ozoneManager = ozoneManager;
+    this.checkpointStrategy = checkpointStrategy;
   }
 
   @Override
@@ -43,6 +46,11 @@ public final class OMEventListenerPluginContextImpl implements OMEventListenerPl
   @Override
   public List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException {
     return ozoneManager.getMetadataManager().listCompletedRequestInfo(startKey, maxResults);
+  }
+
+  @Override
+  public NotificationCheckpointStrategy getNotificationCheckpointStrategy() {
+    return checkpointStrategy;
   }
 
   // TODO: it feels like this doesn't belong here

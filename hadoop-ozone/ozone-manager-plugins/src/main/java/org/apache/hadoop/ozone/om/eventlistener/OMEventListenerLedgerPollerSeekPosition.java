@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.eventlistener;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,21 +25,27 @@ import org.slf4j.LoggerFactory;
 /**
  * This is a helper class to get/set the seek position used by the
  * OMEventListenerLedgerPoller.
- *
- * XXX: the seek position should be persisted (and ideally distributed to
- * all OMs) but at the moment it only lives in memory
  */
 public class OMEventListenerLedgerPollerSeekPosition {
   public static final Logger LOG = LoggerFactory.getLogger(OMEventListenerLedgerPollerSeekPosition.class);
 
+  private final NotificationCheckpointStrategy checkpointStrategy;
   private final AtomicReference<String> seekPosition;
 
-  public OMEventListenerLedgerPollerSeekPosition() {
-    this.seekPosition = new AtomicReference(initSeekPosition());
+  public OMEventListenerLedgerPollerSeekPosition(NotificationCheckpointStrategy checkpointStrategy) {
+    this.checkpointStrategy = checkpointStrategy;
+    this.seekPosition = new AtomicReference<>(initSeekPosition());
   }
 
-  // TODO: load this from persistent storage
   public String initSeekPosition() {
+    try {
+      if (checkpointStrategy != null) {
+        return checkpointStrategy.load();
+      }
+    } catch (Exception ex) {
+      LOG.warn("Failed to load initial seek position from checkpoint strategy. " +
+          "Fallback to starting from the beginning.", ex);
+    }
     return null;
   }
 
@@ -48,10 +55,36 @@ public class OMEventListenerLedgerPollerSeekPosition {
 
   public void set(String val) {
     LOG.debug("Setting seek position {}", val);
-    // NOTE: this in-memory view of the seek position needs to be kept
-    // up to date because the OMEventListenerLedgerPoller has a
-    // reference to it
-    seekPosition.set(val);
+    String current = seekPosition.get();
+    if (Objects.equals(current, val)) {
+      return;
+    }
+    try {
+      if (checkpointStrategy != null) {
+        checkpointStrategy.save(val);
+      }
+    } catch (Exception ex) {
+      // Save failure does NOT block subsequent runs or in-memory progress!
+      LOG.warn("Failed to save seek position checkpoint {} to database. " +
+          "Progress will continue in-memory but is not durably saved.", val, ex);
+    } finally {
+      // ALWAYS advance the in-memory seek position, even if saving fails,
+      // so that the background task is not blocked from making progress.
+      seekPosition.set(val);
+    }
+  }
+
+  public void reset() {
+    LOG.debug("Resetting seek position");
+    try {
+      if (checkpointStrategy != null) {
+        checkpointStrategy.reset();
+      }
+    } catch (Exception ex) {
+      LOG.warn("Failed to reset seek position checkpoint on database strategy.", ex);
+    } finally {
+      seekPosition.set(null);
+    }
   }
 
   @Override
