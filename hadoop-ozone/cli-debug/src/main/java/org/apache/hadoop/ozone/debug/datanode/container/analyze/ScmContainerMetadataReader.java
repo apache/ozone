@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -34,12 +35,17 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Read-only lookup of container metadata from {@code scm.db}.
  */
 public final class ScmContainerMetadataReader implements AutoCloseable {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ScmContainerMetadataReader.class);
   private final DBStore dbStore;
   private final Table<ContainerID, ContainerInfo> containerTable;
 
@@ -84,6 +90,33 @@ public final class ScmContainerMetadataReader implements AutoCloseable {
       return Optional.empty();
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException("Failed to read container " + containerId + " from scm.db", e);
+    }
+  }
+
+  /**
+   * Read the cluster ID from the SCM VERSION file adjacent to {@code scmDbDir}.
+   *
+   * <p>The VERSION file is expected at
+   * {@code {scmDbDir.parent}/{@value OzoneConsts#STORAGE_DIR}/current/VERSION}.
+   *
+   * @return the cluster ID string, or null if the file does not exist or could not be read.
+   */
+  static String readScmClusterId(File scmDbDir) {
+    File parentDir = scmDbDir.getParentFile();
+    if (parentDir == null) {
+      return null;
+    }
+    File versionFile = new File(new File(new File(parentDir, OzoneConsts.STORAGE_DIR),
+        Storage.STORAGE_DIR_CURRENT), Storage.STORAGE_FILE_VERSION);
+    if (!versionFile.exists()) {
+      return null;
+    }
+    try {
+      Properties props = DatanodeVersionFile.readFrom(versionFile);
+      return props.getProperty(OzoneConsts.CLUSTER_ID);
+    } catch (IOException e) {
+      LOG.debug("Could not read SCM cluster ID from {}: {}", versionFile, e.getMessage());
+      return null;
     }
   }
 

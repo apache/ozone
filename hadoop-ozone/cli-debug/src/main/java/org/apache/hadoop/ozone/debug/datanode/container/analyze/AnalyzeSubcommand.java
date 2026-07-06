@@ -25,12 +25,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.shell.ListLimitOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -58,8 +66,16 @@ import picocli.CommandLine.Command;
         "  VALID: metadata file is present, parses correctly, and its containerID matches the directory name."
     })
 public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Void> {
+  @Deprecated
+  @CommandLine.Option(names = {"--count"},
+      hidden = true,
+      description = "Number of containers to display")
+  private Integer count;
+
   @CommandLine.Mixin
   private ListLimitOptions listOptions;
+  
+  private static final Logger LOG = LoggerFactory.getLogger(AnalyzeSubcommand.class);
 
   @CommandLine.Option(names = {"--scm-db"},
       description = "Path to an offline scm.db directory, or its parent metadata directory.")
@@ -73,9 +89,9 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
     Map<Long, List<ContainerDiskOccurrence>> enrichedDuplicates =
         ContainerDirectoryScanner.enrichDuplicates(scanResult.getDuplicates());
 
-    if (scmDb != null) {
+    if (scmDb != null && checkClusterIdConsistency(conf)) {
       findOrphanAndDeletedButPresentContainers(conf, scanResult, enrichedDuplicates);
-    } else {
+    } else if (scmDb == null) {
       out().println("To identify orphan containers (wrt SCM) and containers that are marked as DELETED in SCM but"
           + " exist in the datanode's current directory, provide the SCM database path using the --scm-db option."
       );
@@ -88,12 +104,75 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
 
   /**
    * Validate CLI options before starting the on-disk DN scan.
-   * {@link ListLimitOptions#getLimit()} is also called from
+   * {@link #getDisplayLimit()} is also called from
    * {@link #printContainerOccurrenceReport(String, Map)}, but validating here fails fast
    * before the DN volume scan and SCM DB lookup.
    */
   private void validateOptions() {
-    listOptions.getLimit();
+    getDisplayLimit();
+  }
+
+  private int getDisplayLimit() {
+    if (count != null) {
+      if (count < 1) {
+        throw new IllegalArgumentException("Count must be an integer greater than 0.");
+      }
+      return count;
+    }
+    return listOptions.getLimit();
+  }
+
+  private boolean displayAll() {
+    return count == null && listOptions.isAll();
+  }
+  
+  private boolean checkClusterIdConsistency(OzoneConfiguration conf) {
+    File resolvedScmDb;
+    try {
+      resolvedScmDb = ScmContainerMetadataReader.resolveScmDbDirectory(scmDb);
+    } catch (IOException e) {
+      err().println(e.getMessage());
+      return false;
+    }
+    
+    String scmClusterId = ScmContainerMetadataReader.readScmClusterId(resolvedScmDb);
+    
+    if (scmClusterId == null) {
+      err().printf("Warning: could not determine the SCM cluster ID from the VERSION file next to %s. "
+              + "Cluster ID comparison with DataNode volume cluster ID was skipped. "
+              + "Verify --scm-db is from the same cluster as this DataNode.%n", resolvedScmDb);
+      return true;
+    }
+
+    String dnClusterId = readFirstDnClusterId(conf);
+    if (dnClusterId == null) {
+      err().println("Warning: could not determine the DataNode cluster ID from configured volumes.");
+      return true;
+    } else if (!dnClusterId.equals(scmClusterId)) {
+      err().printf("Warning: cluster ID mismatch. DataNode volume cluster ID [%s]"
+              + " does not match SCM database cluster ID [%s] at %s."
+              + " Verify --scm-db is from the same cluster as this DataNode.%n",
+          dnClusterId, scmClusterId, resolvedScmDb);
+      return false;
+    }
+    return true;
+  }
+
+  private String readFirstDnClusterId(OzoneConfiguration conf) {
+    for (String storageDir : HddsServerUtil.getDatanodeStorageDirs(conf)) {
+      try {
+        String volumeRoot = StorageLocation.parse(storageDir).getUri().getPath();
+        File hddsRoot = new File(volumeRoot, HddsVolume.HDDS_VOLUME_DIR);
+        File versionFile = StorageVolumeUtil.getVersionFile(hddsRoot);
+        Properties props = DatanodeVersionFile.readFrom(versionFile);
+        if (!props.isEmpty()) {
+          return StorageVolumeUtil.getClusterID(props, versionFile, null);
+        }
+      } catch (IOException e) {
+        LOG.debug("Could not read cluster ID from volume {}: {}", storageDir, e.getMessage());
+      }
+    }
+    return null;
   }
 
   private void findOrphanAndDeletedButPresentContainers(OzoneConfiguration conf, ContainerScanResult scanResult,
@@ -140,8 +219,8 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
 
     Stream<Map.Entry<Long, List<ContainerDiskOccurrence>>> stream =
         containersById.entrySet().stream().sorted(Map.Entry.comparingByKey());
-    if (!listOptions.isAll()) {
-      int limit = listOptions.getLimit();
+    if (!displayAll()) {
+      int limit = getDisplayLimit();
       if (total > limit) {
         out().printf("Showing first %d:%n", limit);
       }
