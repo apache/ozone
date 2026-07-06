@@ -222,7 +222,7 @@ public class TestStreamBlockInputStream {
       reader.setStreamingReadResponse(streamingReadResponse);
       readerRef.set(reader);
       return null;
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
 
     // Simulate the race: when the client sends a ReadBlock request, the server
     // responds with data (onNext) and closes the stream (onCompleted) before
@@ -336,7 +336,7 @@ public class TestStreamBlockInputStream {
       reader.setStreamingReadResponse(streamingReadResponse);
       readerRef.set(reader);
       return null;
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
 
     // Server delivers both 4-byte chunks plus onCompleted() in one synchronous
     // call. After streamRead() returns: queue=[chunk1, chunk2], isDone=true.
