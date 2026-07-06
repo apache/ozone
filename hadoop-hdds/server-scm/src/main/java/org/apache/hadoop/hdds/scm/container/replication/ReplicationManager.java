@@ -1345,13 +1345,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     @Config(key = "hdds.scm.replication.reconstruction.global.limit",
         type = ConfigType.INT,
-        defaultValue = "50",
+        defaultValue = "0",
         reconfigurable = true,
         tags = { SCM },
         description = "A cluster-wide limit to restrict the total number of " +
-            "active EC reconstruction commands across the cluster."
+            "active EC reconstruction commands across the cluster. A setting " +
+            "of zero disables global reconstruction limit checking."
     )
-    private int reconstructionGlobalLimit = 50;
+    private int reconstructionGlobalLimit = 0;
 
     @Config(key = "hdds.scm.replication.quasi.closed.stuck.best.origin.copies",
         type = ConfigType.INT,
