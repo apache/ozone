@@ -394,7 +394,12 @@ public class TestFailureHandlingByClient {
 
       assertThat(keyOutputStream.getExcludeList().getContainerIds())
           .contains(ContainerID.valueOf(containerId));
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      // Datanodes are not asserted here. Under the default ALL_COMMITTED watch
+      // level a slow-but-healthy follower can be recorded in the exclude list, so
+      // an empty datanode set is not an invariant for this config (the watch
+      // level is configurable via RatisClientConfig watchType, HDDS-2887).
+      // Watch-level datanode exclusion is covered by
+      // testDatanodeExclusionWithMajorityCommit.
       assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
 
       // The close will just write to the buffer

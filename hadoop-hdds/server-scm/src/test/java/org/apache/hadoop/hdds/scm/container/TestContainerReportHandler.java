@@ -1481,7 +1481,7 @@ public class TestContainerReportHandler {
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
+            .setContainerID(containerId.getIdForTesting())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .setSize(5368709120L)

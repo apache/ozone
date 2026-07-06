@@ -404,6 +404,15 @@ public abstract class EndpointBase {
       Function<KV, String> getTagKey,
       Function<KV, String> getTagValue
   ) throws OS3Exception {
+    return validateAndGetTagging(tagList, getTagKey, getTagValue, TAG_NUM_LIMIT);
+  }
+
+  protected static <KV> Map<String, String> validateAndGetTagging(
+      List<KV> tagList,
+      Function<KV, String> getTagKey,
+      Function<KV, String> getTagValue,
+      int maxTagCount
+  ) throws OS3Exception {
     final Map<String, String> tags = new HashMap<>();
     for (KV tagPair : tagList) {
       final String tagKey = getTagKey.apply(tagPair);
@@ -455,19 +464,18 @@ public abstract class EndpointBase {
 
       final String previous = tags.put(tagKey, tagValue);
       if (previous != null) {
-        // Tags that are associated with an object must have unique tag keys
-        // Reject request if the same key is used twice on the same resource
+        // Tags must have unique keys on the same resource (object or bucket).
         OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("There are tags with duplicate tag keys, tag keys should be unique");
         throw ex;
       }
     }
 
-    if (tags.size() > TAG_NUM_LIMIT) {
-      // You can associate up to 10 tags with an object.
+    if (tags.size() > maxTagCount) {
+      // You can associate up to 10 tags with an object and up to 50 tags with a bucket.
       OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, TAG_HEADER);
       ex.setErrorMessage("The number of tags " + tags.size() +
-          " exceeded the maximum number of tags of " + TAG_NUM_LIMIT);
+          " exceeded the maximum number of tags of " + maxTagCount);
       throw ex;
     }
 

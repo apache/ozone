@@ -46,7 +46,7 @@
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
@@ -82,7 +82,7 @@
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
-    <gson.version>2.13.1</gson.version>
+    <gson.version>2.14.0</gson.version>
     <guava.version>33.6.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
@@ -101,7 +101,7 @@
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
-    <javassist.version>3.31.0-GA</javassist.version>
+    <javassist.version>3.32.0-GA</javassist.version>
     <javax.inject.version>1</javax.inject.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
