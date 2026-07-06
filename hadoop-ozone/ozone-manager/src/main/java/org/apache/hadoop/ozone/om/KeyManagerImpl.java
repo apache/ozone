@@ -2230,6 +2230,11 @@ public class KeyManagerImpl implements KeyManager {
         });
   }
 
+  @Override
+  public boolean isSortDatanodesForWriteEnabled() {
+    return ozoneManager.getConfig().isSortDatanodesForWriteEnabled();
+  }
+
   /**
    * Sort a pipeline's nodes by topology distance to the client. The nodes come
    * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no

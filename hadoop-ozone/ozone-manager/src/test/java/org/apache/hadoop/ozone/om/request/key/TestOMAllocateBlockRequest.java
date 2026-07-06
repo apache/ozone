@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -250,10 +251,30 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testAllocateBlockSendsClientMachineToScmWhenFlagOff() throws Exception {
+    // Flag off (default): OM must NOT sort; SCM receives the real client address
+    // so it performs the sort.
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(false);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
+    request.preExecute(ozoneManager);
+
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
+        any(), any(), clientMachine.capture());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString());
+  }
+
+  @Test
   public void testAllocateBlockDoesNotSendClientMachineToScm() throws Exception {
     // OM now sorts the write pipeline locally, so SCM must receive an empty
     // clientMachine even when the client requests sorted datanodes.
     KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
     when(mockKeyManager.sortDatanodesForWrite(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
@@ -300,6 +321,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     List<DatanodeDetails> sortedOrder = new ArrayList<>(nodes);
     Collections.reverse(sortedOrder);
     KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
     when(mockKeyManager.sortDatanodesForWrite(any(), any()))
         .thenAnswer(inv -> sortedOrder);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);

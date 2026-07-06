@@ -377,4 +377,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine);
+
+  /**
+   * @return true if OM should sort the streaming-write pipeline locally
+   *     ({@code ozone.om.block.write.sort.datanodes.enabled}); false to leave
+   *     the sort to SCM.
+   */
+  boolean isSortDatanodesForWriteEnabled();
 }
