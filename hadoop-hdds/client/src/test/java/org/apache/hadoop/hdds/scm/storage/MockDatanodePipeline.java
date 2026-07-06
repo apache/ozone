@@ -27,12 +27,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -57,11 +54,7 @@ import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.io.WriteOption;
-import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
-import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto;
-import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.DataStreamReply;
-import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RoutingTable;
 
 /**
