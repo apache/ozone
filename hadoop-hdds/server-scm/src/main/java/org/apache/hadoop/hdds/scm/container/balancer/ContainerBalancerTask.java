@@ -120,6 +120,8 @@ public class ContainerBalancerTask implements Runnable {
   private Queue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
   private AtomicBoolean isCurrentIterationInProgress = new AtomicBoolean(false);
+  private volatile String stopReason;
+  private volatile OffsetDateTime stoppedAt;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -190,8 +192,16 @@ public class ContainerBalancerTask implements Runnable {
       balance();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
+      recordStopReason("STOPPED_WITH_ERROR: " + e.getMessage());
     } finally {
       synchronized (this) {
+        finalizeInProgressIteration();
+        if (stoppedAt == null) {
+          stoppedAt = now();
+        }
+        if (stopReason == null) {
+          stopReason = "STOPPED";
+        }
         taskStatus = Status.STOPPED;
       }
     }
@@ -417,19 +427,57 @@ public class ContainerBalancerTask implements Runnable {
   /**
    * Logs the reason for stop and save configuration and stop the task.
    * 
-   * @param stopReason a string specifying the reason for stop
+   * @param reason a string specifying the reason for stop
    */
-  private void tryStopWithSaveConfiguration(String stopReason) {
+  private void tryStopWithSaveConfiguration(String reason) {
     synchronized (this) {
       try {
-        LOG.info("Save Configuration for stopping. Reason: {}", stopReason);
+        recordStopReason(reason);
+        LOG.info("Save Configuration for stopping. Reason: {}", reason);
         saveConfiguration(config, false, 0);
         stop();
       } catch (IOException | TimeoutException e) {
         LOG.warn("Save configuration failed. Reason for " +
-            "stopping: {}", stopReason, e);
+            "stopping: {}", reason, e);
       }
     }
+  }
+
+  /**
+   * Records the reason why the balancer task is stopping.
+   *
+   * @param reason stop reason
+   */
+  public void recordStopReason(String reason) {
+    if (stopReason == null) {
+      stopReason = reason;
+    }
+  }
+
+  private void finalizeInProgressIteration() {
+    if (!isCurrentIterationInProgress.get()) {
+      return;
+    }
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    int lastIterationNumber = resultList.stream()
+        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+        .max()
+        .orElse(0);
+    long iterationDuration = getCurrentIterationDuration();
+    iterationsStatistic.offer(
+        getIterationStatistic(
+            lastIterationNumber + 1,
+            IterationResult.ITERATION_INTERRUPTED,
+            iterationDuration));
+    isCurrentIterationInProgress.set(false);
+  }
+
+  public String getStopReason() {
+    return stopReason;
+  }
+
+  public OffsetDateTime getStoppedAt() {
+    return stoppedAt;
   }
 
   private void saveConfiguration(ContainerBalancerConfiguration configuration,

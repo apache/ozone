@@ -258,4 +258,32 @@ class TestContainerBalancerStatusInfo {
     thread.start();
     Assertions.assertDoesNotThrow(task::getCurrentIterationsStatistic);
   }
+
+  @Test
+  void testFinalizeInProgressIterationOnStop() throws Exception {
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+
+    ContainerBalancerConfiguration config =
+        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    config.setIterations(3);
+    config.setBalancingInterval(0);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+    config.setTriggerDuEnable(false);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
+    LambdaTestUtils.await(5000, 10,
+        () -> !task.getCurrentIterationsStatistic().isEmpty()
+            && task.getCurrentIterationsStatistic().stream()
+            .anyMatch(it -> it.getContainerMovesScheduled() > 0));
+    
+    task.stop();
+    LambdaTestUtils.await(5000, 10,
+        () -> task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
+    assertNotNull(task.getStoppedAt());
+    assertEquals("STOPPED", task.getStopReason());
+
+    boolean hasInterruptedIteration = task.getCurrentIterationsStatistic().stream()
+        .anyMatch(it -> "ITERATION_INTERRUPTED".equals(it.getIterationResult()));
+    assertTrue(hasInterruptedIteration);
+  }
 }
