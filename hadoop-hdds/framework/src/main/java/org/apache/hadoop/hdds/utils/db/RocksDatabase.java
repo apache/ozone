@@ -905,6 +905,14 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
+          // deleteSstFileRange uses deleteFilesInRanges over this file's
+          // [smallestKey, largestKey]. It may also drop other files fully
+          // contained in that range, which is safe here: any such file's key
+          // range is a subset of this non-matching file's range. Because
+          // isKeyWithPrefixPresent is a monotone prefix-range test, a subset
+          // range cannot contain the prefix when the enclosing range does not,
+          // so every collaterally deleted file is likewise non-matching. This
+          // invariant holds only while isKeyWithPrefixPresent stays monotone.
           db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }

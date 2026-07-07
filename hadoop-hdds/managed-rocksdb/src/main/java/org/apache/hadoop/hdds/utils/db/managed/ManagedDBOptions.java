@@ -34,6 +34,8 @@ public class ManagedDBOptions extends DBOptions {
   private final UncheckedAutoCloseable leakTracker = track(this);
   private final AtomicReference<Logger> loggerRef = new AtomicReference<>();
 
+  // Overload (not @Override): DBOptions#setLogger takes LoggerInterface since
+  // RocksDB 9.x. Keep the Logger param so we can leak-track/close it.
   public DBOptions setLogger(Logger logger) {
     IOUtils.close(LOG, loggerRef.getAndSet(logger));
     return super.setLogger(logger);

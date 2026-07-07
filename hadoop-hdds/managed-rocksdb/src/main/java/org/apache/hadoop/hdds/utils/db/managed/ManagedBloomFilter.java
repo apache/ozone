@@ -28,6 +28,8 @@ import org.rocksdb.BloomFilter;
 public class ManagedBloomFilter extends BloomFilter {
   private final UncheckedAutoCloseable leakTracker = track(this);
 
+  // Delegate to satisfy SpotBugs EQ_DOESNT_OVERRIDE_EQUALS: BloomFilter defines
+  // equals()/hashCode() and this subclass adds a field (leakTracker).
   @Override
   public boolean equals(Object obj) {
     return super.equals(obj);
