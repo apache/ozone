@@ -56,7 +56,8 @@ public final class OmSnapshotLocalDataYaml {
   public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
   public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
   public static final String YAML_FILE_EXTENSION = ".yaml";
-  // Defines the maximum size of yaml file it will parse
+  // Maximum number of Unicode code points the YAML parser will read (SnakeYAML code point limit).
+  // For the ASCII snapshot local data YAML this is effectively the maximum file size in bytes.
   public static final int SNAPSHOT_LOCAL_DATA_YAML_CODE_POINT_LIMIT = 128 * 1024 * 1024;
 
   private OmSnapshotLocalDataYaml() {

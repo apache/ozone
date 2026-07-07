@@ -299,8 +299,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    *
    * @param snapshotLocalData snapshot local data to add to the version graph
    * @param failedFilePaths when non-null, a previous snapshot YAML that cannot be loaded or whose snapshotId does not
-   *     match its path is skipped instead of thrown, and the offending paths are recorded here so they are neither
-   *     reloaded nor re-logged during startup
+   *     match its path is skipped instead of thrown, and its path is recorded here so it is not reloaded during
+   *     startup (a path recorded here is not logged again on subsequent lookups)
    * @return true if the snapshot local data was added or was already present, false if skipped due to an unloadable or
    *     mismatched previous snapshot
    * @throws IOException if a required YAML load fails, or the loaded snapshotId does not match, when failedFilePaths is
@@ -330,7 +330,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             Optional<OmSnapshotLocalData> loadedLocalData =
                 tryLoadSnapshotLocalData(previousSnapshotLocalDataFile, failedFilePaths);
             if (!loadedLocalData.isPresent()) {
-              // tryLoadSnapshotLocalData already logged (and recorded) the underlying load failure.
+              // tryLoadSnapshotLocalData recorded this path in failedFilePaths (logging the underlying failure the
+              // first time it was seen). Skip this snapshot so it is not added to the version graph.
               return false;
             }
             prevSnapshotLocalData = loadedLocalData.get();
