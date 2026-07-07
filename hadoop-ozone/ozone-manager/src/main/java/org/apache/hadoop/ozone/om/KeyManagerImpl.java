@@ -171,7 +171,6 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.MultipartPartScanUtil;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -1144,7 +1143,7 @@ public class KeyManagerImpl implements KeyManager {
         if (multipartKeyInfo.getSchemaVersion()
             == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
           SortedMap<Integer, OmMultipartPartInfo> parts =
-              MultipartPartScanUtil.scanParts(metadataManager, uploadID);
+              OMMultipartUploadUtils.scanParts(metadataManager, uploadID);
           List<OmPartInfo> omPartInfoList = new ArrayList<>();
           int count = 0;
           for (Map.Entry<Integer, OmMultipartPartInfo> entry

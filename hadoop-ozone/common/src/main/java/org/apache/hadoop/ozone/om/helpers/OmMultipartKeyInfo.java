@@ -262,8 +262,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {
     if (schemaVersion == SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
-      throw new IllegalStateException(
-          "PartKeyInfoMap is not supported for schemaVersion 1");
+      throw new IllegalStateException("PartKeyInfoMap is not supported for schemaVersion 1");
     }
     this.partKeyInfoMap = PartKeyInfoMap.put(partKeyInfo, partKeyInfoMap);
   }
@@ -430,8 +429,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
-    if (!multipartKeyInfo.hasSchemaVersion()
-        || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
+    if (!multipartKeyInfo.hasSchemaVersion() || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
       multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
           list.put(partKeyInfo.getPartNumber(), partKeyInfo));
     }

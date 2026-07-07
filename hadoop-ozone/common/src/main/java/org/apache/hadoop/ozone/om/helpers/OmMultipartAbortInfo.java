@@ -107,8 +107,7 @@ public final class OmMultipartAbortInfo {
       return this;
     }
 
-    public Builder setPartsTableKeysToDelete(
-        List<OmMultipartPartKey> partKeys) {
+    public Builder setPartsTableKeysToDelete(List<OmMultipartPartKey> partKeys) {
       this.partsTableKeysToDelete = partKeys;
       return this;
     }

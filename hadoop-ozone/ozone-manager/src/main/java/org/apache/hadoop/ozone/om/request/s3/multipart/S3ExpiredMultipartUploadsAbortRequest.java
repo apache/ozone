@@ -293,17 +293,17 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             numParts = omMultipartKeyInfo.getPartKeyInfoMap().size();
           } else {
             SortedMap<Integer, OmMultipartPartInfo> tableParts =
-                MultipartPartScanUtil.scanParts(omMetadataManager,
+                OMMultipartUploadUtils.scanParts(omMetadataManager,
                     multipartUpload.getUploadId());
-            quotaReleased += MultipartPartScanUtil.getReplicatedSize(
+            quotaReleased += OMMultipartUploadUtils.getReplicatedSize(
                 tableParts, omMultipartKeyInfo.getReplicationConfig());
-            partsKeyInfoToDelete.addAll(MultipartPartScanUtil.toOmKeyInfoList(
+            partsKeyInfoToDelete.addAll(OMMultipartUploadUtils.toOmKeyInfoList(
                 tableParts, multipartUpload.getVolumeName(),
                 multipartUpload.getBucketName(), multipartUpload.getKeyName(),
                 omMultipartKeyInfo.getReplicationConfig()));
-            partsTableKeysToDelete.addAll(MultipartPartScanUtil.getPartKeys(
+            partsTableKeysToDelete.addAll(OMMultipartUploadUtils.getPartKeys(
                 multipartUpload.getUploadId(), tableParts));
-            MultipartPartScanUtil.addPartCleanupCacheEntries(omMetadataManager,
+            OMMultipartUploadUtils.addPartCleanupCacheEntries(omMetadataManager,
                 partsTableKeysToDelete, trxnLogIndex);
             numParts = tableParts.size();
           }

@@ -189,16 +189,16 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         }
       } else {
         SortedMap<Integer, OmMultipartPartInfo> tableParts =
-            MultipartPartScanUtil.scanParts(omMetadataManager,
+            OMMultipartUploadUtils.scanParts(omMetadataManager,
                 multipartKeyInfo.getUploadID());
-        quotaReleased += MultipartPartScanUtil.getReplicatedSize(
+        quotaReleased += OMMultipartUploadUtils.getReplicatedSize(
             tableParts, multipartKeyInfo.getReplicationConfig());
-        partsKeyInfoToDelete.addAll(MultipartPartScanUtil.toOmKeyInfoList(
+        partsKeyInfoToDelete.addAll(OMMultipartUploadUtils.toOmKeyInfoList(
             tableParts, volumeName, bucketName, keyName,
             multipartKeyInfo.getReplicationConfig()));
-        partsTableKeysToDelete.addAll(MultipartPartScanUtil.getPartKeys(
+        partsTableKeysToDelete.addAll(OMMultipartUploadUtils.getPartKeys(
             multipartKeyInfo.getUploadID(), tableParts));
-        MultipartPartScanUtil.addPartCleanupCacheEntries(omMetadataManager,
+        OMMultipartUploadUtils.addPartCleanupCacheEntries(omMetadataManager,
             partsTableKeysToDelete, trxnLogIndex);
       }
       omBucketInfo.incrUsedBytes(-quotaReleased);

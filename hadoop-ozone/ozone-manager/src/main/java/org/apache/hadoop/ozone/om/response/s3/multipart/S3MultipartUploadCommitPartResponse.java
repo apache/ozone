@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -79,6 +80,9 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       long bucketId,
       @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
+    Preconditions.checkArgument(
+        (multipartPartKey == null) == (omMultipartPartInfo == null),
+        "multipartPartKey and omMultipartPartInfo must be both null or both not null");
     this.multipartKey = multipartKey;
     this.multipartPartKey = multipartPartKey;
     this.openKey = openKey;

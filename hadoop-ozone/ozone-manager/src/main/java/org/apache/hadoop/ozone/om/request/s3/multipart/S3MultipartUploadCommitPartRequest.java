@@ -201,13 +201,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      if (multipartKeyInfo.getSchemaVersion()
-          == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
         oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
       } else {
-        multipartPartKey = getMultipartPartKey(uploadID, partNumber);
-        oldMultipartPartInfo = omMetadataManager.getMultipartPartsTable()
-            .get(multipartPartKey);
+        multipartPartKey = OmMultipartPartKey.of(uploadID, partNumber);
+        oldMultipartPartInfo = omMetadataManager.getMultipartPartsTable().get(multipartPartKey);
         if (oldMultipartPartInfo != null) {
           oldPartOmKeyInfo = oldMultipartPartInfo.toOmKeyInfo(
               volumeName, bucketName, keyName, multipartKeyInfo.getReplicationConfig());
@@ -219,17 +217,14 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
       partKeyInfo.setPartName(partName);
       partKeyInfo.setPartNumber(partNumber);
-      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(
-          getOmRequest().getVersion()));
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()));
 
-      if (multipartKeyInfo.getSchemaVersion()
-          == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
       } else {
         validateSplitPartInfo(omKeyInfo, partNumber);
-        multipartPartInfo = OmMultipartPartInfo.from(
-            partName, partNumber, omKeyInfo);
+        multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
         omMetadataManager.getMultipartPartsTable().addCacheEntry(
             new CacheKey<>(multipartPartKey),
             CacheValue.get(trxnLogIndex, multipartPartInfo));
@@ -265,11 +260,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       Map<String, RepeatedOmKeyInfo> keyVersionsToDeleteMap = null;
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      if (multipartKeyInfo.getSchemaVersion()
-          == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION
           && null != oldPartKeyInfo) {
-        OmKeyInfo partKeyToBeDeleted =
-            OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
+        OmKeyInfo partKeyToBeDeleted = OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(partKeyToBeDeleted, omBucketInfo.getObjectID(),
             trxnLogIndex);
@@ -282,16 +275,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           keyVersionsToDeleteMap = new HashMap<>();
           keyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
         }
-      } else if (multipartKeyInfo.getSchemaVersion()
-          == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+      } else if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
           && oldMultipartPartInfo != null && oldPartOmKeyInfo != null) {
-        correctedSpace -= QuotaUtil.getReplicatedSize(
-            oldMultipartPartInfo.getDataSize(),
-            multipartKeyInfo.getReplicationConfig());
-        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
-        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            oldPartOmKeyInfo.getObjectID(), multipartKey);
+        correctedSpace -= QuotaUtil.getReplicatedSize(oldMultipartPartInfo.getDataSize(), multipartKeyInfo.getReplicationConfig());
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
+        String delKeyName = omMetadataManager.getOzoneDeletePathKey(oldPartOmKeyInfo.getObjectID(), multipartKey);
 
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
           keyVersionsToDeleteMap = new HashMap<>();
@@ -420,21 +408,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         keyName, uploadID);
   }
 
-  private OmMultipartPartKey getMultipartPartKey(String uploadId,
-      int partNumber) {
-    return OmMultipartPartKey.of(uploadId, partNumber);
-  }
-
   private void validateSplitPartInfo(OmKeyInfo omKeyInfo, int partNumber)
       throws OMException {
     if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
       throw new OMException("Missing ETag for multipart upload part "
-          + partNumber, OMException.ResultCodes.INVALID_REQUEST);
-    }
-    if (omKeyInfo.getKeyLocationVersions() == null
-        || omKeyInfo.getKeyLocationVersions().isEmpty()
-        || omKeyInfo.getLatestVersionLocations().getLocationList().isEmpty()) {
-      throw new OMException("Missing block locations for multipart upload part "
           + partNumber, OMException.ResultCodes.INVALID_REQUEST);
     }
   }
