@@ -53,7 +53,7 @@ In the new architecture, planning runs in `startTransaction` which happens **bef
 **Solution:** An OM-managed `AtomicLong` counter (`ManagedIndexService`) that:
 - Returns a unique, always-increasing value via `getAndIncrement()`.
 - Is saved together with each DB batch (stored in `TransactionInfoTable` under key `#MANAGED_INDEX`).
-- Survives leader switchover: `onBecomeLeader(lastCommitted)` calls `max(currentIndex, lastCommittedIndex)`.
+- Advances its in-memory floor on every apply (leader, follower, and replay) to survive leader switchover.
 - Is recovered on restart from the saved value.
 
 ```java
@@ -61,17 +61,44 @@ public final class ManagedIndexService {
   private final AtomicLong currentIndex;
 
   public long next() { return currentIndex.getAndIncrement(); }
+
+  // Called by applyTransaction on EVERY node (leader, follower, and during
+  // log replay). Advances the in-memory counter past the applied value.
+  public void advanceFloor(long appliedManagedIndex) {
+    currentIndex.updateAndGet(c -> Math.max(c, appliedManagedIndex + 1));
+  }
+
   public void seedFromFinalization(long ratisIndexAtFinalize) {
     currentIndex.updateAndGet(c -> Math.max(c, ratisIndexAtFinalize + 1));
   }
-  public void onBecomeLeader(long lastAppliedRatisIndex) {
-    currentIndex.updateAndGet(c -> Math.max(c, lastAppliedRatisIndex + 1));
-  }
+
   public void persist(BatchOperation batch) {
     // write #MANAGED_INDEX into the same atomic batch as the data patch
   }
 }
 ```
+
+#### Leader switchover and the allocation-to-persistence gap
+
+Managed indices are allocated in `startTransaction` (before the Ratis entry is committed) and persisted in `applyTransaction` (after commit). Between allocation and persistence, the index exists only in the Ratis log — it is not yet in RocksDB or in the in-memory counter on other nodes.
+
+**The problem this creates on leader change:**
+```
+Old leader: allocates managed IDs 1, 2, 3, 4, 5
+Ratis committed by quorum: entries carrying IDs 1..4
+New leader (was follower): has only applied IDs 1..2 so far
+
+New leader elected, replay begins:
+  - Committed entries 3, 4 are replayed via applyTransaction
+  - Each replay calls advanceFloor(3), advanceFloor(4)
+  - In-memory counter is now 5
+  - Entry for ID 5 was never committed → lost on leader change
+  - New leader's first allocation → next() returns 5 → no conflict
+```
+
+The key invariant: `advanceFloor` is called in `applyTransaction` on every node, including during log replay. This guarantees the in-memory counter is always past the highest committed managed index before the new leader accepts its first `startTransaction`. Ratis itself guarantees that all committed entries are replayed before a new leader processes new proposals.
+
+Uncommitted entries (allocated on the old leader but never quorum-ack'd) are dropped from the log on leader change. They are never replayed anywhere, so the new leader can safely allocate those same values.
 
 **Mixed-mode objectID safety:** During the rolling-upgrade window, both the
 legacy path and the new path must draw objectIDs from this single counter.

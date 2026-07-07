@@ -249,10 +249,7 @@ whether to use the new apply path.
 
 ### 3.3 Managed Index Service
 
-The OM-managed `AtomicLong` counter that mints objectIDs independently of the
-Ratis log index. Survives leader switchover, is persisted atomically with each
-DB batch, and ensures old-path/new-path objectID ranges are disjoint during
-mixed mode.
+The OM-managed `AtomicLong` counter that mints objectIDs independently of the Ratis log index. Persisted atomically with each DB batch, and ensures old-path/new-path objectID ranges are disjoint during mixed mode. Every `applyTransaction` (including log replay) calls `advanceFloor` to keep the in-memory counter past all committed values, so the counter is always correct after leader switchover.
 
 → [Full component details](./components.md#1-managed-index-service)
 
@@ -393,14 +390,14 @@ restart the entry is replayed from the Ratis log.
 
 If the leader fails after planning but before Ratis commits:
 - The Ratis entry was not committed (no quorum ack). It is lost.
-- The new leader's `ManagedIndexService.onBecomeLeader(lastCommitted)` resets
-  the index counter to `max(currentIndex, lastCommittedIndex)`.
-- The client times out and retries. The new leader plans the request fresh.
+- The client times out and retries. The new leader plans the request fresh with a fresh managed index.
 
 If the leader fails after Ratis commits but before apply:
 - On restart, the Ratis log replays all committed-but-not-applied entries.
-- The apply engine processes the pre-computed deltas from the log.
+- Each replayed `applyTransaction` calls `advanceFloor`, so the in-memory counter advances past all committed values before new requests are accepted.
 - No re-planning is needed.
+
+Managed indices are allocated before commit and persisted after commit. This gap is safe because: (1) uncommitted entries are dropped on leader change and never replayed, so the new leader can reuse those values; (2) committed entries are replayed via `applyTransaction` which calls `advanceFloor`, advancing the counter past all committed values before the new leader accepts new proposals. See [ManagedIndexService details](./components.md#leader-switchover-and-the-allocation-to-persistence-gap) for the full analysis.
 
 ### 5.6 What Could Go Wrong (and How We Prevent It)
 
@@ -409,7 +406,7 @@ If the leader fails after Ratis commits but before apply:
 | Two threads plan for same key with different base state | Striped key write lock serializes them |
 | Quota drift on parallel CreateKey | Acceptable for reservations; enforced at CommitKey. Can use bucket WRITE lock if stricter |
 | Bucket deleted while key create is in Ratis log | Bucket WRITE lock + Ratis ordering prevents this (see [Scenario C](./obs-design.md#scenario-c-createkey-and-deletebucket-for-the-same-bucket)) |
-| ManagedIndex duplicates after leader change | `onBecomeLeader` calls `max(current, lastCommitted)` — always moves forward |
+| ManagedIndex duplicates after leader change | `advanceFloor` in apply path ensures counter is past all committed IDs before new allocations; uncommitted IDs are lost and safe to reuse |
 | Crash during RocksDB WriteBatch | Atomic batch — either fully committed or not. Ratis replays on restart |
 | Follower apply fails | Fatal error — follower must catch up via Ratis snapshot (same as today) |
 | Snapshot barrier missed | Apply engine checks `cmdType` — CreateSnapshot/SnapshotPurge always get own batch |
