@@ -24,6 +24,7 @@ import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -295,6 +296,73 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     assertSplitFilesInDirectory(outDir, dirName, expectedKeyFiles, maxRecordsPerFile);
   }
 
+  @Test
+  void testRerunRemovesStaleOutputFiles(@TempDir Path tempDir) throws IOException {
+    String dirName = "verify-rerun";
+    File outDir = new File(tempDir.toFile(), dirName);
+
+    // First run: 2 keys per file over 10 keys produces 5 files (verify-rerun.0 ... verify-rerun.4)
+    runVerifyToDirectory(outDir.getAbsolutePath(), 2);
+    int firstRunFiles = (int) Math.ceil(keyInfoMap.size() / (2 * 1.0));
+    assertTrue(new File(outDir, dirName + "." + (firstRunFiles - 1)).isFile(),
+        "First run should create " + firstRunFiles + " split files");
+
+    // Second run: all keys in a single file produces only verify-rerun.0
+    runVerifyToDirectory(outDir.getAbsolutePath(), keyInfoMap.size());
+    for (int i = 1; i < firstRunFiles; i++) {
+      File staleFile = new File(outDir, dirName + "." + i);
+      assertFalse(staleFile.exists(), "Stale output file should be removed on re-run: " + staleFile.getAbsolutePath());
+    }
+  }
+
+  @Test
+  void testSingleFileOutputWithoutSplitting(@TempDir Path tempDir) throws IOException {
+    // Without --max-records-per-file, all keys are written to a single <dirName> file inside the directory.
+    String dirName = "verify-single";
+    File outDir = new File(tempDir.toFile(), dirName);
+
+    List<String> parameters = new ArrayList<>();
+    parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
+    parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
+    parameters.add("replicas");
+    parameters.add("verify");
+    parameters.add("--checksums");
+    parameters.add("--all-results");
+    parameters.add("--out");
+    parameters.add(outDir.getAbsolutePath());
+    parameters.add(ozoneAddress);
+
+    int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
+    assertEquals(0, exitCode, err.get());
+
+    assertTrue(outDir.isDirectory(), "Output directory should be created: " + outDir.getAbsolutePath());
+    File outFile = new File(outDir, dirName);
+    assertTrue(outFile.isFile(), "Expected single output file: " + outFile.getAbsolutePath());
+    JsonNode jsonNode = MAPPER.readTree(outFile);
+    assertNotNull(jsonNode, "Output file must be valid JSON: " + outFile.getAbsolutePath());
+    assertTrue(jsonNode.get("pass").asBoolean(), "Single output file must have a top-level 'pass' field");
+    JsonNode keys = jsonNode.get("keys");
+    assertNotNull(keys, "Output file must contain a 'keys' array");
+    assertEquals(keyInfoMap.size(), keys.size(), "All keys should be written to the single output file");
+  }
+
+  @Test
+  void testMaxRecordsPerFileRequiresOut() {
+    // --max-records-per-file without --out should fail with a usage error (exit code 2).
+    List<String> parameters = new ArrayList<>();
+    parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
+    parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
+    parameters.add("replicas");
+    parameters.add("verify");
+    parameters.add("--checksums");
+    parameters.add("--max-records-per-file");
+    parameters.add("2");
+    parameters.add(ozoneAddress);
+
+    int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
+    assertEquals(2, exitCode, "--max-records-per-file without --out should be rejected");
+  }
+
   private void runVerifyToDirectory(String outputDir, int maxRecordsPerFile) {
     List<String> parameters = new ArrayList<>();
     parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
@@ -322,6 +390,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       assertTrue(keyFile.isFile(), "Expected key file: " + keyFile.getAbsolutePath());
       JsonNode jsonNode = MAPPER.readTree(keyFile);
       assertNotNull(jsonNode, "Output file must be valid JSON: " + keyFile.getAbsolutePath());
+      assertTrue(jsonNode.get("pass").asBoolean(), "Each split file must have a top-level 'pass' field");
       JsonNode keys = jsonNode.get("keys");
       assertNotNull(keys, "Each split file must contain a 'keys' array");
       assertThat(keys.size()).isLessThanOrEqualTo(maxRecordsPerFile);

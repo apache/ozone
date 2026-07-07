@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -133,6 +134,11 @@ public class ReplicasVerify extends Handler {
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     startTime = System.nanoTime();
 
+    if (recordsPerFile > 0 && outputDir == null) {
+      throw new CommandLine.ParameterException(spec().commandLine(),
+          "--max-records-per-file requires --out / -o option to be set.");
+    }
+
     if (!address.getKeyName().isEmpty()) {
       verificationScope = "Key";
     } else if (!address.getBucketName().isEmpty()) {
@@ -226,6 +232,8 @@ public class ReplicasVerify extends Handler {
    */
   private void writeOutputToFiles(ObjectNode root, ArrayNode keysArray, boolean allKeysPassed) throws IOException {
     String outputPrefix = resolveOutputPrefix();
+    // Remove output files from any previous run.
+    deleteExistingOutputFiles(outputPrefix);
 
     if (recordsPerFile <= 0) {
       root.put("pass", allKeysPassed);
@@ -243,12 +251,34 @@ public class ReplicasVerify extends Handler {
       }
       chunkKeys.add(keysArray.get(i));
       if (chunkKeys.size() >= recordsPerFile) {
+        chunkNode.put("pass", allKeysPassed);
         writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
         chunkNode = null;
       }
     }
     if (chunkNode != null) {
+      chunkNode.put("pass", allKeysPassed);
       writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
+    }
+  }
+
+  /**
+   * Deletes output files written by a previous run in the output directory. Matches the single-file
+   * output <dirName> and split files <dirName>.<number> so a re-run does not leave
+   * stale higher-numbered files behind.
+   */
+  private void deleteExistingOutputFiles(String outputPrefix) throws IOException {
+    File prefixFile = new File(outputPrefix);
+    File dir = prefixFile.getParentFile();
+    String baseName = prefixFile.getName();
+    Pattern outputFilePattern = Pattern.compile(Pattern.quote(baseName) + "(\\.\\d+)?");
+    File[] existing = dir.listFiles((d, name) -> outputFilePattern.matcher(name).matches());
+    if (existing != null) {
+      for (File file : existing) {
+        if (!file.delete()) {
+          throw new IOException("Failed to delete stale output file: " + file.getAbsolutePath());
+        }
+      }
     }
   }
 
