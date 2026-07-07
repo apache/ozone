@@ -1447,6 +1447,9 @@ function ozone_set_module_access_args
   fi
 
   # populate JVM args based on java version
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 24 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --enable-native-access=ALL-UNNAMED"
+  fi
   if [[ "${JAVA_MAJOR_VERSION}" -ge 23 ]]; then
     # allow sun.misc.Unsafe until protobuf-java moves away from it
     # see: https://github.com/protocolbuffers/protobuf/issues/20760

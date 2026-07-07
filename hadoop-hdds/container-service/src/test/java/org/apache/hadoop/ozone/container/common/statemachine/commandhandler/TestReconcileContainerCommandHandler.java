@@ -177,7 +177,7 @@ public class TestReconcileContainerCommandHandler {
 
     for (Map.Entry<ContainerID, ContainerReplicaProto> entry: reportsSent.entrySet()) {
       ContainerID id = entry.getKey();
-      assertNotNull(containerSet.getContainer(id.getId()));
+      assertNotNull(containerSet.getContainer(id.getIdForTesting()));
 
       long sentDataChecksum = entry.getValue().getDataChecksum();
       // Current implementation is incomplete, and uses a mocked checksum.

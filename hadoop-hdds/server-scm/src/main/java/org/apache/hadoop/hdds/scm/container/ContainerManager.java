@@ -21,7 +21,6 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -202,16 +201,6 @@ public interface ContainerManager {
    */
   void removeContainerReplica(ContainerID containerID, ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException;
-
-  /**
-   * Update deleteTransactionId according to deleteTransactionMap.
-   *
-   * @param deleteTransactionMap Maps the containerId to latest delete
-   *                             transaction id for the container.
-   * @throws IOException
-   */
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
-      throws IOException;
 
   default ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline) {
