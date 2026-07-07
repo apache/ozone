@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -217,8 +217,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      mergeOmLockDetails(omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
+      mergeOmLockDetails(ozoneLockStrategy.acquireWriteLock(
+          omMetadataManager, volumeName, bucketName, keyName));
       acquiredLock = getOmLockDetails().isLockAcquired();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
@@ -263,9 +264,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
       if (acquiredLock) {
-        mergeOmLockDetails(
-            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-                volumeName, bucketName));
+        OzoneLockStrategy ozoneLockStrategy =
+            getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseWriteLock(
+            omMetadataManager, volumeName, bucketName, keyName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

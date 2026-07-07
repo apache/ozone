@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -135,8 +135,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     try {
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      mergeOmLockDetails(omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
+      mergeOmLockDetails(ozoneLockStrategy.acquireWriteLock(
+          omMetadataManager, volumeName, bucketName, keyName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -284,8 +285,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
               createErrorOMResponse(omResponse, exception), copyBucketInfo, bucketId);
     } finally {
       if (acquiredLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseWriteLock(
+            omMetadataManager, volumeName, bucketName, keyName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

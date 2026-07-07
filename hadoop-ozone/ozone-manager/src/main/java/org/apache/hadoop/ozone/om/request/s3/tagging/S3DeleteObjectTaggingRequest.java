@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -105,14 +105,14 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
         getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     IOException exception = null;
     Result result = null;
     try {
       mergeOmLockDetails(
-          omMetadataManager.getLock()
-              .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName)
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName, bucketName, keyName)
       );
       acquiredLock = getOmLockDetails().isLockAcquired();
 
@@ -158,8 +158,8 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       );
     } finally {
       if (acquiredLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        mergeOmLockDetails(
+            ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName, bucketName, keyName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

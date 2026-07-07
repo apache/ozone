@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
@@ -188,9 +188,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       List<OmKeyLocationInfo>
           locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
       mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName));
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
+              bucketName, keyName));
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -421,8 +422,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omResponse, exception), getBucketLayout());
     } finally {
       if (bucketLockAcquired) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        OzoneLockStrategy ozoneLockStrategy =
+            getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseWriteLock(
+            omMetadataManager, volumeName, bucketName, keyName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

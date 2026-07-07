@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -204,7 +204,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     boolean lockAcquired = false;
     String volume = null;
     String bucket = null;
-    String key;
+    String key = null;
     boolean operationResult = false;
     Result result;
     try {
@@ -215,9 +215,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       bucket = getBucketName();
       key = getKeyName();
 
-      mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
-              bucket));
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
+      mergeOmLockDetails(ozoneLockStrategy.acquireWriteLock(
+          omMetadataManager, volume, bucket, key));
       lockAcquired = getOmLockDetails().isLockAcquired();
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
@@ -245,9 +245,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       if (lockAcquired) {
-        mergeOmLockDetails(
-            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
-                bucket));
+        OzoneLockStrategy ozoneLockStrategy =
+            getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseWriteLock(
+            omMetadataManager, volume, bucket, key));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

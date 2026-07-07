@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -142,9 +142,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
     try {
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
       mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName));
+          ozoneLockStrategy.acquireBucketReadLock(omMetadataManager,
+              volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -243,8 +244,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       if (acquiredBucketLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        OzoneLockStrategy ozoneLockStrategy =
+            getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseBucketReadLock(
+            omMetadataManager, volumeName, bucketName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

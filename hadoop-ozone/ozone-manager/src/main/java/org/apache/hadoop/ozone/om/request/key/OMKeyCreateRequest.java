@@ -242,8 +242,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     try {
 
       mergeOmLockDetails(
-          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
-              bucketName, keyName));
+          ozoneLockStrategy.acquireBucketReadLock(omMetadataManager,
+              volumeName, bucketName));
       acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
@@ -380,8 +380,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
-            .releaseWriteLock(omMetadataManager, volumeName,
-                bucketName, keyName));
+            .releaseBucketReadLock(omMetadataManager, volumeName,
+                bucketName));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

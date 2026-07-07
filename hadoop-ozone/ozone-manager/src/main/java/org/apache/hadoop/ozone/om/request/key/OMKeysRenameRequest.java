@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.RENAMED_KEYS_MAP;
 import static org.apache.hadoop.ozone.OzoneConsts.UNRENAMED_KEYS_MAP;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_RENAME;
 
@@ -112,15 +112,21 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     boolean renameStatus = true;
 
+    List<String> allKeys = new ArrayList<>();
+    for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
+      allKeys.add(renameKey.getFromKeyName());
+      allKeys.add(renameKey.getToKeyName());
+    }
+
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(
           Pair.of(volumeName, bucketName), this);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
-      mergeOmLockDetails(
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName));
+      OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
+      mergeOmLockDetails(ozoneLockStrategy.acquireWriteLock(
+          omMetadataManager, volumeName, bucketName, allKeys));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
@@ -236,8 +242,10 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     } finally {
       if (acquiredLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        OzoneLockStrategy ozoneLockStrategy =
+            getOzoneLockStrategy(ozoneManager);
+        mergeOmLockDetails(ozoneLockStrategy.releaseWriteLock(
+            omMetadataManager, volumeName, bucketName, allKeys));
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());

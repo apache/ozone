@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.K
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
@@ -88,5 +90,56 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     omLockDetails.merge(omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
     return omLockDetails;
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, Collection<String> keyNames)
+      throws IOException {
+    OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+
+    OMLockDetails omLockDetails = omMetadataManager.getLock().acquireReadLock(
+        BUCKET_LOCK, volumeName, bucketName);
+
+    Preconditions.checkArgument(omLockDetails.isLockAcquired(),
+        "BUCKET_LOCK should be acquired!");
+
+    Collection<String[]> keys = keyNames.stream()
+        .map(k -> new String[]{volumeName, bucketName, k})
+        .collect(Collectors.toList());
+    omLockDetails.merge(omMetadataManager.getLock()
+        .acquireWriteLocks(KEY_PATH_LOCK, keys));
+
+    return omLockDetails;
+  }
+
+  @Override
+  public OMLockDetails releaseWriteLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, Collection<String> keyNames) {
+    Collection<String[]> keys = keyNames.stream()
+        .map(k -> new String[]{volumeName, bucketName, k})
+        .collect(Collectors.toList());
+    OMLockDetails omLockDetails = omMetadataManager.getLock()
+        .releaseWriteLocks(KEY_PATH_LOCK, keys);
+    omLockDetails.merge(omMetadataManager.getLock()
+        .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
+    return omLockDetails;
+  }
+
+  @Override
+  public OMLockDetails acquireBucketReadLock(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName) throws IOException {
+    OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    return omMetadataManager.getLock().acquireReadLock(
+        BUCKET_LOCK, volumeName, bucketName);
+  }
+
+  @Override
+  public OMLockDetails releaseBucketReadLock(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName) {
+    return omMetadataManager.getLock().releaseReadLock(
+        BUCKET_LOCK, volumeName, bucketName);
   }
 }

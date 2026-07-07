@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import java.io.IOException;
+import java.util.Collection;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
@@ -42,4 +43,31 @@ public interface OzoneLockStrategy {
 
   OMLockDetails releaseReadLock(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName);
+
+  default OMLockDetails acquireWriteLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, Collection<String> keyNames)
+      throws IOException {
+    return acquireWriteLock(omMetadataManager, volumeName, bucketName,
+        (String) null);
+  }
+
+  default OMLockDetails releaseWriteLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, Collection<String> keyNames) {
+    return releaseWriteLock(omMetadataManager, volumeName, bucketName,
+        (String) null);
+  }
+
+  default OMLockDetails acquireBucketReadLock(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName) throws IOException {
+    return acquireWriteLock(omMetadataManager, volumeName, bucketName,
+        (String) null);
+  }
+
+  default OMLockDetails releaseBucketReadLock(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName) {
+    return releaseWriteLock(omMetadataManager, volumeName, bucketName,
+        (String) null);
+  }
 }
