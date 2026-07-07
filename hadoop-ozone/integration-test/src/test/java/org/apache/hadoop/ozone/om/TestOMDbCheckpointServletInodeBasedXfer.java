@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -407,8 +408,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       actualYamlFiles = files.filter(f -> f.getFileName().toString().endsWith(".yaml")).count();
     }
     if (includeSnapshot) {
-      assertTrue(actualYamlFiles >= numSnapshots,
-          "Generated YAML files should include this test's snapshots.");
+      assertThat(actualYamlFiles)
+          .as("Generated YAML files should include this test's snapshots.")
+          .isGreaterThanOrEqualTo(numSnapshots);
     } else {
       assertEquals(0, actualYamlFiles,
           "Snapshot YAML files should not be included when snapshot data is disabled.");

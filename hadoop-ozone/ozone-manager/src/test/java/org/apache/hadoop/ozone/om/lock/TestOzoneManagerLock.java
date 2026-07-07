@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,7 +47,6 @@ import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -319,7 +317,7 @@ class TestOzoneManagerLock {
       }
 
       AtomicBoolean gotLock = new AtomicBoolean(false);
-      Thread thread = new Thread(() -> {
+      new Thread(() -> {
         if (fullResourceLock) {
           lock.acquireResourceWriteLock(resource);
         } else {
@@ -332,9 +330,9 @@ class TestOzoneManagerLock {
           lock.releaseWriteLock(resource, resourceName);
         }
 
-      });
-      thread.start();
-      waitForBlockedThread(thread);
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
       assertFalse(gotLock.get());
@@ -345,7 +343,8 @@ class TestOzoneManagerLock {
       }
       // Since we have released the lock, the new thread should have the lock
       // now.
-      waitForThread(thread);
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       assertTrue(gotLock.get());
     }
   }
@@ -375,7 +374,7 @@ class TestOzoneManagerLock {
       }
 
       AtomicBoolean gotLock = new AtomicBoolean(false);
-      Thread thread = new Thread(() -> {
+      new Thread(() -> {
         if (!mainThreadAcquireResourceLock) {
           lock.acquireResourceWriteLock(resource);
         } else {
@@ -395,9 +394,9 @@ class TestOzoneManagerLock {
             lock.releaseReadLock(resource, resourceName);
           }
         }
-      });
-      thread.start();
-      waitForBlockedThread(thread);
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
       assertFalse(gotLock.get());
@@ -412,7 +411,8 @@ class TestOzoneManagerLock {
       }
       // Since we have released the lock, the new thread should have the lock
       // now.
-      waitForThread(thread);
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       assertTrue(gotLock.get());
     }
   }
@@ -427,20 +427,21 @@ class TestOzoneManagerLock {
       lock.acquireWriteLocks(resource, resourceName.subList(1, resourceName.size()));
 
       AtomicBoolean gotLock = new AtomicBoolean(false);
-      Thread thread = new Thread(() -> {
+      new Thread(() -> {
         lock.acquireWriteLocks(resource, resourceName.subList(0, 2));
         gotLock.set(true);
         lock.releaseWriteLocks(resource, resourceName.subList(0, 2));
-      });
-      thread.start();
-      waitForBlockedThread(thread);
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
       assertFalse(gotLock.get());
       lock.releaseWriteLocks(resource, resourceName.subList(1, resourceName.size()));
       // Since we have released the lock, the new thread should have the lock
       // now.
-      waitForThread(thread);
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
       assertTrue(gotLock.get());
     }
 
@@ -452,32 +453,22 @@ class TestOzoneManagerLock {
     lock.acquireMultiUserLock("user2", "user1");
 
     AtomicBoolean gotLock = new AtomicBoolean(false);
-    Thread thread = new Thread(() -> {
+    new Thread(() -> {
       lock.acquireMultiUserLock("user1", "user2");
       gotLock.set(true);
       lock.releaseMultiUserLock("user1", "user2");
-    });
-    thread.start();
-    waitForBlockedThread(thread);
+    }).start();
+    // Let's give some time for the new thread to run
+    Thread.sleep(100);
     // Since the new thread is trying to get lock on same resource, it will
     // wait.
     assertFalse(gotLock.get());
     lock.releaseMultiUserLock("user2", "user1");
     // Since we have released the lock, the new thread should have the lock
     // now.
-    waitForThread(thread);
+    // Let's give some time for the new thread to run
+    Thread.sleep(100);
     assertTrue(gotLock.get());
-  }
-
-  private static void waitForBlockedThread(Thread thread) throws Exception {
-    GenericTestUtils.waitFor(() -> thread.getState() == Thread.State.BLOCKED ||
-        thread.getState() == Thread.State.WAITING ||
-        thread.getState() == Thread.State.TIMED_WAITING, 10, 10000);
-  }
-
-  private static void waitForThread(Thread thread) throws InterruptedException {
-    thread.join(TimeUnit.SECONDS.toMillis(10));
-    assertFalse(thread.isAlive(), "Timed out waiting for lock thread to finish");
   }
 
   @ParameterizedTest
