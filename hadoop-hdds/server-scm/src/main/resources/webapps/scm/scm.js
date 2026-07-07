@@ -19,6 +19,32 @@
     "use strict";
     angular.module('scm', ['ozone', 'nvd3']);
 
+    angular.module('scm').config(function ($routeProvider) {
+        $routeProvider
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
+            });
+    });
+
+    angular.module('scm').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=StorageContainerManager,name=SCMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                  var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
+        }
+    });
+
     angular.module('scm').component('scmOverview', {
         templateUrl: 'scm-overview.html',
         require: {
@@ -29,9 +55,10 @@
             $scope.reverse = false;
             $scope.columnName = "hostname";
             let nodeStatusCopy = [];
+            $scope.filteredNodes = [];
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
-            $scope.lastIndex = 0;
+            $scope.lastIndex = 1;
             $scope.statistics = {
                 nodes : {
                     usages : {
@@ -135,10 +162,10 @@
                                 }
                             });
 
-                    nodeStatusCopy = [...$scope.nodeStatus];
-                    $scope.totalItems = nodeStatusCopy.length;
-                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                     nodeStatusCopy = [...$scope.nodeStatus];
+                     $scope.filteredNodes = [...nodeStatusCopy];
+                     $scope.totalItems = $scope.filteredNodes.length;
+                     $scope.UpdateRecordsToShow();
 
                     $scope.formatValue = function(value) {
                         if (value && value.includes(';')) {
@@ -218,28 +245,50 @@
                     $scope.statistics.containers.health.open_without_pipeline = ctrl.scmcontainermanager.OpenContainersWithoutPipeline;
                 });
 
-            /*if option is 'All' display all records else display specified record on page*/
-            $scope.UpdateRecordsToShow = () => {
-                if($scope.RecordsToDisplay == 'All') {
-                    $scope.lastIndex = 1;
-                    $scope.nodeStatus = nodeStatusCopy;
+            /* Global Search Logic */
+            $scope.applyGlobalSearch = function() {
+                if (!$scope.search || $scope.search.trim() === "") {
+                    // Reset to full list if search is empty
+                    $scope.filteredNodes = [...nodeStatusCopy];
                 } else {
-                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                    let query = $scope.search.toLowerCase();
+                    // Dynamically search across all properties in the node object
+                    $scope.filteredNodes = nodeStatusCopy.filter(function(node) {
+                        return Object.values(node).some(function(val) {
+                             return val !== null && val !== undefined
+                             && val.toString().toLowerCase().includes(query);
+                        });
+                    });
                 }
-                $scope.currentPage = 1;
-            }
-            /* Page Slicing  logic */
-            $scope.handlePagination = (pageIndex, isDisabled) => {
-                if(!isDisabled && $scope.RecordsToDisplay != 'All') {
-                    pageIndex = parseInt(pageIndex);
-                    let startIndex = 0, endIndex = 0;
-                    $scope.currentPage = pageIndex;
-                    startIndex = ($scope.currentPage - 1) * parseInt($scope.RecordsToDisplay);
-                    endIndex = startIndex + parseInt($scope.RecordsToDisplay);
-                    $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
-                }
-            }
+                $scope.totalItems = $scope.filteredNodes.length;
+                $scope.UpdateRecordsToShow(); // Re-calculate pagination
+            };
+            /* If option is 'All' display all records, else display specified records on page */
+             $scope.UpdateRecordsToShow = () => {
+                 if ($scope.RecordsToDisplay === 'All') {
+                     $scope.lastIndex = 1;
+                     $scope.nodeStatus = $scope.filteredNodes;
+                 } else {
+                     let limit = parseInt($scope.RecordsToDisplay);
+                     // Use Math.max(1, ...) to ensure lastIndex never drops to 0.
+                     // This prevents the "Next" button from remaining active on empty search results.
+                     $scope.lastIndex = Math.max(1, Math.ceil($scope.filteredNodes.length / limit));
+                     $scope.nodeStatus = $scope.filteredNodes.slice(0, limit);
+                 }
+                 $scope.currentPage = 1;
+             };
+              /* Page Slicing logic */
+                 $scope.handlePagination = (pageIndex, isDisabled) => {
+                 if (!isDisabled && $scope.RecordsToDisplay !== 'All') {
+                     // Force strict math with parseInt
+                     pageIndex = parseInt(pageIndex);
+                     let limit = parseInt($scope.RecordsToDisplay);
+                     $scope.currentPage = pageIndex;
+                     let startIndex = ($scope.currentPage - 1) * limit;
+                     let endIndex = startIndex + limit;
+                     $scope.nodeStatus = $scope.filteredNodes.slice(startIndex, endIndex);
+                 }
+             }
             /*column sort logic*/
             $scope.columnSort = (colName) => {
                 $scope.columnName = colName;

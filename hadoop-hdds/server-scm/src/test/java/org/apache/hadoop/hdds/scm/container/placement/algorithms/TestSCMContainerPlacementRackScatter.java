@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -180,7 +181,8 @@ public class TestSCMContainerPlacementRackScatter {
     cluster.add(datanodeDetails);
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         datanodeDetails, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto());
+        UpgradeUtils.defaultLayoutVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -248,6 +250,10 @@ public class TestSCMContainerPlacementRackScatter {
     }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
+    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
+      DatanodeInfo di = invocation.getArgument(0);
+      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() > 1L);
+    });
 
     // create placement policy instances
     policy = new SCMContainerPlacementRackScatter(
@@ -490,7 +496,8 @@ public class TestSCMContainerPlacementRackScatter {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getID(), "/data1-" + dnInfo.getID(),

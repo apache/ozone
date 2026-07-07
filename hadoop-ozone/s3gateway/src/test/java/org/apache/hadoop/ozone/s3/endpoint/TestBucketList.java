@@ -58,6 +58,9 @@ public class TestBucketList {
     endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
     ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
+    assertNotNull(getBucketResponse.getPrefix());
+    assertEquals("", getBucketResponse.getPrefix().getName());
+
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/",
         getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
@@ -131,6 +134,20 @@ public class TestBucketList {
         getBucketResponse.getContents().get(0).getOwner().getDisplayName());
     assertEquals(user2.getShortUserName(),
         getBucketResponse.getContents().get(1).getOwner().getDisplayName());
+  }
+
+  @Test
+  public void listWithDelimiterAndPrefixMatchingNoKeys() throws OS3Exception, IOException {
+    OzoneClient ozoneClient =
+        createClientWithKeys("b/a/r", "b/a/c", "b/a/g", "g");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "d");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "/");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertEquals(0, response.getContents().size());
+    assertEquals(0, response.getCommonPrefixes().size());
   }
 
   @Test
@@ -454,6 +471,19 @@ public class TestBucketList {
 
     endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, "unSupportType");
     OS3Exception e = assertThrows(OS3Exception.class, () -> endpoint.get("b1").getEntity());
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
+  }
+
+  @Test
+  public void testListObjectsWithNonIntegerMaxKeys() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("bucket");
+    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.MAX_KEYS, "blah");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucket"));
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
   }
 

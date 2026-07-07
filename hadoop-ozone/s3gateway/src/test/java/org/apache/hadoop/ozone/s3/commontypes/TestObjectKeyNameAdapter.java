@@ -42,6 +42,11 @@ public class TestObjectKeyNameAdapter {
         .marshal(EncodingTypeObject.createNullable("a b c/", null)));
     assertEquals("a+b+c/", getAdapter()
         .marshal(EncodingTypeObject.createNullable("a+b+c/", null)));
+
+    assertEquals("", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("", null)));
+    assertEquals("", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("", ENCODING_TYPE)));
   }
 
   private XmlAdapter<String, EncodingTypeObject> getAdapter() {

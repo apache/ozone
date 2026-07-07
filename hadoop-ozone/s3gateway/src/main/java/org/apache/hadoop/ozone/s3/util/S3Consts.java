@@ -50,6 +50,10 @@ public final class S3Consts {
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MATCH =
+      COPY_SOURCE_IF_PREFIX + "match";
+  public static final String COPY_SOURCE_IF_NONE_MATCH =
+      COPY_SOURCE_IF_PREFIX + "none-match";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
       COPY_SOURCE_IF_PREFIX + "modified-since";
   public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
@@ -83,6 +87,7 @@ public final class S3Consts {
   public static final String TAG_COUNT_HEADER = "x-amz-tagging-count";
   public static final String AWS_TAG_PREFIX = "aws:";
 
+  // tag limit for object
   public static final int TAG_NUM_LIMIT = 10;
   public static final int TAG_KEY_LENGTH_LIMIT = 128;
   public static final int TAG_VALUE_LENGTH_LIMIT = 256;
@@ -90,6 +95,9 @@ public final class S3Consts {
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
+
+  /** AWS S3 maximum number of keys per DeleteObjects request. */
+  public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
 
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
@@ -104,6 +112,14 @@ public final class S3Consts {
   public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
   public static final String IF_UNMODIFIED_SINCE_HEADER =
       "If-Unmodified-Since";
+
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
+
+  // tag limit for bucket
+  public static final int TAG_BUCKET_NUM_LIMIT = 50;
 
   //Never Constructed
   private S3Consts() {
@@ -126,7 +142,10 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    // GetBucketLocation is not implemented
+    public static final String LOCATION = "location";
     public static final String MARKER = "marker";
+    public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
     public static final String MAX_KEYS = "max-keys";
     public static final String MAX_PARTS = "max-parts";
     public static final String MAX_UPLOADS = "max-uploads";

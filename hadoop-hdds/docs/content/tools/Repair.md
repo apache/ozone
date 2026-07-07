@@ -65,7 +65,7 @@ CLI to compact a column-family in the DB while the service is offline.
 Note: If om.db is compacted with this tool then it will negatively impact the
 Ozone Manager\'s efficient snapshot diff. The corresponding OM, SCM or Datanode
 role should be stopped for this tool.
-      --cf, --column-family, --column_family=<columnFamilyName>
+      --cf, --column-family=<columnFamilyName>
                       Column family name
       --db=<dbPath>   Database File Path
 ```
@@ -189,7 +189,7 @@ Usage: ozone repair om compact [-hV] [--dry-run] [--force] [--verbose]
                                [--service-id=<omServiceId>]
 CLI to compact a column family in the om.db. The compaction happens
 asynchronously. Requires admin privileges. OM should be running for this tool.
-      --cf, --column-family, --column_family=<columnFamilyName>
+      --cf, --column-family=<columnFamilyName>
                            Column family name
       --node-id=<nodeId>   NodeID of the OM for which db needs to be compacted.
       --service-id, --om-service-id=<omServiceId>

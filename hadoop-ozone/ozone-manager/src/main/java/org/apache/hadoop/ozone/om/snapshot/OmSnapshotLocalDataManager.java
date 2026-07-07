@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.rocksdb.LiveFileMetaData;
@@ -895,8 +896,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     public synchronized void commit() throws IOException {
+      SnapshotVersionsMeta existingVersionsMeta = getVersionNodeMap().get(super.snapshotId);
       // Validate modification and commit the changes.
       SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
+      boolean persistLastDefragTime = shouldUpdateLastDefragTime(existingVersionsMeta, localDataVersionNodes);
       // Need to update the disk state if and only if the dirty bit is set.
       if (isDirty()) {
         String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
@@ -911,9 +914,19 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           if (tmpFileExists) {
             throw new IOException("Unable to delete tmp file " + tmpFilePath);
           }
-          snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
+          Long committedLastDefragTime = null;
+          OmSnapshotLocalData snapshotLocalDataToPersist = super.snapshotLocalData;
+          if (persistLastDefragTime) {
+            committedLastDefragTime = Time.now();
+            snapshotLocalDataToPersist = super.snapshotLocalData.copyObject();
+            snapshotLocalDataToPersist.setLastDefragTime(committedLastDefragTime);
+          }
+          snapshotLocalDataSerializer.save(new File(tmpFilePath), snapshotLocalDataToPersist);
           Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
+          if (committedLastDefragTime != null) {
+            super.snapshotLocalData.setLastDefragTime(committedLastDefragTime);
+          }
         } else if (snapshotLocalDataFile.exists()) {
           LOG.info("Deleting YAML file corresponding to snapshotId: {} in path : {}",
               super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
@@ -927,6 +940,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // Reset dirty bit
         resetDirty();
       }
+    }
+
+    private boolean shouldUpdateLastDefragTime(SnapshotVersionsMeta existingVersionsMeta,
+        SnapshotVersionsMeta currentVersionsMeta) {
+      if (currentVersionsMeta.getSnapshotVersions().isEmpty()) {
+        return false;
+      }
+      int currentVersion = currentVersionsMeta.getVersion();
+      return currentVersion > 0 &&
+          (existingVersionsMeta == null || currentVersion > existingVersionsMeta.getVersion());
     }
 
     private void checkForOphanVersionsAndIncrementCount(UUID snapshotId, SnapshotVersionsMeta previousVersionsMeta,

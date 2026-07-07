@@ -346,21 +346,31 @@ public final class ReplicationSupervisor {
 
   public void nodeStateUpdated(HddsProtos.NodeOperationalState newState) {
     if (state.getAndSet(newState) != newState) {
-      int threadCount = replicationConfig.getReplicationMaxStreams();
-      int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
-
-      if (isMaintenance(newState) || isDecommission(newState)) {
-        threadCount = replicationConfig.scaleOutOfServiceLimit(threadCount);
-        newMaxQueueSize =
-            replicationConfig.scaleOutOfServiceLimit(newMaxQueueSize);
-      }
-
-      LOG.info("Node state updated to {}, scaling executor pool size to {}",
-          newState, threadCount);
-
-      maxQueueSize = newMaxQueueSize;
-      executorThreadUpdater.accept(threadCount);
+      resize(newState);
     }
+  }
+
+  public void setReplicationMaxStreams(int replicationMaxStreams) {
+    replicationConfig.setReplicationMaxStreams(replicationMaxStreams);
+    resize(state.get());
+  }
+
+  private void resize(HddsProtos.NodeOperationalState nodeState) {
+    int threadCount = replicationConfig.getReplicationMaxStreams();
+    int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
+
+    if (isMaintenance(nodeState) || isDecommission(nodeState)) {
+      threadCount = replicationConfig.scaleOutOfServiceLimit(threadCount);
+      newMaxQueueSize =
+          replicationConfig.scaleOutOfServiceLimit(newMaxQueueSize);
+    }
+
+    LOG.info("Scaling replication supervisor for node state {} to executor " +
+        "pool size {} and queue size {}", nodeState, threadCount,
+        newMaxQueueSize);
+
+    maxQueueSize = newMaxQueueSize;
+    executorThreadUpdater.accept(threadCount);
   }
 
   /**

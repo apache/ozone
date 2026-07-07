@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -96,6 +96,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
 
+  static {
+    setExtraClusterConfig(c -> c.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "2s"));
+  }
+
   /**
    * After restarting OMs we need to wait
    * for a leader to be elected and ready.
@@ -122,7 +126,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   @Test
   void oneOMDown() throws Exception {
     getCluster().stopOzoneManager(1);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     createVolumeTest(true);
     createKeyTest(true);
@@ -135,7 +139,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   void twoOMDown() throws Exception {
     getCluster().stopOzoneManager(1);
     getCluster().stopOzoneManager(2);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     createVolumeTest(false);
     createKeyTest(false);
@@ -175,7 +178,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
@@ -242,11 +245,12 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 4);
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
+    GenericTestUtils.waitFor(
+        () -> !firstProxyNodeId.equals(omFailoverProxyProvider.getCurrentProxyOMNodeId()),
+        100, (int) (OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 5));
 
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -354,7 +358,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     // Stop leader OM, and then validate list parts.
     stopLeaderOM();
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 
@@ -438,9 +442,9 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     // Check on leader OM Count.
     GenericTestUtils.waitFor(() ->
-        keyDeletingService.getRunCount().get() >= 2, 10000, 120000);
+        keyDeletingService.getRunCount().get() >= 2, 1000, 120000);
     GenericTestUtils.waitFor(() ->
-        keyDeletingService.getDeletedKeyCount().get() == 4, 10000, 120000);
+        keyDeletingService.getDeletedKeyCount().get() == 4, 1000, 120000);
 
     // Check delete table is empty or not on all OMs.
     getCluster().getOzoneManagersList().forEach((om) -> {
@@ -454,7 +458,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
             return false;
           }
         },
-            10000, 120000);
+            1000, 120000);
       } catch (Exception ex) {
         fail("TestOzoneManagerHAKeyDeletion failed");
       }
@@ -599,7 +603,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     // Stop leader OM, and then validate list volumes for user.
     stopLeaderOM();
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    waitForLeaderToBeReady();
 
     validateVolumesList(expectedVolumes,
         objectStore.listVolumesByUser(userName, prefix, ""));

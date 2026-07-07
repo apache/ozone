@@ -62,6 +62,9 @@ public final class StringToSignProducer {
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
+
+  private static final String[] URL_ENCODE_SEARCH_CHARS = new String[] {"+", "*", "%7E"};
+  private static final String[] URL_ENCODE_REPLACE_CHARS = new String[] {"%20", "%2A", "~"};
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -115,7 +118,7 @@ public final class StringToSignProducer {
     strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
-      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
     strToSign.append(signatureInfo.getDateTime()).append(NEWLINE)
         .append(credentialScope).append(NEWLINE);
@@ -188,13 +191,13 @@ public final class StringToSignProducer {
           validateSignedHeader(schema, header, headerValue);
         } catch (DateTimeParseException ex) {
           LOG.error("DateTime format invalid.", ex);
-          throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+          throw newError(S3_AUTHINFO_CREATION_ERROR);
         }
 
       } else {
         LOG.error("Header " + header + " not present in "
             + "request but requested to be signed.");
-        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
     }
 
@@ -226,7 +229,7 @@ public final class StringToSignProducer {
     if (contentSignatureHeaderValue == null) {
       LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
           + " header for signed payload");
-      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
     // Simply return the header value of x-amz-content-sha256 as the payload hash
     // These are the possible cases:
@@ -282,10 +285,7 @@ public final class StringToSignProducer {
 
   private static String urlEncode(String str) {
     try {
-      return S3Utils.urlEncode(str)
-          .replaceAll("\\+", "%20")
-          .replaceAll("\\*", "%2A")
-          .replaceAll("%7E", "~");
+      return StringUtils.replaceEach(S3Utils.urlEncode(str), URL_ENCODE_SEARCH_CHARS, URL_ENCODE_REPLACE_CHARS);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
@@ -333,7 +333,7 @@ public final class StringToSignProducer {
         LOG.error("AWS date not in valid range. Request timestamp:{} should "
             + "not be older than {} seconds.",
             headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
-        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
       break;
     case X_AMZ_CONTENT_SHA256:
@@ -362,7 +362,7 @@ public final class StringToSignProducer {
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
-      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+      throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
     for (String header : headers.keySet().stream()
         .filter(s -> s.startsWith("x-amz-"))
@@ -376,7 +376,7 @@ public final class StringToSignProducer {
         }
         LOG.error("The SignedHeaders list must include all "
             + "x-amz-* headers in the request");
-        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
+        throw newError(S3_AUTHINFO_CREATION_ERROR);
       }
     }
   }

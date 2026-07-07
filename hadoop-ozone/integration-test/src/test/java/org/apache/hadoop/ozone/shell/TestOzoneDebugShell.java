@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -208,27 +210,49 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
 
   private int runChunkInfoAndVerifyPaths(String volumeName, String bucketName,
       String keyName) throws Exception {
-    int exitCode = 1;
-    try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
-        .SystemOutCapturer()) {
-      exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
-      Set<String> blockFilePaths = new HashSet<>();
-      String output = capture.getOutput();
-      ObjectMapper objectMapper = new ObjectMapper();
-      // Parse the JSON array string into a JsonNode
-      JsonNode jsonNode = objectMapper.readTree(output);
-      JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
-      for (JsonNode element : keyLocations) {
-        String fileName =
-            element.get("file").toString();
-        blockFilePaths.add(fileName);
-      }
-      // DN storage directories are set differently for each DN
-      // in MiniOzoneCluster as datanode-0,datanode-1,datanode-2 which is why
-      // we expect 3 paths here in the set.
-      assertEquals(3, blockFilePaths.size());
+    AtomicInteger exitCode = new AtomicInteger(1);
+    AtomicInteger lastPathCount = new AtomicInteger(-1);
+    AtomicReference<Throwable> lastError = new AtomicReference<>();
+    ObjectMapper objectMapper = new ObjectMapper();
+    // A RATIS THREE write is acknowledged on a Ratis majority, so right after
+    // the key is written one replica may not have applied the write yet and
+    // chunk-info silently drops that datanode. Wait until all three datanodes
+    // report the block, giving three distinct paths.
+    // DN storage directories are set differently for each DN in
+    // MiniOzoneCluster as datanode-0,datanode-1,datanode-2 which is why
+    // we expect 3 paths here in the set.
+    try {
+      GenericTestUtils.waitFor(() -> {
+        Set<String> blockFilePaths = new HashSet<>();
+        try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
+            .SystemOutCapturer()) {
+          exitCode.set(runChunkInfoCommand(volumeName, bucketName, keyName));
+          String output = capture.getOutput();
+          // Parse the JSON array string into a JsonNode
+          JsonNode jsonNode = objectMapper.readTree(output);
+          JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
+          for (JsonNode element : keyLocations) {
+            String fileName =
+                element.get("file").toString();
+            blockFilePaths.add(fileName);
+          }
+        } catch (Exception e) {
+          // Keep retrying in case the output is not ready yet, but remember the
+          // failure so a persistent error is reported instead of an opaque
+          // timeout.
+          lastError.set(e);
+          return false;
+        }
+        lastError.set(null);
+        lastPathCount.set(blockFilePaths.size());
+        return blockFilePaths.size() == 3;
+      }, 1000, 30000);
+    } catch (TimeoutException e) {
+      throw new AssertionError("Expected 3 distinct block file paths across "
+          + "datanodes, last chunk-info reported " + lastPathCount.get()
+          + " path(s)", lastError.get() != null ? lastError.get() : e);
     }
-    return exitCode;
+    return exitCode.get();
   }
 
   /**

@@ -33,16 +33,16 @@ public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "hdds.scm.kerberos.principal",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "This Kerberos principal is used by the SCM service."
+      defaultValue = "SCM/_HOST@REALM",
+      tags = { ConfigTag.SCM, ConfigTag.SECURITY, ConfigTag.OZONE },
+      description = "The SCM service principal. e.g. scm/_HOST@REALM.COM"
   )
   private String principal;
 
   @Config(key = "hdds.scm.kerberos.keytab.file",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      defaultValue = "/etc/security/keytabs/SCM.keytab",
+      tags = { ConfigTag.SCM, ConfigTag.SECURITY, ConfigTag.OZONE },
       description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )

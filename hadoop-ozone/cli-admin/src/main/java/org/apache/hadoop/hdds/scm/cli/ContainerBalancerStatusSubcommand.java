@@ -81,7 +81,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             .findFirst()
             .orElse(null);
         if (currentIterationStatistic == null) {
-          System.out.println("-\n");
+          System.out.println("-");
+          System.out.println();
         } else {
           System.out.println(
               getPrettyIterationStatusInfo(currentIterationStatistic)
@@ -96,7 +97,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                   .stream()
                   .filter(it -> !it.getIterationResult().isEmpty())
                   .map(this::getPrettyIterationStatusInfo)
-                  .collect(Collectors.joining("\n"))
+                  .collect(Collectors.joining(System.lineSeparator()))
           );
         }
       }
@@ -165,16 +166,18 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
     long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
     String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + byteDesc(nodeInfo.getDataVolume()) + "\n")
-            .collect(Collectors.joining());
+        .stream()
+        .map(nodeInfo -> nodeInfo.getUuid() + " <- " + byteDesc(nodeInfo.getDataVolume()) + System.lineSeparator())
+        .collect(Collectors.joining());
     if (enteringDataNodeList.isEmpty()) {
-      enteringDataNodeList = " -\n";
+      enteringDataNodeList = " -" + System.lineSeparator();
     }
     String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + byteDesc(nodeInfo.getDataVolume()) + "\n")
-            .collect(Collectors.joining());
+        .stream()
+        .map(nodeInfo -> nodeInfo.getUuid() + " -> " + byteDesc(nodeInfo.getDataVolume()) + System.lineSeparator())
+        .collect(Collectors.joining());
     if (leavingDataNodeList.isEmpty()) {
-      leavingDataNodeList = " -\n";
+      leavingDataNodeList = " -" + System.lineSeparator();
     }
     return String.format(
             "%-50s %s%n" +

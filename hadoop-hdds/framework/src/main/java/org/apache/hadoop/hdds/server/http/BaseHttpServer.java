@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -370,23 +371,28 @@ public abstract class BaseHttpServer implements AutoCloseable {
     }
   }
 
-  public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
-      HttpServer2.Builder builder, ConfigurationSource sslConf) {
-    return builder
+  public static void loadSslConfToHttpServerBuilder(HttpServer2.Builder builder, ConfigurationSource sslConf) {
+    builder
         .needsClientAuth(
             sslConf.getBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY,
                 OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT))
         .keyPassword(getPassword(sslConf, OZONE_SERVER_HTTPS_KEYPASSWORD_KEY))
-        .keyStore(sslConf.get("ssl.server.keystore.location"),
+        .keyStore(
+            sslConf.get(SSLFactory.SSL_SERVER_KEYSTORE_LOCATION),
             getPassword(sslConf, OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
-            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE,
-                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT))
-        .trustStore(sslConf.get("ssl.server.truststore.location"),
+            sslConf.get(
+                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT)
+        )
+        .trustStore(
+            sslConf.get(SSLFactory.SSL_SERVER_TRUSTSTORE_LOCATION),
             getPassword(sslConf, OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
-            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
-                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT))
-        .excludeCiphers(
-            sslConf.get("ssl.server.exclude.cipher.list"));
+            sslConf.get(
+                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT)
+        )
+        .includeCiphers(sslConf.get(SSLFactory.SSL_SERVER_INCLUDE_CIPHER_LIST))
+        .excludeCiphers(sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST));
   }
 
   /**

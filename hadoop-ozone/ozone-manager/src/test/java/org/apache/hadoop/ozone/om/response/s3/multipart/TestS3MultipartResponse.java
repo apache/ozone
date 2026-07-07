@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
@@ -296,6 +297,95 @@ public class TestS3MultipartResponse {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
+  public S3MultipartUploadCommitPartResponse createS3CommitMPUResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID,
+      OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      OmMultipartKeyInfo multipartKeyInfo,
+      OzoneManagerProtocolProtos.Status status, String openKey)
+      throws IOException {
+    if (multipartKeyInfo == null) {
+      multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+              .setUploadID(multipartUploadID)
+              .setCreationTime(Time.now())
+              .setReplicationConfig(RatisReplicationConfig.getInstance(
+                      HddsProtos.ReplicationFactor.ONE))
+              .build();
+    }
+
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    OmKeyInfo openPartKeyInfoToBeDeleted = new OmKeyInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
+                    HddsProtos.ReplicationFactor.ONE))
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+            .build();
+
+    OMResponse omResponse = OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CommitMultiPartUpload)
+            .setStatus(status).setSuccess(true)
+            .setCommitMultiPartUploadResponse(
+                    OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
+                            .newBuilder().setETag(volumeName).setPartName(volumeName)).build();
+
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap = new HashMap<>();
+    if (oldPartKeyInfo != null) {
+      OmKeyInfo partKeyToBeDeleted =
+          OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
+      String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+          partKeyToBeDeleted.getObjectID(), multipartKey);
+
+      keyToDeleteMap.put(delKeyName, new RepeatedOmKeyInfo(partKeyToBeDeleted, omBucketInfo.getObjectID()));
+    }
+
+    return new S3MultipartUploadCommitPartResponse(omResponse,
+        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
+        getBucketLayout());
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public S3MultipartUploadCompleteResponse createS3CompleteMPUResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID, OmKeyInfo omKeyInfo,
+      OzoneManagerProtocolProtos.Status status,
+      List<OmKeyInfo> allKeyInfoToRemove,
+      OmBucketInfo omBucketInfo) throws IOException {
+
+    String multipartKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+    // In legacy/OBS buckets, the MPU open key and the multipart key share the
+    // same format, so the complete response deletes them using the same key.
+    String multipartOpenKey = multipartKey;
+
+    long bucketId = omBucketInfo != null ? omBucketInfo.getObjectID()
+        : omMetadataManager.getBucketId(volumeName, bucketName);
+
+    OMResponse omResponse = OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload)
+            .setStatus(status).setSuccess(true)
+            .setCompleteMultiPartUploadResponse(
+                    OzoneManagerProtocolProtos.MultipartUploadCompleteResponse
+                            .newBuilder().setBucket(bucketName)
+                            .setVolume(volumeName).setKey(keyName)).build();
+
+    return new S3MultipartUploadCompleteResponse(omResponse, multipartKey,
+        multipartOpenKey, omKeyInfo, allKeyInfoToRemove, getBucketLayout(),
+        omBucketInfo, bucketId);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponse createS3CompleteMPUResponseFSO(
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
@@ -344,6 +434,19 @@ public class TestS3MultipartResponse {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
         multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
         getBucketLayout());
+  }
+
+  /**
+   * Seed the part's open key into the open key table, simulating the open
+   * entry created during part upload that the commit response later removes.
+   */
+  protected void addPartToOpenKeyTable(String volumeName, String bucketName,
+      String keyName, String openKey) throws IOException {
+    OmKeyInfo partKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, keyName, RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE)).build();
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put(openKey, partKeyInfo);
   }
 
   public BucketLayout getBucketLayout() {

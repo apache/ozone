@@ -110,7 +110,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   tests run, then the volume is considered failed.
    */
   private final boolean isDiskCheckEnabled;
+  private final boolean isTimeoutCheckEnabled;
   private SlidingWindow ioTestSlidingWindow;
+  private SlidingWindow timeoutFailureSlidingWindow;
   private int healthCheckFileSize;
 
   /**
@@ -160,8 +162,12 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.isDiskCheckEnabled = dnConf.isDiskCheckEnabled();
+      this.isTimeoutCheckEnabled = dnConf.isDiskCheckTimeoutTestEnabled();
       this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
           dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
+      this.timeoutFailureSlidingWindow = new SlidingWindow(
+          dnConf.getDiskCheckTimeoutFailureTolerance(),
+          dnConf.getDiskCheckTimeoutSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -170,6 +176,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
       this.isDiskCheckEnabled = false;
+      this.isTimeoutCheckEnabled = false;
       this.conf = null;
       this.dnConf = null;
     }
@@ -527,7 +534,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return this.tmpDir;
   }
 
-  @VisibleForTesting
   public File getDiskCheckDir() {
     return this.diskCheckDir;
   }
@@ -565,6 +571,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
   public SlidingWindow getIoTestSlidingWindow() {
     return ioTestSlidingWindow;
+  }
+
+  @VisibleForTesting
+  public SlidingWindow getTimeoutFailureSlidingWindow() {
+    return timeoutFailureSlidingWindow;
   }
 
   public StorageType getStorageType() {
@@ -752,6 +763,38 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return VolumeCheckResult.HEALTHY;
   }
 
+  /**
+   * Records a volume-check timeout in the timeout failure window.
+   *
+   * <p>This is intentionally separate from the normal IO failure window.
+   * Timeouts are tracked as "more than N timeout events within the timeout
+   * window" rather than as a consecutive counter. The time-based expiry
+   * automatically removes old timeout events.
+   *
+   * @return {@code true} if the number of timeout events in the timeout window
+   *         now exceeds the tolerated threshold and the volume should be
+   *         marked failed; {@code false} otherwise.
+   */
+  public boolean recordTimeoutAndCheckFailure() {
+    if (!isTimeoutCheckEnabled) {
+      return false;
+    }
+    timeoutFailureSlidingWindow.add();
+    if (timeoutFailureSlidingWindow.isExceeded()) {
+      LOG.error("Volume {} check timed out more than the {} tolerated times "
+              + "within the past {} ms. Marking FAILED.",
+          this, timeoutFailureSlidingWindow.getWindowSize(),
+          timeoutFailureSlidingWindow.getExpiryDurationMillis());
+      return true;
+    }
+    LOG.warn("Volume {} check timed out. Encountered {} out of {} tolerated "
+            + "timeouts within the past {} ms.",
+        this, timeoutFailureSlidingWindow.getNumEventsInWindow(),
+        timeoutFailureSlidingWindow.getWindowSize(),
+        timeoutFailureSlidingWindow.getExpiryDurationMillis());
+    return false;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(storageDir);
@@ -806,5 +849,15 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       ServerUtils.setDataDirectoryPermissions(getStorageDir(), conf,
           ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
     }
+  }
+
+  public static boolean isNoSpaceAvailable(Throwable t) {
+    for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+      String msg = cause.getMessage();
+      if (msg != null && msg.contains("No space left on device")) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /** Test {@link Archiver}. */
@@ -76,22 +77,19 @@ class TestArchiver {
     Files.write(tempFile.toPath(), "Test Content".getBytes(StandardCharsets.UTF_8));
 
     TarArchiveOutputStream mockArchiveOutput = mock(TarArchiveOutputStream.class);
-    TarArchiveEntry mockEntry = new TarArchiveEntry(entryName);
-    AtomicBoolean isHardLinkCreated = new AtomicBoolean(false);
-    when(mockArchiveOutput.createArchiveEntry(any(File.class), eq(entryName)))
-        .thenAnswer(invocation -> {
-          File linkFile = invocation.getArgument(0);
-          isHardLinkCreated.set(Files.isSameFile(tempFile.toPath(), linkFile.toPath()));
-          return mockEntry;
-        });
 
     // Call method under test
     long bytesCopied = Archiver.linkAndIncludeFile(tempFile, entryName, mockArchiveOutput, tmpDir);
     assertEquals(Files.size(tempFile.toPath()), bytesCopied);
     // Verify archive interactions
-    verify(mockArchiveOutput, times(1)).putArchiveEntry(mockEntry);
+    ArgumentCaptor<TarArchiveEntry> entryCaptor = ArgumentCaptor.forClass(TarArchiveEntry.class);
+    verify(mockArchiveOutput, times(1)).putArchiveEntry(entryCaptor.capture());
     verify(mockArchiveOutput, times(1)).closeArchiveEntry();
-    assertTrue(isHardLinkCreated.get());
+
+    TarArchiveEntry capturedEntry = entryCaptor.getValue();
+    assertEquals(entryName, capturedEntry.getName());
+    assertEquals(Files.size(tempFile.toPath()), capturedEntry.getSize());
+
     assertFalse(Files.exists(tmpDir.resolve(entryName)));
     // Cleanup
     assertTrue(tempFile.delete());

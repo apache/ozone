@@ -85,8 +85,8 @@ public class FileSizeDistSubCommand implements Callable {
       }
       if (sum == 0) {
         printSpaces(2);
-        System.out.println("The object is empty.\n" +
-            "Put more files into it to visualize file size distribution");
+        System.out.println("The object is empty.");
+        System.out.println("Put more files into it to visualize file size distribution");
         printNewLines(1);
         return null;
       }

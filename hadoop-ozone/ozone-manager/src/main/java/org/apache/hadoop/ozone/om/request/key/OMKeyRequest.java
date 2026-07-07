@@ -993,9 +993,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
-      if (keyArgs.hasExpectedETag()) {
-        builder.setExpectedETag(keyArgs.getExpectedETag());
-      }
 
       return builder.build();
     }
@@ -1308,5 +1305,98 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("Attempting to create unencrypted file " +
           keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
     }
+  }
+
+  /**
+   * Validates atomic rewrite conditions for conditional writes.
+   * <p>
+   * For If-None-Match: * (expectedDataGeneration = EXPECTED_GEN_CREATE_IF_NOT_EXISTS),
+   * the key must NOT exist.
+   * <p>
+   * For If-Match with a specific generation, the key must exist with matching updateID.
+   *
+   * @param dbKeyInfo the existing key info from the database (null if key doesn't exist)
+   * @param keyArgs the key arguments containing expected generation
+   * @throws OMException if validation fails
+   */
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasExpectedDataGeneration()) {
+      long expectedGen = keyArgs.getExpectedDataGeneration();
+      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+        if (dbKeyInfo != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+        if (dbKeyInfo == null) {
+          throw new OMException("Key not found during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+        if (dbKeyInfo.getUpdateID() != expectedGen) {
+          throw new OMException("Generation mismatch during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
+    if (!keyArgs.hasExpectedETag()) {
+      return;
+    }
+
+    String expectedETag = keyArgs.getExpectedETag();
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for If-Match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!dbKeyInfo.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          OMException.ResultCodes.ETAG_MISMATCH);
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * If it matches, the ETag condition is converted to a generation-based condition
+   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @throws OMException if validation fails
+   */
+  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+
+    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+      return keyArgs;
+    }
+
+    return keyArgs.toBuilder()
+        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .clearExpectedETag()
+        .build();
   }
 }

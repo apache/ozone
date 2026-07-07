@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -99,7 +100,7 @@ public class TestContainerPlacementFactory {
           .createDatanodeDetails(hostname + i, rack + (i / 5));
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -146,6 +147,7 @@ public class TestContainerPlacementFactory {
       when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
+    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenReturn(true);
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,

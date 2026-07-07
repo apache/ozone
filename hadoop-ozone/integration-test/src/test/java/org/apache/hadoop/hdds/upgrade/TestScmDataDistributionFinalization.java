@@ -414,9 +414,11 @@ public class TestScmDataDistributionFinalization {
       for (int j = 0; j < BLOCKS_PER_TX; j++)  {
         long localID = localIDBase + j;
         if (withSize) {
-          blocks.add(new DeletedBlock(new BlockID(containerID, localID), BLOCK_SIZE, BLOCK_SIZE * 3));
+          blocks.add(new DeletedBlock(new BlockID(containerID, localID),
+              BLOCK_SIZE, BLOCK_SIZE * 3, BLOCK_SIZE));
         } else {
-          blocks.add(new DeletedBlock(new BlockID(containerID, localID), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          blocks.add(new DeletedBlock(new BlockID(containerID, localID),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         }
       }
       blockMap.put(containerID, blocks);

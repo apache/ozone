@@ -183,6 +183,7 @@ message KeyBlocks {
   repeated BlockID blocks = 2;
   repeated uint64 size = 3;
   repeated uint64 replicatedSize = 4;
+  repeated uint64 sizePerReplica = 5;
 }
 
 /**

@@ -71,14 +71,14 @@ public class AuthorizationFilter implements ContainerRequestFilter {
       } else {
         LOG.debug("Unsupported AWS signature version: {}",
             signatureInfo.getVersion());
-        throw S3ErrorTable.newError(S3_AUTHINFO_CREATION_ERROR, String.valueOf(signatureInfo.getVersion()), null);
+        throw S3ErrorTable.newError(S3_AUTHINFO_CREATION_ERROR, String.valueOf(signatureInfo.getVersion()));
       }
 
       String awsAccessId = signatureInfo.getAwsAccessId();
       // ONLY validate aws access id when needed.
       if (awsAccessId == null || awsAccessId.equals("")) {
         LOG.debug("Malformed s3 header. awsAccessID: {}", awsAccessId);
-        throw S3ErrorTable.newError(ACCESS_DENIED, null, null);
+        throw S3ErrorTable.newError(ACCESS_DENIED);
       }
     } catch (OS3Exception ex) {
       LOG.debug("Error during Client Creation: ", ex);
@@ -87,8 +87,7 @@ public class AuthorizationFilter implements ContainerRequestFilter {
       // For any other critical errors during object creation throw Internal
       // error.
       LOG.debug("Error during Client Creation: ", e);
-      throw wrapOS3Exception(
-          S3ErrorTable.newError(INTERNAL_ERROR, null, e));
+      throw wrapOS3Exception(S3ErrorTable.newError(INTERNAL_ERROR, e));
     }
   }
 

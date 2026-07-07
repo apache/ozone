@@ -116,6 +116,7 @@ public class TestOmMetrics {
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     // For testing fs operations with legacy buckets.
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
     clusterBuilder = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5);
     startCluster();
   }

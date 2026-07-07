@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -165,22 +164,6 @@ public class TestDeletedBlockLog {
         });
     when(containerManager.getContainers())
         .thenReturn(new ArrayList<>(containers.values()));
-    doAnswer(invocationOnMock -> {
-      Map<ContainerID, Long> map =
-          (Map<ContainerID, Long>) invocationOnMock.getArguments()[0];
-      for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
-        ContainerInfo info = containers.get(e.getKey());
-        try {
-          assertThat(e.getValue()).isGreaterThan(info.getDeleteTransactionId());
-        } catch (AssertionError err) {
-          throw new Exception("New TxnId " + e.getValue() + " < " + info
-              .getDeleteTransactionId());
-        }
-        info.updateDeleteTransactionId(e.getValue());
-        scmHADBTransactionBuffer.addToBuffer(containerTable, e.getKey(), info);
-      }
-      return null;
-    }).when(containerManager).updateDeleteTransactionId(any());
   }
 
   private void updateContainerMetadata(long cid,
@@ -231,7 +214,8 @@ public class TestDeletedBlockLog {
       updateContainerMetadata(containerID, state);
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
-        blocks.add(new DeletedBlock(new BlockID(containerID, localID), blockSize + j, blockSize + j));
+        blocks.add(new DeletedBlock(new BlockID(containerID, localID),
+            blockSize + j, blockSize + j, blockSize + j));
       }
       blockMap.put(containerID, blocks);
     }
@@ -311,7 +295,8 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testContainerManagerTransactionId() throws Exception {
+  public void testAddTransactionsDoesNotUpdateContainerTransactionId()
+      throws Exception {
     // Initially all containers should have deleteTransactionId as 0
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       assertEquals(0, containerInfo.getDeleteTransactionId());
@@ -328,11 +313,12 @@ public class TestDeletedBlockLog {
 
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
-    // All containers should have positive deleteTransactionId
+    // SCM does not update ContainerInfo deleteTransactionId when adding delete
+    // transactions.
     mockContainerHealthResult(true);
     assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      assertThat(containerInfo.getDeleteTransactionId()).isGreaterThan(0);
+      assertEquals(0, containerInfo.getDeleteTransactionId());
     }
   }
 
@@ -733,7 +719,8 @@ public class TestDeletedBlockLog {
     Map<Long, List<DeletedBlock>> deletedBlocksMap = new HashMap<>();
     long localId = RandomUtils.secure().randomLong();
     List<DeletedBlock> blockIDList = new ArrayList<>();
-    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId),
+        SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
     deletedBlocksMap.put(containerID, blockIDList);
     addTransactions(deletedBlocksMap, true);
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
@@ -808,7 +795,8 @@ public class TestDeletedBlockLog {
     long containerID = 1000000;
     List<DeletedBlock> blocks = new ArrayList<>();
     for (int i = 0; i < blockCount; i++) {
-      blocks.add(new DeletedBlock(new BlockID(containerID, 100000000 + i), 128 * 1024 * 1024, 128 * 1024 * 1024));
+      blocks.add(new DeletedBlock(new BlockID(containerID, 100000000 + i),
+          128 * 1024 * 1024, 128 * 1024 * 1024, 128 * 1024 * 1024));
     }
     List<Long> localIdList = blocks.stream().map(b -> b.getBlockID().getLocalID()).collect(Collectors.toList());
     DeletedBlocksTransaction tx1 = DeletedBlocksTransaction.newBuilder()
@@ -818,6 +806,7 @@ public class TestDeletedBlockLog {
         .setCount(0)
         .setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum())
         .setTotalBlockReplicatedSize(blocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum())
+        .setTotalSizePerReplica(blocks.stream().mapToLong(DeletedBlock::getSizePerReplica).sum())
         .build();
     DeletedBlocksTransaction tx2 = DeletedBlocksTransaction.newBuilder()
         .setTxID(txID)

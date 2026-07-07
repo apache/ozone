@@ -50,6 +50,7 @@ public final class BlockGroup {
       kbb.addBlocks(deletedBlock.getBlockID().getProtobuf());
       kbb.addSize(deletedBlock.getSize());
       kbb.addReplicatedSize(deletedBlock.getReplicatedSize());
+      kbb.addSizePerReplica(deletedBlock.getSizePerReplica());
     }
     return kbb.setKey(groupID).build();
   }
@@ -62,17 +63,21 @@ public final class BlockGroup {
   public static BlockGroup getFromProto(KeyBlocks proto) {
     List<DeletedBlock> deletedBlocksList = new ArrayList<>();
     for (int i = 0; i < proto.getBlocksCount(); i++) {
-      long repSize = SIZE_NOT_AVAILABLE;
       long size = SIZE_NOT_AVAILABLE;
+      long repSize = SIZE_NOT_AVAILABLE;
+      long sizePerReplica = SIZE_NOT_AVAILABLE;
       if (proto.getSizeCount() > i) {
         size = proto.getSize(i);
       }
       if (proto.getReplicatedSizeCount() > i) {
         repSize = proto.getReplicatedSize(i);
       }
+      if (proto.getSizePerReplicaCount() > i) {
+        sizePerReplica = proto.getSizePerReplica(i);
+      }
       BlockID block = new BlockID(proto.getBlocks(i).getContainerBlockID().getContainerID(),
           proto.getBlocks(i).getContainerBlockID().getLocalID());
-      deletedBlocksList.add(new DeletedBlock(block, size, repSize));
+      deletedBlocksList.add(new DeletedBlock(block, size, repSize, sizePerReplica));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllDeletedBlocks(deletedBlocksList)

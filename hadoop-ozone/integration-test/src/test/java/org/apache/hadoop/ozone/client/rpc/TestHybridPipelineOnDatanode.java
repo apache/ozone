@@ -66,7 +66,6 @@ public class TestHybridPipelineOnDatanode {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
   }

@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
@@ -68,6 +71,13 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
+
+    if (!ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY,
+        OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT)) {
+      throw new OMException("Ozone snapshot rename feature is not allowed per Ozone Manager server config",
+          FEATURE_NOT_ENABLED);
+    }
 
     final RenameSnapshotRequest renameSnapshotRequest =
         omRequest.getRenameSnapshotRequest();

@@ -32,7 +32,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,11 +61,11 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class TestOmSnapshotLocalDataYaml {
 
+  private static final long LAST_DEFRAG_TIME = 123456789L;
+
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
   private static final OmSnapshotLocalDataYaml.YamlFactory YAML_FACTORY = new OmSnapshotLocalDataYaml.YamlFactory();
   private static ObjectSerializer<OmSnapshotLocalData> omSnapshotLocalDataSerializer;
-
-  private static final Instant NOW = Instant.now();
 
   @BeforeAll
   public static void setupSerializer() throws IOException {
@@ -126,7 +125,7 @@ public class TestOmSnapshotLocalDataYaml {
     dataYaml.setSstFiltered(true);
 
     // Set last defrag time
-    dataYaml.setLastDefragTime(NOW.toEpochMilli());
+    dataYaml.setLastDefragTime(LAST_DEFRAG_TIME);
 
     // Set needs defrag flag
     dataYaml.setNeedsDefrag(true);
@@ -173,7 +172,7 @@ public class TestOmSnapshotLocalDataYaml {
         ImmutableList.of(new SstFileInfo("sst1", "k1", "k2", "table1"),
             new SstFileInfo("sst2", "k3", "k4", "table1"),
             new SstFileInfo("sst3", "k4", "k5", "table2"))), notDefraggedSSTFiles);
-    assertEquals(NOW.toEpochMilli(), snapshotData.getLastDefragTime());
+    assertEquals(LAST_DEFRAG_TIME, snapshotData.getLastDefragTime());
     assertTrue(snapshotData.getNeedsDefrag());
 
     Map<Integer, VersionMeta> defraggedSSTFiles = snapshotData.getVersionSstFileInfos();
@@ -261,7 +260,7 @@ public class TestOmSnapshotLocalDataYaml {
   }
 
   @Test
-  public void testYamlContainsAllFields() throws IOException {
+  public void testYamlContainsCurrentFields() throws IOException {
     UUID snapshotId = UUID.randomUUID();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
@@ -279,5 +278,44 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(content).contains(OzoneConsts.OM_SLD_SNAP_ID);
     assertThat(content).contains(OzoneConsts.OM_SLD_PREV_SNAP_ID);
     assertThat(content).contains(OzoneConsts.OM_SLD_TXN_INFO);
+  }
+
+  @Test
+  public void testLoadYamlWithoutLastDefragTimeDefaultsTo0() throws IOException {
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot5", null);
+    File yamlFile = yamlFilePrevIdPair.getLeft();
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+    String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME + "\n", "");
+    FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertEquals(44, snapshotData.getVersion());
+    assertEquals(0L, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
+    assertTrue(snapshotData.getSstFiltered());
+    assertEquals(3, snapshotData.getVersionSstFileInfos().size());
+  }
+
+  @Test
+  public void testLoadYamlWithEmptyLastDefragTimeDefaultsTo0() throws IOException {
+    // Parser compatibility for older/edited YAML: removing this field or
+    // leaving it empty must not make deserialization fail.
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot6", null);
+    File yamlFile = yamlFilePrevIdPair.getLeft();
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+    String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME,
+        "lastDefragTime:");
+    FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertEquals(44, snapshotData.getVersion());
+    assertEquals(0L, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
+    assertTrue(snapshotData.getSstFiltered());
+    assertEquals(3, snapshotData.getVersionSstFileInfos().size());
   }
 }

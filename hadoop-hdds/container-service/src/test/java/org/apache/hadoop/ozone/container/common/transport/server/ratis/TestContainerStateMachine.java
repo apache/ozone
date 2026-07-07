@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -49,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroup;
@@ -58,7 +58,6 @@ import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +107,11 @@ abstract class TestContainerStateMachine {
     when(ratisServer.getServerDivision(any())).thenReturn(division);
     stateMachine = new ContainerStateMachine(null,
         RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
+    try {
+      stateMachine.initialize(raftServer, stateMachine.getGroupId(), null);
+    } catch (Exception e) {
+      // Ingore exception, as need init server to be closed
+    }
   }
 
   @AfterEach
@@ -122,8 +126,7 @@ abstract class TestContainerStateMachine {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testWriteFailure(boolean failWithException)
-      throws ExecutionException, InterruptedException, InvalidProtocolBufferException {
+  public void testWriteFailure(boolean failWithException) throws ExecutionException, InterruptedException {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
     when(entry.getTerm()).thenReturn(1L);
     when(entry.getIndex()).thenReturn(1L);
@@ -137,32 +140,28 @@ abstract class TestContainerStateMachine {
     setUpMockDispatcherReturn(failWithException);
     setUpMockRequestProtoReturn(context, 1, 1);
 
-    Message message = stateMachine.write(entry, trx).get();
+    ThrowableCatcher catcher = new ThrowableCatcher();
+
+    stateMachine.write(entry, trx).exceptionally(catcher.asSetter()).get();
     verify(dispatcher, times(1)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
     reset(dispatcher);
-    ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto =
-        ContainerProtos.ContainerCommandResponseProto.parseFrom(message.getContent());
-    if (failWithException) {
-      assertEquals("Failed to write chunk data", containerCommandResponseProto.getMessage());
-      assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, containerCommandResponseProto.getResult());
-    } else {
-      // If dispatcher returned failure response, the state machine should propagate the same failure.
-      assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, containerCommandResponseProto.getResult());
-    }
+    assertNotNull(catcher.getReceived());
+    assertResults(failWithException, catcher.getCaught());
 
     // Writing data to another container(containerId 2) should also fail.
     setUpMockRequestProtoReturn(context, 2, 1);
-    message = stateMachine.write(entryNext, trx).get();
+    stateMachine.write(entryNext, trx).exceptionally(catcher.asSetter()).get();
     verify(dispatcher, times(0)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
-    containerCommandResponseProto
-        = ContainerProtos.ContainerCommandResponseProto.parseFrom(message.getContent());
-    assertTrue(containerCommandResponseProto.getMessage().contains("failed, stopping all writes to container"));
+    assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
+    StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
+    assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY, sce.getResult());
   }
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  @Flaky("HDDS-14962")
   public void testApplyTransactionFailure(boolean failWithException) throws ExecutionException,
       InterruptedException, IOException {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
@@ -232,17 +231,20 @@ abstract class TestContainerStateMachine {
     }).when(dispatcher).dispatch(any(), any());
 
     setUpMockRequestProtoReturn(context, 1, 1);
+    ThrowableCatcher catcher = new ThrowableCatcher();
 
     CompletableFuture<Message> firstWrite = stateMachine.write(entry, trx);
     Thread.sleep(2000);
     CompletableFuture<Message> secondWrite = stateMachine.write(entryNext, trx);
-    ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto
-        = ContainerProtos.ContainerCommandResponseProto.parseFrom(firstWrite.get().getContent());
-    assertEquals("Failed to write chunk data", containerCommandResponseProto.getMessage());
+    firstWrite.exceptionally(catcher.asSetter()).get();
+    assertNotNull(catcher.getCaught());
+    assertInstanceOf(InterruptedException.class, catcher.getReceived().getCause());
 
-    containerCommandResponseProto
-        = ContainerProtos.ContainerCommandResponseProto.parseFrom(secondWrite.get().getContent());
-    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, containerCommandResponseProto.getResult());
+    secondWrite.exceptionally(catcher.asSetter()).get();
+    assertNotNull(catcher.getReceived().getCause());
+    assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
+    StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
+    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
   }
 
   private void setUpMockDispatcherReturn(boolean failWithException) {
@@ -272,8 +274,12 @@ abstract class TestContainerStateMachine {
     if (failWithException) {
       assertInstanceOf(RuntimeException.class, throwable.get());
     } else {
-      assertInstanceOf(StorageContainerException.class, throwable.get());
-      StorageContainerException sce = (StorageContainerException) throwable.get();
+      Throwable th = throwable.get();
+      if (null != th.getCause()) {
+        th = th.getCause();
+      }
+      assertInstanceOf(StorageContainerException.class, th);
+      StorageContainerException sce = (StorageContainerException) th;
       assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
     }
   }

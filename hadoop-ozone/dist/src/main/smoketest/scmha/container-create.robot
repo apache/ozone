@@ -21,4 +21,4 @@ Resource            ../lib/os.robot
 *** Test Cases ***
 Create container without kinit
     ${output} =         Execute And Ignore Error          ozone admin container create
-                        Should contain        ${output}   Permission denied
+                        Should contain        ${output}   Client cannot authenticate via:[KERBEROS]

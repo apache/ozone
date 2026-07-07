@@ -91,8 +91,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   @BeforeEach
   public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class, withSettings().stubOnly());
-    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OMMetrics omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,

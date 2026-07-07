@@ -177,7 +177,7 @@ public class TestRangerBGSyncService {
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
 
-    omMetrics = OMMetrics.create();
+    omMetrics = OMMetrics.create(conf);
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.resolve("om").toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here

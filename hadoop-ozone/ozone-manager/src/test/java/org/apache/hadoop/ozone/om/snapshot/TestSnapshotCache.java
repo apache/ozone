@@ -82,6 +82,7 @@ class TestSnapshotCache {
   private static IOzoneManagerLock lock;
   private SnapshotCache snapshotCache;
 
+  private OzoneConfiguration conf;
   private OMMetrics omMetrics;
 
   @BeforeAll
@@ -94,8 +95,9 @@ class TestSnapshotCache {
 
   @BeforeEach
   void setUp() throws Exception {
+    conf = new OzoneConfiguration();
     // Reset cache for each test case
-    omMetrics = OMMetrics.create();
+    omMetrics = OMMetrics.create(conf);
     // Create a difference mock OmSnapshot instance each time load() is called
     doAnswer((Answer<OmSnapshot>) invocation -> {
       final OmSnapshot omSnapshot = mock(OmSnapshot.class);
@@ -197,7 +199,7 @@ class TestSnapshotCache {
 
   @Test
   public void testLockSupplierReturnsLockWithAnotherLockReleased() {
-    IOzoneManagerLock ozoneManagerLock = new OzoneManagerLock(new OzoneConfiguration());
+    IOzoneManagerLock ozoneManagerLock = new OzoneManagerLock(conf);
     snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true, ozoneManagerLock);
     try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
       ozoneManagerLock.acquireWriteLock(VOLUME_LOCK, "vol1");
@@ -460,7 +462,7 @@ class TestSnapshotCache {
   @Test
   @DisplayName("Snapshot operations not blocked during compaction")
   void testSnapshotOperationsNotBlockedDuringCompaction() throws IOException, InterruptedException, TimeoutException {
-    omMetrics = OMMetrics.create();
+    omMetrics = OMMetrics.create(conf);
     snapshotCache = new SnapshotCache(cacheLoader, 1, omMetrics, 50, true,
         lock);
     final UUID dbKey1 = UUID.randomUUID();

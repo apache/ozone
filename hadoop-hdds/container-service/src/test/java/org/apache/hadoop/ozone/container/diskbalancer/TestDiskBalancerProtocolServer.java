@@ -93,6 +93,7 @@ class TestDiskBalancerProtocolServer {
         TEST_THREADS,
         TEST_STOP_AFTER_DISK_EVEN,
         DiskBalancerVersion.DEFAULT_VERSION,
+        DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES,
         0L, // successCount
         0L, // failureCount
         0L, // bytesToMove
@@ -107,6 +108,7 @@ class TestDiskBalancerProtocolServer {
             .setUtilization(TEST_UTILIZATION_1)
             .setCommittedBytes(TEST_COMMITTED_BYTES_1)
             .setTotalCapacity(TEST_TOTAL_CAPACITY)
+            .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1)
             .setUsedSpace(TEST_USED_SPACE_1)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_1)
             .build(),
@@ -116,6 +118,7 @@ class TestDiskBalancerProtocolServer {
             .setUtilization(TEST_UTILIZATION_2)
             .setCommittedBytes(TEST_COMMITTED_BYTES_2)
             .setTotalCapacity(TEST_TOTAL_CAPACITY)
+            .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2)
             .setUsedSpace(TEST_USED_SPACE_2)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_2)
             .build()));
@@ -156,6 +159,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_1, volReport0.getCommittedBytes());
     assertEquals(TEST_TOTAL_CAPACITY, volReport0.getTotalCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1, volReport0.getOzoneAvailable());
     assertEquals(TEST_USED_SPACE_1, volReport0.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_1, volReport0.getEffectiveUsedSpace());
     assertEquals(TEST_STORAGE_ID_2, volReport1.getStorageId());
@@ -163,6 +167,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_UTILIZATION_2, volReport1.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_2, volReport1.getCommittedBytes());
     assertEquals(TEST_TOTAL_CAPACITY, volReport1.getTotalCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2, volReport1.getOzoneAvailable());
     assertEquals(TEST_USED_SPACE_2, volReport1.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_2, volReport1.getEffectiveUsedSpace());
   }
@@ -189,6 +194,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_BANDWIDTH, conf.getDiskBandwidthInMB());
     assertEquals(TEST_THREADS, conf.getParallelThread());
     assertEquals(TEST_STOP_AFTER_DISK_EVEN, conf.getStopAfterDiskEven());
+    assertEquals(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, conf.getContainerStates());
     assertEquals(10, status.getSuccessMoveCount());
     assertEquals(2, status.getFailureMoveCount());
     assertEquals(1000000, status.getBytesToMove());
@@ -258,6 +264,7 @@ class TestDiskBalancerProtocolServer {
         .setDiskBandwidthInMB(100L)
         .setParallelThread(20)
         .setStopAfterDiskEven(false)
+        .setContainerStates("CLOSED")
         .build();
     
     // Update configuration
@@ -268,6 +275,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(100L, diskBalancerInfo.getBandwidthInMB());
     assertEquals(20, diskBalancerInfo.getParallelThread());
     assertFalse(diskBalancerInfo.isStopAfterDiskEven());
+    assertEquals("CLOSED", diskBalancerInfo.getContainerStates());
     
     // Verify service was refreshed
     verify(diskBalancerService, times(1)).refresh(diskBalancerInfo);
