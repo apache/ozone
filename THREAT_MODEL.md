@@ -8,7 +8,7 @@
 - **Written against:** `master` @ HEAD (2026-06).
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
-- **Status:** DRAFT — under maintainer review (Siyao Meng / smengcl, 2026-06). Wave-1 answers (Q-secure, Q-ratis) folded; not yet fully ratified.
+- **Status:** v1 — ratified by the Ozone PMC. Maintainer review complete (Siyao Meng / smengcl and Wei-Chiu Chuang / jojochuang, 2026-06/07); wave-1–3 answers folded.
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -165,8 +165,12 @@ enablement, transport encryption, and TDE/KMS.
 stock install and must be explicitly enabled:
 
 - **Object ACL checks** are off by default (`ozone.acl.enabled=false`); when
-  enabled, operators configure an ACL authorizer such as Native ACL or Ranger.
+  enabled, **Native ACL is the default authorizer**. Operators can instead
+  configure the Ranger plugin as the authorizer by setting
+  `ozone.acl.authorizer.class` to
+  `org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer`.
   Both are documented authorizers; S3 multi-tenancy setup requires Ranger.
+  *(maintainer — smengcl, 2026-07-07)*
 - **Block/container tokens** are off by default (`hdds.block.token.enabled=false`,
   `hdds.container.token.enabled=false`). When enabled, the block/container-token
   lifetime defaults to `hdds.block.token.expiry.time=1d`.
@@ -377,8 +381,12 @@ list. *(requested by jojochuang, 2026-06-25.)*
 
 **Wave 2 — mechanism confirmations.**
 
-- **Q-authz.** Native ACL vs Ranger: which is the default authorizer, and is the
-  authorization claim in §8 made for both? (§8.)
+- **Q-authz.** *(Answered — maintainer, smengcl 2026-07-07: when
+  `ozone.acl.enabled=true`, **Native ACL is the default authorizer**; the Ranger
+  plugin is an opt-in alternative via
+  `ozone.acl.authorizer.class=org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer`.
+  The §8 authorization property holds for whichever authorizer is configured.
+  Folded into §5a.)* (§8.)
 - **Q-token.** Block/delegation token lifetimes, signing-key rotation, and the
   bearer-token caveat in §9 — confirm. (§8/§9.)
 - **Q-tde / Q-net / Q-infra.** TDE/KMS production expectations, the
