@@ -1036,6 +1036,17 @@ public class TestRocksDBCheckpointDiffer {
           null, allTables, true).orElse(Collections.emptyList());
       sawNonEmptyDiff = sawNonEmptyDiff || !baseline.isEmpty();
 
+      // Independent structural oracle, not derived from getSSTDiffList's own
+      // output: a snapshot diffed against itself must have no differing SST
+      // files. Together with the sawNonEmptyDiff guard below, this bounds a
+      // systematically broken diff in both directions (returning nothing, or
+      // returning files even for identical snapshots).
+      if (snap == src) {
+        assertThat(baseline)
+            .as("diff of a snapshot against itself must be empty")
+            .isEmpty();
+      }
+
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
         tableToLookUp.clear();
