@@ -20,12 +20,12 @@
 - **Draft confidence:** ~24 documented / 2 maintainer / 24 inferred (smengcl confirmed Q-secure + Q-ratis, 2026-06-23).
 
 **What it is.** Ozone is a multi-daemon distributed object store. The
-**Ozone Manager (OM)** owns the namespace/metadata and issues delegation +
+**Ozone Manager (OM)** owns the namespace/metadata and can issue delegation +
 block tokens; the **Storage Container Manager (SCM)** manages blocks/containers
 and acts as the cluster's **internal Certificate Authority** (root of service
 identity); **Datanodes** store data in containers, replicate via **Ratis
-(Raft)**, and enforce block/container tokens; the **S3 Gateway** exposes an
-S3-compatible REST API to (potentially internet-facing) clients; **Recon** is a
+(Raft)**, and enforce block/container tokens when enabled; the **S3 Gateway**
+exposes an S3-compatible REST API to (potentially internet-facing) clients; **Recon** is a
 read-only management/monitoring service; a **CSI driver** provisions Kubernetes
 volumes. Clients reach it via the S3 API or the `ofs://`/`o3fs://` Hadoop
 filesystem over Hadoop RPC.
@@ -54,9 +54,9 @@ library. There is no single "caller"; the roles split:
 | S3 Gateway | S3 REST (AWS SigV4) | **untrusted / internet-facing** | **Yes** |
 | OM (namespace, tokens, ACLs) | Hadoop RPC (SASL/Kerberos) | authenticated clients | **Yes** |
 | SCM (blocks + internal CA) | Hadoop RPC + cert server | services + admin | **Yes** (CA = root of trust) |
-| Datanode (block store, Ratis) | block protocol + Ratis | token-gated clients + DN peers | **Yes** |
+| Datanode (block store, Ratis) | block protocol + Ratis | token-gated clients where enabled + DN peers | **Yes** |
 | Recon | read-only HTTP/RPC | operators | **Yes** (read path) |
-| CSI driver | gRPC (kubelet) | in-cluster | partial — Q |
+| CSI driver | gRPC (kubelet) | in-cluster | **No — §3** |
 | `ofs`/`o3fs` client libs | in-process in the caller's app | as the caller | client-side (§10) |
 | test/integration modules | test | n/a | No — §3 |
 
@@ -66,7 +66,8 @@ library. There is no single "caller"; the roles split:
   the Kerberos KDC, the Ranger policy server + the *correctness of the
   authorization policies an operator writes*, the KMS/key material for
   transparent data encryption, and the network perimeter. Ozone consumes these;
-  hardening them is the operator's (§10). *(inferred — Q-infra.)*
+  hardening them is the operator's (§10). *(documented/inferred — SecureOzone,
+  SecurityWithRanger, SecuringTDE, NetworkPorts.)*
 - **`ozone-thirdparty`** — a shaded-dependency packaging repo; build artifact,
   no runtime attack surface of its own. *(documented.)*
 - **Non-secure mode as a target.** With `ozone.security.enabled=false` Ozone
@@ -96,10 +97,10 @@ Boundaries, outermost first:
    S3 Gateway may reach OM over the OM gRPC transport, and SCM HA uses internal
    Inter-SCM gRPC for checkpoint transfer. In secure mode, authenticated via
    Kerberos / delegation tokens and, for gRPC, TLS/mTLS where configured.
-3. **Block-access boundary** — a client obtains a **block token** from OM,
-   presents it to a Datanode, which verifies the token's signature before
-   serving the block. The Datanode does not re-authenticate the user; the token
-   *is* the capability.
+3. **Block-access boundary** — when block/container tokens are enabled, a client
+   obtains a **block token** from OM, presents it to a Datanode, which verifies
+   the token's signature before serving the block. The Datanode does not
+   re-authenticate the user; the token *is* the capability.
 4. **Service-identity boundary** — OM/SCM/DN use **SCM-issued certificates**
    for service identity; SCM is the CA. Transport encryption is controlled by
    separate TLS/RPC privacy knobs (§5a).
@@ -117,32 +118,35 @@ services ⇄ services : SCM-issued certs ; Datanodes ⇄ Datanodes : Ratis(Raft)
 reachable in **secure mode** (`ozone.security.enabled=true`) from the actor that
 owns that boundary — an S3-Gateway finding from an untrusted REST client; an
 OM/SCM finding from an authenticated-but-unauthorized user; a block-access
-finding from a client without a valid token; a consensus finding from a
-Byzantine Datanode peer below the honest-majority threshold (§7).
+finding from a client without a valid token in a token-enabled deployment; a
+consensus finding from a Byzantine Datanode peer below the honest-majority
+threshold (§7).
 
 ## §5 Assumptions about the environment
 
 - **Secure deployment** assumes a functioning **Kerberos KDC**, time sync,
-  DNS/rDNS, and a **Ranger** server if Ranger authz is enabled. *(inferred —
-  Q-infra.)*
+  DNS/rDNS, and a **Ranger** server if Ranger authz is enabled. Kerberos and
+  Ranger integration are documented; time/DNS are deployment preconditions.
 - **PKI:** SCM is the root CA; service certs are issued/rotated by SCM. The CA
   key's secrecy is assumed. *(documented — `CertificateServer`/`CertificateClient`.)*
 - **Storage:** Datanodes trust their local disks; on-disk encryption (TDE) keys
-  come from an external KMS. *(inferred — Q-tde.)*
-- **Network:** admin/Ratis/datanode service ports are assumed reachable only by
-  the cluster + authorized clients (operator-enforced). *(inferred — Q-net.)*
+  come from an external KMS. *(documented — SecuringTDE.)*
+- **Network:** Ozone exposes documented OM/SCM/Recon/S3G/Datanode listeners;
+  admin/Ratis/datanode service ports are assumed reachable only by the cluster +
+  authorized clients (operator-enforced).
 - Ozone **does** open many network listeners and spawns service processes by
   design; the "no side effects" inventory does not apply to a server.
 
 ## §5a Build-time and configuration variants — **the central knob**
 
 **`ozone.security.enabled` is load-bearing.** With it **true** (secure mode):
-Kerberos authentication on RPC, block/container/delegation tokens enforced,
-SCM-issued certificates for service identity, and ACL/Ranger authorization.
-Transport encryption is configured separately: Hadoop RPC privacy, gRPC TLS
-(`hdds.grpc.tls.enabled`), and HTTP/HTTPS policy (`ozone.http.policy`). With it
-**false** (non-secure mode): **no authentication at all** — intended only for
-dev/sandbox.
+Kerberos authentication on RPC, delegation-token support, and SCM-issued
+certificates for service identity are in the security posture. Several
+authorization, capability, and confidentiality controls are separately
+configured: object ACL checks (`ozone.acl.enabled`), block/container tokens
+(`hdds.block.token.enabled`, `hdds.container.token.enabled`), transport
+encryption, and TDE/KMS. With it **false** (non-secure mode): **no
+authentication at all** — intended only for dev/sandbox.
 
 **The insecure-default problem (wave-1 — answered).** Secure mode **is** the
 supported production posture *(maintainer — smengcl, 2026-06-23)*: operators must
@@ -152,23 +156,35 @@ Gateway specifically: with security enabled, **anonymous access is rejected** an
 there is no plan to support intended anonymous access
 ([HDDS-7961](https://issues.apache.org/jira/browse/HDDS-7961)) — so an
 "unauthenticated S3 request is accepted" finding in secure mode is `VALID`, not a
-disclaimed mode. Other knobs that move the envelope and still need a ruling:
-native vs Ranger ACL authorizer, S3 secret storage backend, and TDE on/off.
-**Q-knobs in §14.**
+disclaimed mode. Other knobs that move the envelope remain deployment choices:
+object ACL authorizer, S3 secret storage backend, block/container-token
+enablement, transport encryption, and TDE/KMS.
 
-**Default authz/crypto state — off by default even in secure mode**
+**Default authz/capability/crypto state — off by default even in secure mode**
 *(maintainer — jojochuang, 2026-06-25)*. Several controls are disabled in a
 stock install and must be explicitly enabled:
 
-- **ACL checks** are off by default (`ozone.acl.enabled=false`); once enabled,
-  the **Native ACL** authorizer is the default (Ranger is opt-in).
-- **Block tokens** are off by default (`hdds.block.token.enabled=false`).
-- **TDE (`hdds.grpc.tls.enabled`) and KMS** are optional and disabled by default.
+- **Object ACL checks** are off by default (`ozone.acl.enabled=false`); when
+  enabled, operators configure an ACL authorizer such as Native ACL or Ranger.
+  Both are documented authorizers; S3 multi-tenancy setup requires Ranger.
+- **Block/container tokens** are off by default (`hdds.block.token.enabled=false`,
+  `hdds.container.token.enabled=false`). When enabled, the block/container-token
+  lifetime defaults to `hdds.block.token.expiry.time=1d`.
+- **Delegation tokens** are enabled by default when security is enabled. OM
+  delegation tokens renew every `1d` and stop renewing after `7d`.
+- **Token signing keys** are SCM-issued symmetric keys. Defaults are
+  `hdds.secret.key.expiry.duration=9d`, `hdds.secret.key.rotate.duration=1d`,
+  `hdds.secret.key.rotate.check.duration=10m`, and `HmacSHA256`.
+- **gRPC TLS** is off by default (`hdds.grpc.tls.enabled=false`) and protects
+  gRPC traffic when enabled.
+- **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
+  it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
 
-So a finding that assumes ACLs / tokens / TDE are active in a default build is
-`OUT-OF-MODEL: non-default-build` unless the operator enabled them (§10); the §10
-checklist lists these as required production hardening. (Answers Q-authz /
-Q-token / Q-tde.)
+So a finding that assumes ACLs / block/container tokens / transport encryption /
+TDE are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
+operator enabled them (§10); the §10 checklist lists these as required
+production hardening. (Answers the Q-authz / Q-token / Q-tde default-state and
+lifetime/rotation mechanism questions.)
 
 ## §6 Assumptions about inputs
 
@@ -177,8 +193,8 @@ Per-boundary input trust (grouped by family):
 | Boundary | Input | Attacker-controllable? | Enforced by / caller must |
 | --- | --- | --- | --- |
 | S3 Gateway | REST request, SigV4 signature, headers, object data | **yes** | gateway verifies SigV4 against the user's S3 secret |
-| OM RPC | request, Kerberos/delegation token, key/volume/bucket names | **yes (authenticated)** | OM verifies token + ACL/Ranger authz |
-| Datanode | block read/write + **block token** | **yes** | Datanode verifies block-token signature + expiry |
+| OM RPC | request, Kerberos/delegation token, names | **yes (authenticated)** | auth; ACL/Ranger if enabled |
+| Datanode | block/container read/write + token | **yes** | tokens verified when enabled |
 | SCM | cert sign request, block alloc | **yes (authenticated service/admin)** | SCM verifies caller identity |
 | Ratis | replicated log entries from a DN peer | **yes if peer compromised** | Raft quorum (honest majority) |
 | TDE | object bytes | n/a (encryption is transparent) | KMS holds keys (operator) |
@@ -210,13 +226,17 @@ Per-boundary input trust (grouped by family):
 
 1. **Authenticated RPC.** All OM/SCM/DN RPC requires Kerberos (or a valid
    delegation token). *Violation:* unauthenticated request accepted. *Severity:*
-   critical. *(documented — SASL/Kerberos; Q-secure for default.)*
-2. **Capability-gated block access.** A Datanode serves a block only on a valid,
-   unexpired, correctly-signed block token. *Violation:* block read/write without
-   a valid token. *Severity:* critical. *(documented — `BlockTokenVerifier`.)*
-3. **Authorization.** Volume/bucket/key operations are checked against native
-   ACLs or Ranger. *Violation:* an authenticated user accesses data outside their
-   ACLs. *Severity:* critical. *(inferred — Q-authz.)*
+   critical. *(documented — SASL/Kerberos; secure-mode posture folded into §5a.)*
+2. **Capability-gated block/container access when tokens are enabled.** A
+   Datanode serves protected blocks/containers only on a valid, unexpired,
+   correctly-signed token. *Violation:* block/container read/write without a
+   valid token in a token-enabled deployment. *Severity:* critical. *(documented
+   — `BlockTokenVerifier`, `ContainerTokenVerifier`, and token configuration.)*
+3. **Authorization when object ACL/Ranger checks are enabled.** Volume/bucket/key
+   operations are checked against the configured Native ACL or Ranger authorizer.
+   *Violation:* an authenticated user accesses data outside their ACLs in an
+   ACL-enabled deployment. *Severity:* critical. *(documented — SecurityAcls,
+   SecurityWithRanger; Ranger CLI/doc gaps tracked by HDDS-4089/HDDS-2093.)*
 4. **Service identity.** Inter-service identity is backed by SCM-issued
    certificates. *Violation:* a rogue process impersonating a service on a
    certificate-backed path. *Severity:* critical. *(documented —
@@ -235,7 +255,7 @@ Per-boundary input trust (grouped by family):
    gRPC TLS, or HTTPS protect the wire when configured; TDE protects data at
    rest when enabled (keys in KMS). *Violation:* plaintext on a transport
    configured for encryption / unencrypted blocks when TDE is configured.
-   *Severity:* high. *(inferred — Q-tde.)*
+   *Severity:* high. *(documented — protect-in-transit-traffic, SecuringTDE.)*
 
 ## §9 Security properties the project does *not* provide
 
@@ -254,8 +274,9 @@ Per-boundary input trust (grouped by family):
   checks catch ordinary corruption, a peer that can forge consistently on its
   served path is out of model (§7). *(maintainer — smengcl, 2026-06-23.)*
 - **Block tokens are bearer capabilities** — a leaked block token grants access
-  until expiry; the caller/operator must protect tokens in transit (TLS) and use
-  reasonable expiry. *(inferred — Q-token.)*
+  until expiry; the caller/operator must protect tokens in transit (TLS). The
+  default block/container-token lifetime is `1d` when those tokens are enabled.
+  *(documented — token verifier/secret-manager code.)*
 - **Well-known classes left to the operator/integrator:** SSRF/credential-relay
   via a misconfigured S3 Gateway, request smuggling at an LB in front of the
   gateway, and authz-policy errors.
@@ -269,7 +290,8 @@ Per-boundary input trust (grouped by family):
   network-isolate datanode/Ratis/admin ports.
 - **Protect tokens and secrets:** enable the relevant transport encryption
   (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
-  secrets aren't sniffable; rotate S3 secrets; set sensible token lifetimes.
+  secrets aren't sniffable; rotate S3 secrets; review token lifetimes for the
+  deployment.
 - **Protect service metadata at rest.** The OM, SCM, and Recon RocksDB stores
   hold critical credential/identity data — set restrictive file permissions and,
   ideally, encrypt them on disk. *(maintainer — jojochuang, 2026-06-25.)*
@@ -359,14 +381,15 @@ list. *(requested by jojochuang, 2026-06-25.)*
   authorization claim in §8 made for both? (§8.)
 - **Q-token.** Block/delegation token lifetimes, signing-key rotation, and the
   bearer-token caveat in §9 — confirm. (§8/§9.)
-- **Q-tde / Q-net / Q-infra.** TDE/KMS expectations, the network-isolation
-  assumptions, and which dependencies (KDC/Ranger/KMS) you want explicitly
-  named as operator-owned in §3/§10. (§5/§3/§10.)
+- **Q-tde / Q-net / Q-infra.** TDE/KMS production expectations, the
+  network-isolation assumptions, and which dependencies (KDC/Ranger/KMS) you want
+  explicitly named as operator-owned in §3/§10. (§5/§3/§10.)
 
 **Wave 3 — scope & coexistence.**
 
-- **Q-csi / Q-recon.** Are the CSI driver and Recon in scope for this model, and
-  at what trust level? (§2.)
+- **Q-csi / Q-recon.** *(Answered — maintainer, jojochuang 2026-06-25: CSI driver
+  is out of scope because it is not production-ready; Recon is in scope as part
+  of the production cluster. Folded into §2/§3.)*
 - **Q-doc.** This adds `THREAT_MODEL.md` + `AGENTS.md` alongside your existing
   `SECURITY.md` (preserved, pointer added). Confirm, and whether the model
   should become canonical. (§1/§15.)
