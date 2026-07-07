@@ -875,12 +875,12 @@ public final class RocksDatabase implements Closeable {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
 
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
+        // Restrict deletion to files at the last level (and skip entirely when
+        // the last level is 0). The old RocksDB #deleteFile API could only
+        // delete last-level SST files (and the last file of level 0);
+        // deleteSstFileRange, used below, no longer has that limitation, but
+        // this method keeps the last-level restriction to preserve its existing
+        // pruning behavior.
         if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
           continue;
         }
