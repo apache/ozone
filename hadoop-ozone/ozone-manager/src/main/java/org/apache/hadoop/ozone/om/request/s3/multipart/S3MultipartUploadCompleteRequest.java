@@ -89,12 +89,25 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
 
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> eTagBasedValidator =
-      (part, partKeyInfo) -> validateByETag(part.getETag(),
-          partKeyInfo != null ? getETagFromPartKeyInfo(partKeyInfo) : null,
-          partKeyInfo != null ? partKeyInfo.getPartName() : null);
+      (part, partKeyInfo) -> {
+        String eTag = part.getETag();
+        String dbPartETag = null;
+        String dbPartName = null;
+        if (partKeyInfo != null) {
+          dbPartETag = partKeyInfo.getPartKeyInfo().getMetadataList().stream()
+              .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG))
+              .findFirst().map(kv -> kv.getValue()).orElse(null);
+          dbPartName = partKeyInfo.getPartName();
+        }
+        return new MultipartCommitRequestPart(eTag, dbPartETag,
+            StringUtils.equals(eTag, dbPartETag) || StringUtils.equals(eTag, dbPartName));
+      };
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> partNameBasedValidator =
-      (part, partKeyInfo) -> validateByPartName(part.getPartName(),
-          partKeyInfo != null ? partKeyInfo.getPartName() : null);
+      (part, partKeyInfo) -> {
+        String partName = part.getPartName();
+        String dbPartName = partKeyInfo != null ? partKeyInfo.getPartName() : null;
+        return new MultipartCommitRequestPart(partName, dbPartName, StringUtils.equals(partName, dbPartName));
+      };
 
   public S3MultipartUploadCompleteRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -781,24 +794,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
     return DigestUtils.md5Hex(keysConcatenated.toString()) + "-"
         + partsList.size();
-  }
-
-  private static String getETagFromPartKeyInfo(PartKeyInfo partKeyInfo) {
-    return partKeyInfo.getPartKeyInfo().getMetadataList()
-        .stream()
-        .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
-        .findFirst().map(OzoneManagerProtocolProtos.KeyValue::getValue).orElse(null);
-  }
-
-  private static MultipartCommitRequestPart validateByETag(
-      String requestETag, String dbETag, String dbPartName) {
-    return new MultipartCommitRequestPart(requestETag, dbETag,
-        StringUtils.equals(requestETag, dbETag) || StringUtils.equals(requestETag, dbPartName));
-  }
-
-  private static MultipartCommitRequestPart validateByPartName(String requestPartName, String dbPartName) {
-    return new MultipartCommitRequestPart(requestPartName, dbPartName,
-        StringUtils.equals(requestPartName, dbPartName));
   }
 
   private static class MultipartCommitRequestPart {

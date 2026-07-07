@@ -277,8 +277,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         }
       } else if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
           && oldMultipartPartInfo != null && oldPartOmKeyInfo != null) {
-        correctedSpace -= QuotaUtil.getReplicatedSize(oldMultipartPartInfo.getDataSize(), multipartKeyInfo.getReplicationConfig());
-        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
+        correctedSpace -= QuotaUtil.getReplicatedSize(
+          oldMultipartPartInfo.getDataSize(), multipartKeyInfo.getReplicationConfig());
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
+          oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(oldPartOmKeyInfo.getObjectID(), multipartKey);
 
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
