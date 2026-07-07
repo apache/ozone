@@ -1018,11 +1018,24 @@ public class TestRocksDBCheckpointDiffer {
   void diffAllSnapshots(RocksDBCheckpointDiffer differ)
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
+    boolean sawNonEmptyDiff = false;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksCheckpointDiffer Dag.
       List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
       // Add some invalid index.
       tablesToTrack.add("compactionLogTable");
+
+      // Baseline diff when tracking every table. A subset's diff must equal
+      // this baseline filtered to the subset's column families (files with no
+      // column family are always kept). This relationship is deterministic and
+      // stable across RocksDB versions, unlike hard-coded SST file names.
+      Set<String> allTables = new HashSet<>(tablesToTrack);
+      List<SstFileInfo> baseline = differ.getSSTDiffList(
+          new DifferSnapshotVersion(src, 0, allTables),
+          new DifferSnapshotVersion(snap, 0, allTables),
+          null, allTables, true).orElse(Collections.emptyList());
+      sawNonEmptyDiff = sawNonEmptyDiff || !baseline.isEmpty();
+
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
         tableToLookUp.clear();
@@ -1039,15 +1052,23 @@ public class TestRocksDBCheckpointDiffer {
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
-        if (!tableToLookUp.isEmpty()) {
-          for (SstFileInfo sstFileInfo : sstDiffList) {
-            assertTrue(sstFileInfo.getColumnFamily() == null
-                    || tableToLookUp.contains(sstFileInfo.getColumnFamily()),
-                "Unexpected column family in diff result: " + sstFileInfo);
-          }
-        }
+        // Expected files: baseline entries whose column family is untracked
+        // (null) or included in this subset, in the same order.
+        List<String> expectedFiles = baseline.stream()
+            .filter(sstFileInfo -> sstFileInfo.getColumnFamily() == null
+                || tableToLookUp.contains(sstFileInfo.getColumnFamily()))
+            .map(SstFileInfo::getFileName)
+            .collect(Collectors.toList());
+        List<String> actualFiles = sstDiffList.stream()
+            .map(SstFileInfo::getFileName)
+            .collect(Collectors.toList());
+        assertThat(actualFiles).containsExactlyElementsOf(expectedFiles);
       }
     }
+    // Guard against getSSTDiffList silently returning nothing for every input.
+    assertThat(sawNonEmptyDiff)
+        .as("expected at least one non-empty SST diff across snapshots")
+        .isTrue();
   }
 
   /**
