@@ -20,9 +20,16 @@
 .github/*
 AGENTS.md
 CLAUDE.md
+GEMINI.md
+AGENTIC_TOOLING.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
+
+# dev-support/
+agent/*.md
+.agents/**/*.md
+.claude/**/*.md
 
 # hadoop-hdds/interface-client
 src/main/resources/proto.lock

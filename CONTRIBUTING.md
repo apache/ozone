@@ -223,3 +223,9 @@ Usually this can be fixed by removing the class file (outside of the IDE), but s
 ## CI
 
 The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).
+
+## AI coding agents
+
+This repository is configured for AI coding agents (Claude Code, OpenAI Codex, Gemini CLI, Cursor, and other tools that read `AGENTS.md`).  `AGENTS.md` is the source of truth; `CLAUDE.md` and `GEMINI.md` import it, and reference material lives under `dev-support/agent/`.  See [`AGENTIC_TOOLING.md`](./AGENTIC_TOOLING.md) for the full layout.
+
+When a contribution is authored in whole or in part with AI tooling, disclose it per the [ASF generative tooling guidance](https://www.apache.org/legal/generative-tooling.html) by adding a `Generated-by: TOOL (MODEL)` line to the pull request description.
