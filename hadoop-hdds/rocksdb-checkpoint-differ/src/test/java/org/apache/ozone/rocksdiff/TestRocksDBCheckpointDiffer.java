@@ -1053,7 +1053,8 @@ public class TestRocksDBCheckpointDiffer {
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
         // Expected files: baseline entries whose column family is untracked
-        // (null) or included in this subset, in the same order.
+        // (null) or included in this subset. getSSTDiffList returns the values
+        // of a HashMap, so its ordering is not guaranteed; compare as sets.
         List<String> expectedFiles = baseline.stream()
             .filter(sstFileInfo -> sstFileInfo.getColumnFamily() == null
                 || tableToLookUp.contains(sstFileInfo.getColumnFamily()))
@@ -1062,7 +1063,7 @@ public class TestRocksDBCheckpointDiffer {
         List<String> actualFiles = sstDiffList.stream()
             .map(SstFileInfo::getFileName)
             .collect(Collectors.toList());
-        assertThat(actualFiles).containsExactlyElementsOf(expectedFiles);
+        assertThat(actualFiles).containsExactlyInAnyOrderElementsOf(expectedFiles);
       }
     }
     // Guard against getSSTDiffList silently returning nothing for every input.

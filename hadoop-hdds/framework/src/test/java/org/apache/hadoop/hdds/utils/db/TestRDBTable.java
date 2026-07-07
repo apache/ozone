@@ -18,10 +18,13 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
@@ -67,6 +70,40 @@ public class TestRDBTable {
     Integer result = table.getIfExist(key, outValue);
     assertEquals(0, result);
     assertEquals(0, key.position(), "caller key buffer position must be unchanged");
+  }
+
+  @Test
+  public void testGetIfExistByteBufferFastPathReturnsValue()
+      throws Exception {
+    RocksDatabase db = mock(RocksDatabase.class);
+    ColumnFamily columnFamily = mock(ColumnFamily.class);
+    RDBMetrics metrics = mock(RDBMetrics.class);
+    RDBTable table = new RDBTable(db, columnFamily, metrics);
+
+    byte[] keyBytes = "key-1".getBytes(UTF_8);
+    byte[] valueBytes = "value-1".getBytes(UTF_8);
+    ByteBuffer key = ByteBuffer.wrap(keyBytes);
+    ByteBuffer outValue = ByteBuffer.allocate(64);
+
+    // Simulate the RocksDB "exists with value" fast path: native code writes
+    // the value into the buffer handed to keyMayExist and reports its length.
+    // getIfExist passes outValue.duplicate(), so the write must land in the
+    // caller's outValue via the shared backing memory.
+    when(db.keyMayExist(eq(columnFamily), any(ByteBuffer.class),
+        any(ByteBuffer.class))).thenAnswer(invocation -> {
+          ByteBuffer valueBuffer = invocation.getArgument(2);
+          valueBuffer.put(valueBytes);
+          return (Supplier<Integer>) () -> valueBytes.length;
+        });
+
+    Integer result = table.getIfExist(key, outValue);
+    assertEquals(valueBytes.length, result);
+    // The fast path must not fall back to a point-get.
+    verify(db, never()).get(eq(columnFamily), any(ByteBuffer.class), any(ByteBuffer.class));
+    // Value bytes written through the duplicate are visible in the caller's buffer.
+    byte[] readBack = new byte[valueBytes.length];
+    outValue.duplicate().get(readBack);
+    assertArrayEquals(valueBytes, readBack);
   }
 }
 
