@@ -280,7 +280,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         correctedSpace -= QuotaUtil.getReplicatedSize(
           oldMultipartPartInfo.getDataSize(), multipartKeyInfo.getReplicationConfig());
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-          oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
+            oldPartOmKeyInfo, omBucketInfo.getObjectID(), trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(oldPartOmKeyInfo.getObjectID(), multipartKey);
 
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
