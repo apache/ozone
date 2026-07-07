@@ -430,7 +430,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             "Expected path: {}.", actualPath, snapshotLocalData.getSnapshotId(), expectedPath);
         continue;
       }
-      addVersionNodeWithDependents(snapshotLocalData, failedFilePaths);
+      if (!addVersionNodeWithDependents(snapshotLocalData, failedFilePaths)) {
+        // A previous snapshot in the dependency chain could not be loaded, so this snapshot was not added to the
+        // version graph. Record its path as failed so later snapshots that depend on it short-circuit in
+        // tryLoadSnapshotLocalData instead of reparsing this YAML.
+        failedFilePaths.add(actualPath);
+      }
     }
     for (UUID snapshotId : versionNodeMap.keySet()) {
       incrementOrphanCheckCount(snapshotId);
