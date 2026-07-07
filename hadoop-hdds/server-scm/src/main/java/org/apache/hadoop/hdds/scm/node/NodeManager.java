@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -195,6 +196,31 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     }
 
     return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes);
+  }
+
+  /**
+   * Returns the lowest apparent (finalized) version among the given datanodes,
+   * so every node involved in an operation uses the same, mutually-supported
+   * version.
+   *
+   * @throws NodeNotFoundException if SCM has no record of one of the nodes;
+   *     callers must not proceed with an operation involving a node SCM does
+   *     not know about.
+   */
+  default HDDSVersion getLowestApparentVersion(DatanodeDetails... nodes)
+      throws NodeNotFoundException {
+    HDDSVersion lowest = HDDSVersion.SOFTWARE_VERSION;
+    for (DatanodeDetails dn : nodes) {
+      DatanodeInfo info = getDatanodeInfo(dn);
+      if (info == null) {
+        throw new NodeNotFoundException(dn.getID());
+      }
+      HDDSVersion version = info.getApparentHddsVersion();
+      if (version.serialize() < lowest.serialize()) {
+        lowest = version;
+      }
+    }
+    return lowest;
   }
 
   /**
