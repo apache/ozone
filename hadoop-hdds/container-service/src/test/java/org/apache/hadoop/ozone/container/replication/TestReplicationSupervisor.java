@@ -1258,9 +1258,13 @@ public class TestReplicationSupervisor {
     healthyVolumes.add(vol2);
     when(volumeSet.getVolumesList()).thenReturn(healthyVolumes);
 
+    ReplicationServer.ReplicationConfig repConf = new ReplicationServer.ReplicationConfig();
+    repConf.setVolumePoolEnabled(true);
+
     // Build supervisor
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
         .stateContext(context)
+        .replicationConfig(repConf)
         .clock(clock)
         .build();
 

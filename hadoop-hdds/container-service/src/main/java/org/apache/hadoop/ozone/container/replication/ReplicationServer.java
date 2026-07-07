@@ -195,14 +195,16 @@ public class ReplicationServer {
 
     /**
      * The maximum number of replication commands a single datanode can execute
-     * simultaneously.
+     * simultaneously. If hdds.datanode.replication.volume.pool.enable is enabled,
+     * this limit becomes the limit per volume.
      */
     @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
         description = "The maximum number of replication commands a single " +
-            "datanode can execute simultaneously"
+            "datanode can execute simultaneously. If hdds.datanode.replication.volume.pool.enable " +
+            "is enabled, this limit becomes the limit per volume."
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
@@ -243,6 +245,14 @@ public class ReplicationServer {
     )
     private int volumeOutboundLimit = 2;
 
+    @Config(key = "hdds.datanode.replication.volume.pool.enable",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        tags = {DATANODE},
+        description = "Enable or disable the disk volume container replication thread pool."
+    )
+    private boolean volumePoolEnabled = false;
+
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
     }
@@ -253,6 +263,14 @@ public class ReplicationServer {
 
     public void setVolumeOutboundLimit(int limit) {
       this.volumeOutboundLimit = limit;
+    }
+
+    public boolean isVolumePoolEnabled() {
+      return volumePoolEnabled;
+    }
+
+    public void setVolumePoolEnabled(boolean enable) {
+      this.volumePoolEnabled = enable;
     }
 
     public int scaleOutOfServiceLimit(int original) {

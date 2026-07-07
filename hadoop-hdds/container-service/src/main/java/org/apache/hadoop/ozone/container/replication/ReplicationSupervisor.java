@@ -53,14 +53,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.Time;
@@ -224,19 +222,22 @@ public final class ReplicationSupervisor {
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.context = context;
     this.executor = executor;
-    this.scheduler = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("ReplicationSupervisor-Scheduler")
-            .build());
-    this.scheduler.scheduleWithFixedDelay(
-        this::cleanupFailedVolumeExecutors, 1, 1, TimeUnit.MINUTES);
     this.replicationConfig = replicationConfig;
     this.datanodeConfig = datanodeConfig;
     maxQueueSize = datanodeConfig.getCommandQueueLimit();
     this.clock = clock;
     this.executorThreadUpdater = executorThreadUpdater;
     this.currentThreadCount = replicationConfig.getReplicationMaxStreams();
+
+    this.scheduler = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("ReplicationSupervisor-Scheduler")
+            .build());
+    if (replicationConfig.isVolumePoolEnabled()) {
+      this.scheduler.scheduleWithFixedDelay(
+          this::cleanupFailedVolumeExecutors, 1, 1, TimeUnit.MINUTES);
+    }
 
     // set initial state
     if (context != null) {
@@ -302,20 +303,17 @@ public final class ReplicationSupervisor {
   }
 
   private ExecutorService getExecutorForTask(AbstractReplicationTask task) {
-    HddsVolume volume = null;
-    if (context != null && task instanceof ReplicationTask) {
+    if (replicationConfig.isVolumePoolEnabled()
+        && context != null && task instanceof ReplicationTask) {
       ReplicationTask repTask = (ReplicationTask) task;
       if (repTask.getTarget() != null) { // push replication
-        OzoneContainer container = context.getParent().getContainer();
-        ContainerSet containerSet = container.getContainerSet();
-        Container<?> localContainer = containerSet.getContainer(task.getContainerId());
+        Container<?> localContainer = context.getParent().getContainer()
+            .getContainerSet().getContainer(task.getContainerId());
         if (localContainer != null) {
-          volume = localContainer.getContainerData().getVolume();
+          HddsVolume volume = localContainer.getContainerData().getVolume();
+          return getOrCreateVolumeExecutor(volume);
         }
       }
-    }
-    if (volume != null) {
-      return getOrCreateVolumeExecutor(volume);
     }
     // fall back to global executor
     return executor;
@@ -341,18 +339,10 @@ public final class ReplicationSupervisor {
 
   @VisibleForTesting
   synchronized void cleanupFailedVolumeExecutors() {
-    if (context == null || context.getParent() == null) {
+    if (context == null) {
       return;
     }
-    OzoneContainer container = context.getParent().getContainer();
-    if (container == null) {
-      return;
-    }
-    MutableVolumeSet volumeSet = container.getVolumeSet();
-    if (volumeSet == null) {
-      return;
-    }
-
+    MutableVolumeSet volumeSet = context.getParent().getContainer().getVolumeSet();
     List<StorageVolume> healthyVolumes = volumeSet.getVolumesList();
     Iterator<Map.Entry<HddsVolume, ThreadPoolExecutor>> it = volumeExecutors.entrySet().iterator();
     while (it.hasNext()) {
