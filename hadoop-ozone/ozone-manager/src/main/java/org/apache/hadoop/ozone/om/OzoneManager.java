@@ -3307,6 +3307,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omHostName;
   }
 
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
+  }
+
   @VisibleForTesting
   public OzoneManagerHttpServer getHttpServer() {
     return httpServer;
