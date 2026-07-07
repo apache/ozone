@@ -388,7 +388,7 @@ public class TestStreamBlockInputStream {
       reader.setStreamingReadResponse(streamingReadResponse);
       readerRef.set(reader);
       return null;
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
     doAnswer(inv -> {
       Thread.sleep(450);
       Thread responseThread = new Thread(() -> {
@@ -437,7 +437,7 @@ public class TestStreamBlockInputStream {
       reader.setStreamingReadResponse(streamingReadResponse);
       readerRef.set(reader);
       return null;
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
     doAnswer(inv -> {
       streamReads.incrementAndGet();
       readerRef.get().onNext(buildResponseProto(new byte[] {1}, 0));
