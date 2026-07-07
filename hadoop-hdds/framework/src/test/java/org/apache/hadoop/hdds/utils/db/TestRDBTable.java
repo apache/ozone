@@ -46,18 +46,22 @@ public class TestRDBTable {
     ByteBuffer key = ByteBuffer.wrap(keyBytes);
     ByteBuffer outValue = ByteBuffer.allocate(64);
 
+    // RocksDatabase.keyMayExist duplicates the key internally, so it leaves the
+    // caller's key buffer untouched. Return an inconclusive result (value-less
+    // "may exist") to force the fallback point-get.
     when(db.keyMayExist(eq(columnFamily), any(ByteBuffer.class),
-        any(ByteBuffer.class))).thenAnswer(invocation -> {
-          // Simulate JNI calls that advance the key position.
-          ByteBuffer keyBuffer = invocation.getArgument(1);
-          keyBuffer.position(keyBuffer.limit());
-          return (Supplier<Integer>) () -> null;
-        });
+        any(ByteBuffer.class))).thenReturn((Supplier<Integer>) () -> null);
 
+    // get() advances the key buffer position as native RocksDB does. It must
+    // still see the full key, i.e. RDBTable must hand it a fresh duplicate.
     when(db.get(eq(columnFamily), any(ByteBuffer.class), any(ByteBuffer.class)))
         .thenAnswer(invocation -> {
           ByteBuffer keyBuffer = invocation.getArgument(1);
-          return keyBuffer.remaining() == keyBytes.length ? 0 : null;
+          if (keyBuffer.remaining() != keyBytes.length) {
+            return null;
+          }
+          keyBuffer.position(keyBuffer.limit());
+          return 0;
         });
 
     Integer result = table.getIfExist(key, outValue);
