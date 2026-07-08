@@ -159,7 +159,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Iterates through network interfaces and return all ip's that are valid to
+   * Iterates through network interfaces and returns all IP addresses that are valid to
    * add to a certificate's SAN extension, as determined by
    * {@link #isValidInetForCsr(InetAddress)}.
    *
