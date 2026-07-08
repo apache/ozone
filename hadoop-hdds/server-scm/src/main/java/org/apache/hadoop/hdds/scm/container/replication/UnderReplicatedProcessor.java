@@ -53,11 +53,6 @@ public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
   }
 
   @Override
-  protected boolean reconstructionLimitReached(ReplicationManager rm) {
-    return rm.isReconstructionLimitReached();
-  }
-
-  @Override
   protected int sendDatanodeCommands(
           ReplicationManager replicationManager,
           ContainerHealthResult.UnderReplicatedHealthResult healthResult)

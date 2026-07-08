@@ -1807,6 +1807,64 @@ public class TestReplicationManager {
     assertEquals(0, rm.getInflightReconstructionCount());
   }
 
+  @Test
+  public void testSendReconstructionCommandRejectedWhenGlobalLimitReached()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(2);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+    ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
+        2L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(2)), (ECReplicationConfig) repConfig);
+    ReconstructECContainersCommand cmd3 = new ReconstructECContainersCommand(
+        3L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd1);
+    rm.sendThrottledReconstructionCommand(container, cmd2);
+    assertEquals(2, rm.getInflightReconstructionCount());
+
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> rm.sendThrottledReconstructionCommand(container, cmd3));
+    assertEquals(2, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testNotifyStatusChangedClearsReconstructionCounters()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    when(scmContext.isLeaderReady()).thenReturn(false);
+    rm.notifyStatusChanged();
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+    rm.notifyStatusChanged();
+
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
   private static ByteString integers2ByteString(List<Integer> src) {
     byte[] dst = new byte[src.size()];
     for (int i = 0; i < src.size(); i++) {
