@@ -48,6 +48,10 @@ ${PARTIAL_BUCKET_LIST_ROLE}                     partial-bucket-list
 ${PARTIAL_BUCKET_READ_ACL_ROLE}                 partial-bucket-read-acl
 ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}           partial-put-object-key-create
 ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}            partial-put-object-key-write
+${ACTION_MATCHES_PUTOBJECT_READ_ROLE}           action-matches-putobject-read
+${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}   action-matches-putobject-create-write
+${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}      action-matches-getobject-putobject
+${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}  action-matches-uploadpartcopy-expected-owner
 ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE_ARN}   arn:aws:iam::123456789012:role/${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}
 ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE_ARN}   arn:aws:iam::123456789012:role/${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}
 ${PARTIAL_BUCKET_READ_ROLE_ARN}                 arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_ROLE}
@@ -56,6 +60,10 @@ ${PARTIAL_BUCKET_LIST_ROLE_ARN}                 arn:aws:iam::123456789012:role/$
 ${PARTIAL_BUCKET_READ_ACL_ROLE_ARN}             arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_ACL_ROLE}
 ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE_ARN}       arn:aws:iam::123456789012:role/${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}
 ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE_ARN}        arn:aws:iam::123456789012:role/${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
+${ACTION_MATCHES_PUTOBJECT_READ_ROLE_ARN}       arn:aws:iam::123456789012:role/${ACTION_MATCHES_PUTOBJECT_READ_ROLE}
+${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}
+${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}
+${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
 ${TEST_USER_NON_ADMIN}                  testuser2
 @{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_LISTABLE_OBJECT_KEYS_OBS}     file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt    zeroByteFile    zeroByteFolder/
@@ -344,6 +352,31 @@ Create Partial Access Table Policies
     # Grant LIST on key prefix "upload*" (not "*") so it doesn't implicitly satisfy bucket-level LIST in Ranger matching.
     ${upload_prefix_policy} =      Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "iceberg ${ICEBERG_BUCKET_OBS} upload prefix list", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${ICEBERG_BUCKET_OBS}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "upload*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "list", "isAllowed": true } ], "roles": [ "${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
     Create Ranger Policy          ${upload_prefix_policy}
+
+Create Action Matches Roles in Ranger
+    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
+        ${role_json} =            Set Variable                  { "name": "${role}", "description": "Action-matches scoped role" }
+        Create Ranger Role        ${role_json}
+    END
+
+Create Action Matches Assume Role Policies
+    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
+        Create Ranger Assume Role Policy  ${role}              ${ICEBERG_SVC_CATALOG_USER}
+    END
+
+Create Action Matches Volume Policies
+    # Apply action-matches conditions at volume level so READ is scoped to the intended S3 action.
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    Update Ranger Policy Items    iceberg volume access         ${policy_items}
+
+Create Action Matches Bucket Policies
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    Update Ranger Policy Items    iceberg ${ICEBERG_BUCKET_OBS} bucket access  ${policy_items}
+
+Create Action Matches Table Policies
+    # READ with action-matches=PutObject must not authorize PutObject; CREATE+WRITE with action-matches=PutObject must only authorize PutObject; READ+CREATE+WRITE with action-matches=GetObject and PutObject supports UploadPartCopy source read and destination write.
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    Update Ranger Policy Items    iceberg ${ICEBERG_BUCKET_OBS} table access  ${policy_items}
 
 Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Upload Files
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
@@ -687,6 +720,47 @@ STS session policy PutObject must require key CREATE and WRITE
     Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE_ARN}
     Put Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
 
+Ranger action-matches PutObject with READ only must deny PutObject
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${key} =                      Set Variable                  sts-object-${key_suffix}.txt
+    ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
+    Create File                   ${local_path}                 action-matches read-only content
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+
+    # Role alone: READ permission scoped to PutObject must not allow PutObject.
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_PUTOBJECT_READ_ROLE_ARN}
+    Put Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${key}  AccessDenied  ${local_path}
+
+    # Role plus session policy PutObject: still must not allow PutObject.
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_PUTOBJECT_READ_ROLE_ARN}
+    Put Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${key}  AccessDenied  ${local_path}
+
+Ranger action-matches PutObject with CREATE and WRITE allows only PutObject
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${key} =                      Set Variable                  sts-object-${key_suffix}.txt
+    ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
+    Create File                   ${local_path}                 action-matches create-write content
+
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE_ARN}
+    Put Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${key}  ${local_path}
+    Get Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${key}  AccessDenied
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --tagging '{"TagSet":[{"Key":"tag-key1","Value":"tag-value1"}]}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+Ranger action-matches GetObject with READ allows UploadPartCopy source read
+    ${src_key} =                  Set Variable                  ${ICEBERG_BUCKET_TESTFILE}
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${dest_key} =                 Set Variable                  sts-mpu-action-matches-get-${key_suffix}.txt
+
+    # Positive: GetObject on source + PutObject on destination via action-matches-getobject-putobject Ranger policies and session policy should allow UploadPartCopy.
+    ${allow_policy} =             Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${src_key}"},{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${allow_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --profile sts
+    ${upload_id} =                Execute                       echo '${output}' | jq -r '.UploadId'
+    Should Not Be Empty           ${upload_id}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     CopyPartResult
+
 STS session policy CreateBucket must require bucket CREATE
     ${bucket_suffix} =            Generate Random String        8   [LOWER]
     ${bucket} =                   Set Variable                  sts-bucket-${bucket_suffix}
@@ -982,6 +1056,52 @@ STS session policy UploadPartCopy must require source GetObject and destination 
     Assume Role And Configure STS Profile                       policy_json=${missing_dest_put}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
     Should Contain                ${output}                     AccessDenied
+
+Ranger action-matches UploadPartCopy expected-owner should allow
+    ${src_bucket} =              Set Variable                  ${ICEBERG_BUCKET_OBS}
+    ${dest_bucket} =             Set Variable                  ${ICEBERG_BUCKET_OBS}
+    ${src_key} =                 Set Variable                  ${ICEBERG_BUCKET_TESTFILE}
+    ${key_suffix} =              Generate Random String        8   [LOWER]
+    ${dest_key} =                Set Variable                  sts-mpu-expected-owner-${key_suffix}.txt
+
+    # Discover source/destination bucket owners (needed to avoid BucketOwnerMismatch).
+    ${acl_policy} =              Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetBucketAcl","Resource":"arn:aws:s3:::${dest_bucket}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${acl_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${src_acl} =                 Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${src_bucket} --output json --profile sts
+    ${dst_acl} =                 Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${dest_bucket} --output json --profile sts
+    ${src_owner} =               Execute                       echo '${src_acl}' | jq -r '.Owner.DisplayName // .Owner.ID'
+    ${dst_owner} =               Execute                       echo '${dst_acl}' | jq -r '.Owner.DisplayName // .Owner.ID'
+
+    ${allow_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${src_bucket}/${src_key}"},{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${dest_bucket}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${allow_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}
+
+    ${output} =                  Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-multipart-upload --bucket ${dest_bucket} --key ${dest_key} --profile sts
+    ${upload_id} =               Execute                       echo '${output}' | jq -r '.UploadId'
+    Should Not Be Empty          ${upload_id}
+
+    ${output} =                  Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${dest_bucket} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${src_bucket}/${src_key} --expected-source-bucket-owner ${src_owner} --expected-bucket-owner ${dst_owner} --profile sts
+    Should Contain               ${output}                     CopyPartResult
+
+Ranger action-matches CopyObject expected-owner should allow
+    ${src_bucket} =              Set Variable                  ${ICEBERG_BUCKET_OBS}
+    ${dest_bucket} =             Set Variable                  ${ICEBERG_BUCKET_OBS}
+    ${src_key} =                 Set Variable                  ${ICEBERG_BUCKET_TESTFILE}
+    ${key_suffix} =              Generate Random String        8   [LOWER]
+    ${dest_key} =                Set Variable                  sts-copy-expected-owner-${key_suffix}.txt
+
+    # Discover source/destination bucket owners (needed to avoid BucketOwnerMismatch).
+    ${acl_policy} =              Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetBucketAcl","Resource":"arn:aws:s3:::${dest_bucket}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${acl_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${src_acl} =                 Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${src_bucket} --output json --profile sts
+    ${dst_acl} =                 Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${dest_bucket} --output json --profile sts
+    ${src_owner} =               Execute                       echo '${src_acl}' | jq -r '.Owner.DisplayName // .Owner.ID'
+    ${dst_owner} =               Execute                       echo '${dst_acl}' | jq -r '.Owner.DisplayName // .Owner.ID'
+
+    ${allow_policy} =            Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${src_bucket}/${src_key}"},{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${dest_bucket}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${allow_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}
+
+    ${output} =                  Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} copy-object --bucket ${dest_bucket} --key ${dest_key} --copy-source ${src_bucket}/${src_key} --expected-source-bucket-owner ${src_owner} --expected-bucket-owner ${dst_owner} --profile sts
+    Should Contain               ${output}                     CopyObjectResult
 
 STS session policy s3:* on bucket resource must allow bucket APIs but deny ListAllMyBuckets and object APIs
     ${bucket_star_policy} =      Set Variable                   {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
