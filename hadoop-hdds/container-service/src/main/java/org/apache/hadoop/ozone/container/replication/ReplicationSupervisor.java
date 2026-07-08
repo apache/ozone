@@ -236,6 +236,7 @@ public final class ReplicationSupervisor {
     return Collections.unmodifiableMap(METRICS_MAP);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private ReplicationSupervisor(StateContext context, ExecutorService executor,
       ReplicationConfig replicationConfig, DatanodeConfiguration datanodeConfig,
       Clock clock, IntConsumer executorThreadUpdater, ContainerSet containerSet,

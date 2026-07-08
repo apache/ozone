@@ -1096,9 +1096,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void perVolumeInitLogging(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 1);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
@@ -1134,9 +1134,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void perVolumePoolSizeRespected(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 3);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 3);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
@@ -1164,9 +1164,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void perVolumePoolResize(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 1);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
@@ -1195,9 +1195,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void perVolumePoolResizeOnNodeStateChange(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 2);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 2);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
@@ -1228,9 +1228,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void nonPushReplicationUsesGlobalPoolWhenPerVolumeEnabled(
-      ContainerLayoutVersion layout, @TempDir File tempDir) throws Exception {
+      ContainerLayoutVersion layout, @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 1);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
@@ -1288,9 +1288,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void perVolumePushIsolation(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 1);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
     HddsVolume vol2 = (HddsVolume) volumeSet.getVolumesList().get(1);
@@ -1341,9 +1341,9 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void volumeFailureShutsDownPool(ContainerLayoutVersion layout,
-      @TempDir File tempDir) throws Exception {
+      @TempDir File perVolumeTempDir) throws Exception {
     this.layoutVersion = layout;
-    OzoneConfiguration conf = perVolumeConf(tempDir, 1);
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
     MutableVolumeSet volumeSet = newVolumeSet(conf);
     HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
     addContainerOnVolume(1L, vol1, conf);
@@ -1377,12 +1377,12 @@ public class TestReplicationSupervisor {
     }
   }
 
-  private OzoneConfiguration perVolumeConf(File tempDir, int perVolumeStreams) {
+  private OzoneConfiguration perVolumeConf(File baseDir, int perVolumeStreams) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, baseDir.getAbsolutePath());
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        tempDir.getAbsolutePath() + "/vol1,"
-            + tempDir.getAbsolutePath() + "/vol2");
+        baseDir.getAbsolutePath() + "/vol1,"
+            + baseDir.getAbsolutePath() + "/vol2");
     conf.setBoolean(PER_VOLUME_ENABLED_KEY, true);
     conf.setInt(PER_VOLUME_STREAMS_LIMIT_KEY, perVolumeStreams);
     conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
