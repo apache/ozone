@@ -47,7 +47,7 @@ EC container decommissioning is bottlenecked by the transfer speed of a single s
 2. **Index Identification**: The handler identifies which EC indexes are only present on decommissioning Datanodes (decommissioningOnlyIndexes())  
 3. **One-to-One Replication**: For each decommissioning index, a replication command is created to copy that specific index to a new Datanode  
 4. **Target Selection**: New target Datanodes are selected based on placement policies  
-5. **Replication Execution**: Each index is replicated independently using the configured replication mode (push by default, configurable to pull via hdds.scm.replication.push)
+5. **Replication Execution**: Each index is replicated independently via push replication (`ReplicateContainerCommand`). Pull replication has been removed upstream.
 ```
 
 [https://ozone.apache.org/docs/system-internals/replication/data/replication-manager/#ec-and-decommissioning](https://ozone.apache.org/docs/system-internals/replication/data/replication-manager/#ec-and-decommissioning)  
@@ -80,7 +80,7 @@ Let’s say a cluster’s SLA dictates the decommission must complete within 8 h
 
 In fact, because Ozone replication manager does not control I/O at disk level (only node level), multiple tasks may land at the same disk at the same time, and the single disk becomes the bottleneck for the entire datanode, and thus the enter cluster.
 
-* Enqueue more tasks at the same DN; change task pick up algorithm so Datanode create a X-way queue,  
+* Enqueue more tasks at the same DN; isolate push replication concurrency per disk so one slow volume does not block others (implemented in HDDS-15412 via per-volume thread pools).  
 
 Reconstruction is CPU intensive, network intensive and disk I/O intensive. It is therefore less efficient than re-replication, but reconstruction in a larger cluster improves parallelism and throughput.
 
@@ -125,34 +125,46 @@ The SCM will monitor the load on decommissioning Datanodes and dynamically shift
         *   **Optimization:** When selecting source Datanodes for this reconstruction, SCM will exclude the decommissioning node if $k$ other replicas are available. This transforms a node-level bottleneck into a parallelized cluster-wide task.
 
 ### Phase 3: Datanode Logic - Disk-Level Fairness
-To protect physical disks from head contention (thrashing) when many replication tasks are permitted on a single node, we will implement a volume-aware dispatcher in the `ReplicationSupervisor`.
+**Status:** Implemented in [HDDS-15412](https://issues.apache.org/jira/browse/HDDS-15412).
 
-1.  **Volume Tracking:**
-    *   Add an `activeOutboundReplications` atomic counter to `HddsVolume`.
-    *   Introduce `hdds.datanode.replication.volume.outbound.limit` (Default: 2).
-2.  **Volume-Aware Dispatching:**
-    *   Replace the standard `PriorityBlockingQueue` dispatcher with a logic that "looks ahead" in the queue.
-    *   When a worker thread is ready:
-        1.  It iterates through the priority queue for the next task.
-        2.  It resolves the task's source volume(s) using the `ContainerController`.
-        3.  If a task's source volume is at the outbound limit, the thread skips over it (leaving it at the head of the queue) and checks the next task.
-        4.  This allows tasks for idle volumes to "leapfrog" bottlenecked volumes, maximizing node throughput without disk thrashing.
-3.  **Starvation Prevention:**
-    *   By keeping skipped tasks at the head of the queue, they are guaranteed to be evaluated first as soon as a volume slot opens or a thread becomes available.
-    *   A `Condition` wake-up will be triggered whenever a task completes and releases a volume slot.
+The original draft proposed a leapfrog queue-dispatch algorithm with per-volume outbound counters on `HddsVolume`. The implemented solution uses dedicated per-volume `ThreadPoolExecutor` instances in `VolumeReplicationThreadPools`, which isolates push replication concurrency per disk without SCM protocol changes.
+
+1.  **Configuration:**
+    *   `hdds.datanode.replication.per.volume.enabled` (Boolean, default: `false`): Enables per-volume replication thread pools. **Requires DataNode restart** (not reconfigurable).
+    *   `hdds.datanode.replication.per.volume.streams.limit` (Int, default: `1`): Maximum concurrent push replication streams per data volume. **Reconfigurable** at runtime via the DataNode reconfiguration handler.
+2.  **Task routing in `ReplicationSupervisor`:**
+    *   Push replication (`ReplicateContainerCommand` with a target datanode) is dispatched to the thread pool for the container's source volume.
+    *   EC reconstruction (`ReconstructECContainersCommand`) and container reconciliation tasks continue to use the global `ReplicationSupervisor` thread pool.
+    *   Volume is resolved on the source DataNode via `ContainerSet`.
+    *   When `per.volume.enabled` is `false` (default), all tasks use the global pool for backward compatibility.
+3.  **Per-volume thread pools:**
+    *   On DataNode startup, `VolumeReplicationThreadPools` creates one fixed-size `ThreadPoolExecutor` per healthy data volume, each with its own `PriorityBlockingQueue`.
+    *   Pool size follows `per.volume.streams.limit` and scales with `hdds.datanode.replication.outofservice.limit.factor` when the node enters maintenance or decommissioning state.
+4.  **Volume failure handling:**
+    *   When a volume fails, the failed-volume listener shuts down and removes that volume's thread pool via `ReplicationSupervisor.shutdownFailedVolumePools()`.
+    *   Push replication tasks for containers on a failed or missing volume are rejected (logged as warnings); SCM retries on the next replication cycle.
+5.  **Operational notes:**
+    *   No SCM protocol or Replication Manager changes are required.
+    *   Pull replication has been removed upstream; `ReplicateContainerCommand` is push-only.
+    *   Reconfiguration of `per.volume.streams.limit` is ignored when `per.volume.enabled` is `false`.
+6.  **Known follow-ups:**
+    *   Reconfiguration parity with out-of-service scaling.
+    *   Rejection metrics for tasks dropped due to unavailable volume pools.
+    *   Integration test coverage.
 
 ### Phase 4: Observability and Robustness
 1.  **SCM Metrics:**
     *   `ec_reconstruction_decommission_triggered_total`: Counter for switches triggered by the load factor.
     *   `ec_reconstruction_global_limit_reached_total`: Counter for global reconstruction throttling.
 2.  **Datanode Metrics:**
-    *   `volume_outbound_concurrency_wait_total`: Count of times a task was skipped due to volume load.
+    *   `volume_outbound_concurrency_wait_total`: Count of times a task was skipped due to volume load (not yet implemented; HDDS-15412 follow-up).
+    *   Existing `ReplicationSupervisor` counters continue to track queued, success, failure, and timeout counts per task type.
 3.  **Fault Tolerance:**
     *   If reconstruction fails due to source/target issues, SCM will automatically retry in the next cycle, re-evaluating the best strategy (replication vs. reconstruction) based on the latest node load.
 
 ### Phase 5: Verification Strategy
 1.  **Simulation:** Decommission a dense node and verify SCM switching behavior at the 90% load mark.
-2.  **Disk Fairness:** Stress test a single Datanode volume with 10+ replication commands and verify that only 2 (by default) are active, while others are correctly bypassed for tasks targeting other volumes.
+2.  **Disk Fairness:** With `hdds.datanode.replication.per.volume.enabled=true`, stress test a single DataNode volume with 10+ push replication commands and verify that only `per.volume.streams.limit` (default 1) are active on that volume, while tasks targeting other volumes proceed on their own per-volume pools.
 3.  **Global Cap:** Verify that the cluster-wide reconstruction limit effectively throttles background traffic during simultaneous decommission of multiple large nodes.
 
 # Expected result:
@@ -171,7 +183,7 @@ To protect physical disks from head contention (thrashing) when many replication
 * SCM RM should prioritize re-replication from source, but once the in-transit re-replication reaches a threshold, it should schedule reconstruction.  
   * Threshold: for example, number of in-transit re-replication tasks reaches number of disks, throughput speed.  
   * **RS(3,2) vs. RS(6,3) Differentiation:** Because RS(6,3) requires 6x the bisectional bandwidth (82.8 GB/s vs 41.4 GB/s), the threshold for switching should likely be different for different EC policies?  
-* **Disk-Aware Scheduling:** The Datanode (DN) ensures tasks in the task queue don't land on the same physical disk simultaneously. A mechanism for the DN to report disk-level busy status to the SCM or for the DN to reorder its internal queue based on disk availability. Note: Ozone datanode does not report disk level status to SCM, so this scheduling algorithm must be design and implemented at Datanode not SCM.  
+* **Disk-Aware Scheduling:** The Datanode (DN) ensures push replication tasks do not overload a single physical disk. HDDS-15412 implements this at the DN via per-volume replication thread pools (no SCM disk-level status reporting). EC reconstruction and reconciliation remain on the global pool.  
 * **Bisectional Bandwidth Management:** For RS(6,3), you need to read 6x the data. The specification needs a plan for how the RM selects "source" nodes for reconstruction to avoid creating new bottlenecks in other parts of the cluster.  
 * **Memory Overhead:** increasing parallelism and adding more re-construction tasks could increase memory overhead. That is expected, but it shouldn’t consume so much it becomes infeasible to deploy. Say, ideally contain the datanode heap to under 31GB, and total process memory (including direct memory, native memory) should not exceed 64GB at any point in time.  
 * **Error handling:** decommission should complete eventually even if the decommissioning data node crashes. The reconstruction mechanism for EC containers is fault-tolerant. If a container at the decommissioning datanode becomes corrupt or missing during re-replication, it should be able to retry and finally fallback to reconstruction automatically without human intervention.  
