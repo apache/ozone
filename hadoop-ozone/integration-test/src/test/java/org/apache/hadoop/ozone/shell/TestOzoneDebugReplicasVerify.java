@@ -390,7 +390,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       assertTrue(keyFile.isFile(), "Expected key file: " + keyFile.getAbsolutePath());
       JsonNode jsonNode = MAPPER.readTree(keyFile);
       assertNotNull(jsonNode, "Output file must be valid JSON: " + keyFile.getAbsolutePath());
-      assertTrue(jsonNode.get("pass").asBoolean(), "Each split file must have a top-level 'pass' field");
       JsonNode keys = jsonNode.get("keys");
       assertNotNull(keys, "Each split file must contain a 'keys' array");
       assertThat(keys.size()).isLessThanOrEqualTo(maxRecordsPerFile);

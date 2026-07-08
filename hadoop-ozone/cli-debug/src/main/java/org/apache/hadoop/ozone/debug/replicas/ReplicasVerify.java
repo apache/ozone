@@ -100,8 +100,11 @@ public class ReplicasVerify extends Handler {
   private String outputDir;
 
   @CommandLine.Option(names = {"--max-records-per-file"},
-      description = "Maximum number of keys to write per output file. When greater than zero (and --out is set), " +
-          "output is split into multiple valid JSON files named <out>.0, <out>.1, Requires --out.",
+      description = "Maximum number of keys to write per output file. When greater than zero, output is split " +
+          "into multiple valid JSON files named <dirName>.0, <dirName>.1, ... Requires --out. " +
+          "Split output files do not include a top-level 'pass' field, check each key's 'pass'. " +
+          "The single-file output keeps the top-level 'pass' for the whole run. JSON format example: " +
+          "single file: { 'pass': true/false, 'keys': [ ... ] }, split files: { 'keys': [ ... ] }.",
       defaultValue = "0")
   private long recordsPerFile;
 
@@ -229,6 +232,8 @@ public class ReplicasVerify extends Handler {
   /**
    * Writes verification output to file(s) instead of stdout.
    * When recordsPerFile is greater than zero, the keys are split into multiple valid JSON files.
+   * Split files contain only a "keys" array (no top-level "pass"); the per-key "pass" field reflects each
+   * key's result. The single-file output keeps the top-level "pass".
    */
   private void writeOutputToFiles(ObjectNode root, ArrayNode keysArray, boolean allKeysPassed) throws IOException {
     String outputPrefix = resolveOutputPrefix();
@@ -251,13 +256,11 @@ public class ReplicasVerify extends Handler {
       }
       chunkKeys.add(keysArray.get(i));
       if (chunkKeys.size() >= recordsPerFile) {
-        chunkNode.put("pass", allKeysPassed);
         writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
         chunkNode = null;
       }
     }
     if (chunkNode != null) {
-      chunkNode.put("pass", allKeysPassed);
       writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
     }
   }
