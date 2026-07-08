@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.exceptions.OMCompletedRequestPrunedException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1380,7 +1381,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             // TODO: we should throw a custom exception here (instead of
             // IOException) that needs to be handled appropriately by
             // callers
-            throw new IOException(
+            throw new OMCompletedRequestPrunedException(
                 "Missing rows - start key not found (startKey=" + startKey
                 + ", foundKey=" + completedRequestInfoRow.getKey() + ")");
           }

@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
+import org.apache.hadoop.ozone.om.request.eventlistener.OMSetEventNotificationCheckpointRequest;
 import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
@@ -217,6 +218,8 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantRevokeAdminRequest(omRequest);
     case SetRangerServiceVersion:
       return new OMSetRangerServiceVersionRequest(omRequest);
+    case SetEventNotificationCheckpoint:
+      return new OMSetEventNotificationCheckpointRequest(omRequest);
     case CreateSnapshot:
       return new OMSnapshotCreateRequest(omRequest);
     case DeleteSnapshot:

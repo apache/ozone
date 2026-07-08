@@ -33,6 +33,17 @@ public interface OMEventListenerPluginContext {
   // them to some predefined value for safety?  e.g. 10K
   List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException;
 
+  NotificationCheckpointStrategy getNotificationCheckpointStrategy();
+
+  /**
+   * Prunes records from completedRequestInfoTable using a hybrid soft and hard retention limit.
+   *
+   * @param softLimit the soft retention keep limit behind the minimum checkpoint across all active listeners.
+   * @param hardLimit the hard retention cap limit behind the latest transaction in database.
+   * @throws IOException if any database error occurs.
+   */
+  void pruneCompletedRequestInfo(long softLimit, long hardLimit) throws IOException;
+
   // XXX: this probably doesn't belong here
   String getThreadNamePrefix();
 }

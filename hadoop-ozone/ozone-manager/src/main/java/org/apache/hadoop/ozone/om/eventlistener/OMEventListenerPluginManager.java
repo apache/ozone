@@ -92,7 +92,11 @@ public class OMEventListenerPluginManager {
       }
     }
 
-    OMEventListenerPluginContext pluginContext = new OMEventListenerPluginContextImpl(ozoneManager);
+    NotificationCheckpointStrategy checkpointStrategy = null;
+    if (ozoneManager != null) {
+      checkpointStrategy = new OzoneDbCheckpointStrategy(ozoneManager, conf);
+    }
+    OMEventListenerPluginContext pluginContext = new OMEventListenerPluginContextImpl(ozoneManager, checkpointStrategy);
 
     for (String destName : destNameList) {
       try {

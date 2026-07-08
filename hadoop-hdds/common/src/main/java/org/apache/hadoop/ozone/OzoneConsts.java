@@ -133,6 +133,9 @@ public final class OzoneConsts {
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
 
+  public static final String EVENT_NOTIFICATION_CHECKPOINT_PREFIX =
+      "#EVENTNOTIFICATIONCHECKPOINT#";
+
   public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
   // Block ID prefixes used in datanode containers.

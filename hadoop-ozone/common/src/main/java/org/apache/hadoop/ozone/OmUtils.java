@@ -307,6 +307,7 @@ public final class OmUtils {
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
     case SetRangerServiceVersion:
+    case SetEventNotificationCheckpoint:
     case CreateSnapshot:
     case DeleteSnapshot:
     case RenameSnapshot:
@@ -422,6 +423,7 @@ public final class OmUtils {
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
     case SetRangerServiceVersion:
+    case SetEventNotificationCheckpoint:
     case CreateSnapshot:
     case DeleteSnapshot:
     case RenameSnapshot:
