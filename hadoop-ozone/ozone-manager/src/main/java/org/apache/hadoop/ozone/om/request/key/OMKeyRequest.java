@@ -224,8 +224,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
-    // Cache the sorted order per pipeline so blocks sharing a pipeline are
-    // sorted once (mirrors the read path's per-pipeline caching).
+    // Cache the sorted order by pipeline nodes so blocks whose pipelines have
+    // the same datanodes are sorted once (mirrors the read path's caching).
     final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes =
         sortOnOm ? new HashMap<>() : null;
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
