@@ -103,15 +103,20 @@ We will implement all three, using solution 1 as a baseline. Solution 2 and 3 pr
 This implementation plan outlines the transition from single-source replication to multi-source reconstruction for EC container decommission, as described in HDDS-15014. The plan focuses on SCM-side dynamic switching and Datanode-side disk-level fairness.
 
 ### Phase 1: SCM Configuration and Global Capacity
-We will introduce new configuration properties in `ReplicationManagerConfiguration` to control the behavior and protect cluster resources.
+**Status:** Implemented in [HDDS-15071](https://issues.apache.org/jira/browse/HDDS-15071).
+
+We introduce configuration properties in `ReplicationManagerConfiguration` to control the behavior and protect cluster resources.
 
 1.  **New Configuration Keys:**
-    *   `hdds.scm.replication.decommission.ec.reconstruction.enabled` (Boolean, default: false): Feature flag to enable/disable the switch to reconstruction during decommission.
-    *   `hdds.scm.replication.decommission.ec.reconstruction.load.factor` (Double, default: 0.9): The threshold of a node's replication limit at which SCM switches to reconstruction.
-    *   `hdds.scm.replication.reconstruction.global.limit` (Int, default: 50): Cluster-wide cap on concurrent reconstruction tasks to prevent aggregate network saturation.
+    *   `hdds.scm.replication.decommission.ec.reconstruction.enabled` (Boolean, default: false): Feature flag to enable/disable the switch to reconstruction during decommission (used by Phase 2).
+    *   `hdds.scm.replication.decommission.ec.reconstruction.load.factor` (Double, default: 0.9): The threshold of a node's replication limit at which SCM switches to reconstruction (used by Phase 2).
+    *   `hdds.scm.replication.reconstruction.global.limit` (Int, default: 0): Cluster-wide cap on concurrent reconstruction commands. A value of zero disables global limit checking (backward compatible). A positive value (e.g. 50) is recommended when enabling EC decommission reconstruction.
 2.  **Global Throttling Implementation:**
-    *   Implement an atomic counter in `ReplicationManager` to track active `ReconstructECContainersCommand` tasks.
-    *   The SCM will skip scheduling new reconstruction tasks if this global limit is reached, falling back to replication or re-queuing the container.
+    *   `ReplicationManager` tracks active `ReconstructECContainersCommand` tasks with an atomic counter and a per-command fragment map.
+    *   The limit is enforced in `sendThrottledReconstructionCommand`, not by stopping the under-replicated processor loop. When the cap is reached, new reconstruction commands are deferred via `CommandTargetOverloadedException` and the container is re-queued.
+    *   Other under-replication recovery continues: 1-1 `ReplicateContainerCommand` work (EC decommission copies, Ratis copies) is unaffected by the reconstruction cap.
+    *   On SCM leader transition, reconstruction counters are cleared alongside `ContainerReplicaPendingOps` because `clear()` does not fire `opCompleted` callbacks.
+    *   Deferred reconstruction commands increment the existing `ec_reconstruction_cmds_deferred_total` metric.
 
 ### Phase 2: SCM Logic - The Dynamic Switch
 The SCM will monitor the load on decommissioning Datanodes and dynamically shift to reconstruction to offload the source node.
@@ -154,8 +159,8 @@ The original draft proposed a leapfrog queue-dispatch algorithm with per-volume 
 
 ### Phase 4: Observability and Robustness
 1.  **SCM Metrics:**
-    *   `ec_reconstruction_decommission_triggered_total`: Counter for switches triggered by the load factor.
-    *   `ec_reconstruction_global_limit_reached_total`: Counter for global reconstruction throttling.
+    *   `ec_reconstruction_decommission_triggered_total`: Counter for switches triggered by the load factor (Phase 2).
+    *   `ec_reconstruction_cmds_deferred_total`: Existing counter; includes reconstruction commands deferred due to per-datanode overload or global reconstruction limit.
 2.  **Datanode Metrics:**
     *   `volume_outbound_concurrency_wait_total`: Count of times a task was skipped due to volume load (not yet implemented; HDDS-15412 follow-up).
     *   Existing `ReplicationSupervisor` counters continue to track queued, success, failure, and timeout counts per task type.
