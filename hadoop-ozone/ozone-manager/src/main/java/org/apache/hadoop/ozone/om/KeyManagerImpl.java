@@ -2165,7 +2165,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private void sortDatanodes(String clientMachine, List<OmKeyInfo> keyInfos) {
     if (keyInfos != null && clientMachine != null) {
-      final Map<Set<String>, List<? extends DatanodeDetails>> sortedPipelines = new HashMap<>();
+      final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
         if (key == null) {
@@ -2180,14 +2180,11 @@ public class KeyManagerImpl implements KeyManager {
             continue;
           }
 
-          final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
-              .collect(Collectors.toSet());
-
-          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(nodes);
           if (sortedNodes == null) {
             sortedNodes = sortDatanodes(nodes, clientMachine);
             if (sortedNodes != null) {
-              sortedPipelines.put(uuidSet, sortedNodes);
+              sortedPipelines.put(nodes, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
             LOG.debug("Found sorted datanodes for pipeline {} and client {} "
