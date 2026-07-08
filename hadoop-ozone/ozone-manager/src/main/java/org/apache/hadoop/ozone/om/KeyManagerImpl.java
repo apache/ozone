@@ -2235,10 +2235,10 @@ public class KeyManagerImpl implements KeyManager {
   /**
    * Sort a pipeline's nodes by topology distance to the client. The nodes come
    * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
-   * parent/level and would be treated as outside the topology (distance
-   * {@link Integer#MAX_VALUE}) and shuffled. Resolve each node (and a co-located
-   * client) to its canonical instance in OM's cluster map before sorting, then
-   * map the sorted order back to the original pipeline nodes.
+   * parent/level: the topology treats them as unknown (distance
+   * {@link Integer#MAX_VALUE}) and the order comes out random. Look each node
+   * (and a co-located client) up in OM's cluster map to get the topology-linked
+   * instance, sort those, then map the order back to the original nodes.
    */
   private List<? extends DatanodeDetails> sortByClusterMapDistance(
       NetworkTopology clusterMap, Node client,
@@ -2264,8 +2264,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   /**
-   * Resolve a node to its canonical, topology-linked instance in the given
-   * cluster map, or return the input node if it is not in the map.
+   * Look a node up in the cluster map and return the topology-linked instance
+   * found there, or the input node if the map has no entry for it.
    */
   private Node toClusterMapNode(NetworkTopology clusterMap, Node node) {
     final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
