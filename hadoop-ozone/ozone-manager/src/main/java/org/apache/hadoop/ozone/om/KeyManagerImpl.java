@@ -2237,13 +2237,12 @@ public class KeyManagerImpl implements KeyManager {
    * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
    * parent/level: the topology treats them as unknown (distance
    * {@link Integer#MAX_VALUE}) and the order comes out random. Look each node
-   * (and a co-located client) up in OM's cluster map to get the topology-linked
-   * instance, sort those, then map the order back to the original nodes.
+   * up in OM's cluster map to get the topology-linked instance, sort those,
+   * then map the order back to the original nodes.
    */
   private List<? extends DatanodeDetails> sortByClusterMapDistance(
       NetworkTopology clusterMap, Node client,
       List<? extends DatanodeDetails> nodes) {
-    final Node reader = toClusterMapNode(clusterMap, client);
     final List<Node> topologyNodes = new ArrayList<>(nodes.size());
     final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
     for (DatanodeDetails node : nodes) {
@@ -2255,21 +2254,12 @@ public class KeyManagerImpl implements KeyManager {
       nodeByPath.put(resolved.getNetworkFullPath(), node);
     }
     final List<Node> sorted =
-        clusterMap.sortByDistanceCost(reader, topologyNodes, topologyNodes.size());
+        clusterMap.sortByDistanceCost(client, topologyNodes, topologyNodes.size());
     final List<DatanodeDetails> result = new ArrayList<>(sorted.size());
     for (Node node : sorted) {
       result.add(nodeByPath.get(node.getNetworkFullPath()));
     }
     return result;
-  }
-
-  /**
-   * Look a node up in the cluster map and return the topology-linked instance
-   * found there, or the input node if the map has no entry for it.
-   */
-  private Node toClusterMapNode(NetworkTopology clusterMap, Node node) {
-    final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
-    return resolved != null ? resolved : node;
   }
 
   private Node getClientNode(String clientMachine,
@@ -2279,7 +2269,10 @@ public class KeyManagerImpl implements KeyManager {
       // address is always an IP even when use.datanode.hostname is enabled.
       if (clientMachine.equals(node.getIpAddress())
           || clientMachine.equals(node.getHostName())) {
-        return node;
+        // The pipeline nodes are RPC-deserialized and not linked into OM's
+        // cluster map; prefer the map's instance so distance can be computed.
+        final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+        return resolved != null ? resolved : node;
       }
     }
     return getOtherNode(clientMachine, clusterMap);
