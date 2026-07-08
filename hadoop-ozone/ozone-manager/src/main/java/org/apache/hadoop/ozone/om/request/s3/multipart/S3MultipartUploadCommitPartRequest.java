@@ -317,8 +317,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       exception = ex;
       omClientResponse =
           getOmClientResponse(ozoneManager, null, openKey,
-              omKeyInfo, multipartKey, multipartKeyInfo, multipartPartKey,
-              multipartPartInfo,
+              omKeyInfo, multipartKey, multipartKeyInfo, null,
+              null,
               createErrorOMResponse(omResponse, exception), copyBucketInfo, bucketId);
     } finally {
       if (acquiredLock) {

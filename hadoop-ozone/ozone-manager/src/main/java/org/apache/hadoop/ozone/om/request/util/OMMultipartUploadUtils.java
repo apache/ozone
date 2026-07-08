@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
@@ -123,6 +124,10 @@ public final class OMMultipartUploadUtils {
    */
   public static SortedMap<Integer, OmMultipartPartInfo> scanParts(
       OMMetadataManager omMetadataManager, String uploadId) throws IOException {
+    // Null values in this map represent cache tombstones (pending deletes).
+    // containsKey returns true for tombstoned entries, which prevents the
+    // DB pass from re-inserting rows that were deleted in cache but not yet
+    // flushed to RocksDB.
     SortedMap<Integer, OmMultipartPartInfo> parts = new TreeMap<>();
 
     Iterator<Map.Entry<CacheKey<OmMultipartPartKey>,
@@ -135,12 +140,7 @@ public final class OMMultipartUploadUtils {
       if (!uploadId.equals(key.getUploadId()) || !key.hasPartNumber()) {
         continue;
       }
-      OmMultipartPartInfo value = cacheEntry.getValue().getCacheValue();
-      if (value == null) {
-        parts.remove(key.getPartNumber());
-      } else {
-        parts.put(key.getPartNumber(), value);
-      }
+      parts.put(key.getPartNumber(), cacheEntry.getValue().getCacheValue());
     }
 
     OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
@@ -162,6 +162,7 @@ public final class OMMultipartUploadUtils {
       }
     }
 
+    parts.values().removeIf(Objects::isNull);
     return parts;
   }
 

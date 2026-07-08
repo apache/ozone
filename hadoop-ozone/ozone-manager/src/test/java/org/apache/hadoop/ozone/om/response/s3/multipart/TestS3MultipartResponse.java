@@ -350,7 +350,7 @@ public class TestS3MultipartResponse {
     }
 
     return new S3MultipartUploadCommitPartResponse(omResponse,
-        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        multipartKey, openKey, multipartKeyInfo, null, null, keyToDeleteMap,
         openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
@@ -382,7 +382,7 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCompleteResponse(omResponse, multipartKey,
         multipartOpenKey, omKeyInfo, allKeyInfoToRemove, getBucketLayout(),
-        omBucketInfo, bucketId);
+        omBucketInfo, bucketId, Collections.emptyList());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
