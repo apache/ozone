@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.debug.ldb;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_NAME;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -28,6 +30,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -54,6 +57,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -94,7 +98,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Table name")
   private String tableName;
@@ -137,7 +141,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           "     \"keyName:regex:^key.*$\" for showing records having keyName that matches the given regex.")
   private String filter;
 
-  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+  @CommandLine.Option(names = {"--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
   private String dnDBSchemaVersion;
@@ -730,9 +734,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
             // one, to ensure valid JSON format.
             sb.append(", ");
           }
+          Object key = dbColumnFamilyDefinition.getKeyCodec()
+              .fromPersistedFormat(byteArrayKeyValue.getKey());
           if (withKey) {
-            Object key = dbColumnFamilyDefinition.getKeyCodec()
-                .fromPersistedFormat(byteArrayKeyValue.getKey());
             if (schemaV3) {
               int index =
                   DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
@@ -758,9 +762,11 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(byteArrayKeyValue.getValue());
 
+          o = parseStatefulServiceConfig(key, o, dbColumnFamilyDefinition);
+
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
-            filteredValue.putAll(getFieldsFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
+            filteredValue.putAll(getFieldsFilteredObject(o, o.getClass(), fieldsSplitMap));
             sb.append(writer.writeValueAsString(filteredValue));
           } else {
             sb.append(writer.writeValueAsString(o));
@@ -827,6 +833,18 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       }
       return subfieldObjectsList;
     }
+  }
+
+  private Object parseStatefulServiceConfig(Object key, Object value, DBColumnFamilyDefinition dbColumnFamily) {
+    if (dbColumnFamily.getName().equals(STATEFUL_SERVICE_CONFIG.getName()) && key.equals(SERVICE_NAME) &&
+        value instanceof ByteString) {
+      try {
+        return HddsProtos.DeletedBlocksTransactionSummary.parseFrom((ByteString) value);
+      } catch (IOException e) {
+        LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), SERVICE_NAME, e);
+      }
+    }
+    return value;
   }
 
   private static class ByteArrayKeyValue {

@@ -41,6 +41,7 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -120,6 +121,23 @@ public class TestMultipartUploadComplete {
 
     assertEquals("custom-value1", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "custom-key1"));
     assertEquals("custom-value2", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "custom-key2"));
+  }
+
+  @Test
+  public void testMultipartStoresContentType() throws Exception {
+    String key = UUID.randomUUID().toString();
+
+    // Content-Type set on CreateMultipartUpload is preserved as
+    // ORIGINAL_CONTENT_TYPE and must survive to the completed object.
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("video/webm");
+
+    String uploadID = initiateMultipartUpload(key);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part1));
+
+    assertEquals("video/webm", rest.head(OzoneConsts.S3_BUCKET, key)
+        .getHeaderString(HttpHeaders.CONTENT_TYPE));
   }
 
   @Test

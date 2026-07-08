@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.HEARTBEAT;
 
-import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +34,7 @@ public class TestSCMConnectionManager {
       throws Exception {
     try (SCMConnectionManager connectionManager =
              new SCMConnectionManager(new OzoneConfiguration())) {
-      InetSocketAddress address = new InetSocketAddress("127.0.0.1", 9861);
+      final HostAndPort address = new HostAndPort("127.0.0.1", 9861);
       connectionManager.addSCMServer(address, "");
       EndpointStateMachine endpoint =
           connectionManager.getValues().iterator().next();
