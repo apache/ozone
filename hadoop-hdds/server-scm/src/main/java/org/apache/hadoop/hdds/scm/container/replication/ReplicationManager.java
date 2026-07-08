@@ -576,6 +576,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
+    if (isReconstructionLimitReached()) {
+      metrics.incrECReconstructionCmdsDeferredTotal();
+      throw new CommandTargetOverloadedException(
+          "Global reconstruction limit (" + getReconstructionInFlightLimit()
+              + ") reached for container " + containerInfo.getContainerID());
+    }
     List<DatanodeDetails> targets = command.getTargetDatanodes();
     List<Pair<Integer, DatanodeDetails>> targetWithCmds =
         getAvailableDatanodesForReplication(targets);
@@ -1558,6 +1564,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           // Therefore we should clear the table so RM starts from a clean
           // state.
           containerReplicaPendingOps.clear();
+          // clear() discards pending ops without firing opCompleted, so also
+          // reset the reconstruction tracking that opCompleted maintains.
+          reconstructionCommandIdToPendingFragmentCount.clear();
+          inflightReconstructionCount.set(0);
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {

@@ -132,24 +132,20 @@ public class TestUnderReplicatedProcessor {
   }
 
   @Test
-  public void testMessageNotProcessedIfReconstructionLimitReached()
+  public void testProcessorContinuesWhenReconstructionLimitReached()
       throws IOException {
     when(replicationManager.isReconstructionLimitReached()).thenReturn(true);
-    when(replicationManager.getReconstructionInFlightLimit()).thenReturn(10);
     when(replicationManager.processUnderReplicatedContainer(any())).thenReturn(1);
 
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
-        container, 3, false, false, false);
-    queue.enqueue(result);
+    queue.enqueue(new UnderReplicatedHealthResult(
+        container, 3, false, false, false));
 
     underReplicatedProcessor.processAll(queue);
 
-    // The message should not be processed and still be on the queue (re-queued)
-    assertEquals(1, queue.underReplicatedQueueSize());
-    // We should not have processed anything in RM
-    verify(replicationManager, times(0)).processUnderReplicatedContainer(any());
+    assertEquals(0, queue.underReplicatedQueueSize());
+    verify(replicationManager, times(1)).processUnderReplicatedContainer(any());
   }
 
 }
