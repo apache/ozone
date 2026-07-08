@@ -841,7 +841,6 @@ public class TestS3MultipartUploadCommitPartRequest
     OmMultipartPartKey partKey1 = OmMultipartPartKey.of(uploadId, 1);
     OmMultipartPartInfo originalInfo = omMetadataManager.getMultipartPartsTable().get(partKey1);
     omMetadataManager.getMultipartPartsTable().put(partKey1, originalInfo);
-    long originalSize = originalInfo.getDataSize();
 
     // Overwrite part 1 with different data size
     long clientID2 = Time.now();
