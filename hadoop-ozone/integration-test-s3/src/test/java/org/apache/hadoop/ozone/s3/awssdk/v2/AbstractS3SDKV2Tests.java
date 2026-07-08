@@ -116,10 +116,13 @@ import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
@@ -139,6 +142,7 @@ import software.amazon.awssdk.services.s3.model.ListPartsRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest;
@@ -306,6 +310,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testBucketTaggingPutGetDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception noTags = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, noTags.statusCode());
+    assertEquals("NoSuchTagSet", noTags.awsErrorDetails().errorCode());
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("tag-key1").value("tag-value1").build(),
+        Tag.builder().key("tag-key2").value("tag-value2").build());
+    s3Client.putBucketTagging(PutBucketTaggingRequest.builder()
+        .bucket(bucketName)
+        .tagging(Tagging.builder().tagSet(tags).build())
+        .build());
+
+    GetBucketTaggingResponse taggingResult = s3Client.getBucketTagging(
+        GetBucketTaggingRequest.builder().bucket(bucketName).build());
+    Map<String, String> actualTags = taggingResult.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals(2, actualTags.size());
+    assertEquals("tag-value1", actualTags.get("tag-key1"));
+    assertEquals("tag-value2", actualTags.get("tag-key2"));
+
+    s3Client.deleteBucketTagging(DeleteBucketTaggingRequest.builder().bucket(bucketName).build());
+
+    S3Exception afterDelete = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, afterDelete.statusCode());
+    assertEquals("NoSuchTagSet", afterDelete.awsErrorDetails().errorCode());
+  }
+
+  @Test
   public void testPutObjectIfNoneMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -399,6 +437,73 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .key(keyName)
             .ifMatch("some-etag"),
         RequestBody.fromString("bar2")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("wrong-etag")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+    assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchWildcard() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("*"));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchWildcardMissingKeyFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("*")));
 
     assertEquals(412, exception.statusCode());
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
@@ -924,6 +1029,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   @Test
   public void testListObjectsManyV2() throws Exception {
     testListObjectsMany(true);
+  }
+
+  @Test
+  public void testListObjectsSpecialKeyNamesV2() throws Exception {
+    final String bucketName = getBucketName("special-keys");
+    final String content = "x";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    for (String keyName : S3SDKTestUtils.S3_SPECIAL_KEY_NAMES) {
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+          RequestBody.fromString(content));
+      ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+          b -> b.bucket(bucketName).key(keyName));
+      assertEquals(content, objectBytes.asUtf8String());
+    }
+
+    ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).build());
+    List<String> listedKeys = listObjectsResponse.contents().stream()
+        .map(S3Object::key)
+        .collect(Collectors.toList());
+    assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {

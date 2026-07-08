@@ -87,6 +87,7 @@ public final class S3Consts {
   public static final String TAG_COUNT_HEADER = "x-amz-tagging-count";
   public static final String AWS_TAG_PREFIX = "aws:";
 
+  // tag limit for object
   public static final int TAG_NUM_LIMIT = 10;
   public static final int TAG_KEY_LENGTH_LIMIT = 128;
   public static final int TAG_VALUE_LENGTH_LIMIT = 256;
@@ -94,6 +95,9 @@ public final class S3Consts {
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
+
+  /** AWS S3 maximum number of keys per DeleteObjects request. */
+  public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
 
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
@@ -113,6 +117,9 @@ public final class S3Consts {
   public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
   public static final String DEFAULT_S3_REGION = "us-east-1";
   public static final String S3_EXPRESS_SERVICE = "s3express";
+
+  // tag limit for bucket
+  public static final int TAG_BUCKET_NUM_LIMIT = 50;
 
   //Never Constructed
   private S3Consts() {

@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -584,7 +585,7 @@ public final class ScmInvokerCodeGenerator {
   void printProxyClass() {
     printf("return new %s() {", apiName);
     try (UncheckedAutoCloseable ignored = printScope(false, 1)) {
-      for (Method m : getMethods(null, false)) {
+      for (Method m : getMethods(m -> m.getAnnotation(Deprecated.class) == null || !m.isDefault())) {
         printProxyClassMethod(m);
       }
     }
@@ -642,7 +643,7 @@ public final class ScmInvokerCodeGenerator {
 
     final MD5Hash javaMd5 = MD5FileUtil.computeMd5ForFile(java);
     final MD5Hash tmpMd5 = MD5FileUtil.computeMd5ForFile(tmp);
-    if (Arrays.equals(javaMd5.getDigest(), tmpMd5.getDigest())) {
+    if (Objects.equals(javaMd5, tmpMd5)) {
       Files.delete(tmp.toPath());
       return null;
     }

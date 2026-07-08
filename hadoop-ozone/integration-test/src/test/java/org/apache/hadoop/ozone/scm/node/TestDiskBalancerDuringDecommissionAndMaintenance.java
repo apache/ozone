@@ -137,20 +137,13 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   }
 
   /**
-   * Helper method to get all IN_SERVICE datanodes.
-   */
-  private List<DatanodeDetails> getInServiceDatanodes(NodeManager nm) {
-    return nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
-  }
-
-  /**
    * Helper method to query DiskBalancer info from all IN_SERVICE datanodes.
    * Similar to --in-service-datanodes option in CLI.
    */
   private <T> List<T> queryAllInServiceDatanodes(
       DiskBalancerQuery<T> query) throws IOException {
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
-    List<DatanodeDetails> inServiceDatanodes = getInServiceDatanodes(nm);
+    final List<DatanodeInfo> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
     List<T> results = new ArrayList<>();
     
     for (DatanodeDetails dn : inServiceDatanodes) {

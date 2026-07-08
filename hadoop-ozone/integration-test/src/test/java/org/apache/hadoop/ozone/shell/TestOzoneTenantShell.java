@@ -529,14 +529,14 @@ public class TestOzoneTenantShell {
     // Attempt to assign the user to the tenant again
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob"});
+        "--access-id=research$bob"});
     checkOutput(out, "", false);
     checkOutput(err, "accessId 'research$bob' already exists!\n", true);
 
     // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob42"});
+        "--access-id=research$bob42"});
     checkOutput(out, "", false);
     // HDDS-6366: Disallow specifying custom accessId.
     checkOutput(err, "Invalid accessId 'research$bob42'. "

@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateSnapshot;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -178,6 +180,7 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key));
 
     // Run validateAndUpdateCache.
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMSnapshotCreateRequest.class);
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
 
@@ -211,6 +214,10 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertEquals(0, getOmMetrics().getNumSnapshotCreateFails());
     assertEquals(1, getOmMetrics().getNumSnapshotActive());
     assertEquals(1, getOmMetrics().getNumSnapshotCreates());
+    assertThat(logCapturer.getOutput()).contains(String.format(
+        "Created snapshot '%s' (snapshotId='%s') under path '%s'",
+        snapshotName1, snapshotInfoInCache.getSnapshotId(),
+        snapshotInfoInCache.getSnapshotPath()));
   }
 
   @Test

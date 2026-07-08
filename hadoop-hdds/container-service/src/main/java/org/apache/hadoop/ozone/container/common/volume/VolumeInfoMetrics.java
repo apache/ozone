@@ -61,6 +61,11 @@ public class VolumeInfoMetrics implements MetricsSource {
       Interns.info("MinFreeSpace",
           "Minimum free space threshold (soft limit) reported to SCM, " +
           "derived from hdds.datanode.volume.min.free.space.percent / hdds.datanode.volume.min.free.space");
+  private static final MetricsInfo HARD_MIN_FREE_SPACE =
+      Interns.info("HardMinFreeSpace",
+          "Minimum free space threshold (hard limit) enforced locally for writes, " +
+          "derived from hdds.datanode.volume.min.free.space.hard.limit.percent " +
+          "/ hdds.datanode.volume.min.free.space");
   private static final MetricsInfo NON_OZONE_USED =
       Interns.info("NonOzoneUsed",
           "Space on the filesystem consumed by non-Ozone workloads " +
@@ -254,6 +259,7 @@ public class VolumeInfoMetrics implements MetricsSource {
           .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
           .addGauge(FS_USED, fsUsage.getCapacity() - fsUsage.getAvailable())
           .addGauge(MIN_FREE_SPACE, volume.getReportedFreeSpaceToSpare(ozoneCapacity))
+          .addGauge(HARD_MIN_FREE_SPACE, volume.getFreeSpaceToSpare(ozoneCapacity))
           .addGauge(NON_OZONE_USED, VolumeUsage.getOtherUsed(fsUsage));
     }
   }
