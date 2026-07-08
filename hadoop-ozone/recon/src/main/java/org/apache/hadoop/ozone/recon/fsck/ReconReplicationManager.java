@@ -358,8 +358,9 @@ public class ReconReplicationManager extends ReplicationManager {
     for (int from = 0; from < allContainers.size(); from += PERSIST_CHUNK_SIZE) {
       int to = Math.min(from + PERSIST_CHUNK_SIZE, allContainers.size());
       List<Long> chunkContainerIds = collectContainerIds(allContainers, from, to);
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState =
-          healthSchemaManager.getExistingInStateSinceByContainerIds(chunkContainerIds);
+      Map<ContainerStateKey, ContainerHealthSchemaManager.UnhealthyContainerRecord>
+          existingInStateSinceByContainerAndState =
+          healthSchemaManager.getExistingUnhealthyRecordsByContainerIds(chunkContainerIds);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert = new ArrayList<>();
       ProcessingStats chunkStats = new ProcessingStats();
       Set<Long> negativeSizeRecorded = new HashSet<>();
@@ -493,7 +494,7 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   private void persistUnhealthyRecords(
-      Map<ContainerStateKey, Long> existingByKey,
+      Map<ContainerStateKey, ContainerHealthSchemaManager.UnhealthyContainerRecord> existingByKey,
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToSync) {
     LOG.info("Syncing unhealthy container records: existing={}, desired={}",
         existingByKey.size(), recordsToSync.size());

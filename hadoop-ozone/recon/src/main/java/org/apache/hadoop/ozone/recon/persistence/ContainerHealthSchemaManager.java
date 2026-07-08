@@ -41,6 +41,7 @@ import org.jooq.Condition;
 import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.OrderField;
+import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
 import org.slf4j.Logger;
@@ -189,12 +190,16 @@ public class ContainerHealthSchemaManager {
    * removes only keys present in {@code existingByKey} but absent from the
    * desired scan result (containers that recovered or changed state).</p>
    *
+   * <p>Rows whose desired content is identical to the existing row are left
+   * untouched, so an UPDATE is issued only when replica counts, delta, reason
+   * or {@code in_state_since} actually changed.</p>
+   *
    * @param existingByKey prior rows for this chunk, keyed by
    *                      (container_id, container_state)
    * @param desiredRecords unhealthy rows produced by the current scan
    */
   public void syncUnhealthyContainerRecordsAtomically(
-      Map<ContainerStateKey, Long> existingByKey,
+      Map<ContainerStateKey, UnhealthyContainerRecord> existingByKey,
       List<UnhealthyContainerRecord> desiredRecords) {
     if ((existingByKey == null || existingByKey.isEmpty())
         && (desiredRecords == null || desiredRecords.isEmpty())) {
@@ -209,7 +214,7 @@ public class ContainerHealthSchemaManager {
       }
     }
 
-    Map<ContainerStateKey, Long> existing =
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing =
         existingByKey == null ? new HashMap<>() : existingByKey;
 
     List<ContainerStateKey> staleKeys = new ArrayList<>();
@@ -224,11 +229,17 @@ public class ContainerHealthSchemaManager {
     for (UnhealthyContainerRecord record : desiredByKey.values()) {
       ContainerStateKey key = new ContainerStateKey(record.getContainerId(),
           record.getContainerState());
-      if (existing.containsKey(key)) {
-        toUpdate.add(record);
-      } else {
+      UnhealthyContainerRecord existingRecord = existing.get(key);
+      if (existingRecord == null) {
         toInsert.add(record);
+      } else if (!hasSameContent(existingRecord, record)) {
+        toUpdate.add(record);
       }
+    }
+
+    if (staleKeys.isEmpty() && toInsert.isEmpty() && toUpdate.isEmpty()) {
+      LOG.debug("Synced unhealthy container records: no changes");
+      return;
     }
 
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
@@ -241,6 +252,20 @@ public class ContainerHealthSchemaManager {
 
     LOG.debug("Synced unhealthy container records: deleted {} stale, inserted {}, updated {}",
         staleKeys.size(), toInsert.size(), toUpdate.size());
+  }
+
+  /**
+   * Returns true when the mutable columns of the existing row already match the
+   * desired scan result, so no UPDATE needs to be issued. The container_id and
+   * container_state are the key and are always equal for a matched pair.
+   */
+  private static boolean hasSameContent(UnhealthyContainerRecord existing,
+      UnhealthyContainerRecord desired) {
+    return existing.getInStateSince() == desired.getInStateSince()
+        && existing.getExpectedReplicaCount() == desired.getExpectedReplicaCount()
+        && existing.getActualReplicaCount() == desired.getActualReplicaCount()
+        && existing.getReplicaDelta() == desired.getReplicaDelta()
+        && Objects.equals(existing.getReason(), desired.getReason());
   }
 
   /**
@@ -296,11 +321,16 @@ public class ContainerHealthSchemaManager {
     if (staleKeys.isEmpty()) {
       return;
     }
-    for (ContainerStateKey key : staleKeys) {
-      dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(key.getContainerId()))
-          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(key.getContainerState()))
-          .execute();
+    for (int from = 0; from < staleKeys.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+      int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, staleKeys.size());
+      List<Query> batch = new ArrayList<>(to - from);
+      for (int i = from; i < to; i++) {
+        ContainerStateKey key = staleKeys.get(i);
+        batch.add(dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(key.getContainerId()))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(key.getContainerState())));
+      }
+      dslContext.batch(batch).execute();
     }
   }
 
@@ -311,9 +341,10 @@ public class ContainerHealthSchemaManager {
     }
     for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
       int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+      List<Query> batch = new ArrayList<>(to - from);
       for (int i = from; i < to; i++) {
         UnhealthyContainerRecord rec = recs.get(i);
-        dslContext.update(UNHEALTHY_CONTAINERS)
+        batch.add(dslContext.update(UNHEALTHY_CONTAINERS)
             .set(UNHEALTHY_CONTAINERS.IN_STATE_SINCE, rec.getInStateSince())
             .set(UNHEALTHY_CONTAINERS.EXPECTED_REPLICA_COUNT,
                 rec.getExpectedReplicaCount())
@@ -322,15 +353,17 @@ public class ContainerHealthSchemaManager {
             .set(UNHEALTHY_CONTAINERS.REPLICA_DELTA, rec.getReplicaDelta())
             .set(UNHEALTHY_CONTAINERS.REASON, rec.getReason())
             .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(rec.getContainerId()))
-            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(rec.getContainerState()))
-            .execute();
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(rec.getContainerState())));
       }
+      dslContext.batch(batch).execute();
     }
   }
 
   /**
-   * Returns previous in-state-since timestamps for tracked unhealthy states.
-   * The key is a stable containerId + state tuple.
+   * Returns the currently persisted unhealthy rows for the tracked SCM-generated
+   * states, keyed by a stable containerId + state tuple. The full row is
+   * returned so callers can both preserve {@code in_state_since} and detect
+   * whether a row's content actually changed before issuing an UPDATE.
    *
    * <p>This method also chunks the container-id predicate internally to stay
    * within Derby's statement compilation limits. Large scan cycles in Recon can
@@ -338,14 +371,14 @@ public class ContainerHealthSchemaManager {
    * single {@code IN (...)} predicate causes Derby to generate bytecode that
    * exceeds the JVM constant-pool / method-size limits.</p>
    */
-  public Map<ContainerStateKey, Long> getExistingInStateSinceByContainerIds(
+  public Map<ContainerStateKey, UnhealthyContainerRecord> getExistingUnhealthyRecordsByContainerIds(
       List<Long> containerIds) {
     if (containerIds == null || containerIds.isEmpty()) {
       return new HashMap<>();
     }
 
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    Map<ContainerStateKey, Long> existing = new HashMap<>();
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = new HashMap<>();
     try {
       for (int from = 0; from < containerIds.size(); from += MAX_IN_CLAUSE_CHUNK_SIZE) {
         int to = Math.min(from + MAX_IN_CLAUSE_CHUNK_SIZE, containerIds.size());
@@ -354,7 +387,11 @@ public class ContainerHealthSchemaManager {
         dslContext.select(
                 UNHEALTHY_CONTAINERS.CONTAINER_ID,
                 UNHEALTHY_CONTAINERS.CONTAINER_STATE,
-                UNHEALTHY_CONTAINERS.IN_STATE_SINCE)
+                UNHEALTHY_CONTAINERS.IN_STATE_SINCE,
+                UNHEALTHY_CONTAINERS.EXPECTED_REPLICA_COUNT,
+                UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT,
+                UNHEALTHY_CONTAINERS.REPLICA_DELTA,
+                UNHEALTHY_CONTAINERS.REASON)
             .from(UNHEALTHY_CONTAINERS)
             .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
             .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
@@ -365,13 +402,20 @@ public class ContainerHealthSchemaManager {
                 UnHealthyContainerStates.MIS_REPLICATED.toString(),
                 UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
                 UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-            .forEach(record -> existing.put(
-                new ContainerStateKey(record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID),
-                    record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE)),
-                record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE)));
+            .forEach(record -> {
+              long id = record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID);
+              String state = record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE);
+              existing.put(new ContainerStateKey(id, state),
+                  new UnhealthyContainerRecord(id, state,
+                      record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE),
+                      record.get(UNHEALTHY_CONTAINERS.EXPECTED_REPLICA_COUNT),
+                      record.get(UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT),
+                      record.get(UNHEALTHY_CONTAINERS.REPLICA_DELTA),
+                      record.get(UNHEALTHY_CONTAINERS.REASON)));
+            });
       }
     } catch (Exception e) {
-      LOG.warn("Failed to load existing inStateSince records. Falling back to current scan time.", e);
+      LOG.warn("Failed to load existing unhealthy records. Falling back to current scan time.", e);
     }
     return existing;
   }
@@ -388,7 +432,7 @@ public class ContainerHealthSchemaManager {
       return records;
     }
     return applyExistingInStateSince(records,
-        getExistingInStateSinceByContainerIds(containerIds));
+        getExistingUnhealthyRecordsByContainerIds(containerIds));
   }
 
   /**
@@ -397,7 +441,7 @@ public class ContainerHealthSchemaManager {
    */
   public List<UnhealthyContainerRecord> applyExistingInStateSince(
       List<UnhealthyContainerRecord> records,
-      Map<ContainerStateKey, Long> existingByContainerAndState) {
+      Map<ContainerStateKey, UnhealthyContainerRecord> existingByContainerAndState) {
     if (records == null || records.isEmpty()
         || existingByContainerAndState == null
         || existingByContainerAndState.isEmpty()) {
@@ -407,16 +451,16 @@ public class ContainerHealthSchemaManager {
     List<UnhealthyContainerRecord> withPreservedInStateSince =
         new ArrayList<>(records.size());
     for (UnhealthyContainerRecord record : records) {
-      Long existingInStateSince = existingByContainerAndState.get(
+      UnhealthyContainerRecord existingRecord = existingByContainerAndState.get(
           new ContainerStateKey(record.getContainerId(),
               record.getContainerState()));
-      if (existingInStateSince == null) {
+      if (existingRecord == null) {
         withPreservedInStateSince.add(record);
       } else {
         withPreservedInStateSince.add(new UnhealthyContainerRecord(
             record.getContainerId(),
             record.getContainerState(),
-            existingInStateSince,
+            existingRecord.getInStateSince(),
             record.getExpectedReplicaCount(),
             record.getActualReplicaCount(),
             record.getReplicaDelta(),

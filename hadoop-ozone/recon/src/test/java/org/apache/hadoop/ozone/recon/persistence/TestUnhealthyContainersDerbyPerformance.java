@@ -628,8 +628,8 @@ public class TestUnhealthyContainersDerbyPerformance {
     for (long id = 1; id <= replaceContainerCount; id++) {
       idsToReplace.add(id);
     }
-    Map<ContainerHealthSchemaManager.ContainerStateKey, Long> existing =
-        schemaManager.getExistingInStateSinceByContainerIds(idsToReplace);
+    Map<ContainerHealthSchemaManager.ContainerStateKey, UnhealthyContainerRecord> existing =
+        schemaManager.getExistingUnhealthyRecordsByContainerIds(idsToReplace);
     List<UnhealthyContainerRecord> replacementRecords =
         generateRecordsForRange(1, replaceContainerCount, replacementTimestamp);
 
@@ -683,11 +683,11 @@ public class TestUnhealthyContainersDerbyPerformance {
     }
 
     long start = System.nanoTime();
-    Map<ContainerHealthSchemaManager.ContainerStateKey, Long> existing =
-        schemaManager.getExistingInStateSinceByContainerIds(containerIds);
+    Map<ContainerHealthSchemaManager.ContainerStateKey, UnhealthyContainerRecord> existing =
+        schemaManager.getExistingUnhealthyRecordsByContainerIds(containerIds);
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
-    LOG.info("Large in-state-since lookup complete: {} container IDs -> {} rows in {} ms",
+    LOG.info("Large existing-record lookup complete: {} container IDs -> {} rows in {} ms",
         lookupCount, existing.size(), elapsedMs);
 
     assertEquals(expectedRecords, existing.size(),

@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -55,7 +54,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
 
   @Test
   public void testSyncInsertsNewUnhealthyRecords() {
-    Map<ContainerStateKey, Long> existing = Collections.emptyMap();
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = Collections.emptyMap();
     List<UnhealthyContainerRecord> desired = Arrays.asList(
         record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0),
         record(2L, UnHealthyContainerStates.UNDER_REPLICATED, ORIGINAL_TIMESTAMP, 3, 2));
@@ -72,10 +71,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
     insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED, ORIGINAL_TIMESTAMP, 3, 2));
     insert(record(2L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
 
-    Map<ContainerStateKey, Long> existing = existingMap(
-        key(1L, UnHealthyContainerStates.MISSING),
-        key(1L, UnHealthyContainerStates.UNDER_REPLICATED),
-        key(2L, UnHealthyContainerStates.MISSING));
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = existingFor(1L, 2L);
 
     // Container 1 recovered; container 2 still missing.
     List<UnhealthyContainerRecord> desired = Collections.singletonList(
@@ -91,8 +87,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
   public void testSyncUpdatesExistingRowAndDeletesChangedState() {
     insert(record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
 
-    Map<ContainerStateKey, Long> existing = existingMap(
-        key(1L, UnHealthyContainerStates.MISSING));
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = existingFor(1L);
 
     // Same container now under-replicated instead of missing.
     List<UnhealthyContainerRecord> desired = Collections.singletonList(
@@ -113,8 +108,7 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
     insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
         ORIGINAL_TIMESTAMP, 3, 2, "old reason"));
 
-    Map<ContainerStateKey, Long> existing = existingMap(
-        key(1L, UnHealthyContainerStates.UNDER_REPLICATED));
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = existingFor(1L);
 
     List<UnhealthyContainerRecord> desired = Collections.singletonList(
         record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
@@ -127,6 +121,48 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
     assertEquals(ORIGINAL_TIMESTAMP, row.getInStateSince());
     assertEquals(1, row.getActualReplicaCount());
     assertEquals("new reason", row.getReason());
+  }
+
+  @Test
+  public void testSyncDeletesScmStateButPreservesNonScmState() {
+    // Non-SCM state (ALL_REPLICAS_BAD) and an SCM state (MISSING) for the same container.
+    insert(record(1L, UnHealthyContainerStates.ALL_REPLICAS_BAD, ORIGINAL_TIMESTAMP, 3, 0));
+    insert(record(1L, UnHealthyContainerStates.MISSING, ORIGINAL_TIMESTAMP, 3, 0));
+
+    // The existing map only carries SCM-generated states; ALL_REPLICAS_BAD is excluded by the loader.
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = existingFor(1L);
+
+    // Current scan reports container 1 is no longer unhealthy in any SCM state.
+    List<UnhealthyContainerRecord> desired = Collections.emptyList();
+
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
+
+    assertEquals(0L, countByState(UnHealthyContainerStates.MISSING),
+        "SCM-generated MISSING row should be deleted when the container recovers");
+    assertEquals(1L, countByState(UnHealthyContainerStates.ALL_REPLICAS_BAD),
+        "Non-SCM ALL_REPLICAS_BAD row must be preserved by sync");
+    assertEquals(1L, countRows());
+  }
+
+  @Test
+  public void testSyncLeavesRowUnchangedWhenContentIdentical() {
+    insert(record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
+        ORIGINAL_TIMESTAMP, 3, 2, "reason"));
+
+    Map<ContainerStateKey, UnhealthyContainerRecord> existing = existingFor(1L);
+
+    // Desired result is identical to what is already persisted, so no write is needed.
+    List<UnhealthyContainerRecord> desired = Collections.singletonList(
+        record(1L, UnHealthyContainerStates.UNDER_REPLICATED,
+            ORIGINAL_TIMESTAMP, 3, 2, "reason"));
+
+    schemaManager.syncUnhealthyContainerRecordsAtomically(existing, desired);
+
+    assertEquals(1L, countRows());
+    UnhealthyContainerRecord row = fetchRow(1L, UnHealthyContainerStates.UNDER_REPLICATED);
+    assertEquals(ORIGINAL_TIMESTAMP, row.getInStateSince());
+    assertEquals(2, row.getActualReplicaCount());
+    assertEquals("reason", row.getReason());
   }
 
   @Test
@@ -156,16 +192,8 @@ public class TestContainerHealthSchemaManager extends AbstractReconSqlDBTest {
         expected, actual, expected - actual, reason);
   }
 
-  private ContainerStateKey key(long id, UnHealthyContainerStates state) {
-    return new ContainerStateKey(id, state.toString());
-  }
-
-  private Map<ContainerStateKey, Long> existingMap(ContainerStateKey... keys) {
-    Map<ContainerStateKey, Long> existing = new HashMap<>();
-    for (ContainerStateKey key : keys) {
-      existing.put(key, ORIGINAL_TIMESTAMP);
-    }
-    return existing;
+  private Map<ContainerStateKey, UnhealthyContainerRecord> existingFor(Long... ids) {
+    return schemaManager.getExistingUnhealthyRecordsByContainerIds(Arrays.asList(ids));
   }
 
   private List<Long> remainingContainerIds() {
