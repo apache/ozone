@@ -86,7 +86,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -213,7 +212,6 @@ public final class HddsServerUtil {
   public static boolean isValidInetForCsr(InetAddress addr) {
     return !addr.isAnyLocalAddress()
         && !addr.isLoopbackAddress()
-        && InetAddressValidator.getInstance().isValid(addr.getHostAddress())
         && !isScopedOrMaskingIPv6Address(addr);
   }
 
