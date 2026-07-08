@@ -660,6 +660,7 @@ message ContainerBalancerStatusInfoProto {
   repeated ContainerBalancerTaskIterationStatusInfoProto iterationsStatusInfo = 3;
   optional uint64 stoppedAt = 4;
   optional string stopReason = 5;
+  optional string stopMessage = 6;
 }
 
 message ContainerBalancerTaskIterationStatusInfoProto {

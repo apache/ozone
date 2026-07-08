@@ -343,7 +343,10 @@ public class TestContainerBalancer {
 
     ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
     assertNotNull(statusInfo);
-    assertEquals("STOPPED_BY_USER", statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.name(),
+        statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.getMessage(),
+        statusInfo.getStopMessage());
     assertNotNull(statusInfo.getStoppedAt());
     assertFalse(statusInfo.getConfiguration().getShouldRun());
     assertFalse(containerBalancer.isBalancerRunning());
@@ -361,7 +364,10 @@ public class TestContainerBalancer {
 
     ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
     assertNotNull(statusInfo);
-    assertEquals("STOPPED_ON_SCM_STATE_CHANGE", statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.SCM_STATE_CHANGE.name(),
+        statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.SCM_STATE_CHANGE.getMessage(),
+        statusInfo.getStopMessage());
     assertNotNull(statusInfo.getStoppedAt());
   }
 

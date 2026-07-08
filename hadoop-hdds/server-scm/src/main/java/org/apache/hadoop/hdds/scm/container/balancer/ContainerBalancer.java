@@ -204,7 +204,8 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
             config.toProtobufBuilder().setShouldRun(false).build(),
             task.getCurrentIterationsStatistic(),
             task.getStoppedAt(),
-            task.getStopReason()
+            task.getStopReason(),
+            task.getStopMessage()
         );
       }
       return null;
@@ -371,7 +372,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
         return;
       }
       LOG.info("Trying to stop ContainerBalancer in this SCM.");
-      task.recordStopReason("STOPPED_ON_SCM_STATE_CHANGE");
+      task.recordStopReason(ContainerBalancerStopReason.SCM_STATE_CHANGE);
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -412,7 +413,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
       saveConfiguration(config, false, 0);
       if (isBalancerRunning()) {
         LOG.info("Trying to stop ContainerBalancer service.");
-        task.recordStopReason("STOPPED_BY_USER");
+        task.recordStopReason(ContainerBalancerStopReason.USER_REQUESTED);
         task.stop();
         balancingThread = currentBalancingThread;
       }

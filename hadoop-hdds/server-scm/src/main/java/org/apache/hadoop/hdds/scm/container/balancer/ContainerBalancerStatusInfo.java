@@ -32,12 +32,13 @@ public class ContainerBalancerStatusInfo {
   private final List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo;
   private final OffsetDateTime stoppedAt;
   private final String stopReason;
+  private final String stopMessage;
 
   public ContainerBalancerStatusInfo(
           OffsetDateTime startedAt,
           HddsProtos.ContainerBalancerConfigurationProto configuration,
           List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo) {
-    this(startedAt, configuration, iterationsStatusInfo, null, null);
+    this(startedAt, configuration, iterationsStatusInfo, null, null, null);
   }
 
   public ContainerBalancerStatusInfo(
@@ -45,12 +46,14 @@ public class ContainerBalancerStatusInfo {
           HddsProtos.ContainerBalancerConfigurationProto configuration,
           List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo,
           OffsetDateTime stoppedAt,
-          String stopReason) {
+          String stopReason,
+          String stopMessage) {
     this.startedAt = startedAt;
     this.configuration = configuration;
     this.iterationsStatusInfo = iterationsStatusInfo;
     this.stoppedAt = stoppedAt;
     this.stopReason = stopReason;
+    this.stopMessage = stopMessage;
   }
 
   public OffsetDateTime getStartedAt() {
@@ -71,6 +74,10 @@ public class ContainerBalancerStatusInfo {
 
   public String getStopReason() {
     return stopReason;
+  }
+
+  public String getStopMessage() {
+    return stopMessage;
   }
 
   /**
@@ -94,6 +101,9 @@ public class ContainerBalancerStatusInfo {
     }
     if (stopReason != null) {
       builder.setStopReason(stopReason);
+    }
+    if (stopMessage != null) {
+      builder.setStopMessage(stopMessage);
     }
     return builder.build();
   }

@@ -63,9 +63,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       System.out.println("ContainerBalancer is Running.");
     } else if (response.hasContainerBalancerStatusInfo()) {
       System.out.println("ContainerBalancer is Not Running.");
-      if (balancerStatusInfo.hasStopReason()) {
-        System.out.printf("Stop reason: %s%n", balancerStatusInfo.getStopReason());
-      }
+      printStopReasonAndMessage(balancerStatusInfo);
     } else {
       System.out.println("ContainerBalancer is Not Running.");
     }
@@ -99,6 +97,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList = 
         balancerStatusInfo.getIterationsStatusInfoList();
 
+    ContainerBalancerTaskIterationStatusInfoProto lastIterationStatistic = null;
     if (isRunning) {
       System.out.println("Current iteration info:");
       ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
@@ -115,7 +114,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       }
     } else {
       System.out.println("Last iteration info:");
-      ContainerBalancerTaskIterationStatusInfoProto lastIterationStatistic = iterationsStatusInfoList.stream()
+      lastIterationStatistic = iterationsStatusInfoList.stream()
           .filter(it -> !it.getIterationResult().isEmpty())
           .reduce((first, second) -> second)
           .orElse(null);
@@ -130,14 +129,31 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     }
 
     if (verboseWithHistory) {
-      System.out.println("Iteration history list:");
-      System.out.println(
-          iterationsStatusInfoList
-              .stream()
-              .filter(it -> !it.getIterationResult().isEmpty())
-              .map(this::getPrettyIterationStatusInfo)
-              .collect(Collectors.joining(System.lineSeparator()))
-      );
+      System.out.println("Completed iteration history:");
+      final int lastCompletedIterationNumber = lastIterationStatistic == null
+          ? -1
+          : lastIterationStatistic.getIterationNumber();
+      String history = iterationsStatusInfoList
+          .stream()
+          .filter(it -> !it.getIterationResult().isEmpty())
+          .filter(it -> isRunning || it.getIterationNumber() != lastCompletedIterationNumber)
+          .map(this::getPrettyIterationStatusInfo)
+          .collect(Collectors.joining(System.lineSeparator()));
+      if (history.isEmpty()) {
+        System.out.println("-");
+      } else {
+        System.out.println(history);
+      }
+      System.out.println();
+    }
+  }
+
+  private void printStopReasonAndMessage(ContainerBalancerStatusInfoProto balancerStatusInfo) {
+    if (balancerStatusInfo.hasStopReason()) {
+      System.out.printf("Stop reason: %s%n", balancerStatusInfo.getStopReason());
+    }
+    if (balancerStatusInfo.hasStopMessage()) {
+      System.out.printf("Message: %s%n", balancerStatusInfo.getStopMessage());
     }
   }
 

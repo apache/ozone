@@ -165,9 +165,13 @@ class TestContainerBalancerSubCommand {
   private AtomicBoolean verbose;
 
   private static final Pattern STOP_REASON = Pattern.compile(
-      "^Stop reason: STOPPED_BY_USER$", Pattern.MULTILINE);
+      "^Stop reason: USER_REQUESTED$", Pattern.MULTILINE);
+  private static final Pattern STOP_MESSAGE = Pattern.compile(
+      "^Message: Stopped by user request\\.$", Pattern.MULTILINE);
   private static final Pattern COMPLETED_ALL_ITERATIONS_STOP_REASON = Pattern.compile(
-      "^Stop reason: Completed all iterations\\.$", Pattern.MULTILINE);
+      "^Stop reason: COMPLETED_ALL_ITERATIONS$", Pattern.MULTILINE);
+  private static final Pattern COMPLETED_ALL_ITERATIONS_STOP_MESSAGE = Pattern.compile(
+      "^Message: Completed all configured number of iterations\\.$", Pattern.MULTILINE);
   private static final Pattern STOPPED_AT = Pattern.compile(
       "^Stopped at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
   
@@ -317,13 +321,14 @@ class TestContainerBalancerSubCommand {
    * Builds a stopped-balancer response.
    *
    * @param config configuration
-   * @param stopReason stop reason to expose in status
+   * @param stopReason stop reason
+   * @param stopMessage stop message
    * @param lastIterationResult result for iteration 3, e.g. ITERATION_INTERRUPTED or ITERATION_COMPLETED
    * @param balancingDurationSeconds wall-clock duration between startedAt and stoppedAt
    */
   private static ContainerBalancerStatusInfoResponseProto getStoppedStatusInfoResponseProto(
-      ContainerBalancerConfiguration config, String stopReason, String lastIterationResult,
-      long balancingDurationSeconds) {
+      ContainerBalancerConfiguration config, String stopReason, String stopMessage,
+      String lastIterationResult, long balancingDurationSeconds) {
     ContainerBalancerStatusInfoProto runningInfo =
         getContainerBalancerStatusInfoResponseProto(config).getContainerBalancerStatusInfo();
 
@@ -339,6 +344,7 @@ class TestContainerBalancerSubCommand {
         .setStartedAt(startedAt)
         .setStoppedAt(stoppedAt)
         .setStopReason(stopReason)
+        .setStopMessage(stopMessage)
         .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
         .clearIterationsStatusInfo()
         .addIterationsStatusInfo(runningInfo.getIterationsStatusInfo(0))
@@ -408,7 +414,7 @@ class TestContainerBalancerSubCommand {
     assertThat(out.get()).containsPattern(IS_RUNNING)
         .doesNotContain(BALANCER_CONFIG_OUTPUT)
         .doesNotContain(currentIterationOutput)
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -469,7 +475,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(STARTED_AT)
         .containsPattern(DURATION)
         .contains(BALANCER_CONFIG_OUTPUT)
-        .contains("Iteration history list:")
+        .contains("Completed iteration history:")
         .contains(firstHistoryIterationOutput)
         .contains(secondHistoryIterationOutput);
   }
@@ -514,7 +520,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(DURATION)
         .contains(BALANCER_CONFIG_OUTPUT)
         .contains(currentIterationOutput)
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -600,15 +606,17 @@ class TestContainerBalancerSubCommand {
     ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
     when(scmClient.getContainerBalancerStatusInfo())
         .thenReturn(getStoppedStatusInfoResponseProto(
-            config, "STOPPED_BY_USER", "ITERATION_INTERRUPTED", 1070L));
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
     statusCmd.execute(scmClient);
     assertThat(out.get())
         .containsPattern(IS_NOT_RUNNING)
         .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
         .doesNotContain(BALANCER_CONFIG_OUTPUT)
         .doesNotContain("Last iteration info:")
         .doesNotContain("Stopped at:")
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -617,20 +625,22 @@ class TestContainerBalancerSubCommand {
     ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
     when(scmClient.getContainerBalancerStatusInfo())
         .thenReturn(getStoppedStatusInfoResponseProto(
-            config, "STOPPED_BY_USER", "ITERATION_INTERRUPTED", 1070L));
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
     verbose.set(true);
     statusCmd.execute(scmClient);
 
     assertThat(out.get())
         .containsPattern(IS_NOT_RUNNING)
         .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
         .containsPattern(STARTED_AT)
         .containsPattern(STOPPED_AT)
         .contains(BALANCER_CONFIG_OUTPUT)
         .contains("Last iteration info:")
         .contains(ITERATION_3_INTERRUPTED_OUTPUT)
         .doesNotContain("Current iteration info:")
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -639,7 +649,8 @@ class TestContainerBalancerSubCommand {
     ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
     when(scmClient.getContainerBalancerStatusInfo())
         .thenReturn(getStoppedStatusInfoResponseProto(
-            config, "STOPPED_BY_USER", "ITERATION_INTERRUPTED", 1070L));
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
     CommandLine cmd = new CommandLine(statusCmd);
     verbose.set(true);
     cmd.parseArgs("--history");
@@ -647,13 +658,14 @@ class TestContainerBalancerSubCommand {
 
     String output = out.get();
     int lastIterationStart = output.indexOf("Last iteration info:");
-    int historyStart = output.indexOf("Iteration history list:");
+    int historyStart = output.indexOf("Completed iteration history:");
     String lastIterationSection = output.substring(lastIterationStart, historyStart);
     String historySection = output.substring(historyStart);
 
     assertThat(output)
         .containsPattern(IS_NOT_RUNNING)
         .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
         .containsPattern(STARTED_AT)
         .containsPattern(STOPPED_AT)
         .contains(BALANCER_CONFIG_OUTPUT)
@@ -662,7 +674,7 @@ class TestContainerBalancerSubCommand {
     assertThat(historySection)
         .contains(ITERATION_1_COMPLETED_OUTPUT)
         .contains(ITERATION_2_COMPLETED_OUTPUT)
-        .contains(ITERATION_3_INTERRUPTED_OUTPUT);
+        .doesNotContain(ITERATION_3_INTERRUPTED_OUTPUT);
   }
 
   @Test
@@ -671,8 +683,9 @@ class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
     when(scmClient.getContainerBalancerStatusInfo())
-        .thenReturn(getStoppedStatusInfoResponseProto(config, "Completed all iterations.",
-            "ITERATION_COMPLETED", 1070L));
+        .thenReturn(getStoppedStatusInfoResponseProto(config, "COMPLETED_ALL_ITERATIONS",
+            "Completed all configured number of iterations.", "ITERATION_COMPLETED",
+            1070L));
 
     CommandLine cmd = new CommandLine(statusCmd);
     verbose.set(true);
@@ -681,13 +694,14 @@ class TestContainerBalancerSubCommand {
 
     String output = out.get();
     int lastIterationStart = output.indexOf("Last iteration info:");
-    int historyStart = output.indexOf("Iteration history list:");
+    int historyStart = output.indexOf("Completed iteration history:");
     String lastIterationSection = output.substring(lastIterationStart, historyStart);
     String historySection = output.substring(historyStart);
 
     assertThat(output)
         .containsPattern(IS_NOT_RUNNING)
         .containsPattern(COMPLETED_ALL_ITERATIONS_STOP_REASON)
+        .containsPattern(COMPLETED_ALL_ITERATIONS_STOP_MESSAGE)
         .containsPattern(STARTED_AT)
         .containsPattern(STOPPED_AT)
         .contains(BALANCER_CONFIG_OUTPUT)
@@ -696,6 +710,6 @@ class TestContainerBalancerSubCommand {
     assertThat(historySection)
         .contains(ITERATION_1_COMPLETED_OUTPUT)
         .contains(ITERATION_2_COMPLETED_OUTPUT)
-        .contains(ITERATION_3_COMPLETED_OUTPUT);
+        .doesNotContain(ITERATION_3_COMPLETED_OUTPUT);
   }
 }
