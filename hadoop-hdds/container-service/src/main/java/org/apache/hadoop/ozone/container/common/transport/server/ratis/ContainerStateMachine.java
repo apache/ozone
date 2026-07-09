@@ -160,6 +160,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private final Semaphore applyTransactionSemaphore;
   private final boolean waitOnBothFollowers;
+  private final boolean datastreamPutBlockEnabled;
   private final HddsDatanodeService datanodeService;
   private static Semaphore semaphore = new Semaphore(1);
   private final AtomicBoolean peersValidated;
@@ -301,6 +302,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
+
+    this.datastreamPutBlockEnabled = conf.getObject(
+        DatanodeConfiguration.class).isDatastreamPutBlockEnabled();
 
     this.writeChunkWaitMaxNs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
         ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT, TimeUnit.NANOSECONDS);
@@ -742,6 +746,15 @@ public class ContainerStateMachine extends BaseStateMachine {
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .build();
         DataChannel channel = getStreamDataChannel(requestProto, context);
+        if (datastreamPutBlockEnabled && channel instanceof KeyValueStreamDataChannel) {
+          final KeyValueStreamDataChannel kvChannel = (KeyValueStreamDataChannel) channel;
+          kvChannel.setDatastreamPutBlockEnabled(true);
+          kvChannel.setPutBlockProcessor(req -> dispatchCommand(req,
+              DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
+                  .setStage(DispatcherContext.WriteChunkStage.COMBINED)
+                  .setContainer2BCSIDMap(container2BCSIDMap)
+                  .build()));
+        }
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
         return new LocalStream(channel, chunkExecutor);
@@ -773,8 +786,20 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-    kvStreamDataChannel.setLinked();
-    return CompletableFuture.completedFuture(null);
+
+    if (datastreamPutBlockEnabled) {
+      // The PutBlock should be commited when the stream is closed thus
+      // we expect this stream has been marked as linked.
+      if (kvStreamDataChannel.isLinked()) {
+        return CompletableFuture.completedFuture(null);
+      } else {
+        return JavaUtils.completeExceptionally(new IllegalStateException(
+            "PutBlock was not committed on stream close: " + kvStreamDataChannel));
+      }
+    } else {
+      kvStreamDataChannel.setLinked();
+      return CompletableFuture.completedFuture(null);
+    }
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {

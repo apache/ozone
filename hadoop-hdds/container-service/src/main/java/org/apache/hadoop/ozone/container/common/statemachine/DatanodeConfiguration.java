@@ -535,6 +535,17 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   private boolean waitOnAllFollowers = WAIT_ON_ALL_FOLLOWERS_DEFAULT;
 
+  public static final String HDDS_DATANODE_DATASTREAM_PUTBLOCK_ENABLED =
+      CONFIG_PREFIX + ".datastream.putblock.enabled";
+
+  @Config(key = "hdds.datanode.datastream.putblock.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "When enabled, PutBlock is committed when a Ratis data stream " +
+          "closes instead of via the Raft WriteAsync path.")
+  private boolean datastreamPutBlockEnabled = false;
+
   @Config(key = "hdds.datanode.container.schema.v3.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
@@ -1309,5 +1320,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setGrpcSoBacklog(int grpcSoBacklog) {
     this.grpcSoBacklog = grpcSoBacklog;
+  }
+
+  public boolean isDatastreamPutBlockEnabled() {
+    return datastreamPutBlockEnabled;
+  }
+
+  public void setDatastreamPutBlockEnabled(boolean datastreamPutBlockEnabled) {
+    this.datastreamPutBlockEnabled = datastreamPutBlockEnabled;
   }
 }

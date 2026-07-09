@@ -359,4 +359,21 @@ public class TestDatanodeConfiguration {
 
     assertEquals(512, subject.getGrpcSoBacklog());
   }
+
+  @Test
+  void testDatastreamPutBlockEnabledDefault() {
+    DatanodeConfiguration subject = new OzoneConfiguration()
+        .getObject(DatanodeConfiguration.class);
+    assertThat(subject.isDatastreamPutBlockEnabled()).isFalse();
+  }
+
+  @Test
+  void testDatastreamPutBlockConfigParsing() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(DatanodeConfiguration.HDDS_DATANODE_DATASTREAM_PUTBLOCK_ENABLED, true);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertThat(subject.isDatastreamPutBlockEnabled()).isTrue();
+  }
 }
