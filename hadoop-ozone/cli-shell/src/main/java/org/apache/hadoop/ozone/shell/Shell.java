@@ -99,9 +99,9 @@ public abstract class Shell extends GenericCli {
       return 0;
     }
 
-    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = spec.name() + " " + String.join(" ", parseResult.originalArgs());
-    return TracingUtil.executeInNewSpan(spanName, () -> new CommandLine.RunLast().execute(parseResult));
+    return TracingUtil.execute("shell", spanName, getOzoneConf(),
+        () -> new CommandLine.RunLast().execute(parseResult));
   }
 
   private void installBatchExceptionHandler() {

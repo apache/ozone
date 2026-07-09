@@ -1,0 +1,1766 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SCM Prometheus `/prom`: JVM (filtered by **`instance=~\"$scm\"`** (Prometheus scrape target = Hadoop **`hostname`** + port)), SCM service counters (block location / container manager / block delete), Apache Ratis (SCM scrape only via join to **`processname`** = **`StorageContainerManager`** heap **`instance`**), replication manager. Metric names follow `PrometheusMetricsSinkUtil` normalization.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": [],
+      "title": "JVM",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_cpu_jvm_load{instance=~\"$scm\"}\n*\non(instance) group_left()\nclamp_max(jvm_metrics_mem_heap_used_m{instance=~\"$scm\", processname=\"StorageContainerManager\"}, 1)",
+          "legendFormat": "JVM \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_cpu_system_load{instance=~\"$scm\"}\n*\non(instance) group_left()\nclamp_max(jvm_metrics_mem_heap_used_m{instance=~\"$scm\", processname=\"StorageContainerManager\"}, 1)",
+          "legendFormat": "system \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "JVM CPU load",
+      "type": "timeseries",
+      "description": "CpuJvmLoad may not carry **`processname`**. **`instance=~\"$scm\"`** selects the SCM **`/prom`** scrape target; CPU series are gated with **`StorageContainerManager`** heap on the same **`instance`**."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "decmbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_used_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "used \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_committed_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "committed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_max_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "max \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Heap \u2014 used / committed / max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "decmbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_used_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "used \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_committed_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "committed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_max_m{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "max \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Non-heap (native / metaspace) \u2014 used / committed / max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis{instance=~\"$scm\",processname=\"StorageContainerManager\"}[1m]) / 60000",
+          "legendFormat": "total \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis_g1_young_generation{instance=~\"$scm\",processname=\"StorageContainerManager\"}[1m]) / 60000",
+          "legendFormat": "G1 young \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis_g1_old_generation{instance=~\"$scm\",processname=\"StorageContainerManager\"}[1m]) / 60000",
+          "legendFormat": "G1 old \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "GC time (fraction of wall per minute)",
+      "type": "timeseries",
+      "description": "Assumes **`G1`** JVM GC metric splits; stacks using **ZGC**/**Parallel** expose different **`jvm_metrics_gc_*`** suffixes."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count{instance=~\"$scm\",processname=\"StorageContainerManager\"}[$__rate_interval])",
+          "legendFormat": "total \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count_g1_young_generation{instance=~\"$scm\",processname=\"StorageContainerManager\"}[$__rate_interval])",
+          "legendFormat": "G1 young \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count_g1_old_generation{instance=~\"$scm\",processname=\"StorageContainerManager\"}[$__rate_interval])",
+          "legendFormat": "G1 old \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "GC count rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "netty_metrics_used_direct_mem{instance=~\"$scm\"}",
+          "legendFormat": "used \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "netty_metrics_max_direct_mem{instance=~\"$scm\"}",
+          "legendFormat": "max \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Netty direct memory \u2014 used / max",
+      "type": "timeseries",
+      "description": "Direct memory gauges tagged **`hostname`** (**`processname`** absent)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 55,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisLabel": "Thread count"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_new{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "new \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_runnable{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "runnable \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_blocked{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "blocked \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_waiting{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "waiting \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_timed_waiting{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "timed_waiting \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_terminated{instance=~\"$scm\",processname=\"StorageContainerManager\"}",
+          "legendFormat": "terminated \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "Thread count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisLabel": "Threads"
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Queued tasks"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_thread_count{instance=~\"$scm\",server_name=~\"scm\"} or http_server2_metrics_http_server_thread_count{instance=~\"$scm\",servername=~\"scm\"})",
+          "legendFormat": "live \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_idle_thread_count{instance=~\"$scm\",server_name=~\"scm\"} or http_server2_metrics_http_server_idle_thread_count{instance=~\"$scm\",servername=~\"scm\"})",
+          "legendFormat": "idle \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_max_thread_count{instance=~\"$scm\",server_name=~\"scm\"} or http_server2_metrics_http_server_max_thread_count{instance=~\"$scm\",servername=~\"scm\"})",
+          "legendFormat": "max \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_thread_queue_waiting_task_count{instance=~\"$scm\",server_name=~\"scm\"} or http_server2_metrics_http_server_thread_queue_waiting_task_count{instance=~\"$scm\",servername=~\"scm\"})",
+          "legendFormat": "queue (waiting) \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Jetty http server threads",
+      "type": "timeseries",
+      "description": "SCM registers Jetty **`BaseHttpServer`** name **`scm`**. **`server_name`** vs **`servername`** label compatibility via **`or`**, matching **OM Overview** style."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 35,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname,servername)(rpc_num_open_connections{context=\"rpc\",instance=~\"$scm\"})",
+          "legendFormat": "{{servername}} \u00b7 open TCP",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "RPC open connections",
+      "description": "**`rpc_num_open_connections`** gauge (`context=\"rpc\"`): live TCP RPC connections (former **right** axis series).",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 10,
+      "panels": [],
+      "title": "CM service counters/gauges",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, type) (rate(scm_block_location_protocol_counter{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "{{type}} \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Block location throughput by RPC type",
+      "type": "timeseries",
+      "description": "**`scm_block_location_protocol_counter`** aggregates client calls hitting **`ScmBlockLocationProtocolService`** (**`AllocateScmBlock`**, \u2026)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 88
+      },
+      "id": 39,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, type) (\n    rate(scm_block_location_protocol_time{instance=~\"$scm\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, type) (\n    clamp_min(\n      rate(scm_block_location_protocol_counter{instance=~\"$scm\"}[$__rate_interval]),\n      1e-12\n    )\n  )\n)",
+          "legendFormat": "{{type}} \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Block location latency by RPC type",
+      "type": "timeseries",
+      "description": "Mean handler time per **`ScmBlockLocationProtocol`** RPC type \u2248 **`rate(scm_block_location_protocol_time)` / `rate(scm_block_location_protocol_counter)`**. **`time`** is cumulative monotonic **milliseconds** from **`ProtocolMessageMetrics`**."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 96
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "scm_block_location_protocol_concurrency{instance=~\"$scm\"}",
+          "legendFormat": "concurrency \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Block location concurrency (in-flight RPC hint)",
+      "type": "timeseries",
+      "description": "Exporter types this as **`counter`** in some builds; SCM sets it as concurrent RPC usage **hint** (**`ConcurrencyContext`)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 104
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (\n  rate(scm_block_deleting_service_num_block_deletion_command_sent[$__rate_interval])\n  and on (hostname)\n  sum by (hostname) (\n    clamp_max(\n      jvm_metrics_mem_heap_used_m{\n        instance=~\"$scm\",\n        processname=\"StorageContainerManager\"\n      },\n      1\n    )\n  )\n)",
+          "legendFormat": "commands sent \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (\n  rate(scm_block_deleting_service_num_block_deletion_command_success[$__rate_interval])\n  and on (hostname)\n  sum by (hostname) (\n    clamp_max(\n      jvm_metrics_mem_heap_used_m{\n        instance=~\"$scm\",\n        processname=\"StorageContainerManager\"\n      },\n      1\n    )\n  )\n)",
+          "legendFormat": "success \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (\n  rate(scm_block_deleting_service_num_block_deletion_command_failure[$__rate_interval])\n  and on (hostname)\n  sum by (hostname) (\n    clamp_max(\n      jvm_metrics_mem_heap_used_m{\n        instance=~\"$scm\",\n        processname=\"StorageContainerManager\"\n      },\n      1\n    )\n  )\n)",
+          "legendFormat": "failure \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (\n  rate(scm_block_deleting_service_num_block_deletion_transaction_completed[$__rate_interval])\n  and on (hostname)\n  sum by (hostname) (\n    clamp_max(\n      jvm_metrics_mem_heap_used_m{\n        instance=~\"$scm\",\n        processname=\"StorageContainerManager\"\n      },\n      1\n    )\n  )\n)",
+          "legendFormat": "transactions completed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Block deleting service throughput",
+      "type": "timeseries",
+      "description": "**`scm_block_deleting_service_*`** counters are tagged **`hostname`** only on Metrics2 export (no **`instance`** in `/prom` text). **`$scm`** selects the Prometheus scrape **`instance`** on JVM heap; this panel **`and on (hostname)`** gates delete rates to the matching SCM host. Flat **0 ops/s** is normal when no keys/blocks are being deleted."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(scm_container_manager_metrics_num_successful_create_containers{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "create ok \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(scm_container_manager_metrics_num_failure_create_containers{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "create fail \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(scm_container_manager_metrics_num_successful_delete_containers{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "delete ok \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(scm_container_manager_metrics_num_failure_delete_containers{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "delete fail \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(scm_container_manager_metrics_num_container_reports_processed_successful{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "container reports processed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "SCM Container Manager throughput",
+      "type": "timeseries",
+      "description": "Prometheus emits **flat counter names** (**`scm_container_manager_metrics_*`**) without Hadoop **`_num_ops`** suffix fragments for these fields."
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 120
+      },
+      "id": 15,
+      "panels": [],
+      "title": "SCM Ratis",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 121
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(ratis_log_worker_appendEntryCount{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "appendEntry \u00b7 {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(ratis_log_worker_flushCount{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "flush \u00b7 {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(ratis_server_clientWriteRequest{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "clientWrite \u00b7 {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(ratis_server_clientReadRequest{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "clientRead \u00b7 {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(ratis_server_numFailedClientWriteOnServer{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "failedClientWrite \u00b7 {{instance}}",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Ratis Operations rate",
+      "type": "timeseries",
+      "description": "Dropwizard **`ratis_*`** metrics (same export path as OM/DN via **`RatisDropwizardExports`**). Filter **`instance=~\"$scm\"`** on the SCM **`/prom`** scrape target; **`sum by (hostname, instance)`** aggregates Ratis **`exported_instance`** / **`group`** shards into one line per SCM."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ns"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 130
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (ratis_log_worker_appendEntryLatency{instance=~\"$scm\"})",
+          "legendFormat": "appendEntryLatency \u00b7 {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (ratis_server_follower_entry_latency{instance=~\"$scm\"})",
+          "legendFormat": "followerEntryLatency \u00b7 {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (ratis_log_worker_syncTime{instance=~\"$scm\"})",
+          "legendFormat": "logSyncTime \u00b7 {{instance}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Ratis Operations latency",
+      "type": "timeseries",
+      "description": "Dropwizard **`ratis_*`** metrics (same export path as OM/DN via **`RatisDropwizardExports`**). Filter **`instance=~\"$scm\"`** on the SCM **`/prom`** scrape target; **`sum by (hostname, instance)`** aggregates Ratis **`exported_instance`** / **`group`** shards into one line per SCM. Timer snapshot values (**ns**); **`sum by (instance)`** merges quantile shards like the DataNode overview."
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 139
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Container replication/deletion/ec-reconstruction/ec-deletion",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 140
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_replication_cmds_sent_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "std replication cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_deletion_cmds_sent_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "delete cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_ec_deletion_cmds_sent_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "EC delete cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_ec_reconstruction_cmds_sent_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "EC reconstruction cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_ec_replication_cmds_sent_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "EC replication cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_delete_container_cmds_deferred_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "defer delete cmds \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname) (rate(replication_manager_metrics_ec_reconstruction_cmds_deferred_total{instance=~\"$scm\"}[$__rate_interval]))",
+          "legendFormat": "defer EC reconstruction \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "G"
+        }
+      ],
+      "title": "Replication manager workload (cmds / s)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 148
+      },
+      "id": 38,
+      "panels": [],
+      "title": "Container lifecycle",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 149
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_open_containers{instance=~\"$scm\"}",
+          "legendFormat": "open \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_closing_containers{instance=~\"$scm\"}",
+          "legendFormat": "closing \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_quasi_closed_containers{instance=~\"$scm\"}",
+          "legendFormat": "quasi-closed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_closed_containers{instance=~\"$scm\"}",
+          "legendFormat": "closed \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_deleting_containers{instance=~\"$scm\"}",
+          "legendFormat": "deleting \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_deleted_containers{instance=~\"$scm\"}",
+          "legendFormat": "deleted \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "replication_manager_metrics_recovering_containers{instance=~\"$scm\"}",
+          "legendFormat": "recovering \u00b7 {{hostname}}",
+          "range": true,
+          "refId": "G"
+        }
+      ],
+      "title": "Containers in states",
+      "type": "timeseries",
+      "description": "Snapshot gauges from **`ReplicationManagerMetrics`** **`LIFECYCLE_STATE_METRICS`**: all **`HddsProtos.LifeCycleState`** counts on SCM **`/prom`** (**`replication_manager_metrics_*_containers`**)."
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "ozone",
+    "scm",
+    "overview",
+    "jvm",
+    "prometheus",
+    "metrics2",
+    "ratis"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus"
+        },
+        "definition": "label_values(jvm_metrics_mem_heap_used_m{processname=\"StorageContainerManager\"}, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "SCM",
+        "multi": true,
+        "name": "scm",
+        "options": [],
+        "query": {
+          "query": "label_values(jvm_metrics_mem_heap_used_m{processname=\"StorageContainerManager\"}, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Ozone - SCM overview",
+  "uid": "ozone-scm-overview",
+  "version": 40,
+  "weekStart": ""
+}

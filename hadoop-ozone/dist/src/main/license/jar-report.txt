@@ -225,7 +225,6 @@ share/ozone/lib/opentelemetry-exporter-otlp-common.jar
 share/ozone/lib/opentelemetry-exporter-otlp.jar
 share/ozone/lib/opentelemetry-exporter-sender-okhttp.jar
 share/ozone/lib/opentelemetry-sdk-common.jar
-share/ozone/lib/opentelemetry-sdk-extension-autoconfigure-spi.jar
 share/ozone/lib/opentelemetry-sdk-logs.jar
 share/ozone/lib/opentelemetry-sdk-metrics.jar
 share/ozone/lib/opentelemetry-sdk-trace.jar

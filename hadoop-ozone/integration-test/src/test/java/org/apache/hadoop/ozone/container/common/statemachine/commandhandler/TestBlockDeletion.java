@@ -220,12 +220,12 @@ public class TestBlockDeletion {
 
     String keyName = UUID.randomUUID().toString();
 
-    OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, repConfig, new HashMap<>());
-    for (int i = 0; i < 10; i++) {
-      out.write(value.getBytes(UTF_8));
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, repConfig, new HashMap<>())) {
+      for (int i = 0; i < 10; i++) {
+        out.write(value.getBytes(UTF_8));
+      }
     }
-    out.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -234,7 +234,7 @@ public class TestBlockDeletion {
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
         om.lookupKey(keyArgs).getKeyLocationVersions();
 
-    // verify key blocks were created in DN.
+    // Verify key blocks were created in DN.
     GenericTestUtils.waitFor(() -> {
       try {
         scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
@@ -250,7 +250,7 @@ public class TestBlockDeletion {
     // Delete transactionIds for the containers should be 0.
     // NOTE: this test assumes that all the container is KetValueContainer. If
     // other container types is going to be added, this test should be checked.
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(0L,
         metrics.getNumBlockDeletionTransactionCreated());
@@ -263,7 +263,7 @@ public class TestBlockDeletion {
         e.getMessage().startsWith("expected: <null> but was:"));
 
     assertEquals(0L, metrics.getNumBlockDeletionTransactionsOnDatanodes());
-    // close the containers which hold the blocks for the key
+    // Close the containers which hold the blocks for the key.
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // If any container present as not closed, i.e. matches some entry
@@ -293,8 +293,9 @@ public class TestBlockDeletion {
 
     // Few containers with deleted blocks
     assertThat(containerIdsWithDeletedBlocks).isNotEmpty();
-    // Containers in the DN and SCM should have same delete transactionIds
-    matchContainerTransactionIds();
+    // DN-side delete transactionIds should advance after deletion. SCM-side
+    // ContainerInfo deleteTransactionId is not updated by DeletedBlockLog.
+    verifyDeleteTransactionIds();
 
     // Verify transactions committed
     GenericTestUtils.waitFor(() -> {
@@ -308,11 +309,10 @@ public class TestBlockDeletion {
       }
     }, 500, 10000);
 
-    // Containers in the DN and SCM should have same delete transactionIds
-    // after DN restart. The assertion is just to verify that the state of
-    // containerInfos in dn and scm is consistent after dn restart.
+    // After DN restart, delete transactionIds should remain persisted on DN.
+    // SCM-side ContainerInfo deleteTransactionId should remain unchanged.
     cluster.restartHddsDatanode(0, true);
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
@@ -353,11 +353,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -464,11 +464,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -494,7 +494,7 @@ public class TestBlockDeletion {
     // Wait for container to close
     TestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
-    // make sure the containers are closed on the dn
+    // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
       locationInfo.forEach(
@@ -508,14 +508,14 @@ public class TestBlockDeletion {
         containerInfos.get(0).getContainerID());
     // Before restart container state is non-empty
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
 
     // After restart also container state remains non-empty.
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Delete key
@@ -535,14 +535,14 @@ public class TestBlockDeletion {
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
     // Container state should be empty even after restart
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     GenericTestUtils.waitFor(() -> {
@@ -594,11 +594,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -624,7 +624,7 @@ public class TestBlockDeletion {
     // Wait for container to close
     TestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
-    // make sure the containers are closed on the dn
+    // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
       locationInfo.forEach(
@@ -716,7 +716,7 @@ public class TestBlockDeletion {
     }
   }
 
-  private void matchContainerTransactionIds() throws IOException {
+  private void verifyDeleteTransactionIds() throws IOException {
     for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
@@ -724,19 +724,17 @@ public class TestBlockDeletion {
       dnContainerSet.listContainer(0, 10000, containerDataList);
       for (ContainerData containerData : containerDataList) {
         long containerId = containerData.getContainerID();
-        if (containerIdsWithDeletedBlocks.contains(containerId)) {
-          assertThat(scm.getContainerInfo(containerId).getDeleteTransactionId())
-              .isGreaterThan(0);
-          maxTransactionId = max(maxTransactionId,
-              scm.getContainerInfo(containerId).getDeleteTransactionId());
-        } else {
-          assertEquals(
-              scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
-        }
-        assertEquals(
+        long dnDeleteTransactionId =
             ((KeyValueContainerData) dnContainerSet.getContainer(containerId)
-                .getContainerData()).getDeleteTransactionId(),
+                .getContainerData()).getDeleteTransactionId();
+        assertEquals(0,
             scm.getContainerInfo(containerId).getDeleteTransactionId());
+        if (containerIdsWithDeletedBlocks.contains(containerId)) {
+          assertThat(dnDeleteTransactionId).isGreaterThan(0);
+          maxTransactionId = max(maxTransactionId, dnDeleteTransactionId);
+        } else {
+          assertEquals(0, dnDeleteTransactionId);
+        }
       }
     }
   }
@@ -798,15 +796,15 @@ public class TestBlockDeletion {
     List<String> keys = new ArrayList<>();
     for (int j = 0; j < keyCount; j++) {
       String keyName = UUID.randomUUID().toString();
-      OzoneOutputStream out = bucket.createKey(keyName,
+      try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.close();
+          ReplicationFactor.THREE, new HashMap<>())) {
+        out.write(value.getBytes(UTF_8));
+      }
       keys.add(keyName);
     }
 
-    // close the containers which hold the blocks for the key
+    // Close the containers which hold the blocks for the key.
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     Thread.sleep(2000);
 

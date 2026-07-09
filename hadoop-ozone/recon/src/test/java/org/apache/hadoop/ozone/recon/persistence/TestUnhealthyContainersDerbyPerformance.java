@@ -45,7 +45,9 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
+import org.apache.ozone.test.tag.Slow;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -74,9 +76,9 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Performance settings applied in this test</h2>
  * <ul>
- *   <li><b>Page cache</b>: {@code derby.storage.pageCacheSize = 20000}
- *       (~80 MB of 4-KB pages) keeps hot B-tree nodes in memory, reducing
- *       filesystem reads even with the file-based Derby driver.</li>
+ *   <li><b>In-memory database</b>: The test uses an in-memory Derby database
+ *       ({@code jdbc:derby:memory:...}) to eliminate disk I/O and fsync overhead
+ *       during the 1-million-row benchmark.</li>
  *   <li><b>JDBC fetch size</b>: set to {@value #READ_PAGE_SIZE} on each query
  *       so Derby pre-buffers a full page of rows per JDBC round-trip instead
  *       of the default 1-row-at-a-time fetch.</li>
@@ -184,8 +186,8 @@ public class TestUnhealthyContainersDerbyPerformance {
   private static final int READ_PAGE_SIZE = 5_000;
 
   // -----------------------------------------------------------------------
-  // Performance thresholds (CI-safe; expected run times are 5–10× faster
-  // than the original file-based Derby baseline after the optimisations)
+  // Performance thresholds (CI-safe; expected run times are significantly faster
+  // than the original file-based Derby baseline after switching to in-memory)
   // -----------------------------------------------------------------------
 
   /** Maximum acceptable time to insert all TOTAL_RECORDS into Derby. */
@@ -220,43 +222,89 @@ public class TestUnhealthyContainersDerbyPerformance {
   // One-time setup: create Derby schema + insert 1 M records
   // -----------------------------------------------------------------------
 
+  private String inMemoryDbName;
+
   /**
-   * Initialises the embedded Derby database and creates the Recon schema.
+   * Initialises the embedded in-memory Derby database and creates the Recon schema.
    * Data population is done in dedicated test methods.
    *
-   * <p>The {@code @TempDir} is injected as a <em>method parameter</em> rather
-   * than a class field.  With {@code @TestInstance(PER_CLASS)}, a field-level
-   * {@code @TempDir} is populated by JUnit's {@code TempDirExtension} in its
-   * own {@code beforeAll} callback, which may run <em>after</em> the user's
-   * {@code @BeforeAll} — leaving it null when needed here.  A method
-   * parameter is resolved by JUnit before the method body executes.</p>
-   *
-   * <h3>Performance settings applied here</h3>
-   * <ul>
-   *   <li><b>Page cache</b> ({@code derby.storage.pageCacheSize = 20000}):
-   *       ~80 MB of 4-KB B-tree pages resident in heap — covers the hot path
-   *       for index scans on a 1-M-row table even with the file-based
-   *       driver.</li>
-   * </ul>
+   * <p>Reuses {@link DerbyDataSourceConfigurationProvider} for all connection settings
+   * and overrides only {@code getJdbcUrl()} to use an in-memory Derby database
+   * ({@code jdbc:derby:memory:...}), eliminating disk I/O and fsync overhead across
+   * the benchmark's insert, replace, and delete transactions.</p>
    */
   @BeforeAll
   public void setUpDatabase(@TempDir Path tempDir) throws Exception {
+    inMemoryDbName = "reconPerf_" + java.util.UUID.randomUUID().toString();
     LOG.info("=== Derby Performance Benchmark — Setup ===");
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
         TESTED_STATES.size(), CONTAINER_ID_RANGE, TOTAL_RECORDS);
 
-    // Derby engine property — must be set before the first connection.
-    //
-    // pageCacheSize: number of 4-KB pages Derby keeps in its buffer pool.
-    //   Default = 1,000 pages (4 MB) — far too small for a 1-M-row table.
-    //   20,000 pages = ~80 MB, enough to hold the full B-tree for both the
-    //   primary-key index and the composite (state, container_id) index.
-    System.setProperty("derby.storage.pageCacheSize", "20000");
-
-    // ----- Guice wiring (mirrors AbstractReconSqlDBTest) -----
     File configDir = Files.createDirectory(tempDir.resolve("Config")).toFile();
-    Provider<DataSourceConfiguration> configProvider =
-        new DerbyDataSourceConfigurationProvider(configDir);
+    DataSourceConfiguration base = new DerbyDataSourceConfigurationProvider(configDir).get();
+
+    // Reuse DerbyDataSourceConfigurationProvider settings but point to an in-memory DB.
+    Provider<DataSourceConfiguration> configProvider = () -> new DataSourceConfiguration() {
+      @Override
+      public String getDriverClass() {
+        return base.getDriverClass();
+      }
+
+      @Override
+      public String getJdbcUrl() {
+        return "jdbc:derby:memory:" + inMemoryDbName;
+      }
+
+      @Override
+      public String getUserName() {
+        return base.getUserName();
+      }
+
+      @Override
+      public String getPassword() {
+        return base.getPassword();
+      }
+
+      @Override
+      public boolean setAutoCommit() {
+        return base.setAutoCommit();
+      }
+
+      @Override
+      public long getConnectionTimeout() {
+        return base.getConnectionTimeout();
+      }
+
+      @Override
+      public String getSqlDialect() {
+        return base.getSqlDialect();
+      }
+
+      @Override
+      public Integer getMaxActiveConnections() {
+        return base.getMaxActiveConnections();
+      }
+
+      @Override
+      public long getMaxConnectionAge() {
+        return base.getMaxConnectionAge();
+      }
+
+      @Override
+      public long getMaxIdleConnectionAge() {
+        return base.getMaxIdleConnectionAge();
+      }
+
+      @Override
+      public String getConnectionTestStatement() {
+        return base.getConnectionTestStatement();
+      }
+
+      @Override
+      public long getIdleConnectionTestPeriod() {
+        return base.getIdleConnectionTestPeriod();
+      }
+    };
 
     Injector injector = Guice.createInjector(
         new JooqPersistenceModule(configProvider),
@@ -275,6 +323,20 @@ public class TestUnhealthyContainersDerbyPerformance {
     dao = injector.getInstance(UnhealthyContainersDao.class);
     schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
     schemaManager = new ContainerHealthSchemaManager(schemaDefinition, new OzoneConfiguration());
+  }
+
+  @AfterAll
+  public void tearDownDatabase() {
+    if (inMemoryDbName != null) {
+      try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
+          "jdbc:derby:memory:" + inMemoryDbName + ";drop=true")) {
+        conn.isValid(1);
+      } catch (java.sql.SQLException e) {
+        if (!"08006".equals(e.getSQLState())) {
+          LOG.warn("Unexpected SQLState while dropping in-memory Derby DB: {}", e.getSQLState(), e);
+        }
+      }
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -655,6 +717,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(9)
+  @Slow("HDDS-15582")
   public void testBatchDeletePerformanceOneMillionRecords() {
     int deleteCount = CONTAINER_ID_RANGE;               // 200 000 container IDs
     int expectedDeleted = deleteCount * STATE_COUNT;    // 1 000 000 rows
@@ -706,6 +769,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(10)
+  @Slow("HDDS-15582")
   public void testCountByStateAfterFullDelete() {
     int expectedPerState = 0;
     LOG.info("--- Test 10: COUNT by state after full delete (expected {} each) ---",

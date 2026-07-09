@@ -459,6 +459,18 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
 
+  /**
+   * If true, BackgroundPipelineCreator will create RATIS/THREE pipelines even
+   * when the default replication is EC. This keeps RATIS write paths warm for
+   * mixed-workload clusters. If false, RATIS/THREE pipeline creation is
+   * skipped for EC-default clusters.
+   */
+  public static final String OZONE_SCM_PIPELINE_CREATE_RATIS_THREE =
+      "ozone.scm.pipeline.creation.ratis.three";
+
+  public static final boolean
+      OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT = true;
+
   public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
       "ozone.scm.block.deletion.per.dn.distribution.factor";
 

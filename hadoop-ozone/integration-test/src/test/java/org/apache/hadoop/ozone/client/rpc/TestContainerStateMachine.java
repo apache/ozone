@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -93,6 +94,7 @@ public class TestContainerStateMachine {
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "0s");
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -108,7 +110,6 @@ public class TestContainerStateMachine {
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
     cluster.getOzoneManager().startSecretManager();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -127,33 +128,34 @@ public class TestContainerStateMachine {
 
   @Test
   public void testContainerStateMachineFailures() throws Exception {
-    OzoneOutputStream key =
+    OmKeyLocationInfo omKeyLocationInfo;
+    try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                    ReplicationFactor.ONE), new HashMap<>());
-    // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
+                    ReplicationFactor.ONE), new HashMap<>())) {
+      // First write and flush creates a container in the datanode.
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
 
-    //get the name of a valid container
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+      // Get the name of a valid container.
+      KeyOutputStream groupOutputStream =
+          (KeyOutputStream) key.getOutputStream();
 
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
 
-    // delete the container dir
-    FileUtil.fullyDelete(new File(
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
-            .getContainerPath()));
+      // Delete the container directory.
+      FileUtil.fullyDelete(new File(
+          cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
+              .getContainerPath()));
+    }
 
-    key.close();
     // Make sure the container is marked unhealthy
     assertEquals(
         ContainerProtos.ContainerDataProto.State.UNHEALTHY,
@@ -174,16 +176,16 @@ public class TestContainerStateMachine {
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
-      OzoneOutputStream key =
+      try (OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
               .createKey(("ratis" + i), 1024,
                   ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                      ReplicationFactor.ONE), new HashMap<>());
-      // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes(UTF_8));
-      key.flush();
-      key.write(("ratis" + i).getBytes(UTF_8));
-      key.close();
+                      ReplicationFactor.ONE), new HashMap<>())) {
+        // First write and flush creates a container in the datanode.
+        key.write(("ratis" + i).getBytes(UTF_8));
+        key.flush();
+        key.write(("ratis" + i).getBytes(UTF_8));
+      }
     }
 
     RatisServerConfiguration ratisServerConfiguration =
@@ -199,16 +201,16 @@ public class TestContainerStateMachine {
 
     // Write 10 more keys. Num Snapshots should remain the same.
     for (int i = 11; i <= 20; i++) {
-      OzoneOutputStream key =
+      try (OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
               .createKey(("ratis" + i), 1024,
                   ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                      ReplicationFactor.ONE), new HashMap<>());
-      // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes(UTF_8));
-      key.flush();
-      key.write(("ratis" + i).getBytes(UTF_8));
-      key.close();
+                      ReplicationFactor.ONE), new HashMap<>())) {
+        // First write and flush creates a container in the datanode.
+        key.write(("ratis" + i).getBytes(UTF_8));
+        key.flush();
+        key.write(("ratis" + i).getBytes(UTF_8));
+      }
     }
     files = parentPath.toFile().listFiles();
     assertThat(files).isNotNull();

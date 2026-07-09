@@ -95,6 +95,50 @@ describe('Capacity Page', () => {
     expect(datanodeCard).toHaveTextContent(/FREE SPACE\s*3\s*KB/i);
   });
 
+  test('clamps pendingBlockSize to 0 when selected datanode reports -1 (offline/unreachable)', async () => {
+    capacityServer.use(
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        if (component === 'dn') {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              ...mockResponses.DnPendingDeletion,
+              pendingDeletionPerDataNode: [
+                { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
+                { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: 2048 }
+              ]
+            })
+          );
+        }
+        const map: Record<string, object> = {
+          scm: mockResponses.ScmPendingDeletion,
+          om: mockResponses.OmPendingDeletion
+        };
+        const body = component ? map[component] : undefined;
+        return body
+          ? res(ctx.status(200), ctx.json(body))
+          : res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+      })
+    );
+
+    render(<Capacity />);
+
+    const downloadLink = await screen.findByText('Download Insights');
+    const datanodeCard = downloadLink.closest('.ant-card');
+    expect(datanodeCard).not.toBeNull();
+    if (!datanodeCard) {
+      return;
+    }
+    // dn-1 is selected by default; its pendingBlockSize is -1 (offline sentinel).
+    // PENDING DELETION should show 0 B, not a negative value.
+    await waitFor(() =>
+      expect(datanodeCard).toHaveTextContent(/PENDING DELETION\s*0\s*B/i)
+    );
+    // USED SPACE = used (4096) + clamped pendingBlockSize (0) = 4 KB
+    expect(datanodeCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
+  });
+
   test('shows scm-only error state when SCM pending deletion returns sentinel failure values', async () => {
     capacityServer.use(
       rest.get('api/v1/pendingDeletion', (req, res, ctx) => {

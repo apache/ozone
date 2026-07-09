@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -66,7 +65,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.junit.jupiter.api.AfterEach;
@@ -94,7 +92,7 @@ public class TestContainerStateManager {
   private EventPublisher publisher;
 
   @BeforeEach
-  public void init() throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -313,8 +311,9 @@ public class TestContainerStateManager {
       names = {"DELETING", "DELETED"})
   public void testECContainerWithStaleClosedReplicaShouldForceDelete(HddsProtos.LifeCycleState state)
       throws IOException {
-    final DatanodeDetails datanode = randomDatanodeDetails();
-    nodeManager.register(datanode, null, null);
+    //Get the first node from our list
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).get(0);
     // Create an EC container
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo ecContainer = getECContainer(
@@ -367,7 +366,7 @@ public class TestContainerStateManager {
   private void verifyForceDeleteCommand(DeleteContainerCommand deleteCmd,
       ContainerID expectedContainerId, boolean expectedForce, String message) {
     assertEquals(expectedForce, deleteCmd.isForce(), message);
-    assertEquals(expectedContainerId.getId(), deleteCmd.getContainerID());
+    assertEquals(expectedContainerId.getIdForTesting(), deleteCmd.getContainerID());
   }
 
   /**
@@ -414,7 +413,7 @@ public class TestContainerStateManager {
       throws Exception {
     ContainerID containerID = ContainerID.valueOf(3L);
     ContainerInfo openContainerInfo = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
+        .setContainerID(containerID.getIdForTesting())
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setSequenceId(100L)
         .setOwner("scm")
@@ -440,7 +439,7 @@ public class TestContainerStateManager {
     long sequenceId = 100L;
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
+        .setContainerID(containerID.getIdForTesting())
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setSequenceId(sequenceId)
         .setOwner("scm")

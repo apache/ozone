@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -62,20 +61,16 @@ public class ReplicationServer {
 
   private CertificateClient caClient;
 
-  private ContainerController controller;
-
   private int port;
   private final ContainerImporter importer;
 
   private ThreadPoolExecutor executor;
 
-  public ReplicationServer(ContainerController controller,
-      ReplicationConfig replicationConfig, SecurityConfig secConf,
-      CertificateClient caClient, ContainerImporter importer,
-      String threadNamePrefix) {
+  public ReplicationServer(ReplicationConfig replicationConfig,
+      SecurityConfig secConf, CertificateClient caClient,
+      ContainerImporter importer, String threadNamePrefix) {
     this.secConf = secConf;
     this.caClient = caClient;
-    this.controller = controller;
     this.importer = importer;
     this.port = replicationConfig.getPort();
 
@@ -103,8 +98,7 @@ public class ReplicationServer {
   }
 
   public void init() {
-    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
-        new OnDemandContainerReplicationSource(controller), importer);
+    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(importer);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(
