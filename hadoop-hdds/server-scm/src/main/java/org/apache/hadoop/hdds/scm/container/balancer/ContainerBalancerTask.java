@@ -89,8 +89,6 @@ public class ContainerBalancerTask implements Runnable {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeScheduledForMoveInLatestIteration;
-  // count actual size moved in bytes
-  private long sizeActuallyMovedInLatestIteration;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
   private Set<String> excludeNodes;
@@ -338,29 +336,18 @@ public class ContainerBalancerTask implements Runnable {
     ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
 
     DataMoveInfo dataMoveInfo =
-        getDataMoveInfo(currentIterationResultName, sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
+        getDataMoveInfo(sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
     return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
   }
 
-  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<DatanodeID, Long> sizeEnteringDataToNodes,
+  private DataMoveInfo getDataMoveInfo(Map<DatanodeID, Long> sizeEnteringDataToNodes,
                                        Map<DatanodeID, Long> sizeLeavingDataFromNodes) {
-    if (currentIterationResultName == null) {
-      // For unfinished iteration
-      return new DataMoveInfo(
-          getSizeScheduledForMoveInLatestIteration(),
-          sizeActuallyMovedInLatestIteration,
-          sizeEnteringDataToNodes,
-          sizeLeavingDataFromNodes
-      );
-    } else {
-      // For finished iteration
-      return new DataMoveInfo(
-          getSizeScheduledForMoveInLatestIteration(),
-          metrics.getDataSizeMovedInLatestIteration(),
-          sizeEnteringDataToNodes,
-          sizeLeavingDataFromNodes
-      );
-    }
+    return new DataMoveInfo(
+        getSizeScheduledForMoveInLatestIteration(),
+        metrics.getDataSizeMovedInLatestIteration(),
+        sizeEnteringDataToNodes,
+        sizeLeavingDataFromNodes
+    );
   }
 
   private Map<DatanodeID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
@@ -743,9 +730,8 @@ public class ContainerBalancerTask implements Runnable {
 
     metrics.incrementNumContainerMovesTimeout(metrics.getNumContainerMovesTimeoutInLatestIteration());
 
-    metrics.incrementDataSizeMovedGBInLatestIteration(sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
-
-    metrics.incrementDataSizeMovedInLatestIteration(sizeActuallyMovedInLatestIteration);
+    long bytesMovedInLatestIteration = metrics.getDataSizeMovedInLatestIteration();
+    metrics.incrementDataSizeMovedGBInLatestIteration(bytesMovedInLatestIteration / OzoneConsts.GB);
 
     metrics.incrementDataSizeMovedGB(metrics.getDataSizeMovedGBInLatestIteration());
 
@@ -754,8 +740,8 @@ public class ContainerBalancerTask implements Runnable {
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
             "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        byteDesc(sizeActuallyMovedInLatestIteration),
-        sizeActuallyMovedInLatestIteration,
+        byteDesc(bytesMovedInLatestIteration),
+        bytesMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
@@ -943,8 +929,7 @@ public class ContainerBalancerTask implements Runnable {
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
-            sizeActuallyMovedInLatestIteration +=
-                containerInfo.getUsedBytes();
+            metrics.incrementDataSizeMovedInLatestIteration(containerInfo.getUsedBytes());
             LOG.debug("Container move completed for container {} from " +
                     "source {} to target {}", containerID, source,
                 moveSelection.getTargetNode());
@@ -1156,7 +1141,6 @@ public class ContainerBalancerTask implements Runnable {
     this.selectedTargets.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeScheduledForMoveInLatestIteration = 0;
-    this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetDataSizeMovedInLatestIteration();
     metrics.resetNumContainerMovesScheduledInLatestIteration();
