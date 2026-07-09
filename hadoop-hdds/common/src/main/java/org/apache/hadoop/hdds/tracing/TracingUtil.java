@@ -238,7 +238,10 @@ public final class TracingUtil {
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
-    return tracer.spanBuilder(name).setParent(extract).setSpanKind(spanKind).startSpan();
+    return tracer.spanBuilder(name).
+        setParent(extract).
+        setSpanKind(spanKind).
+        startSpan();
   }
 
   /**
@@ -448,10 +451,6 @@ public final class TracingUtil {
    * Creates a new span, using the current context as a parent if valid;
    * otherwise, creates a root span.
    */
-  private static Span buildSpan(String spanName) {
-    return buildSpan(spanName, SpanKind.INTERNAL);
-  }
-
   private static Span buildSpan(String spanName, SpanKind spanKind) {
     Context currentContext = Context.current();
     Span parentSpan = Span.fromContext(currentContext);
