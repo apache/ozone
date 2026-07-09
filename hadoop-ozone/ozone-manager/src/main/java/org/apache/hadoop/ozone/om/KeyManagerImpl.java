@@ -2210,9 +2210,16 @@ public class KeyManagerImpl implements KeyManager {
   public List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine) {
     Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine), clientMachine);
+    final NetworkTopology clusterMap;
+    try {
+      clusterMap = ozoneManager.getClusterMap();
+    } catch (NullPointerException ex) {
+      LOG.warn("Could not sort write pipeline for client {} because OM's "
+          + "network topology cache is unavailable.", clientMachine);
+      return nodes;
+    }
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
-          final NetworkTopology clusterMap = ozoneManager.getClusterMap();
           final Node client = getClientNode(clientMachine, nodes, clusterMap);
           if (client == null) {
             // Preserve pipeline order for writes: the first node is the write

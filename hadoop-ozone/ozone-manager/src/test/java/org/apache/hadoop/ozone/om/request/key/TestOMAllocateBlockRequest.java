@@ -355,6 +355,21 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         () -> keyManager.sortDatanodesForWrite(nodes, ""));
   }
 
+  @Test
+  public void sortDatanodesForWriteKeepsOrderWhenTopologyUnavailable() {
+    when(ozoneManager.getClusterMap()).thenThrow(
+        new NullPointerException("ScmBlockLocationClient must have been initialized already."));
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+
+    List<? extends DatanodeDetails> result =
+        keyManager.sortDatanodesForWrite(nodes, "1.2.3.4");
+
+    assertSame(nodes, result);
+  }
+
   // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.
   private OMRequest createAllocateBlockRequestWithSort(String clientAddress) {
     KeyArgs keyArgs = KeyArgs.newBuilder()
