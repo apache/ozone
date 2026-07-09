@@ -50,7 +50,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.time.Instant;
@@ -1767,7 +1766,7 @@ public class TestReplicationManager {
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
             MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
 
     rm.sendThrottledReconstructionCommand(container, cmd1);
     assertEquals(1, rm.getInflightReconstructionCount());
@@ -1777,7 +1776,7 @@ public class TestReplicationManager {
     ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
         2L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);    
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);    
     rm.sendThrottledReconstructionCommand(container, cmd2);
     assertEquals(2, rm.getInflightReconstructionCount());
     assertTrue(rm.isReconstructionLimitReached());
@@ -1820,15 +1819,15 @@ public class TestReplicationManager {
     ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
         2L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(2)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(2)), (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd3 = new ReconstructECContainersCommand(
         3L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);
 
     rm.sendThrottledReconstructionCommand(container, cmd1);
     rm.sendThrottledReconstructionCommand(container, cmd2);
@@ -1852,7 +1851,7 @@ public class TestReplicationManager {
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
     assertEquals(1, rm.getInflightReconstructionCount());
 
@@ -1879,7 +1878,7 @@ public class TestReplicationManager {
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
             MockDatanodeDetails.randomDatanodeDetails()),
-        integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
     assertEquals(1, rm.getInflightReconstructionCount());
 
@@ -1905,12 +1904,22 @@ public class TestReplicationManager {
     assertEquals(0, rm.getInflightReconstructionCount());
   }
 
-  private static ByteString integers2ByteString(List<Integer> src) {
-    byte[] dst = new byte[src.size()];
-    for (int i = 0; i < src.size(); i++) {
-      dst[i] = src.get(i).byteValue();
-    }
-    return dst.length > 0 ? UnsafeByteOperations.unsafeWrap(dst)
-        : ByteString.EMPTY;
+  @Test
+  public void testReconstructionConfigValidation() {
+    ReplicationManager.ReplicationManagerConfiguration config =
+        new ReplicationManager.ReplicationManagerConfiguration();
+
+    config.setEcDecommissionReconstructionLoadFactor(-0.1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setEcDecommissionReconstructionLoadFactor(1.1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setEcDecommissionReconstructionLoadFactor(0.9);
+    config.setReconstructionGlobalLimit(-1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setReconstructionGlobalLimit(0);
+    config.validate();
   }
 }
