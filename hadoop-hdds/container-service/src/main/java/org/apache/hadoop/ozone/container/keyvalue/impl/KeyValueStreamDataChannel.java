@@ -253,7 +253,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     final ContainerCommandRequestProto proto =
         closeBuffers(buffers, super::writeFileChannel);
     putBlockRequest.set(proto);
-    Preconditions.checkState(putBlockProcessor == null);
+    Preconditions.checkState(putBlockProcessor != null);
     putBlockProcessor.processPutBlock(proto);
     setLinked();
   }
