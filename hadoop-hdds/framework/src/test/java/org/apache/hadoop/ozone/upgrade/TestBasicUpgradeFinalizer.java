@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_1;
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
+import static org.apache.hadoop.ozone.upgrade.MockLayoutFeature.VERSION_1;
+import static org.apache.hadoop.ozone.upgrade.MockLayoutFeature.VERSION_3;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,7 +40,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -72,11 +71,11 @@ public class TestBasicUpgradeFinalizer {
     inOrder.verify(finalizer).preFinalizeUpgrade(eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
         eq(
-            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
+            MockLayoutFeature.VERSION_2),
         eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
         eq(
-            TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
+            MockLayoutFeature.VERSION_3),
         eq(mockObj));
     inOrder.verify(finalizer).postFinalizeUpgrade(eq(mockObj));
 
