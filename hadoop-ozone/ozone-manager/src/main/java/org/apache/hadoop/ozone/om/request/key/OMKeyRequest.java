@@ -200,13 +200,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    final boolean sortOnOm =
-        shouldSortDatanodes && keyManager.isSortDatanodesForWriteEnabled();
-    // When SCM sorts, it still needs the real client address; the OM-sort path
-    // sends an empty address so SCM skips its sort.
-    final String scmClientMachine =
-        (shouldSortDatanodes && !sortOnOm) ? userInfo.getRemoteAddress() : "";
-    final String omClientMachine = sortOnOm ? userInfo.getRemoteAddress() : "";
+    final String scmClientMachine;
+    final String omClientMachine;
+    final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes;
+    if (!shouldSortDatanodes) {
+      scmClientMachine = "";
+      omClientMachine = "";
+      sortedByNodes = null;
+    } else if (keyManager.isSortDatanodesForWriteEnabled()) {
+      scmClientMachine = "";
+      omClientMachine = userInfo.getRemoteAddress();
+      sortedByNodes = new HashMap<>();
+    } else {
+      scmClientMachine = userInfo.getRemoteAddress();
+      omClientMachine = "";
+      sortedByNodes = null;
+    }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
@@ -226,12 +235,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     // Cache the sorted order by pipeline nodes so blocks whose pipelines have
     // the same datanodes are sorted once (mirrors the read path's caching).
-    final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes =
-        sortOnOm ? new HashMap<>() : null;
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       Pipeline pipeline = allocatedBlock.getPipeline();
-      if (sortOnOm) {
+      if (sortedByNodes != null) {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
         final List<? extends DatanodeDetails> sorted = sortedByNodes
             .computeIfAbsent(nodes,
