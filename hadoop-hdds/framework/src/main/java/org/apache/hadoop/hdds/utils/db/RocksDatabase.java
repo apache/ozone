@@ -867,17 +867,9 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * <p>
-   * Only the range deletions are issued here; the physical SST removal may be
-   * slow or, when no whole file falls within the range, may not happen at all.
-   * The returned files should be waited on with
-   * {@link ManagedRocksObjectUtils#waitForFileDelete} by the caller, outside of
-   * any lock held across this call.
    * @param prefixInfo a map of TableName to prefixUsed.
-   * @return the SST files whose deletion was requested.
    */
-  public List<File> deleteFilesNotMatchingPrefix(TablePrefixInfo prefixInfo) throws RocksDatabaseException {
-    List<File> deletedSstFiles = new ArrayList<>();
+  public void deleteFilesNotMatchingPrefix(TablePrefixInfo prefixInfo) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
       for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
@@ -921,11 +913,10 @@ public final class RocksDatabase implements Closeable {
           // range cannot contain the prefix when the enclosing range does not,
           // so every collaterally deleted file is likewise non-matching. This
           // invariant holds only while isKeyWithPrefixPresent stays monotone.
-          deletedSstFiles.add(db.deleteSstFileRange(handle, liveFileMetaData));
+          db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }
     }
-    return deletedSstFiles;
   }
 
   @Override

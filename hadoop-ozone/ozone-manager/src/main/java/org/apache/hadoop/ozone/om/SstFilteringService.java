@@ -23,14 +23,10 @@ import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,7 +43,6 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -231,8 +226,6 @@ public class SstFilteringService extends BackgroundService
                 ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName());
 
-            List<File> deletedSstFiles = Collections.emptyList();
-            boolean sstFilteringIssued = false;
             try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock();
                 UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
                     snapshotManager.get().getActiveSnapshot(
@@ -243,8 +236,11 @@ public class SstFilteringService extends BackgroundService
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();
-              deletedSstFiles = db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
-              sstFilteringIssued = true;
+              db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
+
+              markSSTFilteredFlagForSnapshot(snapshotInfo);
+              snapshotLimit--;
+              snapshotFilteredCount.getAndIncrement();
             } catch (OMException ome) {
               // FILE_NOT_FOUND is obtained when the snapshot is deleted
               // In this case, get the snapshotInfo from the db, check if
@@ -259,21 +255,6 @@ public class SstFilteringService extends BackgroundService
                       .getSnapshotId());
                 }
               }
-            }
-            if (sstFilteringIssued) {
-              // Confirm the physical SST removal outside the bootstrap read lock
-              // and the open snapshot. On RocksDB 10 a range delete may not
-              // remove the file promptly, so this wait can take up to a minute;
-              // keeping it out of BOOTSTRAP_LOCK prevents it from starving the OM
-              // checkpoint (bootstrap) servlet that needs the write lock. The
-              // snapshot is marked filtered only after deletion is confirmed (as
-              // before), so a timeout leaves it to be retried on the next cycle.
-              for (File deletedSstFile : deletedSstFiles) {
-                ManagedRocksObjectUtils.waitForFileDelete(deletedSstFile, Duration.ofSeconds(60));
-              }
-              markSSTFilteredFlagForSnapshot(snapshotInfo);
-              snapshotLimit--;
-              snapshotFilteredCount.getAndIncrement();
             }
           } catch (IOException e) {
             if (isSnapshotDeleted(snapshotInfoTable.get(snapShotTableKey))) {

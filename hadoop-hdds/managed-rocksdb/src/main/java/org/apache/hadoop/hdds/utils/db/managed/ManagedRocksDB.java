@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -190,21 +191,13 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
   }
 
   /**
-   * Delete the SST file's key range from the RocksDB column family.
-   * <p>
-   * This only issues the range deletion; it does not wait for the physical SST
-   * file to be removed from disk. A range delete only drops files that fall
-   * entirely within the range, so it may remove the file slowly or not at all,
-   * in which case a wait can block for up to a minute. Callers that need to
-   * confirm the file is gone should wait on the returned {@link File} via
-   * {@link ManagedRocksObjectUtils#waitForFileDelete}, outside of any lock they
-   * would otherwise hold across that wait.
+   * Delete the SST file range from rocks db and wait for file deletion.
    * @param columnFamilyHandle column family of the target sst file.
    * @param fileToBeDeleted file metadata to be deleted.
-   * @return the SST file whose deletion was requested.
-   * @throws RocksDatabaseException if the underlying db throws an exception.
+   * @throws RocksDatabaseException if the underlying db throws an exception
+   *                                or the file is not deleted within a time limit.
    */
-  public File deleteSstFileRange(
+  public void deleteSstFileRange(
       ColumnFamilyHandle columnFamilyHandle,
       LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
@@ -218,7 +211,7 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     } catch (RocksDBException e) {
       throw new RocksDatabaseException("Failed to delete " + file, e);
     }
-    return file;
+    ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 
   public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
