@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -345,17 +346,13 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void sortDatanodesForWriteSkipsEmptyClient() {
-    // An empty client address must short-circuit and return the input order
-    // unchanged; without the guard the timed sort path runs against the
-    // fixture's mock metric and throws, so this returning cleanly is the test.
+  public void sortDatanodesForWriteRequiresClientMachine() {
     List<DatanodeDetails> nodes = Arrays.asList(
         MockDatanodeDetails.randomDatanodeDetails(),
         MockDatanodeDetails.randomDatanodeDetails(),
         MockDatanodeDetails.randomDatanodeDetails());
-    List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, "");
-    assertEquals(nodes, result);
+    assertThrows(IllegalArgumentException.class,
+        () -> keyManager.sortDatanodesForWrite(nodes, ""));
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.

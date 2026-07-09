@@ -2209,11 +2209,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine) {
-    if (StringUtils.isEmpty(clientMachine)) {
-      // No client address: keep the pipeline order (the first node is the write
-      // primary). Mirrors SCMBlockProtocolServer#getClientNode's empty guard.
-      return nodes;
-    }
+    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine), clientMachine);
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
           final NetworkTopology clusterMap = ozoneManager.getClusterMap();
