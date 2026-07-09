@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -122,7 +123,7 @@ public class TestCompactOMDB {
   @Test
   public void testCompactHAWithoutNodeIdFailsFast() throws Exception {
     CommandLine cli = new OzoneRepair().getCmd();
-    cli.execute("-D", "ozone.om.service.ids=omservice",
+    cli.execute("-D", OZONE_OM_SERVICE_IDS_KEY + "=omservice",
         "om", "compact", "--column-family", COLUMN_FAMILY);
 
     verify(omAdminClient, never()).compactOMDB(any(), anyInt());

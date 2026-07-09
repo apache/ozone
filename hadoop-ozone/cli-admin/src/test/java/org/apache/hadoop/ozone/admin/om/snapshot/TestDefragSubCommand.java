@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.om.snapshot;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -151,7 +152,7 @@ public class TestDefragSubCommand {
 
   @Test
   public void testDefragHAWithoutNodeIdFailsFast() throws Exception {
-    cmd.testConf.set("ozone.om.service.ids", "omservice");
+    cmd.testConf.set(OZONE_OM_SERVICE_IDS_KEY, "omservice");
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs();
