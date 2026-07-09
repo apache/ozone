@@ -482,7 +482,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         final ByteBuffer buf = readFromQueue();
-        if (buf != null && buf.hasRemaining()) {
+        if (buf == null) {
+          // The stream ended before the requested data arrived.
+          return null;
+        }
+        if (buf.hasRemaining()) {
           return buf;
         }
       }
@@ -490,6 +494,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     ByteBuffer readFromQueue() throws IOException {
       final ReadBlockResponseProto readBlock = poll();
+      if (readBlock == null) {
+        // poll() returns null only when the stream has ended and the queue is drained.
+        return null;
+      }
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind
@@ -528,15 +536,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
+        // Record the failure first: the log and observer calls below must not mask it.
+        setFailed(e);
         final ByteString data = readBlock.getData();
+        final ByteString preview = data.substring(0, Math.min(10, data.size()));
         final long offset = readBlock.getOffset();
         final StreamingReadResponse r = getResponse();
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
-            offset, data.size(), StringUtils.bytes2Hex(data.substring(0, 10).asReadOnlyByteBuffer()),
+            offset, data.size(), StringUtils.bytes2Hex(preview.asReadOnlyByteBuffer()),
             readBlock.getChecksumData(), e);
-        setFailed(e);
-        r.getRequestObserver().onError(e);
+        if (r != null) {
+          r.getRequestObserver().onError(e);
+        }
         releaseResources();
       }
     }
