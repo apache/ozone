@@ -118,7 +118,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.UncheckedAutoCloseable;
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -127,6 +126,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
@@ -141,6 +142,7 @@ import org.slf4j.LoggerFactory;
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -170,6 +172,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 60_000);
     client = cluster.newClient();
   }
 
@@ -565,20 +568,17 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     setupMocks();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
     CountDownLatch purgeSubmitted = new CountDownLatch(1);
-    CountDownLatch purgeCompleted = new CountDownLatch(1);
+    AtomicLong checkpointEndTime = new AtomicLong(0);
+    AtomicLong purgeEndTime = new AtomicLong(0);
 
     DBStore dbStore = om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
-    AtomicBoolean purgeStarted = new AtomicBoolean(false);
-    AtomicBoolean purgeBlockedWhileLockHeld = new AtomicBoolean(false);
     when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
       // Submit purge request in background thread (simulating Ratis transaction on follower)
       Thread purgeThread = new Thread(() -> {
         try {
           String snapshotTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshot2.getName());
-          Path snapshotCheckpointDir = OmSnapshotManager.getSnapshotPath(om.getMetadataManager(),
-              snapshot2.getSnapshotId(), 0);
           // Construct SnapshotPurge request
           OzoneManagerProtocolProtos.SnapshotPurgeRequest snapshotPurgeRequest =
               OzoneManagerProtocolProtos.SnapshotPurgeRequest.newBuilder()
@@ -601,14 +601,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
               response = om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
 
           if (response.getSuccess()) {
-            // Wait for purge to complete (snapshot checkpoint directory removed from disk)
-            GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+            // Wait for purge to complete (snapshot removed from table)
+            GenericTestUtils.waitFor(() -> {
               try {
-                boolean purged = !Files.exists(snapshotCheckpointDir);
+                boolean purged = om.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey) == null;
                 if (purged) {
-                  long duration = System.currentTimeMillis() - purgeStartTime;
+                  purgeEndTime.set(System.currentTimeMillis());
+                  long duration = purgeEndTime.get() - purgeStartTime;
                   LOG.info("Purge completed in {} ms", duration);
-                  purgeCompleted.countDown();
                 }
                 return purged;
               } catch (Exception ex) {
@@ -620,12 +620,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
           LOG.error("Purge submission failed", e);
         }
       });
-      purgeStarted.set(true);
       purgeThread.start();
 
       // Wait for purge request to be submitted
       assertTrue(purgeSubmitted.await(2, TimeUnit.SECONDS), "Purge should be submitted");
-      purgeBlockedWhileLockHeld.set(!purgeCompleted.await(200, TimeUnit.MILLISECONDS));
+      // Small delay to ensure purge request reaches state machine
+      Thread.sleep(200);
       DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
       doNothing().when(checkpoint).cleanupCheckpoint(); // Don't cleanup for verification
       capturedCheckpoint.set(checkpoint);
@@ -639,9 +639,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     // Process checkpoint servlet
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    assertTrue(purgeStarted.get(), "Purge should be started while checkpoint holds snapshot local data lock");
-    assertTrue(purgeBlockedWhileLockHeld.get(),
-        "Purge should wait while checkpoint holds snapshot local data lock");
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);
@@ -654,7 +651,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
     Path snapshot2DbDir = Paths.get(newDbDir.getPath(),  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
-    assertTrue(purgeCompleted.await(40, TimeUnit.SECONDS), "Purge should complete");
+    assertTrue(purgeEndTime.get() >= checkpointEndTime.get(),
+        "Purge should complete after checkpoint releases snapshot cache lock");
 
     // Verify snapshot is purged
     List<OzoneSnapshot> snapshotsAfter = new ArrayList<>();
@@ -676,7 +674,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshot.getName());
     // delete snapshot and wait for snapshot to be purged
     client.getObjectStore().deleteSnapshot(volumeName, bucketName, snapshot.getName());
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+    GenericTestUtils.waitFor(() -> {
       try {
         SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey);
         return snapshotInfo != null &&

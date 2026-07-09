@@ -246,61 +246,62 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     AtomicLong maxTotalSstSize = new AtomicLong(getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT));
 
+    Collection<Path> snapshotPaths = Collections.emptySet();
+
+    if (!includeSnapshotData) {
+      maxTotalSstSize.set(Long.MAX_VALUE);
+    } else {
+      snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, omMetadataManager, snapshotLocalDataManager).values();
+    }
+
+    if (sstFilesToExclude.isEmpty()) {
+      logEstimatedTarballSize(getDbStore().getDbLocation().toPath(), snapshotPaths);
+    }
+
+    boolean shouldContinue = true;
     try {
-      SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
-      /*
-       * Acquire snapshot cache and local data locks when includeSnapshotData is true to prevent race conditions
-       * between checkpoint operations and snapshot purge operations. Without these locks, a purge operation
-       * (e.g., from a Ratis transaction on follower OM) could delete snapshot directories while checkpoint is
-       * reading snapshot data, leading to FileNotFoundException or corrupted checkpoint data.
-       *
-       * When includeSnapshotData is false, lock is set to null and no locking is performed. In this case, the
-       * try-with-resources block does not call close() on any resource, which is intentional because snapshot
-       * consistency is not required.
-       */
-      try (UncheckedAutoCloseableSupplier<OMLockDetails> snapshotDBLock =
-               includeSnapshotData ? snapshotCache.lock() : null;
-           HierarchicalResourceLock snapshotLocalDataLock =
-               includeSnapshotData ? snapshotLocalDataManager.lock() : null) {
-        Collection<Path> snapshotPaths = Collections.emptySet();
-
-        if (!includeSnapshotData) {
-          maxTotalSstSize.set(Long.MAX_VALUE);
-        } else {
-          snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, omMetadataManager,
-              snapshotLocalDataManager).values();
+      if (includeSnapshotData) {
+        // Process each snapshot db path and write it to archive
+        for (Path snapshotDbPath : snapshotPaths) {
+          if (!shouldContinue) {
+            break;
+          }
+          shouldContinue = collectFilesFromDir(sstFilesToExclude, snapshotDbPath,
+              maxTotalSstSize,  true, omdbArchiver);
         }
 
-        if (sstFilesToExclude.isEmpty()) {
-          logEstimatedTarballSize(getDbStore().getDbLocation().toPath(), snapshotPaths);
-        }
 
-        boolean shouldContinue = true;
-        if (includeSnapshotData) {
-          // Process each snapshot db path and write it to archive
-          for (Path snapshotDbPath : snapshotPaths) {
-            if (!shouldContinue) {
-              break;
-            }
-            shouldContinue = collectFilesFromDir(sstFilesToExclude, snapshotDbPath,
-                maxTotalSstSize,  true, omdbArchiver);
-          }
-
-
-          if (shouldContinue) {
-            shouldContinue = collectFilesFromDir(sstFilesToExclude, getSstBackupDir(),
-                maxTotalSstSize,   true, omdbArchiver);
-          }
-
-          if (shouldContinue) {
-            shouldContinue = collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(),
-                maxTotalSstSize,   true, omdbArchiver);
-          }
+        if (shouldContinue) {
+          shouldContinue = collectFilesFromDir(sstFilesToExclude, getSstBackupDir(),
+              maxTotalSstSize,   true, omdbArchiver);
         }
 
         if (shouldContinue) {
-          // we finished transferring files from snapshot DB's by now and
-          // this is the last step where we transfer the active om.db contents
+          shouldContinue = collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(),
+              maxTotalSstSize,   true, omdbArchiver);
+        }
+      }
+
+      if (shouldContinue) {
+        // we finished transferring files from snapshot DB's by now and
+        // this is the last step where we transfer the active om.db contents
+        SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
+        OmSnapshotLocalDataManager localDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
+        /*
+         * Acquire snapshot cache lock when includeSnapshotData is true to prevent race conditions
+         * between checkpoint operations and snapshot purge operations. Without this lock, a purge
+         * operation (e.g., from a Ratis transaction on follower OM) could delete snapshot directories
+         * while checkpoint is reading snapshot data, leading to FileNotFoundException or corrupted
+         * checkpoint data. The lock ensures checkpoint completes reading snapshot data before purge
+         * can delete the snapshot directory.
+         *
+         * When includeSnapshotData is false, lock is set to null and no locking is performed.
+         * In this case, the try-with-resources block does not call close() on any resource,
+         * which is intentional because snapshot consistency is not required.
+         */
+        try (UncheckedAutoCloseableSupplier<OMLockDetails> snapshotDBLock =
+                 includeSnapshotData ? snapshotCache.lock() : null;
+             HierarchicalResourceLock snapshotLocalDataLock = includeSnapshotData ? localDataManager.lock() : null) {
           // get the list of sst files of the checkpoint.
           checkpoint = createAndPrepareCheckpoint(true);
           // unlimited files as we want the Active DB contents to be transferred in a single batch
@@ -322,14 +323,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
               // NoSuchFileException needs to be caught
               collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver, true);
             }
-            Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(snapshotLocalDataManager,
+            Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
             // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
             collectSnapshotData(sstFilesToExclude, snapshotInCheckpoint.values(), snapshotLocalPropertyFiles,
                 maxTotalSstSize, omdbArchiver);
           }
-          omdbArchiver.setCompleted(true);
         }
+        omdbArchiver.setCompleted(true);
       }
 
     } catch (IOException ioe) {

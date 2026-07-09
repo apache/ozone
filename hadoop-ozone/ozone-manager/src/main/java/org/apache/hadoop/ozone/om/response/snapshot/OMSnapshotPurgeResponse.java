@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
@@ -93,20 +92,19 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         continue;
       }
       OmSnapshotManager omSnapshotManager = metadataManager.getOzoneManager().getOmSnapshotManager();
-      OmSnapshotLocalDataManager snapshotLocalDataManager = ((OmMetadataManagerImpl) omMetadataManager)
-          .getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
       // Remove and close snapshot's RocksDB instance from SnapshotCache.
       omSnapshotManager.invalidateCacheEntry(snapshotInfo.getSnapshotId());
       // Remove the snapshot from snapshotId to snapshotTableKey map.
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
 
+      OmSnapshotLocalDataManager snapshotLocalDataManager = ((OmMetadataManagerImpl) omMetadataManager)
+          .getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
       // Update snapshot local data to update purge transaction info. This would be used to check whether the
       // snapshot purged txn is flushed to rocksdb.
-      try (HierarchicalResourceLock snapshotLocalDataLock = snapshotLocalDataManager.lock()) {
-        updateLocalData(snapshotLocalDataManager, snapshotInfo);
-      }
+      updateLocalData(snapshotLocalDataManager, snapshotInfo);
       // Delete Snapshot checkpoint directory.
+
       omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotInfo.getSnapshotId(), -1);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
