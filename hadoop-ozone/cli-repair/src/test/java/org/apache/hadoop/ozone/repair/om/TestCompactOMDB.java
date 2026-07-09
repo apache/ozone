@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -116,5 +117,15 @@ public class TestCompactOMDB {
     compact();
 
     assertThat(err.getOutput()).contains("Couldn't determine OM node");
+  }
+
+  @Test
+  public void testCompactHAWithoutNodeIdFailsFast() throws Exception {
+    CommandLine cli = new OzoneRepair().getCmd();
+    cli.execute("-D", "ozone.om.service.ids=omservice",
+        "om", "compact", "--column-family", COLUMN_FAMILY);
+
+    verify(omAdminClient, never()).compactOMDB(any(), anyInt());
+    assertThat(err.getOutput()).contains("specify --node-id");
   }
 }

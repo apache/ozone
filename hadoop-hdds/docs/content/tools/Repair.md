@@ -182,7 +182,8 @@ CLI to get the status of last trigger quota repair if available.
 
 ### compact
 Compact a column family in the OM DB to clean up tombstones. The compaction happens asynchronously. Requires admin privileges.
-OM should be running for this tool.
+OM should be running for this tool. On an HA OM cluster, specify `--node-id` to select which OM's db to compact.
+
 ```bash
 Usage: ozone repair om compact [-hV] [--dry-run] [--force] [--verbose]
                                --cf=<columnFamilyName> [--node-id=<nodeId>]

@@ -21,6 +21,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -71,6 +72,13 @@ public class CompactOMDB extends RepairTool {
   public void execute() throws Exception {
 
     OzoneConfiguration conf = getOzoneConf();
+
+    if (nodeId == null && OmUtils.isServiceIdsDefined(conf)) {
+      error("This is an HA OM cluster; specify --node-id to select which OM's"
+          + " db to compact.");
+      return;
+    }
+
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
 

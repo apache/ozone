@@ -179,7 +179,7 @@ Note in JSON output mode, field `contToken` won't show up at all in the result i
 The snapshot defrag command triggers the Snapshot Defragmentation Service to run immediately on a specific Ozone Manager node.
 This command manually initiates the snapshot defragmentation process which compacts snapshot data and removes fragmentation to improve storage efficiency.
 
-This command only works on Ozone Manager HA clusters.
+This command only works on Ozone Manager HA clusters. Specify `--node-id` to select which OM to defragment.
 
 ```bash
 $ ozone admin om snapshot defrag --help
