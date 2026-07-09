@@ -461,6 +461,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return limit > 0 && getInflightReconstructionCount() >= limit;
   }
 
+  private void decrementInflightReconstructionCount() {
+    inflightReconstructionCount.updateAndGet(count -> Math.max(0, count - 1));
+  }
+
   /**
    * Sends delete container command for the given container to the given
    * datanode.
@@ -1112,8 +1116,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         && op.getCommand().getType() == Type.reconstructECContainersCommand) {
       long cmdId = op.getCommand().getId();
       reconstructionCommandIdToPendingFragmentCount.compute(cmdId, (k, v) -> {
-        if (v == null || v <= 1) {
-          inflightReconstructionCount.decrementAndGet();
+        if (v == null) {
+          return null;
+        }
+        if (v <= 1) {
+          decrementInflightReconstructionCount();
           return null;
         }
         return v - 1;
