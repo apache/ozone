@@ -218,7 +218,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmHeartbeat()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       int registeredNodes = 5;
@@ -229,8 +229,8 @@ public class TestSCMNodeManager {
         nodeManager.processHeartbeat(datanodeDetails);
       }
 
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getAllNodes().size() == registeredNodes, 100, 4000);
       assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
           "Heartbeat thread should have picked up the scheduled heartbeats.");
     }
@@ -587,7 +587,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmHealthyNodeCount()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     final int count = 10;
 
@@ -597,8 +597,8 @@ public class TestSCMNodeManager {
             .createRandomDatanodeAndRegister(nodeManager);
         nodeManager.processHeartbeat(datanodeDetails);
       }
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == count, 100, 4000);
       assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
@@ -812,8 +812,9 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(node1);
       nodeManager.processHeartbeat(node2);
 
-      // Sleep so that heartbeat processing thread gets to run.
-      Thread.sleep(1000);
+      // Wait for the heartbeat processing thread to mark both nodes healthy.
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 2, 100, 5000);
 
       //Assert all nodes are healthy.
       assertEquals(2, nodeManager.getAllNodes().size());
@@ -1802,7 +1803,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWith4LayerNetworkTopology()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1829,7 +1830,8 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
       assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
@@ -1844,7 +1846,7 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1872,7 +1874,8 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
       assertEquals(nodeCount,
           nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
@@ -2037,7 +2040,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWithUpdatedIpAndHostname()
-          throws IOException, InterruptedException, AuthenticationException {
+          throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
             MILLISECONDS);
@@ -2061,7 +2064,8 @@ public class TestSCMNodeManager {
       nodeManager.register(node, null, null);
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(2 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
       assertEquals(1,
               nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
