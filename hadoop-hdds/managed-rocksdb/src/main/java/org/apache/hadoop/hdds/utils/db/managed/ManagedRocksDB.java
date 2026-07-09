@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import java.io.File;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -191,11 +190,19 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
   }
 
   /**
-   * Delete the SST file range from rocks db and wait for file deletion.
+   * Delete the SST file range from rocks db.
+   * <p>
+   * {@code deleteFilesInRanges} only drops files that fall entirely within the
+   * range and skips files that are currently being compacted, so it can be a
+   * no-op. Rather than polling the filesystem, verify the outcome against the
+   * live SST metadata: once a file leaves the live metadata it has been removed
+   * from the LSM (and RocksDB purges the on-disk file), so no wait is needed. If
+   * the file is still listed, the delete did not take effect and we surface it
+   * so the caller retries instead of assuming success.
    * @param columnFamilyHandle column family of the target sst file.
    * @param fileToBeDeleted file metadata to be deleted.
    * @throws RocksDatabaseException if the underlying db throws an exception
-   *                                or the file is not deleted within a time limit.
+   *                                or the delete was a no-op.
    */
   public void deleteSstFileRange(
       ColumnFamilyHandle columnFamilyHandle,
@@ -211,7 +218,10 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     } catch (RocksDBException e) {
       throw new RocksDatabaseException("Failed to delete " + file, e);
     }
-    ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
+    if (getLiveMetadataForSSTFiles(get()).containsKey(
+        FilenameUtils.getBaseName(fileToBeDeleted.fileName()))) {
+      throw new RocksDatabaseException("deleteFilesInRanges was a no-op for " + file);
+    }
   }
 
   public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {

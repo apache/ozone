@@ -76,7 +76,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Base class to test snapshot functionalities.
  */
-public class TestSnapshotRequestAndResponse {
+public class SnapshotRequestAndResponseTests {
   @TempDir
   private File testDir;
 
@@ -131,11 +131,11 @@ public class TestSnapshotRequestAndResponse {
     return volumeName;
   }
 
-  protected TestSnapshotRequestAndResponse() {
+  protected SnapshotRequestAndResponseTests() {
     this.isAdmin = false;
   }
 
-  protected TestSnapshotRequestAndResponse(boolean isAdmin) {
+  protected SnapshotRequestAndResponseTests(boolean isAdmin) {
     this.isAdmin = isAdmin;
   }
 
