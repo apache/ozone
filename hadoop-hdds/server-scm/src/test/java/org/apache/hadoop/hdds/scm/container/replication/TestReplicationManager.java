@@ -1865,6 +1865,46 @@ public class TestReplicationManager {
     assertEquals(0, rm.getInflightReconstructionCount());
   }
 
+  @Test
+  public void testInflightReconstructionCountNotNegativeAfterFailoverClear()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    when(scmContext.isLeaderReady()).thenReturn(false);
+    rm.notifyStatusChanged();
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+    rm.notifyStatusChanged();
+    assertEquals(0, rm.getInflightReconstructionCount());
+
+    ContainerReplicaOp op1 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+    ContainerReplicaOp op2 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0);
+
+    rm.opCompleted(op1, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+    rm.opCompleted(op2, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+    rm.opCompleted(op1, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
   private static ByteString integers2ByteString(List<Integer> src) {
     byte[] dst = new byte[src.size()];
     for (int i = 0; i < src.size(); i++) {
