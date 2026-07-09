@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
@@ -421,7 +422,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
-    return TracingUtil.executeInNewSpan(spanName,
+    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
         () -> {
           ContainerCommandRequestProto.Builder builder =
               ContainerCommandRequestProto.newBuilder(request)
@@ -676,7 +677,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException, ExecutionException, InterruptedException {
 
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
-        "XceiverClientGrpc." + request.getCmdType().name())) {
+        "XceiverClientGrpc." + request.getCmdType().name(), SpanKind.CLIENT)) {
 
       ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)

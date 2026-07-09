@@ -21,6 +21,7 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
@@ -121,9 +122,18 @@ public final class TracingUtil {
       String spanName,
       ConfigurationSource conf,
       CheckedSupplier<R, E> supplier) throws E {
+    return execute(serviceName, spanName, SpanKind.INTERNAL, conf, supplier);
+  }
+
+  public static <R, E extends Exception> R execute(
+      String serviceName,
+      String spanName,
+      SpanKind spanKind,
+      ConfigurationSource conf,
+      CheckedSupplier<R, E> supplier) throws E {
     initTracing(serviceName, conf);
     try {
-      return executeInNewSpan(spanName, supplier);
+      return executeInNewSpan(spanName, spanKind, supplier);
     } finally {
       flushTracing();
     }
@@ -217,15 +227,18 @@ public final class TracingUtil {
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
+    return importAndCreateSpan(name, encodedParent, SpanKind.INTERNAL);
+  }
+
+  public static Span importAndCreateSpan(String name, String encodedParent,
+                                         SpanKind spanKind) {
     if (encodedParent == null || encodedParent.isEmpty()) {
-      return tracer.spanBuilder(name).setNoParent().startSpan();
+      return tracer.spanBuilder(name).setNoParent().setSpanKind(spanKind).startSpan();
     }
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
-    return tracer.spanBuilder(name)
-        .setParent(extract)
-        .startSpan();
+    return tracer.spanBuilder(name).setParent(extract).setSpanKind(spanKind).startSpan();
   }
 
   /**
@@ -298,7 +311,12 @@ public final class TracingUtil {
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
-    Span span = buildSpan(spanName);
+    executeInNewSpan(spanName, SpanKind.INTERNAL, runnable);
+  }
+
+  public static <E extends Exception> void executeInNewSpan(String spanName,
+      SpanKind spanKind, CheckedRunnable<E> runnable) throws E {
+    Span span = buildSpan(spanName, spanKind);
     executeInSpan(span, runnable);
   }
 
@@ -307,7 +325,12 @@ public final class TracingUtil {
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
-    Span span = buildSpan(spanName);
+    return executeInNewSpan(spanName, SpanKind.INTERNAL, supplier);
+  }
+
+  public static <R, E extends Exception> R executeInNewSpan(String spanName,
+      SpanKind spanKind, CheckedSupplier<R, E> supplier) throws E {
+    Span span = buildSpan(spanName, spanKind);
     return executeInSpan(span, supplier);
   }
 
@@ -361,7 +384,11 @@ public final class TracingUtil {
    * in case of Exceptions.
    */
   public static TraceCloseable createActivatedSpan(String spanName) {
-    Span span = buildSpan(spanName);
+    return createActivatedSpan(spanName, SpanKind.INTERNAL);
+  }
+
+  public static TraceCloseable createActivatedSpan(String spanName, SpanKind spanKind) {
+    Span span = buildSpan(spanName, spanKind);
     Scope scope = span.makeCurrent();
     return () -> {
       scope.close();
@@ -422,13 +449,17 @@ public final class TracingUtil {
    * otherwise, creates a root span.
    */
   private static Span buildSpan(String spanName) {
+    return buildSpan(spanName, SpanKind.INTERNAL);
+  }
+
+  private static Span buildSpan(String spanName, SpanKind spanKind) {
     Context currentContext = Context.current();
     Span parentSpan = Span.fromContext(currentContext);
 
     if (parentSpan.getSpanContext().isValid()) {
-      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+      return tracer.spanBuilder(spanName).setParent(currentContext).setSpanKind(spanKind).startSpan();
     } else {
-      return tracer.spanBuilder(spanName).setNoParent().startSpan();
+      return tracer.spanBuilder(spanName).setNoParent().setSpanKind(spanKind).startSpan();
     }
   }
 
@@ -464,6 +495,7 @@ public final class TracingUtil {
 
     Span span = tracer.spanBuilder(spanName)
         .setParent(remote)
+        .setSpanKind(SpanKind.SERVER)
         .startSpan();
 
     Scope scope = span.makeCurrent();

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.tracing;
 
 import static java.util.Collections.emptyMap;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -77,7 +78,12 @@ public class TraceAllMethod<T> implements InvocationHandler {
       }
     }
 
-    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
+    SpanKind spanKind = "close".equals(method.getName())
+        ? SpanKind.INTERNAL
+        : SpanKind.CLIENT;
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
+        name + "." + method.getName(), spanKind)) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
