@@ -349,13 +349,11 @@ public class TestSnapshotBackgroundServices {
     actionAfterStarting.run();
 
     // The recently started OM should be lagging behind the leader OM.
-    // Wait for the follower to catch up to the leader snapshot index after
-    // installing the checkpoint. Serving the bootstrap checkpoint contends
-    // with snapshot background services on the leader's bootstrap lock, so
-    // allow 30s here, matching the equivalent wait in TestOMRatisSnapshots.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 10s
     GenericTestUtils.waitFor(() ->
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= leaderOMSnapshotIndex - 1, 100, 30_000);
+            >= leaderOMSnapshotIndex - 1, 100, 10000);
 
     // Verify RPC server is running
     GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
