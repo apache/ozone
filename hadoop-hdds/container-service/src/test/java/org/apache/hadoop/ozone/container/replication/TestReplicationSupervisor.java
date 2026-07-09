@@ -1371,7 +1371,7 @@ public class TestReplicationSupervisor {
       assertFalse(pools.hasPool(volumeRoot));
 
       supervisor.addTask(createPushTask(1L));
-      assertEquals(0, supervisor.getReplicationSuccessCount());
+      assertEquals(1, supervisor.getReplicationSuccessCount());
     } finally {
       supervisor.stop();
     }

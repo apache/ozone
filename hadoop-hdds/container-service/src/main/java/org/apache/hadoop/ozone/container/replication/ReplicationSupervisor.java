@@ -310,16 +310,7 @@ public final class ReplicationSupervisor {
           k -> new AtomicInteger()).incrementAndGet();
     }
     queuedCounter.get(task.getMetricName()).incrementAndGet();
-    ExecutorService taskExecutor = selectExecutor(task);
-    if (taskExecutor == null) {
-      LOG.warn("Rejected {} in ReplicationSupervisor: no replication handler "
-          + "thread pool available", task);
-      queuedCounter.get(task.getMetricName()).decrementAndGet();
-      inFlight.remove(task);
-      decrementTaskCounter(task);
-      return;
-    }
-    taskExecutor.execute(new TaskRunner(task));
+    selectExecutor(task).execute(new TaskRunner(task));
   }
 
   private ExecutorService selectExecutor(AbstractReplicationTask task) {
@@ -348,20 +339,22 @@ public final class ReplicationSupervisor {
       return executor;
     }
     HddsVolume volume = container.getContainerData().getVolume();
+    String volumeRoot = volume == null ? "unknown"
+        : volume.getStorageDir().getPath();
     if (volume == null || volume.isFailed()) {
-      String volumeRoot = volume == null ? "unknown"
-          : volume.getStorageDir().getPath();
       LOG.warn("No per-volume replication handler thread pool available for "
-              + "container {} on volume {}; rejecting task",
+              + "container {} on volume {}; falling back to global replication "
+              + "handler thread pool",
           containerId, volumeRoot);
-      return null;
+      return executor;
     }
-    String volumeRoot = volume.getStorageDir().getPath();
     ExecutorService volumeExecutor = volumePools.getExecutor(volumeRoot);
     if (volumeExecutor == null) {
       LOG.warn("No per-volume replication handler thread pool available for "
-              + "container {} on volume {}; rejecting task",
+              + "container {} on volume {}; falling back to global replication "
+              + "handler thread pool",
           containerId, volumeRoot);
+      return executor;
     }
     return volumeExecutor;
   }
