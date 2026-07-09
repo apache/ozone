@@ -1550,6 +1550,21 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
       }
+      if (ecDecommissionReconstructionLoadFactor < 0) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be >= 0");
+      }
+      if (ecDecommissionReconstructionLoadFactor > 1) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be <= 1");
+      }
+      if (reconstructionGlobalLimit < 0) {
+        throw new IllegalArgumentException(
+            "reconstruction.global.limit is set to " + reconstructionGlobalLimit
+                + " and must be >= 0");
+      }
     }
   }
 

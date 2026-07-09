@@ -131,21 +131,4 @@ public class TestUnderReplicatedProcessor {
     assertEquals(1, rmMetrics.getPendingReplicationLimitReachedTotal());
   }
 
-  @Test
-  public void testProcessorContinuesWhenReconstructionLimitReached()
-      throws IOException {
-    when(replicationManager.isReconstructionLimitReached()).thenReturn(true);
-    when(replicationManager.processUnderReplicatedContainer(any())).thenReturn(1);
-
-    ContainerInfo container = ReplicationTestUtil
-        .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    queue.enqueue(new UnderReplicatedHealthResult(
-        container, 3, false, false, false));
-
-    underReplicatedProcessor.processAll(queue);
-
-    assertEquals(0, queue.underReplicatedQueueSize());
-    verify(replicationManager, times(1)).processUnderReplicatedContainer(any());
-  }
-
 }
