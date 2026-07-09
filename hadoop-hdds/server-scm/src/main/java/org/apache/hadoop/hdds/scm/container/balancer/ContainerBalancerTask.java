@@ -278,7 +278,7 @@ public class ContainerBalancerTask implements Runnable {
         }
         // otherwise, try to stop balancer
         tryStopWithSaveConfiguration(ContainerBalancerStopReason.INITIALIZATION_FAILED,
-            " iteration number " + i + ", " + lastInitializationFailureDetail);
+            " iteration number " + (i + 1) + ", " + lastInitializationFailureDetail);
         return;
       }
 
