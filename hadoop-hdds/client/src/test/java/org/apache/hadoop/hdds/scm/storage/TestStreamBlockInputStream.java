@@ -435,8 +435,9 @@ public class TestStreamBlockInputStream {
       ByteBuffer buf = ByteBuffer.allocate(4);
       // Before the fixes: threw NullPointerException (Bug 1) or looped forever (Bug 3).
       // After the fixes: returns gracefully with 0 / EOF rather than crashing.
-      assertDoesNotThrow(() -> sbis.read(buf),
-          "should not NPE when server completes stream without covering the seek position");
+      int bytesRead = sbis.read(buf);
+      assertEquals(-1, bytesRead, "should reach EOF when the stream completes before the seek position");
+      assertEquals(0, buf.position(), "no bytes should be produced");
     }
   }
 
