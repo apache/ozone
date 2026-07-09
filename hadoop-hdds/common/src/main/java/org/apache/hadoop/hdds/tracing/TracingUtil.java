@@ -238,10 +238,10 @@ public final class TracingUtil {
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
-    return tracer.spanBuilder(name).
-        setParent(extract).
-        setSpanKind(spanKind).
-        startSpan();
+    return tracer.spanBuilder(name)
+        .setParent(extract)
+        .setSpanKind(spanKind)
+        .startSpan();
   }
 
   /**
