@@ -465,6 +465,26 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     inflightReconstructionCount.updateAndGet(count -> Math.max(0, count - 1));
   }
 
+  private boolean tryReserveReconstructionSlot() {
+    int limit = getReconstructionInFlightLimit();
+    if (limit <= 0) {
+      return true;
+    }
+    while (true) {
+      int current = inflightReconstructionCount.get();
+      if (current >= limit) {
+        return false;
+      }
+      if (inflightReconstructionCount.compareAndSet(current, current + 1)) {
+        return true;
+      }
+    }
+  }
+
+  private void releaseReconstructionSlot() {
+    decrementInflightReconstructionCount();
+  }
+
   /**
    * Sends delete container command for the given container to the given
    * datanode.
@@ -580,23 +600,31 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
-    if (isReconstructionLimitReached()) {
+    if (!tryReserveReconstructionSlot()) {
       metrics.incrECReconstructionCmdsDeferredTotal();
       throw new CommandTargetOverloadedException(
           "Global reconstruction limit (" + getReconstructionInFlightLimit()
               + ") reached for container " + containerInfo.getContainerID());
     }
-    List<DatanodeDetails> targets = command.getTargetDatanodes();
-    List<Pair<Integer, DatanodeDetails>> targetWithCmds =
-        getAvailableDatanodesForReplication(targets);
-    if (targetWithCmds.isEmpty()) {
-      metrics.incrECReconstructionCmdsDeferredTotal();
-      throw new CommandTargetOverloadedException("No target with capacity " +
-          "available for reconstruction of " + containerInfo.getContainerID());
+    boolean sent = false;
+    try {
+      List<DatanodeDetails> targets = command.getTargetDatanodes();
+      List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+          getAvailableDatanodesForReplication(targets);
+      if (targetWithCmds.isEmpty()) {
+        metrics.incrECReconstructionCmdsDeferredTotal();
+        throw new CommandTargetOverloadedException("No target with capacity " +
+            "available for reconstruction of " + containerInfo.getContainerID());
+      }
+      DatanodeDetails target = selectAndOptionallyExcludeDatanode(
+          rmConf.getReconstructionCommandWeight(), targetWithCmds);
+      sendDatanodeCommand(command, containerInfo, target);
+      sent = true;
+    } finally {
+      if (!sent) {
+        releaseReconstructionSlot();
+      }
     }
-    DatanodeDetails target = selectAndOptionallyExcludeDatanode(
-        rmConf.getReconstructionCommandWeight(), targetWithCmds);
-    sendDatanodeCommand(command, containerInfo, target);
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
@@ -746,7 +774,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
             targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
-      inflightReconstructionCount.incrementAndGet();
       reconstructionCommandIdToPendingFragmentCount.put(cmd.getId(), targetIndexes.size());
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
