@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
+import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 
 /**
  * Tests TestOMKeyRenameResponseWithFSO.
@@ -90,7 +90,7 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         .build();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    bucketInfo = TestOMResponseUtils.createBucket(volumeName, bucketName);
+    bucketInfo = OMResponseTestUtils.createBucket(volumeName, bucketName);
   }
 
   @Override

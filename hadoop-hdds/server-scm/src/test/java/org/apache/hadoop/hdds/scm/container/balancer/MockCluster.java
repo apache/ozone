@@ -46,9 +46,9 @@ import org.slf4j.LoggerFactory;
  * 1. Fill the cluster by generating some data.
  * 2. Nodes in the cluster have utilization values determined by generateUtilization method.
  */
-public final class TestableCluster {
+public final class MockCluster {
   static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
-  private static final Logger LOG = LoggerFactory.getLogger(TestableCluster.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MockCluster.class);
   private final int nodeCount;
   private final double[] nodeUtilizationList;
   private final DatanodeUsageInfo[] nodesInCluster;
@@ -57,7 +57,7 @@ public final class TestableCluster {
   private final Map<DatanodeUsageInfo, Set<ContainerID>> dnUsageToContainersMap = new HashMap<>();
   private final double averageUtilization;
 
-  TestableCluster(int numberOfNodes, long storageUnit) {
+  MockCluster(int numberOfNodes, long storageUnit) {
     nodeCount = numberOfNodes;
     nodeUtilizationList = createUtilizationList(nodeCount);
     nodesInCluster = new DatanodeUsageInfo[nodeCount];

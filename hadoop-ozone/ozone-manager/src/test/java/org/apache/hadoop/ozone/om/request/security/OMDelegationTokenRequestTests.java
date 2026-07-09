@@ -15,49 +15,50 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.volume;
+package org.apache.hadoop.ozone.om.request.security;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Base test class for OM volume response.
+ * Base class for testing OM delegation token request.
  */
-public class TestOMVolumeResponse {
+@SuppressWarnings("visibilitymodifier")
+public class OMDelegationTokenRequestTests {
+
   @TempDir
   private Path folder;
 
-  private OMMetadataManager omMetadataManager;
-  private BatchOperation batchOperation;
+  protected OzoneManager ozoneManager;
+  protected OMMetadataManager omMetadataManager;
+  protected ConfigurationSource conf;
 
   @BeforeEach
   public void setup() throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
-    batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ozoneManager = mock(OzoneManager.class);
+
+    conf = new OzoneConfiguration();
+    ((OzoneConfiguration) conf)
+        .set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
+    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf,
+        ozoneManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
   }
 
   @AfterEach
-  public void tearDown() {
-    if (batchOperation != null) {
-      batchOperation.close();
-    }
-  }
-
-  protected OMMetadataManager getOmMetadataManager() {
-    return omMetadataManager;
-  }
-
-  protected BatchOperation getBatchOperation() {
-    return batchOperation;
+  public void stop() {
+    framework().clearInlineMocks();
   }
 }

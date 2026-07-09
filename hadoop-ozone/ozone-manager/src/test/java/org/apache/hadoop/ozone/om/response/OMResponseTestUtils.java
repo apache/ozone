@@ -15,34 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.loadgenerators;
+package org.apache.hadoop.ozone.om.response;
 
-import org.apache.commons.lang3.RandomUtils;
+import static java.util.Collections.singletonMap;
+
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.util.Time;
 
 /**
- * A load generator where directories are read multiple times.
+ * Helper class to test OMClientResponse classes.
  */
-public class AgedDirLoadGenerator extends LoadGenerator {
-  private final LoadBucket fsBucket;
-  private final int maxDirIndex;
+public final class OMResponseTestUtils {
 
-  public AgedDirLoadGenerator(DataBuffer dataBuffer, LoadBucket fsBucket) {
-    this.fsBucket = fsBucket;
-    this.maxDirIndex = 100;
+  // No one can instantiate, this is just utility class with all static methods.
+  private OMResponseTestUtils() {
   }
 
-  @Override
-  public void generateLoad() throws Exception {
-    int index = RandomUtils.secure().randomInt(0, maxDirIndex);
-    String keyName = getKeyName(index);
-    fsBucket.readDirectory(keyName);
+  public static OmBucketInfo createBucket(String volume, String bucket) {
+    return OmBucketInfo.newBuilder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setCreationTime(Time.now())
+        .setIsVersionEnabled(true)
+        .addAllMetadata(singletonMap("key1", "value1"))
+        .build();
+
   }
 
-  @Override
-  public void initialize() throws Exception {
-    for (int i = 0; i < maxDirIndex; i++) {
-      String keyName = getKeyName(i);
-      fsBucket.createDirectory(keyName);
-    }
-  }
 }

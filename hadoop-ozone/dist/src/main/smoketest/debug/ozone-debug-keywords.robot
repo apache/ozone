@@ -63,12 +63,25 @@ Check Container State Replicas
         ${checks} =       Get From Dictionary    ${replica}    checks
         ${check} =        Get From List          ${checks}     0
         Should Be Equal    ${check['type']}    containerState
-        Should Be Equal    ${check['pass']}    ${False}
-        ${actual_message} =    Set Variable    ${check['failures'][0]['message']}
-
-        Run Keyword If    '${hostname}' == '${faulty_datanode}'    Should Contain    ${actual_message}    ${expected_message}
-        ...    ELSE    Should Match Regexp    ${actual_message}    Replica state is (OPEN|CLOSING|QUASI_CLOSED|CLOSED)
+        Run Keyword If    '${hostname}' == '${faulty_datanode}'    Check Replica Failed    ${replica}  containerState  ${expected_message}
+        ...    ELSE    Check Healthy Replica Container State    ${replica}
     END
+
+Check Healthy Replica Container State
+    [Arguments]    ${replica}
+    ${checks} =     Get From Dictionary    ${replica}    checks
+    ${check} =      Get From List          ${checks}     0
+    Should Be Equal    ${check['type']}    containerState
+    Run Keyword If    ${check['pass']}    Check Replica Passed    ${replica}  containerState
+    ...    ELSE    Check Replica Failed Container State    ${replica}
+
+Check Replica Failed Container State
+    [Arguments]    ${replica}
+    ${checks} =     Get From Dictionary    ${replica}    checks
+    ${check} =      Get From List          ${checks}     0
+    Should Be Equal    ${check['type']}    containerState
+    Should Be Equal    ${check['pass']}    ${False}
+    Should Match Regexp    ${check['failures'][0]['message']}    Replica state is (OPEN|CLOSING|QUASI_CLOSED|CLOSED)
 
 Check Replica Failed
     [Arguments]    ${replica}  ${check_type}  ${expected_message}
@@ -101,3 +114,23 @@ Get key names from output
         Append To List    ${key_names}    ${key_name}
     END
     [Return]       ${key_names}
+
+Get chunk-info block sizes by group
+    ${output} =    Execute          ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} | jq -c '[.keyLocations[] | [.[] | {i: .replicaIndex, s: .blockData.size}] | sort_by(.i) | map(.s)]'
+    [Return]       ${output}
+
+Verify chunk-info block sizes
+    [Arguments]    ${expected_json}
+    ${actual_json} =    Get chunk-info block sizes by group
+    ${actual} =    Evaluate    json.dumps(json.loads('''${actual_json}'''.strip()))    json, json
+    ${expected} =    Evaluate    json.dumps(json.loads('''${expected_json}'''))    json, json
+    Should Be Equal As Strings    ${actual}    ${expected}
+
+Create EC key
+    [Arguments]    ${ec_data}    ${ec_parity}    ${file_size}
+    Execute    dd if=/dev/urandom of=${TEMP_DIR}/testfile bs=1 count=${file_size}
+    Execute    ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${ec_data}-${ec_parity}-1024k -t EC
+
+Create Volume Bucket
+    Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
+    Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}

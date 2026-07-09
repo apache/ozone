@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * Tests OMKeyRenameResponse.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public class TestOMKeyRenameResponse extends TestOMKeyResponse {
+public class TestOMKeyRenameResponse extends OMKeyResponseTests {
   protected OmKeyInfo fromKeyParent;
   protected OmKeyInfo toKeyParent;
   protected OmBucketInfo bucketInfo;
