@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -68,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -729,6 +731,22 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  private static ContainerCommandRequestProto withCreatableFalse(
+      ContainerCommandRequestProto writeChunk) {
+    WriteChunkRequestProto wc = writeChunk.getWriteChunk();
+    ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo.newBuilder(wc.getChunkData())
+        .addMetadata(ContainerProtos.KeyValue.newBuilder()
+            .setKey(OzoneConsts.CONTAINER_CREATABLE)
+            .setValue(OzoneConsts.CONTAINER_CREATABLE_FALSE)
+            .build())
+        .build();
+    return ContainerCommandRequestProto.newBuilder(writeChunk)
+        .setWriteChunk(WriteChunkRequestProto.newBuilder(wc)
+            .setChunkData(chunk)
+            .build())
+        .build();
+  }
+
   static ChecksumData checksum(ByteString data) {
     try {
       return new Checksum(ContainerProtos.ChecksumType.CRC32, 256)
@@ -1005,6 +1023,24 @@ public class TestHddsDispatcher {
       volumeSet.shutdown();
       ContainerMetrics.remove();
     }
+  }
+
+  @Test
+  public void testEcReconstructionWriteChunkDeniedWhenContainerCreatableFalse()
+      throws IOException {
+    String testDirPath = testDir.getPath();
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf);
+    long containerId = 99L;
+
+    ContainerCommandResponseProto response = dispatcher.dispatch(
+        withCreatableFalse(getWriteChunkRequest(dd.getUuidString(), containerId, 1L)), null);
+    assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+    assertNull(dispatcher.getContainer(containerId));
   }
 
   static DispatcherContext newContext(Op op) {

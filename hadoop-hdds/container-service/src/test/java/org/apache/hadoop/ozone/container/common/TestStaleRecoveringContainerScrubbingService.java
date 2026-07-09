@@ -187,4 +187,26 @@ public class TestStaleRecoveringContainerScrubbingService {
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
   }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testUpdateRecoveringContainerTimeoutExtendsScrubDeadline(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initVersionInfo(versionInfo);
+    ContainerSet containerSet = newContainerSet(1000, testClock);
+    StaleRecoveringContainerScrubbingService srcss =
+        new StaleRecoveringContainerScrubbingService(
+            50, TimeUnit.MILLISECONDS, 10,
+            Duration.ofSeconds(300).toMillis(),
+            containerSet);
+    List<Long> ids = createTestContainers(containerSet, 1, RECOVERING);
+    long containerId = ids.get(0);
+    testClock.fastForward(800L);
+    containerSet.updateRecoveringContainerTimeout(containerId);
+    testClock.fastForward(800L);
+    srcss.runPeriodicalTaskNow();
+    assertEquals(RECOVERING, containerSet.getContainer(containerId).getContainerState());
+    testClock.fastForward(500L);
+    srcss.runPeriodicalTaskNow();
+    assertEquals(UNHEALTHY, containerSet.getContainer(containerId).getContainerState());
+  }
 }

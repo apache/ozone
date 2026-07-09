@@ -1105,7 +1105,16 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    maybeUpdateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private void maybeUpdateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
+    if (kvContainer.getContainerState() != RECOVERING) {
+      return;
+    }
+    containerSet.updateRecoveringContainerTimeout(
+        kvContainer.getContainerData().getContainerID());
   }
 
   /**

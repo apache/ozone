@@ -18,7 +18,10 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_CREATABLE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_CREATABLE_FALSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,6 +37,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -52,6 +56,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -129,6 +134,35 @@ class TestBlockOutputStreamCorrectness {
         pipeline)) {
       Assertions.assertDoesNotThrow(() -> ecBlockOutputStream.executePutBlock(true, true, locationInfo.getLength(),
           blockData));
+    }
+  }
+
+  @Test
+  public void testEcReconstructionWriteChunkSetsContainerCreatableFalse() throws IOException {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    BlockID blockID = new BlockID(1, 1);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        blockID, pipeline)) {
+      ContainerProtos.ChunkInfo chunk = ecBlockOutputStream.decorateChunkInfo(
+          ContainerProtos.ChunkInfo.newBuilder()
+              .setChunkName("chunk")
+              .setOffset(0)
+              .setLen(1)
+              .setChecksumData(Checksum.getNoChecksumDataProto()))
+          .build();
+      assertTrue(chunk.getMetadataList().stream()
+          .anyMatch(kv -> CONTAINER_CREATABLE.equals(kv.getKey())
+              && CONTAINER_CREATABLE_FALSE.equals(kv.getValue())));
     }
   }
 

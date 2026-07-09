@@ -403,4 +403,24 @@ public final class ContainerUtils {
               " not support.");
     }
   }
+
+  /**
+   * @return true if the DataNode may auto-create a missing container for this WriteChunk request
+   */
+  public static boolean isContainerCreatable(ContainerCommandRequestProto request) {
+    if (!request.hasWriteChunk()) {
+      return true;
+    }
+    ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+    if (!writeChunk.hasChunkData()) {
+      return true;
+    }
+    for (ContainerProtos.KeyValue kv : writeChunk.getChunkData().getMetadataList()) {
+      if (OzoneConsts.CONTAINER_CREATABLE.equals(kv.getKey())
+          && OzoneConsts.CONTAINER_CREATABLE_FALSE.equals(kv.getValue())) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

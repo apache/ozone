@@ -441,6 +441,16 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * Reset the stale recovering scrub deadline for an active RECOVERING container.
+   */
+  public void updateRecoveringContainerTimeout(long containerId) {
+    Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
+    removeRecoveringContainer(containerId);
+    recoveringContainerSet.add(
+        new RecoveringContainer(clock.millis() + recoveringTimeout, containerId));
+  }
+
+  /**
    * Return number of containers in container map.
    * @return container count
    */

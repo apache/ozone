@@ -91,6 +91,14 @@ public class ECBlockOutputStream extends BlockOutputStream {
   }
 
   @Override
+  protected ChunkInfo.Builder decorateChunkInfo(ChunkInfo.Builder builder) {
+    return builder.addMetadata(ContainerProtos.KeyValue.newBuilder()
+        .setKey(OzoneConsts.CONTAINER_CREATABLE)
+        .setValue(OzoneConsts.CONTAINER_CREATABLE_FALSE)
+        .build());
+  }
+
+  @Override
   public synchronized void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(
