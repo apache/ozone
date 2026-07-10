@@ -66,6 +66,23 @@ for dn_container in ${datanodes}; do
   wait_for_datanode "${dn_container}" HEALTHY 60
 done
 
+# A datanode reporting HEALTHY only means SCM sees its heartbeat again; the
+# write pipelines it belonged to are not necessarily re-established yet. Wait
+# for an OPEN RATIS THREE pipeline before running the debug test, whose
+# "Write keys" suite setup writes RATIS THREE and EC keys and otherwise fails
+# with a non-zero exit when no pipeline is available after the restart above.
+echo "Waiting for an OPEN RATIS THREE pipeline before writing keys"
+SECONDS=0
+until [[ "$(docker-compose exec -T ${SCM} bash -c \
+    "ozone admin pipeline list --state OPEN --type RATIS --replication THREE --json" 2>/dev/null \
+    | jq -r 'length')" -ge 1 ]]; do
+  if [[ $SECONDS -ge 180 ]]; then
+    echo "Timed out waiting for an OPEN RATIS THREE pipeline" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 
 # get block locations for key
