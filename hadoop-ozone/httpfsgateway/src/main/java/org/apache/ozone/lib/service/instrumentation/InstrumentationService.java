@@ -248,7 +248,7 @@ public class InstrumentationService extends BaseService
     }
 
     @JsonValue
-    private Map<String, Object> getJSON() {
+    Map<String, Object> getJSON() {
       long[] values = getValues();
       Map<String, Object> json = new LinkedHashMap<>();
       json.put("lastTotal", values[0]);
@@ -295,7 +295,7 @@ public class InstrumentationService extends BaseService
     }
 
     @JsonValue
-    private Map<String, Object> getJSON() {
+    Map<String, Object> getJSON() {
       Map<String, Object> json = new LinkedHashMap<>();
       json.put("value", var.getValue());
       return json;
@@ -339,7 +339,7 @@ public class InstrumentationService extends BaseService
     }
 
     @JsonValue
-    private Map<String, Object> getJSON() {
+    Map<String, Object> getJSON() {
       Map<String, Object> json = new LinkedHashMap<>();
       json.put("sampler", getRate());
       json.put("size", (full) ? values.length : last);
