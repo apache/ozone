@@ -1786,7 +1786,7 @@ public final class FSOperations {
       Path snapshotPath = fs.createSnapshot(path, snapshotName);
       Map<String, Object> json = toJSON(HttpFSConstants.HOME_DIR_JSON,
           snapshotPath.toString());
-      return JsonUtil.toJsonString(json).replaceAll("\\\\", "");
+      return JsonUtil.toJsonString(json);
     }
   }
 

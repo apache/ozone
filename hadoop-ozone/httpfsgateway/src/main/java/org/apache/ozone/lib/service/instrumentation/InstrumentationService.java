@@ -282,8 +282,8 @@ public class InstrumentationService extends BaseService
   }
 
   static class VariableHolder<E> {
-    // Supressed, because it is only used in this class or in test files,
-    // but the tests will be removed later.
+    // Package-private and mutable so the enclosing service can assign it
+    // directly; suppress the visibility check.
     @SuppressWarnings("checkstyle:VisibilityModifier")
     Variable<E> var;
 
