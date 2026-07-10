@@ -70,7 +70,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
-  private MockClock mockClock;
+  private MockClock testClock;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -93,10 +93,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
     ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
     ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
-    mockClock = MockClock.newInstance();
+    testClock = MockClock.newInstance();
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
-        reconGlobalStatsManager, reconFileMetadataManager, mockClock);
+        reconGlobalStatsManager, reconFileMetadataManager, testClock);
     reconTaskController.start();
   }
 
@@ -588,7 +588,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Iterations 1-6: should return RETRY_LATER and increment retry count
     for (int i = 1; i <= 6; i++) {
       if (i > 1) {
-        mockClock.fastForward(2100); // Advance virtual time past the retry delay
+        testClock.fastForward(2100); // Advance virtual time past the retry delay
       }
       result = controllerSpy.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
@@ -599,7 +599,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     // Iteration 7: should return MAX_RETRIES_EXCEEDED (eventProcessRetryCount is now 6,
     // which >= MAX_EVENT_PROCESS_RETRIES)
-    mockClock.fastForward(2100); // Advance virtual time past the retry delay
+    testClock.fastForward(2100); // Advance virtual time past the retry delay
     result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
@@ -680,7 +680,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertTrue(controllerSpy.hasTasksFailed(), "tasksFailed should still be true, triggering retry");
     
     // Advance virtual time past the retry delay before attempting to queue again (RETRY_DELAY_MS = 2000)
-    mockClock.fastForward(2100);
+    testClock.fastForward(2100);
     
     // Queue another reinitialization event (simulating what syncDataFromOM does)
     ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(

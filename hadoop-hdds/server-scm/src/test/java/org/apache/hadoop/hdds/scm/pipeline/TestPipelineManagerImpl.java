@@ -124,11 +124,11 @@ public class TestPipelineManagerImpl {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private StorageContainerManager scm;
-  private MockClock mockClock;
+  private MockClock testClock;
 
   @BeforeEach
   void init(@TempDir File testDir, @TempDir File dbDir) throws Exception {
-    mockClock = new MockClock(Instant.now(), ZoneOffset.UTC);
+    testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf(dbDir);
     scm = HddsTestUtils.getScm(SCMTestUtils.getConf(testDir));
 
@@ -167,7 +167,7 @@ public class TestPipelineManagerImpl {
         new EventQueue(),
         scmContext,
         serviceManager,
-        mockClock);
+        testClock);
   }
 
   private PipelineManagerImpl createPipelineManager(
@@ -531,7 +531,7 @@ public class TestPipelineManagerImpl {
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
 
     // Set the clock to "now". All pipelines were created before this.
-    mockClock.set(Instant.now());
+    testClock.set(Instant.now());
 
     pipelineManager.scrubPipelines();
 
@@ -549,7 +549,7 @@ public class TestPipelineManagerImpl {
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
 
-    mockClock.fastForward((60000));
+    testClock.fastForward((60000));
 
     pipelineManager.scrubPipelines();
 
@@ -599,7 +599,7 @@ public class TestPipelineManagerImpl {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       assertAllocate(pipelineManager);
       changeToFollower(pipelineManager);
-      mockClock.fastForward(20000);
+      testClock.fastForward(20000);
       assertThrows(SCMException.class,
           pipelineManager::scrubPipelines);
     }

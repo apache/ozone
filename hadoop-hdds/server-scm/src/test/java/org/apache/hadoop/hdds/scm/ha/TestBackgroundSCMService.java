@@ -40,18 +40,18 @@ import org.junit.jupiter.api.Test;
  * */
 public class TestBackgroundSCMService {
   private BackgroundSCMService backgroundSCMService;
-  private MockClock mockClock;
+  private MockClock testClock;
   private SCMContext scmContext;
   private PipelineManager pipelineManager;
 
   @BeforeEach
   public void setup() throws IOException, TimeoutException {
-    mockClock = new MockClock(Instant.now(), ZoneOffset.UTC);
+    testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
     scmContext = SCMContext.emptyContext();
     this.pipelineManager = mock(PipelineManager.class);
     doNothing().when(pipelineManager).scrubPipelines();
     this.backgroundSCMService = new BackgroundSCMService.Builder()
-        .setClock(mockClock)
+        .setClock(testClock)
         .setScmContext(scmContext)
         .setServiceName("testBackgroundService")
         .setIntervalInMillis(1L)
@@ -87,7 +87,7 @@ public class TestBackgroundSCMService {
     // Still cannot run, as the safemode delay has not passed.
     assertFalse(backgroundSCMService.shouldRun());
 
-    mockClock.fastForward(60000);
+    testClock.fastForward(60000);
     assertTrue(backgroundSCMService.shouldRun());
 
     // go into safe mode, RUNNING -> PAUSING
@@ -103,7 +103,7 @@ public class TestBackgroundSCMService {
     synchronized (backgroundSCMService) {
       backgroundSCMService.notifyStatusChanged();
       assertFalse(backgroundSCMService.shouldRun());
-      mockClock.fastForward(60000);
+      testClock.fastForward(60000);
       assertTrue(backgroundSCMService.shouldRun());
       backgroundSCMService.runImmediately();
     }

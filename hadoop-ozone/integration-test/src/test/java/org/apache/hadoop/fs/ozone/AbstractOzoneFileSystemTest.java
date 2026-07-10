@@ -1203,7 +1203,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       throws IOException {
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
-    final MockClock mockClock = new MockClock(Instant.now(), ZoneOffset.UTC);
+    final MockClock testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
@@ -1217,7 +1217,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       OzoneFileSystem o3FS = (OzoneFileSystem) fileSystem;
 
       //Let's reset the clock to control the time.
-      ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(mockClock);
+      ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
 
       createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
           ReplicationType.RATIS);
@@ -1229,7 +1229,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
           ReplicationType.RATIS);
 
-      mockClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
       //After client bucket refresh time, it should create new type what is
       // available on bucket at that moment.
@@ -1244,7 +1244,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
           ReplicationType.EC);
 
-      mockClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
       createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
           ReplicationType.RATIS);

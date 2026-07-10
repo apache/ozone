@@ -114,13 +114,13 @@ public class TestDeleteContainerCommandHandler {
     when(context.getTermOfLeaderSCM())
         .thenReturn(OptionalLong.of(command.getTerm()));
 
-    MockClock mockClock = new MockClock(Instant.now(), ZoneId.systemDefault());
+    MockClock testClock = new MockClock(Instant.now(), ZoneId.systemDefault());
     CountDownLatch latch = new CountDownLatch(1);
     ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
     ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
         threadFactory, latch);
     DeleteContainerCommandHandler subject = new DeleteContainerCommandHandler(
-        mockClock, executor, 100);
+        testClock, executor, 100);
 
     // WHEN
     subject.handle(command, ozoneContainer, context, null);

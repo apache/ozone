@@ -52,7 +52,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static final MockClock MOCK_CLOCK = MockClock.newInstance();
+  private static final MockClock TEST_CLOCK = MockClock.newInstance();
 
   @TempDir
   private static Path volumePath;
@@ -63,21 +63,21 @@ public class TestStorageVolumeHealthChecks {
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(MOCK_CLOCK);
+            .clock(TEST_CLOCK);
 
     MetadataVolume.Builder metadataVolumeBuilder =
         new MetadataVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(MOCK_CLOCK);
+            .clock(TEST_CLOCK);
 
     DbVolume.Builder dbVolumeBuilder =
         new DbVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(MOCK_CLOCK);
+            .clock(TEST_CLOCK);
 
     return Stream.of(
         Arguments.of(Named.of("HDDS Volume", hddsVolumeBuilder)),
@@ -92,7 +92,7 @@ public class TestStorageVolumeHealthChecks {
     // needs to be cleared before each test.
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
-    MOCK_CLOCK.set(Instant.now());
+    TEST_CLOCK.set(Instant.now());
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckEnabled(true);
     dnConf.setDiskCheckTimeoutTestEnabled(true);
@@ -305,7 +305,7 @@ public class TestStorageVolumeHealthChecks {
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
-      MOCK_CLOCK.fastForward(eventRateMillis);
+      TEST_CLOCK.fastForward(eventRateMillis);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
@@ -391,7 +391,7 @@ public class TestStorageVolumeHealthChecks {
 
     assertFalse(volume.recordTimeoutAndCheckFailure(),
         "First timeout should be tolerated");
-    MOCK_CLOCK.fastForward(
+    TEST_CLOCK.fastForward(
         volume.getTimeoutFailureSlidingWindow().getExpiryDurationMillis() + 1);
 
     assertFalse(volume.recordTimeoutAndCheckFailure(),
