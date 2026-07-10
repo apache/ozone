@@ -1344,7 +1344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public NetworkTopology getClusterMap() {
     return requireNonNull(getClusterMapAllowNull(),
-        "ScmBlockLocationClient must have been initialized already.");
+        "OM topology cache has not been initialized yet.");
   }
 
   public NetworkTopology getClusterMapAllowNull() {

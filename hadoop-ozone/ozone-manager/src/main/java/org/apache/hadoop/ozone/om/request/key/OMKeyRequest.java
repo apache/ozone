@@ -202,6 +202,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final String scmClientMachine;
     final String omClientMachine;
     final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes;
+    final String remoteAddress = userInfo.getRemoteAddress();
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
         ? ozoneManager.getClusterMapAllowNull() : null;
@@ -209,12 +210,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
       scmClientMachine = "";
       omClientMachine = "";
       sortedByNodes = null;
-    } else if (clusterMap != null) {
+    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
+      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
       scmClientMachine = "";
-      omClientMachine = userInfo.getRemoteAddress();
+      omClientMachine = remoteAddress;
       sortedByNodes = new HashMap<>();
     } else {
-      scmClientMachine = userInfo.getRemoteAddress();
+      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
+      // sorting for an empty client machine).
+      scmClientMachine = remoteAddress;
       omClientMachine = "";
       sortedByNodes = null;
     }

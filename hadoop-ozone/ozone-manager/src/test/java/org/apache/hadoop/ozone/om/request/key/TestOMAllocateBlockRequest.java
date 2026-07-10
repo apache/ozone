@@ -364,6 +364,46 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testAllocateBlockKeepsOrderWhenRemoteAddressEmpty() throws Exception {
+    // Sort enabled and topology available, but the client has no remote address:
+    // OM must not sort, SCM receives an empty clientMachine, and the pipeline
+    // order is preserved.
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .build();
+    AllocatedBlock block = new AllocatedBlock.Builder().setPipeline(pipeline)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        .thenReturn(Collections.singletonList(block));
+
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("").build(), ozoneManager);
+
+    assertEquals("", clientMachine.getValue());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString());
+    assertEquals(1, locations.size());
+    assertEquals(nodes, locations.get(0).getPipeline().getNodes());
+  }
+
+  @Test
   public void sortDatanodesForWriteRequiresClientMachine() {
     List<DatanodeDetails> nodes = Arrays.asList(
         MockDatanodeDetails.randomDatanodeDetails(),
