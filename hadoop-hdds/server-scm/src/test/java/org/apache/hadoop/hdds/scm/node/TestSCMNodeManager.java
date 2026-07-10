@@ -215,8 +215,7 @@ public class TestSCMNodeManager {
    * safe Mode.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmHeartbeat()

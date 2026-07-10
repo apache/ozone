@@ -178,6 +178,7 @@ public class TestContainerPlacement {
    *
    * @throws IOException
    * @throws InterruptedException
+   * @throws TimeoutException
    */
   @Test
   public void testContainerPlacementCapacity() throws IOException,
