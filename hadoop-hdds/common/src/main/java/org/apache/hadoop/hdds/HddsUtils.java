@@ -229,6 +229,21 @@ public final class HddsUtils {
   }
 
   /**
+   * Combine a host and port into a "host:port" string, wrapping the host in
+   * square brackets when it is an IPv6 literal (for example
+   * {@code [2001:db8::1]:9858}). A bare IPv6 literal joined to a port with a
+   * plain colon is ambiguous and cannot be parsed by Ratis/gRPC targets or
+   * URI-based address parsers.
+   *
+   * @param host a hostname, IPv4 literal, or (bracketed or bare) IPv6 literal
+   * @param port the port number
+   * @return the combined address, bracketed for IPv6 literals
+   */
+  public static String getHostPortString(String host, int port) {
+    return HostAndPort.fromParts(host, port).toString();
+  }
+
+  /**
    * Retrieve a number, trying the supplied config keys in order.
    * Each config value may be absent
    *

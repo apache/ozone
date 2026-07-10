@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
-import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
+import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,7 +90,7 @@ public class TestOMDirectoryCreateResponseWithFSO {
             .build();
     ThreadLocalRandom random = ThreadLocalRandom.current();
     long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
-    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+    OmBucketInfo omBucketInfo = OMResponseTestUtils.createBucket(
         volumeName, bucketName);
     omBucketInfo = omBucketInfo.toBuilder()
         .setUsedNamespace(usedNamespace).build();

@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -68,7 +68,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMSnapshotCreateRequest class, which handles CreateSnapshot request.
  */
-public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests {
   private String snapshotName1;
   private String snapshotName2;
   private String snapshotName3;

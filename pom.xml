@@ -92,7 +92,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <iceberg.version>1.10.1</iceberg.version>
+    <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
     <jackson2-bom.version>2.21.4</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
@@ -118,7 +118,6 @@
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
-    <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.14.4</junit5.version>
@@ -159,7 +158,7 @@
     <native.lib.tmp.dir />
     <netty.version>4.1.135.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
-    <nodejs.version>20.18.2</nodejs.version>
+    <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <opentelemetry.version>1.63.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
@@ -455,11 +454,6 @@
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.googlecode.json-simple</groupId>
-        <artifactId>json-simple</artifactId>
-        <version>${json-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jcraft</groupId>

@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -56,10 +57,11 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
@@ -67,12 +69,10 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +113,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // transaction (recursive directory creations) is 2^8 - 1 as only 8
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
+  private static final Set<AccessModeProto> READ_WRITE = EnumSet.of(READ, WRITE);
 
   protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
@@ -179,22 +181,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  /**
-   * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
-   * in one rpc call.
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
+  /** Allocate multiple blocks using one rpc to SCM. */
+  protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
-      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      long requestedSize, boolean shouldSortDatanodes,
+      UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    final long scmBlockSize = ozoneManager.getScmBlockSize();
+
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = (int) Math.min(preallocateBlocksMax,
+    final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
     String clientMachine = "";
@@ -204,15 +201,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    final List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+      allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, clientMachine);
     } catch (SCMException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+      ozoneManager.getMetrics().incNumBlockAllocateCallFails();
+      if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
@@ -225,9 +220,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setLength(scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
-      if (grpcBlockTokenEnabled) {
-        builder.setToken(secretManager.generateToken(remoteUser, blockID,
-            EnumSet.of(READ, WRITE), scmBlockSize));
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
+            remoteUser, blockID, READ_WRITE, scmBlockSize);
+        builder.setToken(token);
       }
       locationInfos.add(builder.build());
     }

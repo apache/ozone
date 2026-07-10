@@ -25,10 +25,10 @@ import org.apache.hadoop.util.Time;
 /**
  * Helper class to test OMClientResponse classes.
  */
-public final class TestOMResponseUtils {
+public final class OMResponseTestUtils {
 
   // No one can instantiate, this is just utility class with all static methods.
-  private TestOMResponseUtils() {
+  private OMResponseTestUtils() {
   }
 
   public static OmBucketInfo createBucket(String volume, String bucket) {

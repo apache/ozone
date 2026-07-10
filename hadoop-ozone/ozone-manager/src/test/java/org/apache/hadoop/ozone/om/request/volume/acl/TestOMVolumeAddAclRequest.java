@@ -27,7 +27,7 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
+import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests volume addAcl request.
  */
-public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
+public class TestOMVolumeAddAclRequest extends OMVolumeRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

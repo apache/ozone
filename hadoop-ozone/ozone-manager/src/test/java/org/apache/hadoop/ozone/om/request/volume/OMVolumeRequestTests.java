@@ -48,7 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Base test class for Volume request.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMVolumeRequest {
+public class OMVolumeRequestTests {
 
   @TempDir
   private Path folder;

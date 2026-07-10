@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Base test class for Bucket request.
  */
 @SuppressWarnings("visibilityModifier")
-public class TestBucketRequest {
+public class BucketRequestTests {
   @TempDir
   private Path folder;
 

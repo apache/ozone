@@ -15,50 +15,45 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.security;
+package org.apache.hadoop.ozone.om.response.security;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.mockito.Mockito.framework;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
+import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Base class for testing OM delegation token request.
- */
+/** Base test class for delegation token response. */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMDelegationTokenRequest {
+public class OMDelegationTokenResponseTests {
 
   @TempDir
   private Path folder;
 
-  protected OzoneManager ozoneManager;
-  protected OMMetadataManager omMetadataManager;
   protected ConfigurationSource conf;
+  protected OMMetadataManager omMetadataManager;
+  protected BatchOperation batchOperation;
 
   @BeforeEach
-  public void setup() throws Exception {
-    ozoneManager = mock(OzoneManager.class);
-
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    ((OzoneConfiguration) conf)
-        .set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
+    ((OzoneConfiguration) conf).set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf,
-        ozoneManager);
-    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+        null);
+    batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
   @AfterEach
-  public void stop() {
-    framework().clearInlineMocks();
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 }
