@@ -514,10 +514,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return cluster;
     }
 
-    protected int numberOfOzoneManagers() {
-      return numOfOMs;
-    }
-
     protected void initOMRatisConf() {
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.

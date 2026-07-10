@@ -114,7 +114,11 @@ public class BucketEndpoint extends BucketOperationHandler {
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
-    ContinueToken decodedToken = ContinueToken.decodeFromString(continueToken);
+    // AWS S3 treats an empty continuation-token as no token: list from the
+    // start and echo the empty token back (see setContinueToken below).
+    ContinueToken decodedToken =
+        (continueToken == null || continueToken.isEmpty())
+            ? null : ContinueToken.decodeFromString(continueToken);
     OzoneBucket bucket = null;
 
     try {
@@ -127,7 +131,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
       // If continuation token and start after both are provided, then we
       // ignore start After
-      String prevKey = continueToken != null ? decodedToken.getLastKey()
+      String prevKey = decodedToken != null ? decodedToken.getLastKey()
           : startAfter;
 
       // If shallow is true, only list immediate children
@@ -175,7 +179,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    String prevDir = continueToken != null ? decodedToken.getLastDir() : null;
+    String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {

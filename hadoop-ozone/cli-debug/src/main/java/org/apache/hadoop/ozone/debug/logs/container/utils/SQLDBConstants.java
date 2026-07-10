@@ -86,31 +86,41 @@ public final class SQLDBConstants {
   public static final String CREATE_DCL_STATE_CONTAINER_DATANODE_TIME_INDEX =
       "CREATE INDEX IF NOT EXISTS idx_dcl_state_container_datanode_time " +
           "ON DatanodeContainerLogTable(container_state, container_id, datanode_id, timestamp DESC);";
-  public static final String SELECT_REPLICATED_CONTAINERS =
-          "SELECT container_id, COUNT(DISTINCT datanode_id) AS replica_count\n" +
-                  "FROM ContainerLogTable\n" +
-                  "WHERE latest_state != '" + DELETED_STATE + "'\n" +
-                  " GROUP BY container_id\n" +
-                  "HAVING COUNT(DISTINCT datanode_id) {operator} ?";
+
+  private static final String REPLICA_COUNTS_CTE =
+      "  SELECT\n" +
+      "    container_id,\n" +
+      "    SUM(CASE WHEN latest_state != '" + UNHEALTHY_STATE + "' THEN 1 ELSE 0 END) AS count_a,\n" +
+      "    SUM(CASE WHEN latest_state = '" + UNHEALTHY_STATE + "' THEN 1 ELSE 0 END) AS count_b,\n" +
+      "    COUNT(DISTINCT datanode_id) AS count_c\n" +
+      "  FROM ContainerLogTable\n" +
+      "  WHERE latest_state != '" + DELETED_STATE + "'\n" +
+      "  GROUP BY container_id\n";
+  
+  public static final String SELECT_UNDER_REPLICATED_CONTAINERS =
+      "WITH replica_counts AS (\n" +
+          REPLICA_COUNTS_CTE +
+          ")\n" +
+          "SELECT container_id, count_c AS replica_count\n" +
+          "FROM replica_counts\n" +
+          "WHERE count_a < ?\n" +
+          "ORDER BY container_id";
+  public static final String SELECT_OVER_REPLICATED_CONTAINERS =
+      "WITH replica_counts AS (\n" +
+          REPLICA_COUNTS_CTE +
+          ")\n" +
+          "SELECT container_id, count_c AS replica_count\n" +
+          "FROM replica_counts\n" +
+          "WHERE count_c > ? AND count_a >= ?\n" +
+          "ORDER BY container_id";
   public static final String SELECT_UNHEALTHY_CONTAINERS =
-      "SELECT u.container_id, COUNT(*) AS unhealthy_replica_count\n" +
-          "FROM (\n" +
-          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_unhealthy_timestamp\n" +
-          "    FROM DatanodeContainerLogTable\n" +
-          "    WHERE container_state = '" + UNHEALTHY_STATE + "'\n" +
-          "    GROUP BY container_id, datanode_id\n" +
-          ") AS u\n" +
-          "LEFT JOIN (\n" +
-          "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_closed_timestamp\n" +
-          "    FROM DatanodeContainerLogTable\n" +
-          "    WHERE container_state IN ('" + CLOSED_STATE + "', '" + DELETED_STATE + "')\n" +
-          "    GROUP BY container_id, datanode_id\n" +
-          ") AS c\n" +
-          "ON u.container_id = c.container_id AND u.datanode_id = c.datanode_id\n" +
-          "WHERE c.latest_closed_timestamp IS NULL \n" +
-          "   OR u.latest_unhealthy_timestamp > c.latest_closed_timestamp\n" +
-              "GROUP BY u.container_id\n" +
-              "ORDER BY u.container_id";
+      "WITH replica_counts AS (\n" +
+          REPLICA_COUNTS_CTE +
+          ")\n" +
+          "SELECT container_id, count_b AS unhealthy_replica_count\n" +
+          "FROM replica_counts\n" +
+          "WHERE count_b = count_c AND count_c > 0\n" +
+          "ORDER BY container_id";
   public static final String SELECT_QUASI_CLOSED_STUCK_CONTAINERS =
       "WITH quasi_closed_replicas AS ( " +
           "    SELECT container_id, datanode_id, MAX(timestamp) AS latest_quasi_closed_timestamp\n" +
