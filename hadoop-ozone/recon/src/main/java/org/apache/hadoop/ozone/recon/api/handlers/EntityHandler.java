@@ -234,8 +234,9 @@ public abstract class EntityHandler {
       for (long childId : nsSummary.getChildDir()) {
         if (visited.add(childId)) {
           stack.push(childId);
-        } else {
-          cycleLogged = logNSSummaryCycle(childId, cycleLogged);
+        } else if (!cycleLogged) {
+          logNSSummaryCycle(childId);
+          cycleLogged = true;
         }
       }
     }
@@ -261,8 +262,9 @@ public abstract class EntityHandler {
       for (long subdir : nsSummary.getChildDir()) {
         if (visited.add(subdir)) {
           stack.push(subdir);
-        } else {
-          cycleLogged = logNSSummaryCycle(subdir, cycleLogged);
+        } else if (!cycleLogged) {
+          logNSSummaryCycle(subdir);
+          cycleLogged = true;
         }
       }
     }
@@ -271,20 +273,16 @@ public abstract class EntityHandler {
   }
 
   /**
-   * Warn once per walk when the NSSummary tree references the same object more
-   * than once (a self/ancestor loop or shared child), which indicates the
-   * persisted NSSummary data is corrupted. The walk de-duplicates such nodes
-   * so the request still completes; this surfaces the corruption to operators.
-   *
-   * @return {@code true}, so callers can record that the warning was emitted
+   * Warn that the NSSummary tree references the same object more than once (a
+   * self/ancestor loop or shared child), which indicates the persisted
+   * NSSummary data is corrupted. The walk de-duplicates such nodes so the
+   * request still completes; this surfaces the corruption to operators. Callers
+   * invoke this at most once per walk.
    */
-  private boolean logNSSummaryCycle(long objectId, boolean alreadyLogged) {
-    if (!alreadyLogged) {
-      LOG.warn("Detected a repeated reference to object {} while walking the " +
-          "NSSummary tree under {}; returning a de-duplicated result. The " +
-          "NSSummary data may be corrupted.", objectId, getNormalizedPath());
-    }
-    return true;
+  private void logNSSummaryCycle(long objectId) {
+    LOG.warn("Detected a repeated reference to object {} while walking the " +
+        "NSSummary tree under {}; returning a de-duplicated result. The " +
+        "NSSummary data may be corrupted.", objectId, getNormalizedPath());
   }
 
   /**
