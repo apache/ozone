@@ -17,10 +17,8 @@
 
 package org.apache.hadoop.ozone.shell.keys;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -29,7 +27,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -48,15 +45,13 @@ import picocli.CommandLine;
  */
 public class TestGetKeyHandler {
 
-  @TempDir
-  private Path tempDir;
-
   private GetKeyHandler cmd;
   private OzoneBucket bucket;
   private OzoneAddress address;
+  private Path out;
 
   @BeforeEach
-  public void setup() throws Exception {
+  public void setup(@TempDir Path tempDir) throws Exception {
     // Override getConf() so execute() can be called directly without going
     // through Handler.call(), which normally sets the OzoneConfiguration.
     cmd = new GetKeyHandler() {
@@ -67,6 +62,82 @@ public class TestGetKeyHandler {
     };
     bucket = mock(OzoneBucket.class);
     address = new OzoneAddress("o3://ozone1/vol/bucket/key");
+    out = tempDir.resolve("out.dat");
+    parseArgs(out.toString());
+  }
+
+  /**
+   * When the first read throws an IOException (zero bytes written),
+   * the empty output file should be deleted.
+   */
+  @Test
+  public void testEmptyFileDeletedOnFirstReadFailure() throws Exception {
+    when(bucket.readKey(anyString()))
+        .thenReturn(new OzoneInputStream(failOnFirstReadWithIOException()));
+
+    assertThrows(IOException.class, () -> cmd.execute(buildClient(), address));
+
+    assertThat(out).doesNotExist();
+  }
+
+  /**
+   * When the first read throws a RuntimeException (e.g. NO_REPLICA_FOUND from
+   * XceiverClientManager), the empty output file should be deleted.
+   */
+  @Test
+  public void testEmptyFileDeletedOnRuntimeException() throws Exception {
+    when(bucket.readKey(anyString()))
+        .thenReturn(new OzoneInputStream(failOnFirstReadWithRuntimeException()));
+
+    assertThrows(IllegalArgumentException.class, () -> cmd.execute(buildClient(), address));
+
+    assertThat(out).doesNotExist();
+  }
+
+  /**
+   * When some bytes are written before failure, the partial file should be
+   * kept so the user can inspect or recover what was downloaded.
+   */
+  @Test
+  public void testPartialFileKeptOnMidTransferFailure() throws Exception {
+    byte[] partial = "hello".getBytes(StandardCharsets.UTF_8);
+
+    when(bucket.readKey(anyString()))
+        .thenReturn(new OzoneInputStream(failAfterBytes(partial)));
+
+    OzoneClient client = buildClient();
+    assertThrows(IOException.class, () -> cmd.execute(client, address));
+
+    assertThat(out).hasBinaryContent(partial);
+  }
+
+  /**
+   * Successful download: file exists and contains the full content.
+   */
+  @Test
+  public void testSuccessfulDownload() throws Exception {
+    byte[] content = "full content".getBytes(StandardCharsets.UTF_8);
+
+    when(bucket.readKey(anyString()))
+        .thenReturn(new OzoneInputStream(new ByteArrayInputStream(content)));
+
+    cmd.execute(buildClient(), address);
+
+    assertThat(out).hasBinaryContent(content);
+  }
+
+  /**
+   * Successful zero-byte key: the empty file must be kept (cleanup only runs
+   * on the failure path).
+   */
+  @Test
+  public void testSuccessfulZeroByteKeyKeepsEmptyFile() throws Exception {
+    when(bucket.readKey(anyString()))
+        .thenReturn(new OzoneInputStream(new ByteArrayInputStream(new byte[0])));
+
+    cmd.execute(buildClient(), address);
+
+    assertThat(out).isEmptyFile();
   }
 
   /** Simulate a stream that throws IOException on the first read (zero bytes written). */
@@ -134,103 +205,6 @@ public class TestGetKeyHandler {
     System.arraycopy(extra, 0, all, base.length, extra.length);
     new CommandLine(cmd).parseArgs(all);
   }
-
-  /**
-   * When the first read throws (zero bytes written), the empty output file
-   * should be deleted.
-   */
-  @Test
-  public void testEmptyFileDeletedOnFirstReadFailure() throws Exception {
-    Path out = tempDir.resolve("out.dat");
-    parseArgs(out.toString());
-
-    when(bucket.readKey(anyString()))
-        .thenReturn(new OzoneInputStream(failOnFirstReadWithIOException()));
-
-    assertThrows(IOException.class, () -> cmd.execute(buildClient(), address));
-
-    assertFalse(Files.exists(out),
-        "Empty output file should be deleted after a first-read failure");
-  }
-
-  /**
-   * When the first read throws a RuntimeException (e.g. NO_REPLICA_FOUND from
-   * XceiverClientManager), the empty output file should be deleted.
-   */
-  @Test
-  public void testEmptyFileDeletedOnRuntimeException() throws Exception {
-    Path out = tempDir.resolve("out.dat");
-    parseArgs(out.toString());
-
-    when(bucket.readKey(anyString()))
-        .thenReturn(new OzoneInputStream(failOnFirstReadWithRuntimeException()));
-
-    assertThrows(IllegalArgumentException.class, () -> cmd.execute(buildClient(), address));
-
-    assertFalse(Files.exists(out),
-        "Empty output file should be deleted after a RuntimeException on first read");
-  }
-
-  /**
-   * When some bytes are written before failure, the partial file should be
-   * kept so the user can inspect or recover what was downloaded.
-   */
-  @Test
-  public void testPartialFileKeptOnMidTransferFailure() throws Exception {
-    byte[] partial = "hello".getBytes(StandardCharsets.UTF_8);
-    Path out = tempDir.resolve("out.dat");
-    parseArgs(out.toString());
-
-    when(bucket.readKey(anyString()))
-        .thenReturn(new OzoneInputStream(failAfterBytes(partial)));
-
-    OzoneClient client = buildClient();
-    assertThrows(IOException.class, () -> cmd.execute(client, address));
-
-    assertTrue(Files.exists(out),
-        "Partial output file should be kept after mid-transfer failure");
-    assertArrayEquals(partial, Files.readAllBytes(out),
-        "Partial file should contain the bytes written before failure");
-  }
-
-  /**
-   * Successful download: file exists and contains the full content.
-   */
-  @Test
-  public void testSuccessfulDownload() throws Exception {
-    byte[] content = "full content".getBytes(StandardCharsets.UTF_8);
-    Path out = tempDir.resolve("out.dat");
-    parseArgs(out.toString());
-
-    when(bucket.readKey(anyString()))
-        .thenReturn(new OzoneInputStream(new ByteArrayInputStream(content)));
-
-    cmd.execute(buildClient(), address);
-
-    assertTrue(Files.exists(out), "Output file should exist after successful download");
-    assertArrayEquals(content, Files.readAllBytes(out));
-  }
-
-  /**
-   * Successful zero-byte key: the empty file must be kept (cleanup only runs
-   * on the failure path).
-   */
-  @Test
-  public void testSuccessfulZeroByteKeyKeepsEmptyFile() throws Exception {
-    Path out = tempDir.resolve("out.dat");
-    parseArgs(out.toString());
-
-    when(bucket.readKey(anyString()))
-        .thenReturn(new OzoneInputStream(new ByteArrayInputStream(new byte[0])));
-
-    cmd.execute(buildClient(), address);
-
-    assertTrue(Files.exists(out),
-        "Empty output file should be kept after a successful zero-byte download");
-    assertArrayEquals(new byte[0], Files.readAllBytes(out));
-  }
-
-  // -------------------------------------------------------------------------
 
   private OzoneClient buildClient() throws Exception {
     OzoneClient client = mock(OzoneClient.class);
