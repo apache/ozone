@@ -363,7 +363,7 @@ public final class FSOperations {
   }
 
   /**
-   * Converts an object into a Json Map with with one key-value entry.
+   * Converts an object into a Json Map with one key-value entry.
    * <p/>
    * The value may be a JSON primitive, a Map or List, or any object that
    * Jackson can serialize.
