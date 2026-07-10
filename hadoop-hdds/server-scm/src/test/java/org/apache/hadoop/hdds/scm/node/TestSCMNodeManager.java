@@ -231,7 +231,7 @@ public class TestSCMNodeManager {
 
       GenericTestUtils.waitFor(
           () -> nodeManager.getAllNodes().size() == registeredNodes, 100, 4000);
-      assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
+      assertEquals(registeredNodes, nodeManager.getAllNodes().size(),
           "Heartbeat thread should have picked up the scheduled heartbeats.");
     }
   }
