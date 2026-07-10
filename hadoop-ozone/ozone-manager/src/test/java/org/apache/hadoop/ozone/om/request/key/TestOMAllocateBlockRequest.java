@@ -400,7 +400,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     assertEquals("", clientMachine.getValue());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString());
     assertEquals(1, locations.size());
-    assertEquals(nodes, locations.get(0).getPipeline().getNodes());
+    // Assert the write order (nodesInOrder), which copyWithNodesInOrder would
+    // have changed had OM sorted; it must stay as the original pipeline order.
+    assertEquals(nodes, locations.get(0).getPipeline().getNodesInOrder());
   }
 
   @Test

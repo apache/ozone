@@ -2263,8 +2263,9 @@ public class KeyManagerImpl implements KeyManager {
   private Node getClientNode(String clientMachine,
       List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
-      // Match by either IP or hostname, like SCM's getNodesByAddress; the client
-      // address is always an IP even when use.datanode.hostname is enabled.
+      // Match by either IP or hostname, like SCM's getNodesByAddress. clientMachine
+      // may be a hostname on the read path; the streaming-write remoteAddress is
+      // typically an IP. Matching both covers use.datanode.hostname either way.
       if (clientMachine.equals(node.getIpAddress())
           || clientMachine.equals(node.getHostName())) {
         // The pipeline nodes are RPC-deserialized and not linked into OM's
