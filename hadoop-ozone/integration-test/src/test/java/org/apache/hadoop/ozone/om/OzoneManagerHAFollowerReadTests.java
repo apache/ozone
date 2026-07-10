@@ -28,7 +28,7 @@ import org.junit.jupiter.api.BeforeAll;
 /**
  * Base class for Ozone Manager HA follower read tests.
  */
-public abstract class TestOzoneManagerHAFollowerRead extends AbstractOzoneManagerHATest {
+public abstract class OzoneManagerHAFollowerReadTests extends AbstractOzoneManagerHATest {
 
   @BeforeAll
   public static void init() throws Exception {
