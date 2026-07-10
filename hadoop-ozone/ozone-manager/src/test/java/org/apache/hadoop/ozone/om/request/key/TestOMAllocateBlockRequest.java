@@ -67,7 +67,7 @@ import org.mockito.ArgumentCaptor;
 /**
  * Tests OMAllocateBlockRequest class.
  */
-public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
+public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {
@@ -330,11 +330,9 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     OMAllocateBlockRequest request =
         getOmAllocateBlockRequest(createAllocateBlockRequest());
     // requestedSize spans two scmBlockSize blocks on the same pipeline.
-    List<OmKeyLocationInfo> locations = request.allocateBlock(scmClient,
-        ozoneBlockTokenSecretManager, replicationConfig, new ExcludeList(),
-        2 * scmBlockSize, scmBlockSize, 2, false, "svc", omMetrics, true,
-        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(),
-        mockKeyManager);
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), 2 * scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
 
     // Sorted once for the shared pipeline...
     verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"));

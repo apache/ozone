@@ -36,7 +36,7 @@ permissions: { }
 env:
   # variables are duplicated from ci.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
-  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Restore cache for Maven dependencies
         id: restore-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -60,7 +60,7 @@ jobs:
 
       - name: Setup Java
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -73,7 +73,7 @@ jobs:
       - name: Restore NodeJS tarballs
         id: restore-nodejs
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.m2/repository/com/github/eirslett/node
           key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
@@ -90,7 +90,7 @@ jobs:
 
       - name: Setup Java 8
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
         with:
           distribution: 'temurin'
           java-version: 8
@@ -109,7 +109,7 @@ jobs:
 
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.m2/repository/*/*/*

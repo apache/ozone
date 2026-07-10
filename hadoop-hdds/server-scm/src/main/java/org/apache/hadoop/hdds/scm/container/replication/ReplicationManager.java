@@ -701,22 +701,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
 
-      if (rcc.getTargetDatanode() == null) {
-        /*
-        This means the target will pull a replica from a source, so the
-        op's target Datanode should be the Datanode this command is being
-        sent to.
-         */
-        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targetDatanode,
-            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
-      } else {
-        /*
-        This means the source will push replica to the target, so the op's
-        target Datanode should be the Datanode the replica will be pushed to.
-         */
-        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
-            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
-      }
+      containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
+          rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
 
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
@@ -1214,16 +1200,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int maintenanceRemainingRedundancy = 1;
 
-    @Config(key = "hdds.scm.replication.push",
-        type = ConfigType.BOOLEAN,
-        defaultValue = "true",
-        tags = { SCM, DATANODE },
-        description = "If false, replication happens by asking the target to " +
-            "pull from source nodes.  If true, the source node is asked to " +
-            "push to the target node."
-    )
-    private boolean push = true;
-
     @Config(key = "hdds.scm.replication.datanode.replication.limit",
         type = ConfigType.INT,
         defaultValue = "20",
@@ -1392,10 +1368,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public void setMaintenanceReplicaMinimum(int replicaCount) {
       this.maintenanceReplicaMinimum = replicaCount;
-    }
-
-    public boolean isPush() {
-      return push;
     }
 
     public int getContainerSampleLimit() {

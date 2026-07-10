@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -69,7 +69,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMSnapshotPurgeRequest class.
  */
-public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndResponseTests {
   private final List<Path> checkpointPaths = new ArrayList<>();
   private String keyName;
 

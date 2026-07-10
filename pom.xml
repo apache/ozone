@@ -36,8 +36,8 @@
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.java11.version>1.9.20</aspectj.java11.version>
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
-    <!-- Default aspectj version for java8 -->
-    <aspectj.version>1.9.7</aspectj.version>
+    <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
+    <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
@@ -46,7 +46,7 @@
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
@@ -82,7 +82,7 @@
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
-    <gson.version>2.13.1</gson.version>
+    <gson.version>2.14.0</gson.version>
     <guava.version>33.6.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
@@ -101,7 +101,7 @@
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
-    <javassist.version>3.31.0-GA</javassist.version>
+    <javassist.version>3.32.0-GA</javassist.version>
     <javax.inject.version>1</javax.inject.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
@@ -122,7 +122,7 @@
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.14.4</junit5.version>
-    <kerby.version>1.0.1</kerby.version>
+    <kerby.version>2.1.2</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
@@ -157,9 +157,9 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.133.Final</netty.version>
+    <netty.version>4.1.135.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
-    <nodejs.version>20.18.2</nodejs.version>
+    <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <opentelemetry.version>1.63.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
@@ -185,16 +185,16 @@
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.8.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.75.0</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.127.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.grpc.version>1.77.1</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.130.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.8</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.0.10</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.11</ratis.thirdparty.version>
     <ratis.version>3.2.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>10.10.1.1</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.18</slf4j.version>
@@ -2649,6 +2649,15 @@
     </profile>
     <!-- Profiles for specific aspectj versions -->
     <profile>
+      <id>aspectj-java8-10</id>
+      <activation>
+        <jdk>[1.8,10]</jdk>
+      </activation>
+      <properties>
+        <aspectj.version>${aspectj.java8.version}</aspectj.version>
+      </properties>
+    </profile>
+    <profile>
       <id>aspectj-java11-20</id>
       <activation>
         <jdk>[11,20]</jdk>
@@ -2658,12 +2667,21 @@
       </properties>
     </profile>
     <profile>
-      <id>aspectj-java21-or-later</id>
+      <id>aspectj-java21-24</id>
       <activation>
-        <jdk>[21,]</jdk>
+        <jdk>[21,24]</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>aspectj-java25-or-later</id>
+      <activation>
+        <jdk>[25,]</jdk>
+      </activation>
+      <properties>
+        <aspectj.version>${aspectj.java25.version}</aspectj.version>
       </properties>
     </profile>
     <profile>

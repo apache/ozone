@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -58,7 +58,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Mostly mirrors TestOMSnapshotCreateRequest.
  * testEntryNotExist() and testEntryExists() are unique.
  */
-public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotDeleteRequest extends SnapshotRequestAndResponseTests {
 
   private String snapshotName;
 

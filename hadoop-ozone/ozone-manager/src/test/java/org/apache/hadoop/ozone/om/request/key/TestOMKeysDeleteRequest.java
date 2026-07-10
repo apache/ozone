@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Class tests OMKeysDeleteRequest.
  */
-public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
+public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
 
   private List<String> deleteKeyList;
   private OMRequest omRequest;

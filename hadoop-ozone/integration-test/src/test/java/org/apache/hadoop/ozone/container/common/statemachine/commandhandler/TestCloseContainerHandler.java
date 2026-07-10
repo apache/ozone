@@ -113,25 +113,25 @@ public class TestCloseContainerHandler {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    assertFalse(isContainerClosed(cluster, containerId.getId()));
+    assertFalse(isContainerClosed(cluster, containerId.getIdForTesting()));
 
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
     //send the order to close the container
     SCMCommand<?> command = new CloseContainerCommand(
-        containerId.getId(), pipeline.getId());
+        containerId.getIdForTesting(), pipeline.getId());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
-            isContainerClosed(cluster, containerId.getId()),
+            isContainerClosed(cluster, containerId.getIdForTesting()),
             500,
             5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    assertTrue(isContainerClosed(cluster, containerId.getId()));
+    assertTrue(isContainerClosed(cluster, containerId.getIdForTesting()));
   }
 
   private static Boolean isContainerClosed(MiniOzoneCluster cluster,

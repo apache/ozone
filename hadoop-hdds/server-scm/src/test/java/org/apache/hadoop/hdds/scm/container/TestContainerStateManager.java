@@ -366,7 +366,7 @@ public class TestContainerStateManager {
   private void verifyForceDeleteCommand(DeleteContainerCommand deleteCmd,
       ContainerID expectedContainerId, boolean expectedForce, String message) {
     assertEquals(expectedForce, deleteCmd.isForce(), message);
-    assertEquals(expectedContainerId.getId(), deleteCmd.getContainerID());
+    assertEquals(expectedContainerId.getIdForTesting(), deleteCmd.getContainerID());
   }
 
   /**
@@ -413,7 +413,7 @@ public class TestContainerStateManager {
       throws Exception {
     ContainerID containerID = ContainerID.valueOf(3L);
     ContainerInfo openContainerInfo = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
+        .setContainerID(containerID.getIdForTesting())
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setSequenceId(100L)
         .setOwner("scm")
@@ -439,7 +439,7 @@ public class TestContainerStateManager {
     long sequenceId = 100L;
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
+        .setContainerID(containerID.getIdForTesting())
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setSequenceId(sequenceId)
         .setOwner("scm")

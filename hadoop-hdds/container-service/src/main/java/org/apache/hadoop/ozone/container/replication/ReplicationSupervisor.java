@@ -58,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Single point to schedule the downloading tasks based on priorities.
+ * Single point to schedule container replication tasks based on priorities.
  */
 public final class ReplicationSupervisor {
 
@@ -90,9 +90,9 @@ public final class ReplicationSupervisor {
   }
 
   /**
-   * A set of container IDs that are currently being downloaded
-   * or queued for download. Tracked so we don't schedule > 1
-   * concurrent download for the same container. Note that the uniqueness of a
+   * A set of container IDs that are currently being sent
+   * or queued. Tracked so we don't schedule > 1
+   * concurrent replications for the same container. Note that the uniqueness of a
    * task is defined by the tasks equals and hashCode methods.
    */
   private final Set<AbstractReplicationTask> inFlight;
@@ -227,7 +227,7 @@ public final class ReplicationSupervisor {
   }
 
   /**
-   * Queue an asynchronous download of the given container.
+   * Queue an asynchronous replication of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
     if (queueHasRoomFor(task)) {
@@ -399,15 +399,6 @@ public final class ReplicationSupervisor {
         }
 
         if (context != null) {
-          DatanodeDetails dn = context.getParent().getDatanodeDetails();
-          if (dn != null && dn.getPersistedOpState() !=
-              HddsProtos.NodeOperationalState.IN_SERVICE
-              && task.shouldOnlyRunOnInServiceDatanodes()) {
-            LOG.info("Ignoring {} since datanode is not in service ({})",
-                this, dn.getPersistedOpState());
-            return;
-          }
-
           final OptionalLong currentTerm = context.getTermOfLeaderSCM();
           final long taskTerm = task.getTerm();
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
