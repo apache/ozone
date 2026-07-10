@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -698,7 +698,7 @@ public class TestStreamBlockInputStream {
       ByteBuffer buf = ByteBuffer.allocate(data.length);
       IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
           "checksum failure should surface as an IOException");
-      assertCauseChainContains(thrown, OzoneChecksumException.class);
+      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
     }
     verify(requestObserver, times(1)).onError(any(OzoneChecksumException.class));
   }
@@ -739,7 +739,7 @@ public class TestStreamBlockInputStream {
       ByteBuffer buf = ByteBuffer.allocate(data.length);
       IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
           "checksum failure should surface as an IOException");
-      assertCauseChainContains(thrown, OzoneChecksumException.class);
+      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
     }
     verify(requestObserver, never()).onError(any());
   }
@@ -784,16 +784,5 @@ public class TestStreamBlockInputStream {
                 .build())
             .build())
         .build();
-  }
-
-  private static void assertCauseChainContains(Throwable thrown, Class<? extends Throwable> expected) {
-    Throwable cause = thrown;
-    while (cause != null) {
-      if (expected.isInstance(cause)) {
-        return;
-      }
-      cause = cause.getCause();
-    }
-    fail("Expected " + expected.getSimpleName() + " in the cause chain of: " + thrown);
   }
 }

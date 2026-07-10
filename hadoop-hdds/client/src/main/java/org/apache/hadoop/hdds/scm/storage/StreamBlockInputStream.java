@@ -539,12 +539,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // Record the failure first: the log and observer calls below must not mask it.
         setFailed(e);
         final ByteString data = readBlock.getData();
-        final ByteString preview = data.substring(0, Math.min(10, data.size()));
         final long offset = readBlock.getOffset();
         final StreamingReadResponse r = getResponse();
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
-            offset, data.size(), StringUtils.bytes2Hex(preview.asReadOnlyByteBuffer()),
+            offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
             readBlock.getChecksumData(), e);
         if (r != null) {
           r.getRequestObserver().onError(e);
