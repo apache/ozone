@@ -42,10 +42,12 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -328,12 +330,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return edek;
   }
 
-  protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
+  protected Set<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
       PrefixManager prefixManager, OmConfig config) throws OMException {
 
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
@@ -352,7 +353,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         if (prefixInfo  != null) {
           if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls(), ACCESS)) {
             // Remove the duplicates
-            acls = acls.stream().distinct().collect(Collectors.toList());
             return acls;
           }
         }
@@ -363,7 +363,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // prefix are not set
     if (omPathInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
@@ -372,12 +371,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // parent-dir are not set.
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
 
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 
@@ -389,12 +386,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param config
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
-  protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
+  protected Set<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
-    List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
@@ -411,7 +407,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 

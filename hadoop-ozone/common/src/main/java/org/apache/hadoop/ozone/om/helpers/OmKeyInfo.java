@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -617,7 +618,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+    public Builder setAcls(Collection<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
         this.acls.set(listOfAcls);
       }
