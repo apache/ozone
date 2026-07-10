@@ -201,9 +201,10 @@ public class TestReconUtils {
     List<String> subPaths = new ArrayList<>();
     ReconUtils.gatherSubPaths(1L, subPaths, 100L, 200L, nsSummaryManager);
 
-    // Child directories reachable from parent 1 are {2, 3}, each emitted once.
-    assertEquals(2, subPaths.size());
-    assertThat(subPaths).doesNotHaveDuplicates();
+    // Child directories reachable from parent 1 are exactly {2, 3}, each emitted
+    // once. The traversal root (1) must be excluded and no child dropped, so
+    // assert the exact "/volumeId/bucketId/objectId" subpaths (in any order).
+    assertThat(subPaths).containsExactlyInAnyOrder("/100/200/2", "/100/200/3");
   }
 
   private static NSSummary nsSummaryWithChildren(Long... childIds) {
