@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL;
@@ -54,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToLongFunction;
-import java.util.stream.IntStream;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -79,6 +80,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -98,44 +100,69 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 /**
  * Integration tests for per-volume push replication thread pools (HDDS-15412).
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Execution(ExecutionMode.SAME_THREAD)
+@ResourceLock("MiniOzoneCluster")
 class TestPerVolumePushReplication {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong(1_000_000L);
   private static final int DATA_VOLUMES = 2;
+  private static final int DATANODE_COUNT = 7;
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
   private static final RatisReplicationConfig RATIS_THREE =
       RatisReplicationConfig.getInstance(THREE);
   private static final ECReplicationConfig EC_REP = new ECReplicationConfig(3, 2);
 
+  private MiniOzoneCluster cluster;
+  private XceiverClientFactory clientFactory;
+
+  @BeforeAll
+  void setUp() throws Exception {
+    OzoneConfiguration conf = createSharedConfig();
+    cluster = newCluster(conf, DATANODE_COUNT);
+    cluster.waitForClusterToBeReady();
+    clientFactory = new XceiverClientManager(conf);
+  }
+
+  @AfterAll
+  void tearDown() {
+    IOUtils.closeQuietly(clientFactory, cluster);
+  }
+
+  @Order(1)
   @Test
   void testPushAndScmReplicationWithPerVolumeEnabled() throws Exception {
-    OzoneConfiguration conf = createPerVolumeConfig(true, 1);
-    try (MiniOzoneCluster cluster = newCluster(conf, 3);
-        XceiverClientFactory clientFactory = new XceiverClientManager(conf);
-        OzoneClient client = cluster.newClient()) {
-      cluster.waitForClusterToBeReady();
-
-      DatanodeDetails source = cluster.getHddsDatanodes().get(0).getDatanodeDetails();
-      DatanodeDetails target = selectOtherNode(cluster, source);
+    try (OzoneClient client = cluster.newClient()) {
+      HddsDatanodeService sourceDn = selectHealthyDatanode(0);
+      DatanodeDetails source = sourceDn.getDatanodeDetails();
+      DatanodeDetails target = selectOtherHealthyNode(source);
       long containerId = createClosedContainer(clientFactory, source, 0L);
 
       ReplicateContainerCommand cmd =
           ReplicateContainerCommand.toTarget(containerId, target);
       queuePushAndWait(cluster, cmd, source, ReplicationSupervisor::getReplicationSuccessCount);
       assertNotNull(getContainer(cluster, target, containerId));
-
-      HddsDatanodeService sourceDn = cluster.getHddsDatanode(source);
       assertVolumePools(sourceDn, DATA_VOLUMES, 1);
 
       OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
-      TestDataUtil.createKey(bucket, "key1", RATIS_THREE, "data".getBytes(UTF_8));
-      OzoneKeyDetails keyDetails = bucket.getKey("key1");
+      TestDataUtil.createKey(bucket, "pushKey1", RATIS_THREE, "data".getBytes(UTF_8));
+      OzoneKeyDetails keyDetails = bucket.getKey("pushKey1");
       long scmContainerId = keyDetails.getOzoneKeyLocations().get(0).getContainerID();
       waitForContainerClose(cluster, scmContainerId);
 
@@ -148,74 +175,61 @@ class TestPerVolumePushReplication {
     }
   }
 
+  @Order(2)
   @Test
   void testHealthyVolumeReplicationAfterVolumeFailure() throws Exception {
-    OzoneConfiguration conf = createPerVolumeConfig(true, 1);
-    configureVolumeFailureDetection(conf);
-    try (MiniOzoneCluster cluster = newCluster(conf, 3);
-        XceiverClientFactory clientFactory = new XceiverClientManager(conf)) {
-      cluster.waitForClusterToBeReady();
+    HddsDatanodeService sourceDn = selectHealthyDatanode(1);
+    DatanodeDetails source = sourceDn.getDatanodeDetails();
+    DatanodeDetails target = selectOtherHealthyNode(source);
+    MutableVolumeSet volSet = sourceDn.getDatanodeStateMachine().getContainer().getVolumeSet();
+    HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
+    HddsVolume vol1 = (HddsVolume) volSet.getVolumesList().get(1);
 
-      HddsDatanodeService sourceDn = cluster.getHddsDatanodes().get(0);
-      DatanodeDetails source = sourceDn.getDatanodeDetails();
-      DatanodeDetails target = selectOtherNode(cluster, source);
-      MutableVolumeSet volSet = sourceDn.getDatanodeStateMachine().getContainer().getVolumeSet();
-      HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
-      HddsVolume vol1 = (HddsVolume) volSet.getVolumesList().get(1);
+    long containerOnVol0 = findOrCreateContainerOnVolume(
+        cluster, clientFactory, source, vol0, 0L);
+    long containerOnVol1 = findOrCreateContainerOnVolume(
+        cluster, clientFactory, source, vol1, 0L);
 
-      long containerOnVol0 = findOrCreateContainerOnVolume(
-          cluster, clientFactory, source, vol0, 0L);
-      long containerOnVol1 = findOrCreateContainerOnVolume(
-          cluster, clientFactory, source, vol1, 0L);
+    assertVolumePools(sourceDn, DATA_VOLUMES, 1);
 
-      assertVolumePools(sourceDn, DATA_VOLUMES, 1);
+    triggerAndWaitForVolumeFailure(volSet, vol0);
+    waitForVolumePoolState(sourceDn, vol0, vol1);
 
-      triggerAndWaitForVolumeFailure(volSet, vol0);
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(containerOnVol1, target);
+    queuePushAndWait(cluster, cmd, source, ReplicationSupervisor::getReplicationSuccessCount);
+    assertNotNull(getContainer(cluster, target, containerOnVol1));
+    assertEquals(1, volSet.getFailedVolumesList().size());
 
-      VolumeReplicationThreadPools pools =
-          sourceDn.getDatanodeStateMachine().getSupervisor().getVolumeReplicationThreadPools();
-      assertNotNull(pools);
-      assertFalse(pools.hasPool(vol0.getStorageDir().getPath()));
-      assertTrue(pools.hasPool(vol1.getStorageDir().getPath()));
+    // Container on the failed volume must not replicate successfully.
+    ReplicateContainerCommand failedVolCmd =
+        ReplicateContainerCommand.toTarget(containerOnVol0, target);
+    long previousFailures = sourceDn.getDatanodeStateMachine().getSupervisor()
+        .getReplicationFailureCount();
+    queuePushAndWait(cluster, failedVolCmd, source,
+        ReplicationSupervisor::getReplicationFailureCount);
+    assertEquals(previousFailures + 1,
+        sourceDn.getDatanodeStateMachine().getSupervisor().getReplicationFailureCount());
 
-      ReplicateContainerCommand cmd =
-          ReplicateContainerCommand.toTarget(containerOnVol1, target);
-      queuePushAndWait(cluster, cmd, source, ReplicationSupervisor::getReplicationSuccessCount);
-      assertNotNull(getContainer(cluster, target, containerOnVol1));
-      assertEquals(1, volSet.getFailedVolumesList().size());
-
-      // Container on the failed volume must not replicate successfully.
-      ReplicateContainerCommand failedVolCmd =
-          ReplicateContainerCommand.toTarget(containerOnVol0, target);
-      long previousFailures = sourceDn.getDatanodeStateMachine().getSupervisor()
-          .getReplicationFailureCount();
-      queuePushAndWait(cluster, failedVolCmd, source,
-          ReplicationSupervisor::getReplicationFailureCount);
-      assertEquals(previousFailures + 1,
-          sourceDn.getDatanodeStateMachine().getSupervisor().getReplicationFailureCount());
-
-      DatanodeTestUtils.restoreBadVolume(vol0);
-    }
+    DatanodeTestUtils.restoreBadVolume(vol0);
   }
 
+  @Order(3)
   @Test
   void testDecommissionWithPerVolumePools() throws Exception {
-    OzoneConfiguration conf = createDecommissionConfig(true, 1);
-    try (MiniOzoneCluster cluster = newCluster(conf, 7);
-        OzoneClient client = cluster.newClient();
-        ContainerOperationClient scmClient = new ContainerOperationClient(conf)) {
-      cluster.waitForClusterToBeReady();
+    try (OzoneClient client = cluster.newClient();
+        ContainerOperationClient scmClient = new ContainerOperationClient(cluster.getConf())) {
       StorageContainerManager scm = cluster.getStorageContainerManager();
       NodeManager nm = scm.getScmNodeManager();
       ContainerManager cm = scm.getContainerManager();
       PipelineManager pm = scm.getPipelineManager();
 
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
-      generateData(bucket, 20, "key", RATIS_THREE);
-      generateData(bucket, 20, "ecKey", EC_REP);
+      OzoneBucket bucket = client.getObjectStore().getVolume(VOLUME).getBucket(BUCKET);
+      generateData(bucket, 20, "decomKey", RATIS_THREE);
+      generateData(bucket, 20, "decomEcKey", EC_REP);
 
-      ContainerInfo ratisContainer = waitForAndReturnContainer(cm, RATIS_THREE, 3);
-      ContainerInfo ecContainer = waitForAndReturnContainer(cm, EC_REP, 5);
+      ContainerInfo ratisContainer = waitForKeyContainer(bucket, cm, "decomKey0", 3);
+      ContainerInfo ecContainer = waitForKeyContainer(bucket, cm, "decomEcKey0", 5);
       Pipeline ratisPipeline = pm.getPipeline(ratisContainer.getPipelineID());
       Pipeline ecPipeline = pm.getPipeline(ecContainer.getPipelineID());
 
@@ -243,6 +257,36 @@ class TestPerVolumePushReplication {
     }
   }
 
+  private HddsDatanodeService selectHealthyDatanode(int indexAmongHealthy) {
+    List<HddsDatanodeService> healthy = cluster.getHddsDatanodes().stream()
+        .filter(this::isHealthyDatanode)
+        .collect(Collectors.toList());
+    if (indexAmongHealthy >= healthy.size()) {
+      throw new AssertionError("not enough healthy datanodes: requested index "
+          + indexAmongHealthy + ", found " + healthy.size());
+    }
+    return healthy.get(indexAmongHealthy);
+  }
+
+  private DatanodeDetails selectOtherHealthyNode(DatanodeDetails source) {
+    return cluster.getHddsDatanodes().stream()
+        .filter(this::isHealthyDatanode)
+        .map(HddsDatanodeService::getDatanodeDetails)
+        .filter(dn -> !dn.equals(source))
+        .findAny()
+        .orElseThrow(() -> new AssertionError("no target datanode found"));
+  }
+
+  private boolean isHealthyDatanode(HddsDatanodeService datanode) {
+    if (datanode.getDatanodeDetails().getPersistedOpState() != IN_SERVICE) {
+      return false;
+    }
+    MutableVolumeSet volumeSet =
+        datanode.getDatanodeStateMachine().getContainer().getVolumeSet();
+    return volumeSet.getFailedVolumesList().isEmpty()
+        && volumeSet.getVolumesList().size() == DATA_VOLUMES;
+  }
+
   private static void assertVolumePools(HddsDatanodeService dn,
       int expectedVolumeCount, int expectedPoolSize) {
     VolumeReplicationThreadPools pools =
@@ -258,6 +302,25 @@ class TestPerVolumePushReplication {
     }
   }
 
+  private static void waitForVolumePoolState(HddsDatanodeService sourceDn,
+      HddsVolume failedVolume, HddsVolume healthyVolume)
+      throws TimeoutException, InterruptedException {
+    String failedPath = failedVolume.getStorageDir().getPath();
+    String healthyPath = healthyVolume.getStorageDir().getPath();
+    GenericTestUtils.waitFor(() -> {
+      VolumeReplicationThreadPools pools =
+          sourceDn.getDatanodeStateMachine().getSupervisor().getVolumeReplicationThreadPools();
+      return pools != null
+          && !pools.hasPool(failedPath)
+          && pools.hasPool(healthyPath);
+    }, 100, 60000);
+    VolumeReplicationThreadPools pools =
+        sourceDn.getDatanodeStateMachine().getSupervisor().getVolumeReplicationThreadPools();
+    assertNotNull(pools);
+    assertFalse(pools.hasPool(failedPath));
+    assertTrue(pools.hasPool(healthyPath));
+  }
+
   private static void queuePushAndWait(MiniOzoneCluster cluster,
       ReplicateContainerCommand cmd, DatanodeDetails source,
       ToLongFunction<ReplicationSupervisor> counter)
@@ -269,16 +332,6 @@ class TestPerVolumePushReplication {
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
     context.addCommand(cmd);
     waitFor(() -> counter.applyAsLong(supervisor) == previousCount + 1, 100, 30000);
-  }
-
-  private static DatanodeDetails selectOtherNode(MiniOzoneCluster cluster,
-      DatanodeDetails source) throws IOException {
-    int sourceIndex = cluster.getHddsDatanodeIndex(source);
-    int targetIndex = IntStream.range(0, cluster.getHddsDatanodes().size())
-        .filter(index -> index != sourceIndex)
-        .findAny()
-        .orElseThrow(() -> new AssertionError("no target datanode found"));
-    return cluster.getHddsDatanodes().get(targetIndex).getDatanodeDetails();
   }
 
   private static long findOrCreateContainerOnVolume(MiniOzoneCluster cluster,
@@ -366,6 +419,12 @@ class TestPerVolumePushReplication {
         .build();
   }
 
+  private static OzoneConfiguration createSharedConfig() {
+    OzoneConfiguration conf = createDecommissionConfig(true, 1);
+    configureVolumeFailureDetection(conf);
+    return conf;
+  }
+
   private static OzoneConfiguration createPerVolumeConfig(boolean perVolumeEnabled,
       int streamsLimit) {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -437,17 +496,11 @@ class TestPerVolumePushReplication {
     }
   }
 
-  private static ContainerInfo waitForAndReturnContainer(ContainerManager cm,
-      ReplicationConfig repConfig, int expectedReplicas) throws Exception {
-    List<ContainerInfo> containers = cm.getContainers();
-    ContainerInfo container = null;
-    for (ContainerInfo candidate : containers) {
-      if (candidate.getReplicationConfig().equals(repConfig)) {
-        container = candidate;
-        break;
-      }
-    }
-    assertNotNull(container, "no container for replication config " + repConfig);
+  private static ContainerInfo waitForKeyContainer(OzoneBucket bucket,
+      ContainerManager cm, String keyName, int expectedReplicas) throws Exception {
+    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+    long containerId = keyDetails.getOzoneKeyLocations().get(0).getContainerID();
+    ContainerInfo container = cm.getContainer(ContainerID.valueOf(containerId));
     waitForContainerReplicas(cm, container, expectedReplicas);
     return container;
   }
