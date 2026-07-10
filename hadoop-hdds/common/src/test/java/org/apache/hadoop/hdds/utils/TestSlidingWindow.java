@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,11 +32,11 @@ import org.junit.jupiter.api.Test;
  */
 class TestSlidingWindow {
 
-  private TestClock testClock;
+  private MockClock mockClock;
 
   @BeforeEach
   void setup() {
-    testClock = TestClock.newInstance();
+    mockClock = MockClock.newInstance();
   }
   
   @Test
@@ -51,7 +51,7 @@ class TestSlidingWindow {
 
   @Test
   void testAdd() {
-    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5), mockClock);
     for (int i = 0; i < slidingWindow.getWindowSize(); i++) {
       slidingWindow.add();
       assertEquals(i + 1, slidingWindow.getNumEvents());
@@ -65,7 +65,7 @@ class TestSlidingWindow {
 
   @Test
   void testEventExpiration() {
-    SlidingWindow slidingWindow = new SlidingWindow(2, Duration.ofMillis(500), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(2, Duration.ofMillis(500), mockClock);
 
     // Add events to reach threshold
     slidingWindow.add();
@@ -75,7 +75,7 @@ class TestSlidingWindow {
     assertTrue(slidingWindow.isExceeded());
 
     // Fast forward time to expire events
-    testClock.fastForward(600);
+    mockClock.fastForward(600);
 
     assertEquals(0, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isExceeded());
@@ -88,7 +88,7 @@ class TestSlidingWindow {
 
   @Test
   void testPartialExpiration() {
-    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(1), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(1), mockClock);
 
     slidingWindow.add();
     slidingWindow.add();
@@ -97,19 +97,19 @@ class TestSlidingWindow {
     assertEquals(4, slidingWindow.getNumEvents());
     assertTrue(slidingWindow.isExceeded());
 
-    testClock.fastForward(600);
+    mockClock.fastForward(600);
     slidingWindow.add(); // this will remove the oldest event as the window is full
     assertEquals(4, slidingWindow.getNumEvents());
 
     // Fast forward time to expire the oldest events
-    testClock.fastForward(500);
+    mockClock.fastForward(500);
     assertEquals(1, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isExceeded());
   }
 
   @Test
   void testZeroWindowSize() {
-    SlidingWindow slidingWindow = new SlidingWindow(0, Duration.ofSeconds(5), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(0, Duration.ofSeconds(5), mockClock);
     
     // Verify initial state
     assertEquals(0, slidingWindow.getWindowSize());
@@ -127,7 +127,7 @@ class TestSlidingWindow {
     assertTrue(slidingWindow.isExceeded());
     
     // Test expiration
-    testClock.fastForward(6000); // Move past expiry time
+    mockClock.fastForward(6000); // Move past expiry time
     assertEquals(0, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isExceeded());
     

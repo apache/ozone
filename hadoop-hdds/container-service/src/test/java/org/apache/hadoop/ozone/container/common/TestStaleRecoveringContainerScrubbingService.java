@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -77,8 +77,8 @@ public class TestStaleRecoveringContainerScrubbingService {
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private final TestClock testClock =
-      new TestClock(Instant.now(), ZoneOffset.UTC);
+  private final MockClock mockClock =
+      new MockClock(Instant.now(), ZoneOffset.UTC);
 
   private void initVersionInfo(ContainerTestVersionInfo versionInfo)
       throws IOException {
@@ -122,7 +122,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     List<Long> createdIds = new ArrayList<>();
     int end = containerIdNum + num;
     for (; containerIdNum < end; containerIdNum++) {
-      testClock.fastForward(10L);
+      mockClock.fastForward(10L);
       KeyValueContainerData recoveringContainerData = new KeyValueContainerData(
           containerIdNum, layout, (long) StorageUnit.GB.toBytes(5),
           UUID.randomUUID().toString(), datanodeUuid);
@@ -144,19 +144,19 @@ public class TestStaleRecoveringContainerScrubbingService {
   public void testScrubbingStaleRecoveringContainers(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initVersionInfo(versionInfo);
-    ContainerSet containerSet = newContainerSet(10, testClock);
+    ContainerSet containerSet = newContainerSet(10, mockClock);
     StaleRecoveringContainerScrubbingService srcss =
         new StaleRecoveringContainerScrubbingService(
             50, TimeUnit.MILLISECONDS, 10,
             Duration.ofSeconds(300).toMillis(),
             containerSet);
-    testClock.fastForward(1000L);
+    mockClock.fastForward(1000L);
     Map<Long, ContainerProtos.ContainerDataProto.State> containerStateMap =
         new HashMap<>();
     containerStateMap.putAll(createTestContainers(containerSet, 5, CLOSED)
             .stream().collect(Collectors.toMap(i -> i, i -> CLOSED)));
 
-    testClock.fastForward(1000L);
+    mockClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
     assertEquals(5, containerSet.containerCount());
@@ -164,7 +164,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
             .collect(Collectors.toMap(i -> i, i -> UNHEALTHY)));
-    testClock.fastForward(1000L);
+    mockClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
     assertEquals(10, containerSet.containerCount());
@@ -178,7 +178,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
             .collect(Collectors.toMap(i -> i, i -> RECOVERING)));
-    testClock.fastForward(1000L);
+    mockClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
     assertEquals(15, containerSet.containerCount());

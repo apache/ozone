@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -52,7 +52,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static final TestClock TEST_CLOCK = TestClock.newInstance();
+  private static final MockClock MOCK_CLOCK = MockClock.newInstance();
 
   @TempDir
   private static Path volumePath;
@@ -63,21 +63,21 @@ public class TestStorageVolumeHealthChecks {
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(TEST_CLOCK);
+            .clock(MOCK_CLOCK);
 
     MetadataVolume.Builder metadataVolumeBuilder =
         new MetadataVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(TEST_CLOCK);
+            .clock(MOCK_CLOCK);
 
     DbVolume.Builder dbVolumeBuilder =
         new DbVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
             .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
-            .clock(TEST_CLOCK);
+            .clock(MOCK_CLOCK);
 
     return Stream.of(
         Arguments.of(Named.of("HDDS Volume", hddsVolumeBuilder)),
@@ -92,7 +92,7 @@ public class TestStorageVolumeHealthChecks {
     // needs to be cleared before each test.
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
-    TEST_CLOCK.set(Instant.now());
+    MOCK_CLOCK.set(Instant.now());
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckEnabled(true);
     dnConf.setDiskCheckTimeoutTestEnabled(true);
@@ -305,7 +305,7 @@ public class TestStorageVolumeHealthChecks {
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
-      TEST_CLOCK.fastForward(eventRateMillis);
+      MOCK_CLOCK.fastForward(eventRateMillis);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
@@ -391,7 +391,7 @@ public class TestStorageVolumeHealthChecks {
 
     assertFalse(volume.recordTimeoutAndCheckFailure(),
         "First timeout should be tolerated");
-    TEST_CLOCK.fastForward(
+    MOCK_CLOCK.fastForward(
         volume.getTimeoutFailureSlidingWindow().getExpiryDurationMillis() + 1);
 
     assertFalse(volume.recordTimeoutAndCheckFailure(),

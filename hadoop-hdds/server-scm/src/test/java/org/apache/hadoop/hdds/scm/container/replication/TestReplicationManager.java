@@ -101,7 +101,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,7 +125,7 @@ public class TestReplicationManager {
   private EventPublisher eventPublisher;
   private SCMContext scmContext;
   private NodeManager nodeManager;
-  private TestClock clock;
+  private MockClock clock;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
@@ -160,7 +160,7 @@ public class TestReplicationManager {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
         new ContainerReplicaPendingOps(clock, null);
 

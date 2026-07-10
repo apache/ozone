@@ -30,7 +30,7 @@ import java.time.ZoneOffset;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,18 +40,18 @@ import org.junit.jupiter.api.Test;
  * */
 public class TestBackgroundSCMService {
   private BackgroundSCMService backgroundSCMService;
-  private TestClock testClock;
+  private MockClock mockClock;
   private SCMContext scmContext;
   private PipelineManager pipelineManager;
 
   @BeforeEach
   public void setup() throws IOException, TimeoutException {
-    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    mockClock = new MockClock(Instant.now(), ZoneOffset.UTC);
     scmContext = SCMContext.emptyContext();
     this.pipelineManager = mock(PipelineManager.class);
     doNothing().when(pipelineManager).scrubPipelines();
     this.backgroundSCMService = new BackgroundSCMService.Builder()
-        .setClock(testClock)
+        .setClock(mockClock)
         .setScmContext(scmContext)
         .setServiceName("testBackgroundService")
         .setIntervalInMillis(1L)
@@ -87,7 +87,7 @@ public class TestBackgroundSCMService {
     // Still cannot run, as the safemode delay has not passed.
     assertFalse(backgroundSCMService.shouldRun());
 
-    testClock.fastForward(60000);
+    mockClock.fastForward(60000);
     assertTrue(backgroundSCMService.shouldRun());
 
     // go into safe mode, RUNNING -> PAUSING
@@ -103,7 +103,7 @@ public class TestBackgroundSCMService {
     synchronized (backgroundSCMService) {
       backgroundSCMService.notifyStatusChanged();
       assertFalse(backgroundSCMService.shouldRun());
-      testClock.fastForward(60000);
+      mockClock.fastForward(60000);
       assertTrue(backgroundSCMService.shouldRun());
       backgroundSCMService.runImmediately();
     }
