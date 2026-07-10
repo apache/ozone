@@ -39,6 +39,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -218,10 +220,12 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmHeartbeat()
-      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
+      throws IOException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       int registeredNodes = 5;
+      long hbProcessedBefore =
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME));
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
         DatanodeDetails datanodeDetails = HddsTestUtils
@@ -229,9 +233,10 @@ public class TestSCMNodeManager {
         nodeManager.processHeartbeat(datanodeDetails);
       }
 
-      // Heartbeat thread should pick up the scheduled heartbeats.
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getAllNodes().size() == registeredNodes, 100, 4000);
+      // Each heartbeat above is processed synchronously by the node manager.
+      assertEquals(hbProcessedBefore + registeredNodes,
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME)),
+          "All scheduled heartbeats should have been processed.");
     }
   }
 
