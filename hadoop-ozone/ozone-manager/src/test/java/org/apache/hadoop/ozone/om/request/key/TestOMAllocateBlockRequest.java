@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -279,6 +280,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(mockKeyManager.sortDatanodesForWrite(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
     OMAllocateBlockRequest request =
         getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
@@ -288,6 +290,23 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture());
     assertEquals("", clientMachine.getValue());
+  }
+
+  @Test
+  public void testAllocateBlockFallsBackToScmWhenTopologyUnavailable() throws Exception {
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
+    request.preExecute(ozoneManager);
+
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
+        any(), any(), clientMachine.capture());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString());
   }
 
   @Test
@@ -326,6 +345,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(mockKeyManager.sortDatanodesForWrite(any(), any()))
         .thenAnswer(inv -> sortedOrder);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
     OMAllocateBlockRequest request =
         getOmAllocateBlockRequest(createAllocateBlockRequest());
@@ -351,21 +371,6 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         MockDatanodeDetails.randomDatanodeDetails());
     assertThrows(IllegalArgumentException.class,
         () -> keyManager.sortDatanodesForWrite(nodes, ""));
-  }
-
-  @Test
-  public void sortDatanodesForWriteKeepsOrderWhenTopologyUnavailable() {
-    when(ozoneManager.getClusterMap()).thenThrow(
-        new NullPointerException("ScmBlockLocationClient must have been initialized already."));
-    List<DatanodeDetails> nodes = Arrays.asList(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails());
-
-    List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, "1.2.3.4");
-
-    assertSame(nodes, result);
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.

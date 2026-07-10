@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -1342,6 +1343,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public NetworkTopology getClusterMap() {
+    return requireNonNull(getClusterMapAllowNull(),
+        "ScmBlockLocationClient must have been initialized already.");
+  }
+
+  public NetworkTopology getClusterMapAllowNull() {
     return scmTopologyClient.getClusterMap();
   }
 

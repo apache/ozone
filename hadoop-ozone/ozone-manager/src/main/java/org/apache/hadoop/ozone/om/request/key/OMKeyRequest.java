@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.Ac
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -201,11 +202,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final String scmClientMachine;
     final String omClientMachine;
     final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes;
+    final NetworkTopology clusterMap = shouldSortDatanodes
+        && keyManager.isSortDatanodesForWriteEnabled()
+        ? ozoneManager.getClusterMapAllowNull() : null;
     if (!shouldSortDatanodes) {
       scmClientMachine = "";
       omClientMachine = "";
       sortedByNodes = null;
-    } else if (keyManager.isSortDatanodesForWriteEnabled()) {
+    } else if (clusterMap != null) {
       scmClientMachine = "";
       omClientMachine = userInfo.getRemoteAddress();
       sortedByNodes = new HashMap<>();
