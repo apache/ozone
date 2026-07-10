@@ -106,7 +106,7 @@ public final class FSOperations {
       boolean isFile) {
     Map<String, Object> json = new LinkedHashMap<>();
     Map<String, Object> inner = new LinkedHashMap<>();
-    List<Object> statuses = new ArrayList<>();
+    List<Map<String, Object>> statuses = new ArrayList<>();
     for (FileStatus f : fileStatuses) {
       statuses.add(toJsonInner(f, isFile));
     }
@@ -208,7 +208,7 @@ public final class FSOperations {
   private static Map<String, Object> aclStatusToJSON(AclStatus aclStatus) {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     Map<String, Object> inner = new LinkedHashMap<String, Object>();
-    List<Object> entriesArray = new ArrayList<>();
+    List<String> entriesArray = new ArrayList<>();
     inner.put(HttpFSConstants.OWNER_JSON, aclStatus.getOwner());
     inner.put(HttpFSConstants.GROUP_JSON, aclStatus.getGroup());
     inner.put(HttpFSConstants.PERMISSION_JSON,
@@ -393,8 +393,8 @@ public final class FSOperations {
     return policyJson;
   }
 
-  private static List<Object> toJsonArray(StorageType[] storageTypes) {
-    List<Object> jsonArray = new ArrayList<>();
+  private static List<String> toJsonArray(StorageType[] storageTypes) {
+    List<String> jsonArray = new ArrayList<>();
     for (StorageType type : storageTypes) {
       jsonArray.add(type.toString());
     }
@@ -404,7 +404,7 @@ public final class FSOperations {
   private static Map<String, Object> storagePoliciesToJSON(
       Collection<? extends BlockStoragePolicySpi> storagePolicies) {
     Map<String, Object> json = new LinkedHashMap<>();
-    List<Object> jsonArray = new ArrayList<>();
+    List<Map<String, Object>> jsonArray = new ArrayList<>();
     Map<String, Object> policies = new LinkedHashMap<>();
     if (storagePolicies != null) {
       for (BlockStoragePolicySpi policy : storagePolicies) {
