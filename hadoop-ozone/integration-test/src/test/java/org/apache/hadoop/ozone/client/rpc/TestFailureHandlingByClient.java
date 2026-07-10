@@ -400,7 +400,12 @@ public class TestFailureHandlingByClient {
       // level is configurable via RatisClientConfig watchType, HDDS-2887).
       // Watch-level datanode exclusion is covered by
       // testDatanodeExclusionWithMajorityCommit.
-      assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
+      // Pipeline IDs are also not asserted here. Under ALL_COMMITTED a WATCH
+      // RaftRetryFailureException can fire (retryFailure=true) before the
+      // ClosedContainerException path runs; that takes the else-branch in
+      // KeyOutputStream.handleException and adds the pipeline to the exclude
+      // list, so an empty pipeline set is not an invariant for this config.
+      // The container-id assertion above is the actual property under test.
 
       // The close will just write to the buffer
     }
