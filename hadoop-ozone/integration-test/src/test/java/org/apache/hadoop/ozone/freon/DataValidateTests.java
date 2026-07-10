@@ -34,7 +34,7 @@ import picocli.CommandLine;
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
-public abstract class TestDataValidate {
+public abstract class DataValidateTests {
 
   private static MiniOzoneCluster cluster = null;
 
