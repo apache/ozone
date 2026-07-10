@@ -104,11 +104,11 @@ public final class OzoneConsts {
   // for client and DataNode to label a block contains a incremental chunk list.
   public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   /**
-   * Write metadata: when value is {@link #CONTAINER_CREATABLE_FALSE}, the DataNode must not
-   * auto-create a missing container on WriteChunk (EC reconstruction writes).
+   * Write metadata value for key {@code containerCreatable}: the DataNode must not
+   * auto-create a missing container (EC reconstruction writes).
    */
-  public static final String CONTAINER_CREATABLE = "containerCreatable";
-  public static final String CONTAINER_CREATABLE_FALSE = "false";
+  public static final String CONTAINER_CREATABLE_KEY = "containerCreatable";
+  public static final String CONTAINER_CREATABLE = "false";
   public static final long KB = 1024L;
   public static final long MB = KB * 1024L;
   public static final long GB = MB * 1024L;

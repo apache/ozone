@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_CREATABLE_KEY;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
 import java.io.File;
@@ -35,6 +36,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -404,23 +406,53 @@ public final class ContainerUtils {
     }
   }
 
+  public static ContainerProtos.KeyValue containerCreatableFalseKv() {
+    return ContainerProtos.KeyValue.newBuilder()
+        .setKey(CONTAINER_CREATABLE_KEY)
+        .setValue(OzoneConsts.CONTAINER_CREATABLE)
+        .build();
+  }
+
   /**
-   * @return true if the DataNode may auto-create a missing container for this WriteChunk request
+   * @return true if the DataNode may auto-create a missing container for this request
    */
   public static boolean isContainerCreatable(ContainerCommandRequestProto request) {
-    if (!request.hasWriteChunk()) {
-      return true;
+    if (request.hasWriteChunk()) {
+      ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      if (writeChunk.hasChunkData()
+          && deniesContainerAutoCreate(writeChunk.getChunkData().getMetadataList())) {
+        return false;
+      }
     }
-    ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
-    if (!writeChunk.hasChunkData()) {
-      return true;
+    if (request.hasPutBlock()) {
+      ContainerProtos.PutBlockRequestProto putBlock = request.getPutBlock();
+      if (putBlock.hasBlockData()
+          && deniesContainerAutoCreate(putBlock.getBlockData().getMetadataList())) {
+        return false;
+      }
     }
-    for (ContainerProtos.KeyValue kv : writeChunk.getChunkData().getMetadataList()) {
-      if (OzoneConsts.CONTAINER_CREATABLE.equals(kv.getKey())
-          && OzoneConsts.CONTAINER_CREATABLE_FALSE.equals(kv.getValue())) {
+    if (request.hasPutSmallFile()) {
+      ContainerProtos.PutSmallFileRequestProto putSmallFile = request.getPutSmallFile();
+      if (putSmallFile.hasChunkInfo()
+          && deniesContainerAutoCreate(putSmallFile.getChunkInfo().getMetadataList())) {
+        return false;
+      }
+      if (putSmallFile.hasBlock() && putSmallFile.getBlock().hasBlockData()
+          && deniesContainerAutoCreate(putSmallFile.getBlock().getBlockData().getMetadataList())) {
         return false;
       }
     }
     return true;
+  }
+
+  private static boolean deniesContainerAutoCreate(
+      List<ContainerProtos.KeyValue> metadataList) {
+    for (ContainerProtos.KeyValue kv : metadataList) {
+      if (CONTAINER_CREATABLE_KEY.equals(kv.getKey())
+          && OzoneConsts.CONTAINER_CREATABLE.equals(kv.getValue())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -69,7 +69,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -78,6 +77,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -735,14 +735,43 @@ public class TestHddsDispatcher {
       ContainerCommandRequestProto writeChunk) {
     WriteChunkRequestProto wc = writeChunk.getWriteChunk();
     ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo.newBuilder(wc.getChunkData())
-        .addMetadata(ContainerProtos.KeyValue.newBuilder()
-            .setKey(OzoneConsts.CONTAINER_CREATABLE)
-            .setValue(OzoneConsts.CONTAINER_CREATABLE_FALSE)
-            .build())
+        .addMetadata(ContainerUtils.containerCreatableFalseKv())
         .build();
     return ContainerCommandRequestProto.newBuilder(writeChunk)
         .setWriteChunk(WriteChunkRequestProto.newBuilder(wc)
             .setChunkData(chunk)
+            .build())
+        .build();
+  }
+
+  private static ContainerCommandRequestProto getEmptyPutBlockRequest(
+      String datanodeId, Long containerId, Long localId) {
+    BlockID blockID = new BlockID(containerId, localId);
+    ContainerProtos.BlockData blockData = ContainerProtos.BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+        .build();
+    ContainerProtos.PutBlockRequestProto putBlockRequest =
+        ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(blockData)
+            .setEof(true)
+            .build();
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(containerId)
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(datanodeId)
+        .setPutBlock(putBlockRequest)
+        .build();
+  }
+
+  private static ContainerCommandRequestProto withCreatableFalsePutBlock(
+      ContainerCommandRequestProto putBlock) {
+    ContainerProtos.PutBlockRequestProto pb = putBlock.getPutBlock();
+    ContainerProtos.BlockData blockData = ContainerProtos.BlockData.newBuilder(pb.getBlockData())
+        .addMetadata(ContainerUtils.containerCreatableFalseKv())
+        .build();
+    return ContainerCommandRequestProto.newBuilder(putBlock)
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder(pb)
+            .setBlockData(blockData)
             .build())
         .build();
   }
@@ -1039,6 +1068,25 @@ public class TestHddsDispatcher {
 
     ContainerCommandResponseProto response = dispatcher.dispatch(
         withCreatableFalse(getWriteChunkRequest(dd.getUuidString(), containerId, 1L)), null);
+    assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+    assertNull(dispatcher.getContainer(containerId));
+  }
+
+  @Test
+  public void testEcReconstructionPutBlockDeniedWhenContainerCreatableFalse()
+      throws IOException {
+    String testDirPath = testDir.getPath();
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf);
+    long containerId = 100L;
+
+    ContainerCommandResponseProto response = dispatcher.dispatch(
+        withCreatableFalsePutBlock(getEmptyPutBlockRequest(dd.getUuidString(), containerId, 1L)),
+        null);
     assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
     assertNull(dispatcher.getContainer(containerId));
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_CREATABLE_KEY;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -59,6 +60,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 public class ECBlockOutputStream extends BlockOutputStream {
 
   private final DatanodeDetails datanodeDetails;
+  private final boolean denyContainerAutoCreate;
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       currentChunkRspFuture = null;
 
@@ -84,18 +86,45 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier
   ) throws IOException {
+    this(blockID, xceiverClientManager, pipeline, bufferPool, config, token, clientMetrics,
+        streamBufferArgs, executorServiceSupplier, false);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public ECBlockOutputStream(
+      BlockID blockID,
+      XceiverClientFactory xceiverClientManager,
+      Pipeline pipeline,
+      BufferPool bufferPool,
+      OzoneClientConfig config,
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
+      Supplier<ExecutorService> executorServiceSupplier,
+      boolean denyContainerAutoCreate
+  ) throws IOException {
     super(blockID, -1, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
+    this.denyContainerAutoCreate = denyContainerAutoCreate;
+    if (denyContainerAutoCreate) {
+      getContainerBlockData().addMetadata(containerCreatableFalseKv());
+    }
   }
 
   @Override
   protected ChunkInfo.Builder decorateChunkInfo(ChunkInfo.Builder builder) {
-    return builder.addMetadata(ContainerProtos.KeyValue.newBuilder()
-        .setKey(OzoneConsts.CONTAINER_CREATABLE)
-        .setValue(OzoneConsts.CONTAINER_CREATABLE_FALSE)
-        .build());
+    if (!denyContainerAutoCreate) {
+      return builder;
+    }
+    return builder.addMetadata(containerCreatableFalseKv());
+  }
+
+  private static ContainerProtos.KeyValue containerCreatableFalseKv() {
+    return ContainerProtos.KeyValue.newBuilder()
+        .setKey(CONTAINER_CREATABLE_KEY)
+        .setValue(OzoneConsts.CONTAINER_CREATABLE)
+        .build();
   }
 
   @Override
