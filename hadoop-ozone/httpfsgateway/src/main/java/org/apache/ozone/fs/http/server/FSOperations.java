@@ -253,14 +253,13 @@ public final class FSOperations {
    * @return The JSON representation of the xAttrs.
    * @throws IOException 
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  private static Map xAttrsToJSON(Map<String, byte[]> xAttrs, 
+  private static Map<String, Object> xAttrsToJSON(Map<String, byte[]> xAttrs,
       XAttrCodec encoding) throws IOException {
-    Map jsonMap = new LinkedHashMap();
-    List<Object> jsonArray = new ArrayList<>();
+    Map<String, Object> jsonMap = new LinkedHashMap<>();
+    List<Map<String, Object>> jsonArray = new ArrayList<>();
     if (xAttrs != null) {
       for (Entry<String, byte[]> e : xAttrs.entrySet()) {
-        Map json = new LinkedHashMap();
+        Map<String, Object> json = new LinkedHashMap<>();
         json.put(HttpFSConstants.XATTR_NAME_JSON, e.getKey());
         if (e.getValue() != null) {
           json.put(HttpFSConstants.XATTR_VALUE_JSON,
