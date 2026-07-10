@@ -29,7 +29,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.trace.ReadableSpan;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -65,6 +67,10 @@ public class TestTracingUtil {
     String[] parts = traceparent.split("-", 4);
     assertEquals(4, parts.length, "bad traceparent: " + traceparent);
     return parts[2];
+  }
+
+  private static SpanKind spanKind(Span span) {
+    return ((ReadableSpan) span).getKind();
   }
 
   @Test
@@ -213,5 +219,44 @@ public class TestTracingUtil {
     assertTrue(ex2.keys(carrier).iterator().hasNext());
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
+  }
+
+  @Test
+  public void testImportAndCreateSpanDefaultsToInternal() {
+    TracingUtil.initTracing("serviceTestKind",
+        tracingEnabled().getObject(TracingConfig.class));
+
+    Span root = TracingUtil.importAndCreateSpan("rootspan", null);
+    try {
+      assertEquals(SpanKind.INTERNAL, spanKind(root));
+    } finally {
+      root.end();
+    }
+
+    String parent;
+    try (TracingUtil.TraceCloseable ignored =
+             TracingUtil.createActivatedSpan("parentSpan")) {
+      parent = TracingUtil.exportCurrentSpan();
+    }
+    Span child = TracingUtil.importAndCreateSpan("childSpan", parent);
+    try {
+      assertEquals(SpanKind.INTERNAL, spanKind(child));
+    } finally {
+      child.end();
+    }
+  }
+
+  @Test
+  public void testImportAndCreateSpanUsesExplicitKind() {
+    TracingUtil.initTracing("span-kind-explicit",
+        tracingEnabled().getObject(TracingConfig.class));
+
+    Span server = TracingUtil.importAndCreateSpan(
+        "server", null, SpanKind.SERVER);
+    try {
+      assertEquals(SpanKind.SERVER, spanKind(server));
+    } finally {
+      server.end();
+    }
   }
 }

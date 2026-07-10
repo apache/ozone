@@ -78,6 +78,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
       }
     }
 
+    // close() is local cleanup in the shell process, not an outbound RPC to OM/SCM/DN , so it stays INTERNAL.
     SpanKind spanKind = "close".equals(method.getName())
         ? SpanKind.INTERNAL
         : SpanKind.CLIENT;
