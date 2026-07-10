@@ -220,7 +220,6 @@ public class TestContainerPlacement {
 
       GenericTestUtils.waitFor(
           () -> scmNodeManager.getNodeCount(null, HEALTHY) == nodeCount, 100, 5000);
-      assertEquals(nodeCount, scmNodeManager.getNodeCount(null, HEALTHY));
       assertEquals(capacity * nodeCount,
           (long) scmNodeManager.getStats().getCapacity().get());
       assertEquals(used * nodeCount,

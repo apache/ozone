@@ -229,10 +229,9 @@ public class TestSCMNodeManager {
         nodeManager.processHeartbeat(datanodeDetails);
       }
 
+      // Heartbeat thread should pick up the scheduled heartbeats.
       GenericTestUtils.waitFor(
           () -> nodeManager.getAllNodes().size() == registeredNodes, 100, 4000);
-      assertEquals(registeredNodes, nodeManager.getAllNodes().size(),
-          "Heartbeat thread should have picked up the scheduled heartbeats.");
     }
   }
 
@@ -599,7 +598,6 @@ public class TestSCMNodeManager {
       }
       GenericTestUtils.waitFor(
           () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == count, 100, 4000);
-      assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(count,
@@ -818,8 +816,6 @@ public class TestSCMNodeManager {
 
       //Assert all nodes are healthy.
       assertEquals(2, nodeManager.getAllNodes().size());
-      assertEquals(2,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       /**
        * Simulate a JVM Pause and subsequent handling in following steps:
        * Step 1 : stop heartbeat check process for stale node interval
@@ -1833,7 +1829,6 @@ public class TestSCMNodeManager {
       GenericTestUtils.waitFor(
           () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -1877,8 +1872,6 @@ public class TestSCMNodeManager {
       GenericTestUtils.waitFor(
           () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -2067,8 +2060,6 @@ public class TestSCMNodeManager {
       GenericTestUtils.waitFor(
           () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(1,
-              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
