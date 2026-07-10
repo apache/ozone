@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -201,7 +202,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     final String scmClientMachine;
     final String omClientMachine;
-    final Map<List<DatanodeDetails>, List<? extends DatanodeDetails>> sortedByNodes;
+    // Sorted order cached per pipeline so blocks sharing a pipeline are sorted
+    // once (mirrors the read path's caching). Keyed by pipeline id so it is
+    // robust to node-list ordering or copying.
+    final Map<PipelineID, List<? extends DatanodeDetails>> sortedByPipeline;
     final String remoteAddress = userInfo.getRemoteAddress();
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
@@ -209,18 +213,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!shouldSortDatanodes) {
       scmClientMachine = "";
       omClientMachine = "";
-      sortedByNodes = null;
+      sortedByPipeline = null;
     } else if (clusterMap != null && !remoteAddress.isEmpty()) {
       // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
       scmClientMachine = "";
       omClientMachine = remoteAddress;
-      sortedByNodes = new HashMap<>();
+      sortedByPipeline = new HashMap<>();
     } else {
       // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
       // sorting for an empty client machine).
       scmClientMachine = remoteAddress;
       omClientMachine = "";
-      sortedByNodes = null;
+      sortedByPipeline = null;
     }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
@@ -237,16 +241,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       throw ex;
     }
-    // Cache the sorted order by pipeline nodes so blocks whose pipelines have
-    // the same datanodes are sorted once (mirrors the read path's caching).
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       Pipeline pipeline = allocatedBlock.getPipeline();
-      if (sortedByNodes != null) {
+      if (sortedByPipeline != null) {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
-        final List<? extends DatanodeDetails> sorted = sortedByNodes
-            .computeIfAbsent(nodes,
-                n -> keyManager.sortDatanodesForWrite(n, omClientMachine));
+        final List<? extends DatanodeDetails> sorted = sortedByPipeline
+            .computeIfAbsent(pipeline.getId(),
+                id -> keyManager.sortDatanodesForWrite(nodes, omClientMachine));
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
