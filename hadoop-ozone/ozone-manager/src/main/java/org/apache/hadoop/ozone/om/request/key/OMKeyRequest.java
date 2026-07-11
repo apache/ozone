@@ -247,9 +247,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
         final Set<String> uuidSet = nodes.stream()
             .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
-        final List<? extends DatanodeDetails> sorted = sortedByNodes
-            .computeIfAbsent(uuidSet,
-                k -> keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap));
+        List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
+        if (sorted == null) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
+          // Cache only a freshly sorted order, not an input list returned
+          // unchanged when the client is unresolved: that order is per-pipeline
+          // and must not be reused for another pipeline with the same node set.
+          if (sorted != nodes) {
+            sortedByNodes.put(uuidSet, sorted);
+          }
+        }
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }

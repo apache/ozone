@@ -364,6 +364,61 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testAllocateBlockKeepsPerPipelineOrderWhenSortSkipped() throws Exception {
+    // Two pipelines share the same datanode set but in a different order. When
+    // the sort is skipped (sortDatanodesForWrite returns the input unchanged),
+    // each pipeline must keep its own order: the unsorted result must not be
+    // cached under the node set and reused for the other pipeline.
+    DatanodeDetails a = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails b = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails c = MockDatanodeDetails.randomDatanodeDetails();
+    List<DatanodeDetails> nodes1 = Arrays.asList(a, b, c);
+    List<DatanodeDetails> nodes2 = Arrays.asList(c, b, a);
+    Pipeline pipeline1 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes1)
+        .build();
+    Pipeline pipeline2 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes2)
+        .build();
+    AllocatedBlock block1 = new AllocatedBlock.Builder().setPipeline(pipeline1)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString()))
+        .thenReturn(Arrays.asList(block1, block2));
+
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    // Skip the sort: return the input list instance unchanged.
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), 2 * scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+
+    assertEquals(2, locations.size());
+    // Each pipeline keeps its own order; the skipped-sort result is not shared.
+    assertEquals(nodes1, locations.get(0).getPipeline().getNodesInOrder());
+    assertEquals(nodes2, locations.get(1).getPipeline().getNodesInOrder());
+    // Sorted per pipeline, since the unsorted result is not cached.
+    verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
+  }
+
+  @Test
   public void testAllocateBlockKeepsOrderWhenRemoteAddressEmpty() throws Exception {
     // Sort enabled and topology available, but the client has no remote address:
     // OM must not sort, SCM receives an empty clientMachine, and the pipeline
