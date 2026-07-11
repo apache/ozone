@@ -90,7 +90,11 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
         ContainerDirectoryScanner.enrichDuplicates(scanResult.getDuplicates());
 
     if (scmDb != null && checkClusterIdConsistency(conf)) {
-      findOrphanAndDeletedButPresentContainers(conf, scanResult, enrichedDuplicates);
+      try {
+        findOrphanAndDeletedButPresentContainers(conf, scanResult, enrichedDuplicates);
+      } catch (IOException e) {
+        err().printf("SCM container consistency checks were skipped: %s%n", e.getMessage());
+      }
     } else if (scmDb == null) {
       out().println("To identify orphan containers (wrt SCM) and containers that are marked as DELETED in SCM but"
           + " exist in the datanode's current directory, provide the SCM database path using the --scm-db option."
@@ -131,7 +135,7 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
     try {
       resolvedScmDb = ScmContainerMetadataReader.resolveScmDbDirectory(scmDb);
     } catch (IOException e) {
-      err().println(e.getMessage());
+      err().printf("SCM container consistency checks were skipped: %s%n", e.getMessage());
       return false;
     }
     
