@@ -64,7 +64,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -202,10 +201,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     final String scmClientMachine;
     final String omClientMachine;
-    // Sorted order cached per pipeline so blocks sharing a pipeline are sorted
-    // once (mirrors the read path's caching). Keyed by pipeline id so it is
-    // robust to node-list ordering or copying.
-    final Map<PipelineID, List<? extends DatanodeDetails>> sortedByPipeline;
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
     final String remoteAddress = userInfo.getRemoteAddress();
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
@@ -213,18 +212,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!shouldSortDatanodes) {
       scmClientMachine = "";
       omClientMachine = "";
-      sortedByPipeline = null;
+      sortedByNodes = null;
     } else if (clusterMap != null && !remoteAddress.isEmpty()) {
       // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
       scmClientMachine = "";
       omClientMachine = remoteAddress;
-      sortedByPipeline = new HashMap<>();
+      sortedByNodes = new HashMap<>();
     } else {
       // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
       // sorting for an empty client machine).
       scmClientMachine = remoteAddress;
       omClientMachine = "";
-      sortedByPipeline = null;
+      sortedByNodes = null;
     }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
@@ -244,11 +243,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       Pipeline pipeline = allocatedBlock.getPipeline();
-      if (sortedByPipeline != null) {
+      if (sortedByNodes != null) {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
-        final List<? extends DatanodeDetails> sorted = sortedByPipeline
-            .computeIfAbsent(pipeline.getId(),
-                id -> keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap));
+        final Set<String> uuidSet = nodes.stream()
+            .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+        final List<? extends DatanodeDetails> sorted = sortedByNodes
+            .computeIfAbsent(uuidSet,
+                k -> keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap));
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
