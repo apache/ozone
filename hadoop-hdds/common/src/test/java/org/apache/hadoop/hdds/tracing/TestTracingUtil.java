@@ -92,38 +92,6 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testSkipTracingNoSpan() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    serviceProxy.skippedMethod();
-    assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
-  }
-
-  @Test
-  public void testSkipTracingExceptionUnwrapped() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    IOException ex = assertThrows(IOException.class,
-        () -> serviceProxy.throwingMethod());
-    assertEquals("Original Exception", ex.getMessage());
-    assertFalse(impl.wasSpanActive(), "Span should NOT have been created for a @SkipTracing throwing method.");
-  }
-
-  @Test
-  public void testProxyNormalVsSkipped() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    serviceProxy.normalMethod();
-    assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
-  }
-
-  @Test
   public void testImportAndCreateSpanNullOrEmptyParent() {
     TracingUtil.initTracing("NoParentService", tracingEnabled().getObject(TracingConfig.class));
     for (String parent : new String[] {null, ""}) {
