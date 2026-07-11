@@ -2209,10 +2209,9 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public List<? extends DatanodeDetails> sortDatanodesForWrite(
-      List<? extends DatanodeDetails> nodes, String clientMachine) {
+      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap) {
     Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine),
         "clientMachine is empty");
-    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
           final Node client = getClientNode(clientMachine, nodes, clusterMap);

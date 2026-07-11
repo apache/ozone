@@ -190,13 +190,13 @@ public class TestOMSortDatanodes {
       // The client address is normally an IP, but the sort must resolve a client
       // by either IP or hostname, so cover both.
       List<? extends DatanodeDetails> byIp =
-          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress());
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress(), om.getClusterMap());
       assertEquals(dn, byIp.get(0),
           "Source node should be sorted first for writes (IP client)");
       assertRackOrder(dn.getNetworkLocation(), byIp);
 
       List<? extends DatanodeDetails> byHostname =
-          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName());
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName(), om.getClusterMap());
       assertEquals(dn, byHostname.get(0),
           "Source node should be sorted first for writes (hostname client)");
       assertRackOrder(dn.getNetworkLocation(), byHostname);
@@ -210,7 +210,7 @@ public class TestOMSortDatanodes {
     nodes.addAll(nodeManager.getAllNodes());
 
     List<? extends DatanodeDetails> sorted =
-        keyManager.sortDatanodesForWrite(nodes, "edge0");
+        keyManager.sortDatanodesForWrite(nodes, "edge0", om.getClusterMap());
 
     assertSame(nodes, sorted,
         "Pipeline order should be preserved when a node is missing from the OM topology");
@@ -223,7 +223,7 @@ public class TestOMSortDatanodes {
     // A client that resolves to no known rack must NOT trigger a shuffle.
     String unresolved = nodes.get(0).getIpAddress() + "X";
     List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, unresolved);
+        keyManager.sortDatanodesForWrite(nodes, unresolved, om.getClusterMap());
     assertEquals(original, result,
         "Write pipeline order must be preserved when client is unresolved");
   }

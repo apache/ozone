@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -373,10 +374,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    *
    * @param nodes the pipeline nodes to sort
    * @param clientMachine client address (IP or hostname)
+   * @param clusterMap OM's cached cluster map used to resolve topology distance
    * @return nodes sorted nearest-first, or the input order if client is unresolved
    */
   List<? extends DatanodeDetails> sortDatanodesForWrite(
-      List<? extends DatanodeDetails> nodes, String clientMachine);
+      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap);
 
   /**
    * @return true if OM should sort the streaming-write pipeline locally

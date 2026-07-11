@@ -248,7 +248,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         final List<DatanodeDetails> nodes = pipeline.getNodes();
         final List<? extends DatanodeDetails> sorted = sortedByPipeline
             .computeIfAbsent(pipeline.getId(),
-                id -> keyManager.sortDatanodesForWrite(nodes, omClientMachine));
+                id -> keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap));
         if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
