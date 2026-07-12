@@ -35,6 +35,7 @@ public enum S3GAction implements AuditAction {
 
   //RootEndpoint
   LIST_S3_BUCKETS,
+  LIST_DIRECTORY_BUCKETS,
 
   //ObjectEndpoint
   CREATE_MULTIPART_KEY,
@@ -54,6 +55,9 @@ public enum S3GAction implements AuditAction {
   GET_OBJECT_TAGGING,
   PUT_OBJECT_TAGGING,
   DELETE_OBJECT_TAGGING,
+  GET_BUCKET_TAGGING,
+  PUT_BUCKET_TAGGING,
+  DELETE_BUCKET_TAGGING,
   PUT_OBJECT_ACL;
 
   @Override

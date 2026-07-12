@@ -66,10 +66,6 @@ python -m pytest -s .
 
 See the README in the blockade directory for more details.
 
-## MiniChaosOzoneCluster
-
-This is a way to get [chaos](https://en.wikipedia.org/wiki/Chaos_engineering) in your machine. It can be started from the source code and a MiniOzoneCluster (which starts real daemons) will be started and killed randomly.
-
 ## Freon
 
 Freon is a command line application which is included in the Ozone distribution. It's a load generator which is used in our stress tests.

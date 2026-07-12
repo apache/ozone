@@ -2069,6 +2069,11 @@ public class KeyValueHandler extends Handler {
     // Since the putBlock request may fail, we don't know if the chunk exists,
     // thus we need to check it when receiving the request to delete such blocks
     String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    if (chunkNames == null) {
+      throw new IOException("Failed to list chunks under " + chunkDir
+          + " for unreferenced block " + localID + " in container "
+          + containerID);
+    }
     if (chunkNames.length == 0) {
       LOG.warn("Missing delete block(Container = {}, Block = {}",
           containerID, localID);
@@ -2079,10 +2084,18 @@ public class KeyValueHandler extends Handler {
       if (!file.isFile()) {
         continue;
       }
-      FileUtil.fullyDelete(file);
+      if (!deleteUnreferencedFile(file)) {
+        throw new IOException("Failed to delete unreferenced chunk/block "
+            + file + " in container " + containerID);
+      }
       LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
           containerID);
     }
+  }
+
+  @VisibleForTesting
+  boolean deleteUnreferencedFile(File file) {
+    return FileUtil.fullyDelete(file);
   }
 
   @Override

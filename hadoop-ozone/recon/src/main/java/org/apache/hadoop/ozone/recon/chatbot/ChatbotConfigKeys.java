@@ -63,11 +63,6 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
   // ── Execution policy ────────────────────────────────────────
-  // Total records aggregated for an answer are bounded by exec.max.pages * exec.page.size.
-  public static final String OZONE_RECON_CHATBOT_EXEC_MAX_PAGES = OZONE_RECON_CHATBOT_PREFIX + "exec.max.pages";
-  public static final int OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT = 5;
-  public static final String OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE = OZONE_RECON_CHATBOT_PREFIX + "exec.page.size";
-  public static final int OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT = 200;
 
   public static final String OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE = OZONE_RECON_CHATBOT_PREFIX
       + "exec.require.safe.scope";
@@ -76,24 +71,6 @@ public final class ChatbotConfigKeys {
   // ── Agent configuration ─────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
-
-  // ── ToolExecutor HTTP timeouts (loopback calls to Recon REST APIs) ───────
-  /**
-   * Connect timeout in milliseconds for loopback HTTP calls from ToolExecutor
-   * to Recon's own REST APIs. Increase this on slow or heavily loaded clusters.
-   */
-  public static final String OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS =
-      OZONE_RECON_CHATBOT_PREFIX + "exec.connect.timeout.ms";
-  public static final int OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS_DEFAULT = 30_000;
-
-  /**
-   * Read timeout in milliseconds for loopback HTTP calls from ToolExecutor
-   * to Recon's own REST APIs. Increase this when Recon APIs are slow due to
-   * large dataset sizes (e.g. millions of unhealthy containers).
-   */
-  public static final String OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS =
-      OZONE_RECON_CHATBOT_PREFIX + "exec.read.timeout.ms";
-  public static final int OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS_DEFAULT = 30_000;
 
   // ── Async execution thread pool ──────────────────────────────
   /**

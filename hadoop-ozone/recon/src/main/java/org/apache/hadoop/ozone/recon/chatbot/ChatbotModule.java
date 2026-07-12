@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.recon.chatbot;
 import com.google.inject.AbstractModule;
 import com.google.inject.Scopes;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
-import org.apache.hadoop.ozone.recon.chatbot.agent.ToolExecutor;
+import org.apache.hadoop.ozone.recon.chatbot.agent.LlmToolSpecFactory;
 import org.apache.hadoop.ozone.recon.chatbot.api.ChatbotEndpoint;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LangChain4jDispatcher;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconEndpointRouter;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 
 /**
@@ -39,8 +42,11 @@ public class ChatbotModule extends AbstractModule {
     // Bind LLM provider — LangChain4j-backed dispatcher handles all three providers
     bind(LLMClient.class).to(LangChain4jDispatcher.class).in(Scopes.SINGLETON);
 
-    // Bind agent components
-    bind(ToolExecutor.class).in(Scopes.SINGLETON);
+    // Recon data access (direct endpoint bean calls)
+    bind(ReconEndpointRouter.class).in(Scopes.SINGLETON);
+    bind(ReconApiAllowlist.class).in(Scopes.SINGLETON);
+    bind(ReconQueryExecutor.class).in(Scopes.SINGLETON);
+    bind(LlmToolSpecFactory.class).in(Scopes.SINGLETON);
     bind(ChatbotAgent.class).in(Scopes.SINGLETON);
 
     // Bind API endpoint

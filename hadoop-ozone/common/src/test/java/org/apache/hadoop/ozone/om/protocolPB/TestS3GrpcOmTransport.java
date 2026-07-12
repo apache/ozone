@@ -18,8 +18,12 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.AdditionalAnswers.delegatesTo;
@@ -29,13 +33,19 @@ import com.google.protobuf.ServiceException;
 import io.grpc.ManagedChannel;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
@@ -270,6 +280,215 @@ public class TestS3GrpcOmTransport {
     // This exception should cause failover to NOT retry,
     // rather to fail.
     assertThrows(Exception.class, () -> client.submitRequest(omRequest));
+  }
+
+  @Test
+  public void testFollowerReadDoesNotFailoverFromKnownLeader() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, leaderRequest));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om0");
+
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .build();
+
+    client.submitRequest(request);
+
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(0, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER,
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+  }
+
+  @Test
+  public void testFollowerReadDoesNotRouteWriteRequestToFollower() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, leaderRequest));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om1");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.CreateVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .build());
+
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(0, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.DEFAULT,
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+  }
+
+  @Test
+  public void testFollowerReadKeepsExistingConsistencyHint() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> followerRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        new AtomicInteger(), new AtomicReference<>()));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, followerRequest));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om1");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE)
+            .build())
+        .build());
+
+    assertEquals(1, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.LOCAL_LEASE,
+        followerRequest.get().getReadConsistencyHint().getReadConsistency());
+  }
+
+  @Test
+  public void testFollowerReadFallsBackToLeaderOnNotLeaderException() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, leaderRequest));
+    client.startClient("om1", createNotLeaderNodeChannel(followerRequestCount));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om1");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .build());
+
+    assertEquals(1, followerRequestCount.get());
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(ReadConsistencyProto.DEFAULT,
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+  }
+
+  @Test
+  public void testFollowerReadRejectsInvalidFollowerReadConsistency() {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "DEFAULT");
+    configureHaOmService("om0", "om1");
+
+    assertThrows(IllegalStateException.class,
+        () -> new GrpcOmTransport(conf, ugi, omServiceId));
+  }
+
+  @Test
+  public void testFollowerReadRejectsInvalidLeaderReadConsistency() {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY,
+        "LINEARIZABLE_ALLOW_FOLLOWER");
+    configureHaOmService("om0", "om1");
+
+    assertThrows(IllegalStateException.class,
+        () -> new GrpcOmTransport(conf, ugi, omServiceId));
+  }
+
+  private void configureHaOmService(String... nodeIds) {
+    omServiceId = "om-service-test";
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+    conf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, omServiceId),
+        String.join(",", nodeIds));
+    for (int i = 0; i < nodeIds.length; i++) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, omServiceId,
+          nodeIds[i]), "localhost");
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_OM_GRPC_PORT_KEY, omServiceId,
+          nodeIds[i]), 19880 + i);
+    }
+  }
+
+  private ManagedChannel createNodeChannel(String nodeId,
+      AtomicInteger requestCount, AtomicReference<OMRequest> lastRequest)
+      throws IOException {
+    String nodeServerName = InProcessServerBuilder.generateName();
+    grpcCleanup.register(InProcessServerBuilder
+        .forName(nodeServerName)
+        .directExecutor()
+        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
+          @Override
+          public void submitRequest(OMRequest request,
+              StreamObserver<OMResponse> responseObserver) {
+            requestCount.incrementAndGet();
+            lastRequest.set(request);
+            responseObserver.onNext(OMResponse.newBuilder()
+                .setSuccess(true)
+                .setStatus(org.apache.hadoop.ozone.protocol
+                    .proto.OzoneManagerProtocolProtos.Status.OK)
+                .setLeaderOMNodeId(nodeId)
+                .setCmdType(request.getCmdType())
+                .build());
+            responseObserver.onCompleted();
+          }
+        })
+        .build()
+        .start());
+    return grpcCleanup.register(
+        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
+  }
+
+  private ManagedChannel createNotLeaderNodeChannel(AtomicInteger requestCount)
+      throws IOException {
+    String nodeServerName = InProcessServerBuilder.generateName();
+    grpcCleanup.register(InProcessServerBuilder
+        .forName(nodeServerName)
+        .directExecutor()
+        .addService(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
+          @Override
+          public void submitRequest(OMRequest request,
+              StreamObserver<OMResponse> responseObserver) {
+            requestCount.incrementAndGet();
+            try {
+              throw createNotLeaderException();
+            } catch (Throwable e) {
+              IOException ex = new IOException(e.getCause());
+              responseObserver.onError(io.grpc.Status
+                  .INTERNAL
+                  .withDescription(ex.getMessage())
+                  .asRuntimeException());
+            }
+          }
+        })
+        .build()
+        .start());
+    return grpcCleanup.register(
+        InProcessChannelBuilder.forName(nodeServerName).directExecutor().build());
   }
 
   private static OMRequest arbitraryOmRequest() {

@@ -65,7 +65,7 @@ public class PutKeyHandler extends KeyHandler {
   @Mixin
   private ShellReplicationOptions replication;
 
-  @Option(names = "--expectedGeneration",
+  @Option(names = "--expected-generation",
       description = "Store key only if it already exists and its generation matches the value provided")
   private Long expectedGeneration;
 

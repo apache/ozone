@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMAllocateBlockRequest class.
  */
-public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
+public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

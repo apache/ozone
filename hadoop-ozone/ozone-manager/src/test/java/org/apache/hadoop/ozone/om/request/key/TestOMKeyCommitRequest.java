@@ -71,7 +71,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * Class tests OMKeyCommitRequest class.
  */
-public class TestOMKeyCommitRequest extends TestOMKeyRequest {
+public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
   private static final int DEFAULT_COMMIT_BLOCK_SIZE = 5;
 

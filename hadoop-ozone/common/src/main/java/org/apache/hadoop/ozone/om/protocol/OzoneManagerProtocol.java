@@ -1214,6 +1214,32 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Gets the tags for the specified bucket.
+   * @param args Bucket args
+   * @return Tags associated with the bucket.
+   */
+  @Override
+  Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException;
+
+  /**
+   * Sets tags on an existing bucket (replaces existing tag set).
+   * @param args Bucket args
+   */
+  default void putBucketTagging(OmBucketArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Removes all tags from the specified bucket.
+   * @param args Bucket args
+   */
+  default void deleteBucketTagging(OmBucketArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
    * Get status of last triggered quota repair in OM.
    * @return String
    * @throws IOException

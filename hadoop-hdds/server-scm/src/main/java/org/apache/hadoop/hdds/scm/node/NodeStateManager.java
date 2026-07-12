@@ -537,12 +537,8 @@ public class NodeStateManager implements Runnable, Closeable {
     return getVolumeFailuresNodes().size();
   }
 
-  /**
-   * Returns all the nodes which have registered to NodeStateManager.
-   *
-   * @return all the managed nodes
-   */
-  public List<DatanodeInfo> getAllNodes() {
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
+  List<DatanodeInfo> getAllNodes() {
     return nodeStateMap.getAllDatanodeInfos();
   }
 

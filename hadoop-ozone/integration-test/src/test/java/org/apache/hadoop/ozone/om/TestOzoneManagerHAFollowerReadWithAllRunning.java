@@ -21,6 +21,7 @@ import static java.util.UUID.randomUUID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -40,6 +41,7 @@ import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -59,7 +61,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -73,6 +79,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Ozone Manager HA follower read tests where all OMs are running throughout all tests.
@@ -105,29 +113,63 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
     }
   }
 
-  @Test
-  void testFollowerReadTargetsFollower() throws Exception {
-    ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-        OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
+  private static Stream<Class<? extends OmTransportFactory>> followerReadTransportClasses() {
+    return Stream.<Class<? extends OmTransportFactory>>of(
+        Hadoop3OmTransportFactory.class,
+        GrpcOmTransportFactory.class);
+  }
 
+  @ParameterizedTest
+  @MethodSource("followerReadTransportClasses")
+  void testFollowerReadTargetsFollower(Class<? extends OmTransportFactory> omTransportClass) throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "LOCAL_LEASE");
+    clientConf.set(OZONE_OM_TRANSPORT_CLASS, omTransportClass.getName());
     String leaderOMNodeId = getCluster().getOMLeader().getOMNodeId();
-    String followerOMNodeId = null;
+    OzoneManager followerOM = null;
     for (OzoneManager om : getCluster().getOzoneManagersList()) {
       if (!om.getOMNodeId().equals(leaderOMNodeId)) {
-        followerOMNodeId = om.getOMNodeId();
+        followerOM = om;
         break;
       }
     }
-    assertNotNull(followerOMNodeId);
+    assertNotNull(followerOM);
 
-    followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
-    objectStore.getClientProxy().listVolumes(null, null, 10);
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      changeFollowerReadInitialProxy(objectStore, omTransportClass, leaderOMNodeId, followerOM.getOMNodeId());
+      long previousLocalLeaseSuccess = followerOM.getMetrics().getNumFollowerReadLocalLeaseSuccess();
 
-    OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
-        (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
-    assertNotNull(lastProxy);
-    assertEquals(followerOMNodeId, lastProxy.getNodeId());
+      objectStore.listVolumes("");
+
+      long currentLocalLeaseSuccess = followerOM.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+      assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess);
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
+  }
+
+  private void changeFollowerReadInitialProxy(ObjectStore objectStore,
+      Class<? extends OmTransportFactory> omTransportClass, String leaderOMNodeId, String followerOMNodeId)
+      throws Exception {
+    if (Hadoop3OmTransportFactory.class.equals(omTransportClass)) {
+      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
+          OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
+      followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
+      return;
+    }
+
+    if (GrpcOmTransportFactory.class.equals(omTransportClass)) {
+      GrpcOmTransport grpcOmTransport = OmTestUtil.getGrpcOmTransport(objectStore);
+      grpcOmTransport.changeLeaderProxyForTest(leaderOMNodeId);
+      grpcOmTransport.changeFollowerReadInitialProxy(followerOMNodeId);
+      return;
+    }
+
+    throw new IllegalArgumentException("Unsupported OM transport class " + omTransportClass);
   }
 
   /**
@@ -571,4 +613,5 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
       IOUtils.closeQuietly(ozoneClient);
     }
   }
+
 }
