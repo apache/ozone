@@ -470,7 +470,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         () -> keyManager.sortDatanodesForWrite(nodes, "", mock(NetworkTopology.class)));
   }
 
-  // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote address for OM-side sort.
+  // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote
+  // address for OM-side sort.
   private OMRequest createAllocateBlockRequestWithSort(String clientAddress) {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)
