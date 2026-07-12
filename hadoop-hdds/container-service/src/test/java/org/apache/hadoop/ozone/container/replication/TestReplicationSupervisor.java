@@ -91,7 +91,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -126,14 +126,14 @@ public class TestReplicationSupervisor {
   private ContainerLayoutVersion layoutVersion;
 
   private StateContext context;
-  private TestClock clock;
+  private MockClock clock;
   private DatanodeDetails datanode;
   private DNContainerOperationClient mockClient;
   private ContainerController mockController;
 
   @BeforeEach
   public void setUp() throws Exception {
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     set = newContainerSet();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     context = new StateContext(
