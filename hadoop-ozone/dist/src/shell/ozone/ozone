@@ -66,6 +66,7 @@ function ozone_usage
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
   ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
+  ozone_add_subcommand "local" client "run a single-node local ozone cluster"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
   ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
@@ -207,6 +208,10 @@ function ozonecmd_case
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
       OZONE_RUN_ARTIFACT_NAME="ozone-insight"
+    ;;
+    local)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.local.OzoneLocal
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo
