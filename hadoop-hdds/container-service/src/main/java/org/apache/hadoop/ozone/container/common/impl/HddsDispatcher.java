@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -77,8 +78,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -823,7 +824,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
-      StreamObserver<ContainerCommandResponseProto> streamObserver,
+      DataStreamObserver<ReadBlockResponse> streamObserver,
       RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
     Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
@@ -875,20 +876,22 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         containerSet.scanContainer(containerID, "ReadBlock failed " + responseProto.getResult());
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
-        streamObserver.onNext(responseProto);
+        streamObserver.onNext(new ReadBlockResponse(responseProto, null));
       }
       perf.appendOpLatencyMs(oPLatencyMS);
       performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
 
     } catch (StorageContainerException sce) {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
-      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+      streamObserver.onNext(new ReadBlockResponse(
+          ContainerUtils.logAndReturnError(LOG, sce, msg), null));
     } catch (IOException ioe) {
       final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
           + " for " + dispatcherContext + ": " + ioe.getMessage();
       final StorageContainerException sce = new StorageContainerException(
           s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
-      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+      streamObserver.onNext(new ReadBlockResponse(
+          ContainerUtils.logAndReturnError(LOG, sce, msg), null));
     } finally {
       span.end();
     }

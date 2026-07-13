@@ -102,6 +102,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.DataStreamReadResolver;
 import org.apache.ratis.server.DataStreamServerRpc;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -525,6 +526,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
+    if (parameters == null) {
+      parameters = new Parameters();
+    }
+    ClosedContainerReadResolver resolver = new ClosedContainerReadResolver(dispatcher,
+      containerController, datanodeDetails);
+    DataStreamReadResolver.set(parameters, resolver);
 
     return new XceiverServerRatis(hddsDatanodeService, datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);

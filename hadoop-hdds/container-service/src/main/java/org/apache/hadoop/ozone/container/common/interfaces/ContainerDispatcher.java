@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -24,8 +25,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 
 /**
  * Dispatcher acts as the bridge between the transport layer and
@@ -36,6 +37,26 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
  * The reply from the request is dispatched to the client.
  */
 public interface ContainerDispatcher {
+  /** A ReadBlock response with its data kept outside the protobuf metadata. */
+  final class ReadBlockResponse {
+    private final ContainerCommandResponseProto response;
+    private final ByteBuffer data;
+
+    public ReadBlockResponse(ContainerCommandResponseProto response,
+        ByteBuffer data) {
+      this.response = response;
+      this.data = data;
+    }
+
+    public ContainerCommandResponseProto getResponse() {
+      return response;
+    }
+
+    public ByteBuffer getData() {
+      return data;
+    }
+  }
+
   /**
    * Dispatches commands to container layer.
    * @param msg - Command Request
@@ -97,7 +118,7 @@ public interface ContainerDispatcher {
    */
   default void streamDataReadOnly(
        ContainerCommandRequestProto msg,
-       StreamObserver<ContainerCommandResponseProto> streamObserver,
+       DataStreamObserver<ReadBlockResponse> streamObserver,
        RandomAccessFileChannel blockFile,
        DispatcherContext dispatcherContext) {
     throw new UnsupportedOperationException("streamDataReadOnly not supported.");
