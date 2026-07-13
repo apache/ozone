@@ -22,9 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -50,6 +48,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -90,21 +89,34 @@ public class TestOmRatisSnapshotProvider {
 
   @Test
   public void testIsDiskFullOrQuotaIOExceptionDetectsNoSpaceMessage() {
-    assertTrue(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
-        new IOException("No space left on device")));
+    assertThat(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
+        new IOException("No space left on device"))).isTrue();
   }
 
   @Test
   public void testIsDiskFullOrQuotaIOExceptionDetectsFileSystemExceptionReason() {
     IOException wrapped = new IOException("write failed",
         new FileSystemException("p", null, "No space left on device"));
-    assertTrue(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(wrapped));
+    assertThat(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(wrapped)).isTrue();
+  }
+
+  @Test
+  public void testIsDiskFullOrQuotaIOExceptionDetectsDiskOutOfSpaceExceptionInCauseChain() {
+    IOException wrapped = new IOException("write failed", new DiskOutOfSpaceException("full"));
+    assertThat(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(wrapped)).isTrue();
+  }
+
+  @Test
+  public void testIsDiskFullOrQuotaIOExceptionReturnsFalseForNonEnglishFileSystemException() {
+    IOException wrapped = new IOException("write failed",
+        new FileSystemException("p", null, "Kein Speicherplatz mehr auf dem Gerät"));
+    assertThat(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(wrapped)).isFalse();
   }
 
   @Test
   public void testIsDiskFullOrQuotaIOExceptionReturnsFalseForOtherErrors() {
-    assertFalse(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
-        new IOException("Connection reset")));
+    assertThat(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
+        new IOException("Connection reset"))).isFalse();
   }
 
   @Test

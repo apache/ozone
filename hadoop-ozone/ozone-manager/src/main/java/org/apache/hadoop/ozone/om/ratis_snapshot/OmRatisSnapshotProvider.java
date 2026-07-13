@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -117,29 +118,44 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    */
   public static boolean isDiskFullOrQuotaIOException(IOException ioe) {
     for (Throwable t = ioe; t != null; t = t.getCause()) {
-      if (t instanceof FileSystemException) {
-        FileSystemException fse = (FileSystemException) t;
-        String reason = fse.getReason();
-        if (reason != null) {
-          String r = reason.toLowerCase(Locale.ROOT);
-          if (r.contains("no space") || r.contains("space left")
-              || r.contains("quota") || r.contains("enospc")) {
-            return true;
-          }
-        }
+      if (t instanceof DiskOutOfSpaceException) {
+        return true;
       }
-      String msg = t.getMessage();
-      if (msg != null) {
-        String m = msg.toLowerCase(Locale.ROOT);
-        if (m.contains("no space left on device")
-            || m.contains("enospc")
-            || m.contains("disk quota exceeded")
-            || m.contains("quota exceeded")) {
-          return true;
-        }
+      if (matchesDiskFullOrQuotaMessage(t)) {
+        return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Best-effort supplement for JDK {@link FileSystemException} ENOSPC and
+   * quota wording on Linux OM deployments (typically English from libc/JVM).
+   * {@link DiskOutOfSpaceException} in the cause chain is handled by type
+   * in {@link #isDiskFullOrQuotaIOException(IOException)} and does not depend
+   * on message text. Localized OS messages without matching substrings are not
+   * detected here.
+   */
+  private static boolean matchesDiskFullOrQuotaMessage(Throwable throwable) {
+    if (throwable instanceof FileSystemException) {
+      String reason = ((FileSystemException) throwable).getReason();
+      if (reason != null && containsDiskFullOrQuotaText(reason)) {
+        return true;
+      }
+    }
+    String msg = throwable.getMessage();
+    return msg != null && containsDiskFullOrQuotaText(msg);
+  }
+
+  private static boolean containsDiskFullOrQuotaText(String text) {
+    String m = text.toLowerCase(Locale.ROOT);
+    return m.contains("no space left on device")
+        || m.contains("no space")
+        || m.contains("space left")
+        || m.contains("enospc")
+        || m.contains("disk quota exceeded")
+        || m.contains("quota exceeded")
+        || m.contains("quota");
   }
 
   private static String formatSnapshotVolumeUsableSpace(File pathOnVolume) {
