@@ -824,9 +824,9 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().awaitDoubleBufferFlush();
         return cluster.getOzoneManager().getMetadataManager()
             .countRowsInTable(snapshotInfoTable) == expectedCount;
-      } catch (Exception e) {
-        return false;
-      }
+} catch (Exception e) {
+  throw new RuntimeException("Failed to run SnapshotDeletingService purge task", e);
+}
     }, 1000, 120000);
     assertTableRowCount(snapshotInfoTable, expectedCount);
   }
