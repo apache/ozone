@@ -159,7 +159,7 @@ public class TestFinalizeBlock {
     // Before finalize block WRITE chunk on the same block should pass through
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getWriteChunkRequest(pipeline, (
-            new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
+            new BlockID(containerId.getIdForTesting(), omKeyLocationInfoGroupList.get(0)
                 .getLocationList().get(0).getLocalID())), 100);
     xceiverClient.sendCommand(request);
 
@@ -176,7 +176,7 @@ public class TestFinalizeBlock {
         omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
 
     assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
+        containerId.getIdForTesting()).getContainerData()).getFinalizedBlockSet().size());
 
     testRejectPutAndWriteChunkAfterFinalizeBlock(containerId, pipeline, xceiverClient, omKeyLocationInfoGroupList);
     testFinalizeBlockReloadAfterDNRestart(containerId);
@@ -192,7 +192,7 @@ public class TestFinalizeBlock {
 
     // After restart DN, finalizeBlock should be loaded into memory
     assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-            containerId.getId()).getContainerData()).getFinalizedBlockSet().size());
+            containerId.getIdForTesting()).getContainerData()).getFinalizedBlockSet().size());
   }
 
   private void testFinalizeBlockClearAfterCloseContainer(ContainerID containerId)
@@ -203,7 +203,7 @@ public class TestFinalizeBlock {
     // Finalize Block should be cleared from container data.
     GenericTestUtils.waitFor(() -> (
             (KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-                containerId.getId()).getContainerData()).getFinalizedBlockSet().isEmpty(),
+                containerId.getIdForTesting()).getContainerData()).getFinalizedBlockSet().isEmpty(),
         100, 10 * 1000);
     try {
       // Restart DataNode
@@ -215,7 +215,7 @@ public class TestFinalizeBlock {
     // After DN restart also there should not be any finalizeBlock
     assertTrue(((KeyValueContainerData)getContainerfromDN(
         cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
+        containerId.getIdForTesting()).getContainerData())
         .getFinalizedBlockSet().isEmpty());
   }
 
@@ -225,7 +225,7 @@ public class TestFinalizeBlock {
     // Try doing WRITE chunk on the already finalized block
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getWriteChunkRequest(pipeline,
-            (new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
+            (new BlockID(containerId.getIdForTesting(), omKeyLocationInfoGroupList.get(0)
                 .getLocationList().get(0).getLocalID())), 100);
 
     try {

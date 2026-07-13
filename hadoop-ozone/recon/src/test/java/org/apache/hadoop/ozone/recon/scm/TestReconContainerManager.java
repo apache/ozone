@@ -205,7 +205,7 @@ public class TestReconContainerManager
     assertFalse(getContainerManager().getPipelineToOpenContainer()
         .containsKey(openContainer.getPipeline().getId()));
     verify(getContainerManager().getScmClient(), never())
-        .getContainerWithPipeline(containerID.getId());
+        .getContainerWithPipeline(containerID.getIdForTesting());
   }
 
   @Test
@@ -275,7 +275,7 @@ public class TestReconContainerManager
     assertEquals(CLOSED,
         getContainerManager().getContainer(containerID).getState());
     verify(getContainerManager().getScmClient(), never())
-        .getContainerWithPipeline(containerID.getId());
+        .getContainerWithPipeline(containerID.getIdForTesting());
   }
 
   ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {

@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  * Test multipart upload abort response.
  */
 public class TestS3MultipartUploadAbortResponse
-    extends TestS3MultipartResponse {
+    extends S3MultipartResponseTests {
 
   @Test
   public void testAddDBToBatch() throws Exception {

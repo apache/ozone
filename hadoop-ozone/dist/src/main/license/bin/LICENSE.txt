@@ -298,7 +298,6 @@ Apache License 2.0
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
    com.google.j2objc:j2objc-annotations
-   com.googlecode.json-simple:json-simple
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt

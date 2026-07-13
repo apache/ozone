@@ -1036,7 +1036,7 @@ public class TestContainerCommandsEC {
                     .map(ContainerInfo::containerID)
                     .collect(Collectors.toList());
     assertEquals(1, containerIDs.size());
-    containerID = containerIDs.get(0).getId();
+    containerID = containerIDs.get(0).getIdForTesting();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
     assertEquals(1, pipelines.size());
     pipeline = pipelines.get(0);

@@ -154,7 +154,7 @@ public class TestContainerReportHandling {
         assertThat(keyLocations).isNotEmpty();
         OmKeyLocationInfo keyLocation = keyLocations.get(0);
         ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
-        waitForContainerClose(cluster, containerID.getId());
+        waitForContainerClose(cluster, containerID.getIdForTesting());
 
         // also wait till the container is closed in SCM
         waitForContainerClosedInSCM(containerID);

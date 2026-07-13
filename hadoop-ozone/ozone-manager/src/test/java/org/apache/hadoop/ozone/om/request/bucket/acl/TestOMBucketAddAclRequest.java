@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
+import org.apache.hadoop.ozone.om.request.bucket.BucketRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests bucket addAcl request.
  */
-public class TestOMBucketAddAclRequest extends TestBucketRequest {
+public class TestOMBucketAddAclRequest extends BucketRequestTests {
   @Test
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();

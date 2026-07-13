@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  * Class tests S3 Initiate MPU response.
  */
 public class TestS3InitiateMultipartUploadResponse
-    extends TestS3MultipartResponse {
+    extends S3MultipartResponseTests {
 
   @Test
   public void testAddDBToBatch() throws Exception {

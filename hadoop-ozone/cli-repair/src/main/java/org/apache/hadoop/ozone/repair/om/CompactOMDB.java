@@ -73,6 +73,14 @@ public class CompactOMDB extends RepairTool {
     OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
+
+    if (omNodeDetails == null) {
+      error("Couldn't determine OM node from the given service-id: %s and node-id: %s.",
+          omServiceId, nodeId);
+      return;
+    }
+
+    String omDisplay = nodeId != null ? nodeId : omNodeDetails.getRpcAddressString();
     ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
         CompactDBUtil.getBottommostLevelCompaction(bottommostLevelCompaction);
     if (!isDryRun()) {
@@ -81,8 +89,8 @@ public class CompactOMDB extends RepairTool {
                    UserGroupInformation.getCurrentUser(), omNodeDetails)) {
         omAdminProtocolClient.compactOMDB(columnFamilyName, blcOption.getValue());
         info("Compaction request issued for om.db of om node: %s, column-family: %s" +
-            " with bottommost level compaction: %s.", nodeId, columnFamilyName, blcOption.name());
-        info("Please check role logs of %s for completion status.", nodeId);
+            " with bottommost level compaction: %s.", omDisplay, columnFamilyName, blcOption.name());
+        info("Please check role logs of %s for completion status.", omDisplay);
       } catch (IOException ex) {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
       }

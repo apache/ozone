@@ -779,7 +779,7 @@ public class TestIncrementalContainerReportHandler {
           final long bcsId) {
     final ContainerReplicaProto.Builder replicaProto =
             ContainerReplicaProto.newBuilder()
-                    .setContainerID(containerId.getId())
+                    .setContainerID(containerId.getIdForTesting())
                     .setState(state)
                     .setOriginNodeId(originNodeId)
                     .setSize(5368709120L)
