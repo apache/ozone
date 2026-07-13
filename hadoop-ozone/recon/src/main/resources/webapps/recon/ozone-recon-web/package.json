@@ -83,7 +83,7 @@
     "typescript-eslint": "^8.63.0",
     "vite": "6.4.3",
     "vite-tsconfig-paths": "^3.6.0",
-    "vitest": "^1.6.1"
+    "vitest": "^3.2.6"
   },
   "proxy": "http://localhost:9888"
 }
