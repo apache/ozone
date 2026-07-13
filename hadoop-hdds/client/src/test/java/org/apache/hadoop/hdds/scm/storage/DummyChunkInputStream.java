@@ -93,7 +93,6 @@ public class DummyChunkInputStream extends ChunkInputStream {
     return readByteBuffers;
   }
 
-
   @Override
   protected Pair<XceiverClientSpi, DatanodeBlockID> getClientAndUpdateBlock() throws IOException {
     return Pair.of(null, null);

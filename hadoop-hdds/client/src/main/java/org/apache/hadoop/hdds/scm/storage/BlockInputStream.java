@@ -565,7 +565,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     } finally {
       lock.unlock();
-      }
+    }
   }
 
   /**
