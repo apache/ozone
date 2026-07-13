@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -43,12 +47,13 @@ public class DummyChunkInputStream extends ChunkInputStream {
       boolean verifyChecksum,
       byte[] data, Pipeline pipeline) {
     super(chunkInfo, blockId, xceiverClientFactory, () -> pipeline,
-        verifyChecksum, () -> null);
+        verifyChecksum, () -> null, null);
     this.chunkData = data.clone();
   }
 
   @Override
-  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+  protected ByteBuffer[] readChunk(
+      XceiverClientSpi client, ChunkInfo readChunkInfo, DatanodeBlockID datanodeBlockID) {
     int offset = (int) readChunkInfo.getOffset();
     int remainingToRead = (int) readChunkInfo.getLen();
 
@@ -86,5 +91,11 @@ public class DummyChunkInputStream extends ChunkInputStream {
 
   public List<ByteString> getReadByteBuffers() {
     return readByteBuffers;
+  }
+
+
+  @Override
+  protected Pair<XceiverClientSpi, DatanodeBlockID> getClientAndUpdateBlock() throws IOException {
+    return Pair.of(null, null);
   }
 }

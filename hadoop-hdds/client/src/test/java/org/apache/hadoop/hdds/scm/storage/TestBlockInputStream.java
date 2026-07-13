@@ -469,4 +469,22 @@ public class TestBlockInputStream {
             new StatusException(Status.UNAVAILABLE))))
     );
   }
+
+  @Test
+  public void testPositionedReadFully() throws Exception {
+    // 1. Read first full chunk (100 bytes) starting at offset 0
+    ByteBuffer buffer1 = ByteBuffer.allocate(100);
+    assertTrue(blockStream.readFully(0, buffer1));
+    matchWithInputData(buffer1.array(), 0, 100);
+
+    // 2. Read crossing chunk boundary: start at offset 50 (middle of chunk 0), read 120 bytes (into chunk 1)
+    ByteBuffer buffer2 = ByteBuffer.allocate(120);
+    assertTrue(blockStream.readFully(50, buffer2));
+    matchWithInputData(buffer2.array(), 50, 120);
+
+    // 3. Read up to the end of the block: start at offset 400 (start of last chunk), read 50 bytes
+    ByteBuffer buffer3 = ByteBuffer.allocate(50);
+    assertTrue(blockStream.readFully(400, buffer3));
+    matchWithInputData(buffer3.array(), 400, 50);
+  }
 }
