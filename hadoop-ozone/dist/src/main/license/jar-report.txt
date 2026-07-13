@@ -165,7 +165,6 @@ share/ozone/lib/jooq-codegen.jar
 share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jooq.jar
 share/ozone/lib/jsch.jar
-share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
 share/ozone/lib/jsr311-api.jar

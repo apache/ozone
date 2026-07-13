@@ -281,7 +281,7 @@ public class TestReconcileContainerEventHandler {
 
   private ContainerInfo addContainer(ReplicationConfig repConfig, LifeCycleState state) throws Exception {
     ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(CONTAINER_ID.getId())
+        .setContainerID(CONTAINER_ID.getIdForTesting())
         .setReplicationConfig(repConfig)
         .setState(state)
         .build();

@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
@@ -56,7 +56,7 @@ import org.junit.jupiter.api.Timeout;
  * Test class for quota repair.
  */
 @Timeout(120)
-public class TestQuotaRepairTask extends TestOMKeyRequest {
+public class TestQuotaRepairTask extends OMKeyRequestTests {
 
   /** Seconds; must match {@link Timeout} on this class. */
   private static final int REPAIR_TEST_TIMEOUT_SECONDS = 120;

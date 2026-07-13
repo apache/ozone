@@ -78,7 +78,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
-  public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
+  private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
@@ -512,10 +512,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
       prepareForNextBuild();
       return cluster;
-    }
-
-    protected int numberOfOzoneManagers() {
-      return numOfOMs;
     }
 
     protected void initOMRatisConf() {

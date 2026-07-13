@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -603,9 +604,22 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
+    initStreamRead(blockID, streamObserver, Collections.emptySet());
+  }
+
+  /**
+   * Start a streaming read, skipping datanodes that previously failed for this block stream.
+   */
+  public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver,
+      Set<DatanodeID> excludedDatanodes) throws IOException {
     final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
+      if (excludedDatanodes.contains(dn.getID())) {
+        LOG.debug("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
+            dn, dn.getUuidString(), blockID.getContainerBlockID());
+        continue;
+      }
       try {
         checkOpen(dn);
         semaphore.acquire();

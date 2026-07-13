@@ -213,6 +213,35 @@ public final class ContainerProtocolCalls  {
     return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token, replicaIndexes);
   }
 
+  /**
+   * Gets block metadata from a datanode.
+   * <p>
+   *
+   * @param xceiverClient client to perform call
+   * @param blockID blockID to identify container
+   * @param token a token for this block (may be null)
+   * @param datanode datanode to query
+   * @param replicaIndexes replica indexes for EC pipelines
+   * @return container protocol get block response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static GetBlockResponseProto getBlockFromDatanode(
+      XceiverClientSpi xceiverClient,
+      BlockID blockID,
+      Token<? extends TokenIdentifier> token,
+      DatanodeDetails datanode,
+      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(Type.GetBlock)
+        .setContainerID(blockID.getContainerID());
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+    return getBlock(xceiverClient, getValidatorList(), builder, blockID, datanode,
+        replicaIndexes);
+  }
+
   private static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder, BlockID blockID,

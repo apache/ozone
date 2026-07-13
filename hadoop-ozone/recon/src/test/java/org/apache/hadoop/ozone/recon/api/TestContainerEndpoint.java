@@ -798,7 +798,7 @@ public class TestContainerEndpoint {
         responseObject.getContainers().stream().findFirst().orElse(null);
     assertNotNull(container);
 
-    assertEquals(containerID.getId(), container.getContainerID());
+    assertEquals(containerID.getIdForTesting(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
     assertEquals(3, container.getReplicas().size());
@@ -1185,7 +1185,7 @@ public class TestContainerEndpoint {
     reconPipelineManager.addPipeline(localPipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(localContainerID.getId())
+            .setContainerID(localContainerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(localPipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
