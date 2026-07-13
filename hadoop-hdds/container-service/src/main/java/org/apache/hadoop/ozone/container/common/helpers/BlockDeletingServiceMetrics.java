@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -24,6 +26,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -32,9 +35,11 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
     + "background block deleting service on Datanode", context = "dfs")
 public final class BlockDeletingServiceMetrics {
 
-  private static BlockDeletingServiceMetrics instance;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
+  private static final Map<String, BlockDeletingServiceMetrics> INSTANCES =
+      new ConcurrentHashMap<>();
+  private final String sourceName;
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -84,26 +89,42 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of delete block transactions failed.")
   private MutableGaugeLong processedTransactionFailCount;
 
-  private BlockDeletingServiceMetrics() {
+  private BlockDeletingServiceMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "BlockDeletingService",
-          new BlockDeletingServiceMetrics());
-    }
+  public static BlockDeletingServiceMetrics create() {
+    return create(null);
+  }
 
-    return instance;
+  public static BlockDeletingServiceMetrics create(String component) {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return INSTANCES.computeIfAbsent(getSourceName(component),
+        key -> ms.register(key, "BlockDeletingService",
+            new BlockDeletingServiceMetrics(key)));
+  }
+
+  /**
+   * Returns the metrics source name registered by {@link #create(String)} for the given component,
+   * e.g. for looking up the JMX bean of a specific datanode.
+   */
+  public static String getSourceName(String component) {
+    return MetricUtil.qualifySourceName(SOURCE_NAME, component);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static synchronized void unRegister() {
-    instance = null;
+  public static void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    INSTANCES.remove(SOURCE_NAME);
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    INSTANCES.remove(sourceName);
+    ms.unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

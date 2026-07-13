@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
@@ -126,6 +127,7 @@ public class OzoneContainer {
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource config;
+  private final String metricsSourceComponent;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
   private final MutableVolumeSet dbVolumeSet;
@@ -179,7 +181,10 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(), datanodeDetails.threadNamePrefix());
+    this.metricsSourceComponent =
+        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
+        datanodeDetails.threadNamePrefix(), metricsSourceComponent);
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -215,12 +220,12 @@ public class OzoneContainer {
     volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
-    metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf, metricsSourceComponent);
     handlers = Maps.newHashMap();
 
     IncrementalReportSender<Container> icrSender = createIncrementalReportSender();
 
-    checksumTreeManager = new ContainerChecksumTreeManager(config);
+    checksumTreeManager = new ContainerChecksumTreeManager(config, metricsSourceComponent);
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
@@ -231,7 +236,7 @@ public class OzoneContainer {
 
     SecurityConfig secConf = new SecurityConfig(conf);
     hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics, TokenVerifier.create(secConf, secretKeyClient));
+        handlers, context, metrics, TokenVerifier.create(secConf, secretKeyClient), metricsSourceComponent);
 
     /*
      * ContainerController is the control plane
@@ -285,6 +290,7 @@ public class OzoneContainer {
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
+            metricsSourceComponent,
             checksumTreeManager,
             context.getParent().getReconfigurationHandler());
 
@@ -297,7 +303,7 @@ public class OzoneContainer {
       diskBalancerService =
           new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
               diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-              config);
+              config, metricsSourceComponent);
     } else {
       diskBalancerService = null;
       LOG.info("Disk Balancer is not enabled. Please enable the " +
@@ -487,7 +493,7 @@ public class OzoneContainer {
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
       this.metadataScanner =
-          new BackgroundContainerMetadataScanner(c, controller);
+          new BackgroundContainerMetadataScanner(c, controller, metricsSourceComponent);
       backgroundScanners.add(metadataScanner);
     }
     this.metadataScanner.start();
@@ -499,7 +505,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerScanner(c, controller);
+    onDemandScanner = new OnDemandContainerScanner(c, controller, metricsSourceComponent);
     containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
@@ -647,7 +653,7 @@ public class OzoneContainer {
     }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
-    ContainerMetrics.remove();
+    metrics.unregister();
     checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {

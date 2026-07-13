@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.local;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
@@ -147,6 +148,7 @@ class TestLocalOzoneCluster {
     assertFalse(conf.getBoolean(HDDS_CONTAINER_RATIS_ENABLED_KEY, true));
     assertFalse(conf.getBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, true));
     assertEquals(2, conf.getInt(HDDS_SCM_SAFEMODE_MIN_DATANODE, 0));
+    assertTrue(conf.getBoolean(HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED, false));
     assertTrue(conf.get(OZONE_SCM_CLIENT_ADDRESS_KEY).endsWith(":9860"));
     assertTrue(conf.get(OZONE_OM_ADDRESS_KEY).endsWith(":9862"));
     assertTrue(conf.get(OZONE_S3G_HTTP_ADDRESS_KEY).endsWith(":9878"));

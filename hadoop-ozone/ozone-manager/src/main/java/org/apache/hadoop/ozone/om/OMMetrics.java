@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -276,7 +277,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numDeleteBucketTaggingFails;
 
   public OMMetrics(int maxRatisEvents) {
-    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
+    this(maxRatisEvents, null);
+  }
+
+  private OMMetrics(int maxRatisEvents, String metricsSourceComponent) {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics", metricsSourceComponent);
     this.maxRatisEvents = maxRatisEvents;
   }
 
@@ -286,9 +291,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
         ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
+    String metricsSourceComponent = conf == null
+        ? null : MetricUtil.metricsSourceComponent(conf, "OM");
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
-        new OMMetrics(maxRatisEvents));
+        new OMMetrics(maxRatisEvents, metricsSourceComponent));
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
