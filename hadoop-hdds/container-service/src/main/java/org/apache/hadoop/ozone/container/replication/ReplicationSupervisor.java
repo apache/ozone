@@ -315,8 +315,7 @@ public final class ReplicationSupervisor {
     try {
       selectExecutor(task).execute(new TaskRunner(task));
     } catch (RejectedExecutionException e) {
-      LOG.warn("Rejected {} in ReplicationSupervisor: replication handler "
-          + "thread pool unavailable", task, e);
+      LOG.warn("Rejected {} in ReplicationSupervisor: {}", task, e.getMessage());
       rollbackQueuedTask(task);
     }
   }
