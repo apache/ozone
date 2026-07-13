@@ -18,20 +18,28 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -40,17 +48,26 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,9 +96,26 @@ class TestLocalOzoneCluster {
       assertTrue(Files.isRegularFile(portStateFile(dataDir)));
       assertTrue(prepared.getScmPort() > 0);
       assertTrue(prepared.getOmPort() > 0);
+      assertTrue(prepared.getS3gPort() > 0);
+    }
+  }
+
+  @Test
+  void prepareConfigurationSkipsS3GatewayWhenDisabled() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setS3gEnabled(false)
+        .build();
+
+    try (LocalOzoneCluster cluster = newCluster(config)) {
+      LocalOzoneCluster.PreparedConfiguration prepared =
+          cluster.prepareConfiguration();
+
+      assertEquals(-1, prepared.getS3gPort());
       assertEquals(-1, cluster.getS3gPort());
       assertEquals("", cluster.getS3Endpoint());
     }
+    assertFalse(loadPortState(dataDir).stringPropertyNames().stream().anyMatch(key -> key.startsWith("s3g.")));
   }
 
   @Test
@@ -91,6 +125,7 @@ class TestLocalOzoneCluster {
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
         .setScmPort(9860)
         .setOmPort(9862)
+        .setS3gPort(9878)
         .setDatanodes(2)
         .build();
 
@@ -112,10 +147,50 @@ class TestLocalOzoneCluster {
     assertEquals(2, conf.getInt(HDDS_SCM_SAFEMODE_MIN_DATANODE, 0));
     assertTrue(conf.get(OZONE_SCM_CLIENT_ADDRESS_KEY).endsWith(":9860"));
     assertTrue(conf.get(OZONE_OM_ADDRESS_KEY).endsWith(":9862"));
+    assertTrue(conf.get(OZONE_S3G_HTTP_ADDRESS_KEY).endsWith(":9878"));
     assertTrue(conf.getTrimmedStringCollection(OZONE_SCM_NAMES).iterator()
         .next().contains(":"));
     assertEquals(9860, prepared.getScmPort());
     assertEquals(9862, prepared.getOmPort());
+    assertEquals(9878, prepared.getS3gPort());
+  }
+
+  /**
+   * Every listener with a bind-host key binds loopback unless the user widens it with
+   * {@code --bind-host}: the pre-provisioned S3 credentials are fixed and well known, so a
+   * wildcard default would serve a remotely writable S3 endpoint on every interface.
+   */
+  @Test
+  void prepareConfigurationBindsListenersToLoopbackByDefault() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+        tempDir.resolve("local-ozone")).build();
+
+    LocalOzoneCluster.PreparedConfiguration prepared = prepare(config);
+    OzoneConfiguration conf = prepared.getConfiguration();
+
+    assertEquals("127.0.0.1", conf.get(OZONE_SCM_CLIENT_BIND_HOST_KEY));
+    assertEquals("127.0.0.1", conf.get(OZONE_OM_HTTP_BIND_HOST_KEY));
+    assertEquals("127.0.0.1", conf.get(OZONE_S3G_HTTP_BIND_HOST_KEY));
+    assertEquals("127.0.0.1", prepared.getDatanodeConfigurations().get(0)
+        .get(HDDS_DATANODE_CLIENT_BIND_HOST_KEY));
+  }
+
+  @Test
+  void prepareConfigurationAllocatesDistinctS3GatewayPorts() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setS3gPort(9878)
+        .build();
+
+    OzoneConfiguration conf = prepare(config).getConfiguration();
+
+    int httpPort = parsePort(conf.get(OZONE_S3G_HTTP_ADDRESS_KEY));
+    int httpsPort = parsePort(conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY));
+    int webHttpPort = parsePort(conf.get(OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY));
+    int webHttpsPort = parsePort(conf.get(OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY));
+
+    assertEquals(9878, httpPort);
+    assertEquals(4, new HashSet<>(Arrays.asList(httpPort, httpsPort, webHttpPort, webHttpsPort)).size());
   }
 
   @Test
@@ -308,8 +383,27 @@ class TestLocalOzoneCluster {
     assertPositivePort(properties, "om.rpc");
     assertPositivePort(properties, "om.http");
     assertPositivePort(properties, "om.ratis");
+    assertPositivePort(properties, "s3g.http");
+    assertPositivePort(properties, "s3g.https");
+    assertPositivePort(properties, "s3g.web.http");
+    assertPositivePort(properties, "s3g.web.https");
     assertNotEquals(properties.getProperty("scm.client"),
         properties.getProperty("om.rpc"));
+  }
+
+  @Test
+  void formatNeverRejectsPortStateMissingS3GatewayPorts() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    prepare(LocalOzoneClusterConfig.builder(dataDir)
+        .setS3gEnabled(false)
+        .build());
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.NEVER)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertMessageContains(error, "s3g.");
   }
 
   @Test
@@ -575,6 +669,59 @@ class TestLocalOzoneCluster {
   }
 
   @Test
+  void timedOutStartupIsStoppedOnceItFinishes() throws Exception {
+    // Pins the timeout contract of executeWithinStartupTimeout: Gateway.call() ignores
+    // interruption, so a timed-out startup can still finish after the launcher has rolled back.
+    // The cleanup must run after the abandoned attempt returns, as its only stopper; without the
+    // queued cleanup the late-started service leaks until JVM exit.
+    CountDownLatch startupBlocked = new CountDownLatch(1);
+    List<String> events = new CopyOnWriteArrayList<>();
+    CountDownLatch cleanupRan = new CountDownLatch(1);
+
+    IOException error = assertThrows(IOException.class, () ->
+        LocalOzoneCluster.executeWithinStartupTimeout("S3 Gateway", () -> {
+          Uninterruptibles.awaitUninterruptibly(startupBlocked);
+          events.add("startup finished");
+          return null;
+        }, () -> {
+          events.add("cleanup");
+          cleanupRan.countDown();
+        }, Duration.ofMillis(50)));
+
+    assertTrue(error.getMessage().contains("did not start within"), error.getMessage());
+    startupBlocked.countDown();
+    assertTrue(cleanupRan.await(30, TimeUnit.SECONDS));
+    assertEquals(Arrays.asList("startup finished", "cleanup"), events);
+  }
+
+  @Test
+  void failedStartupIsStoppedInPlace() {
+    // A startup that throws may have started some of its servers first; the cleanup stops them
+    // before the failure propagates to the launcher.
+    AtomicBoolean cleaned = new AtomicBoolean();
+
+    IllegalStateException error = assertThrows(IllegalStateException.class, () ->
+        LocalOzoneCluster.executeWithinStartupTimeout("S3 Gateway",
+            () -> {
+              throw new IllegalStateException("startup failed");
+            },
+            () -> cleaned.set(true), Duration.ofSeconds(30)));
+
+    assertEquals("startup failed", error.getMessage());
+    assertTrue(cleaned.get());
+  }
+
+  @Test
+  void successfulStartupIsNotCleanedUp() throws Exception {
+    AtomicBoolean cleaned = new AtomicBoolean();
+
+    LocalOzoneCluster.executeWithinStartupTimeout("S3 Gateway", () -> null,
+        () -> cleaned.set(true), Duration.ofSeconds(30));
+
+    assertFalse(cleaned.get());
+  }
+
+  @Test
   void persistedPortFileContainsDatanodePorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
@@ -684,6 +831,10 @@ class TestLocalOzoneCluster {
 
   private void assertPositivePort(Properties properties, String key) {
     assertTrue(Integer.parseInt(properties.getProperty(key)) > 0, key);
+  }
+
+  private static int parsePort(String address) {
+    return NetUtils.createSocketAddr(address).getPort();
   }
 
   private Path metadataDir(Path dataDir) {
