@@ -116,7 +116,7 @@ public class OzoneLocal extends GenericCli {
   }
 
   @Command(name = "run",
-      description = "Start SCM, OM, and datanodes in one local process")
+      description = "Start SCM, OM, datanodes, and optional S3 Gateway in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -142,7 +142,7 @@ public class OzoneLocal extends GenericCli {
 
     @Option(names = "--bind-host",
         defaultValue = DEFAULT_BIND_HOST_VALUE,
-        description = "Bind host for HTTP and RPC listeners")
+        description = "Bind host for HTTP and RPC listeners (use 0.0.0.0 to listen on all interfaces)")
     private String bindHost;
 
     @Option(names = "--scm-port",
@@ -261,6 +261,16 @@ public class OzoneLocal extends GenericCli {
       writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
       writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
       writer.println("Datanodes: " + config.getDatanodes());
+      if (config.isS3gEnabled()) {
+        writer.println("S3 endpoint: " + runtime.getS3Endpoint());
+        writer.println("Suggested local AWS settings:");
+        writer.println("AWS_ACCESS_KEY_ID=" + config.getS3AccessKey());
+        writer.println("AWS_SECRET_ACCESS_KEY=" + config.getS3SecretKey());
+        writer.println("AWS_REGION=" + config.getS3Region());
+        writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
+        writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
+        writer.println("These credentials are pre-provisioned for the local S3 Gateway.");
+      }
       writer.println("Press Ctrl+C to stop.");
       writer.flush();
     }

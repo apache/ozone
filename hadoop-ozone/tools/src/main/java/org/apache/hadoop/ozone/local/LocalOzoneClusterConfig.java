@@ -56,7 +56,11 @@ public final class LocalOzoneClusterConfig {
   static final int DEFAULT_DATANODES =
       Integer.parseInt(DEFAULT_DATANODES_VALUE);
   static final String DEFAULT_HOST = "127.0.0.1";
-  static final String DEFAULT_BIND_HOST = "0.0.0.0";
+  // Loopback, not the wildcard address: the pre-provisioned S3 credentials are fixed and well
+  // known, so listening on every interface by default would serve a remotely writable S3
+  // endpoint. Widening the bind is an explicit --bind-host choice.
+  static final String DEFAULT_BIND_HOST = "127.0.0.1";
+  static final String WILDCARD_HOST = "0.0.0.0";
   static final int DEFAULT_PORT = Integer.parseInt(DEFAULT_PORT_VALUE);
   static final boolean DEFAULT_S3G_ENABLED =
       Boolean.parseBoolean(DEFAULT_S3G_ENABLED_VALUE);

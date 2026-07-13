@@ -87,6 +87,10 @@
       <artifactId>ozone-manager</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-s3gateway</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
     </dependency>
