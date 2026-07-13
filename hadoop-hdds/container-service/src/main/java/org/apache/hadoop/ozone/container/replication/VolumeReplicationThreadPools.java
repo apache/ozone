@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,9 +53,11 @@ final class VolumeReplicationThreadPools {
     currentPoolSize = poolSize;
     List<String> volumeRoots = new ArrayList<>();
     for (StorageVolume volume : volumes) {
-      String volumeRoot = volume.getStorageDir().getPath();
+      File storageDir = volume.getStorageDir();
+      String volumeRoot = storageDir.getPath();
       volumeRoots.add(volumeRoot);
-      pools.put(volumeRoot, createPool(poolSize, threadNamePrefix, volumeRoot));
+      pools.put(volumeRoot,
+          createPool(poolSize, threadNamePrefix, storageDir.getName()));
     }
     LOG.info("Initialized {} per-volume replication thread pools "
             + "(threads per volume = {}): {}",
@@ -62,9 +65,7 @@ final class VolumeReplicationThreadPools {
   }
 
   private static ThreadPoolExecutor createPool(int poolSize,
-      String threadNamePrefix, String volumeRoot) {
-    String volumeLabel = volumeRoot.substring(
-        Math.max(0, volumeRoot.lastIndexOf('/') + 1));
+      String threadNamePrefix, String volumeLabel) {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + "ContainerReplicationThread-"
