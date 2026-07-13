@@ -420,8 +420,7 @@ public class TestDeleteBlocksCommandHandler {
     CommandStatus fatalStatus = context.getCmdStatus(fatalCommand.getId());
     assertEquals(Status.FAILED, fatalStatus.getStatus());
     assertFalse(fatalStatus.getProtoBufMessage().hasBlockDeletionAck());
-    assertEquals(Status.PENDING,
-        context.getCmdStatus(queuedCommand.getId()).getStatus());
+    assertEquals(Status.PENDING, context.getCmdStatus(queuedCommand.getId()).getStatus());
   }
 
   @ContainerTestVersionInfo.ContainerTest
