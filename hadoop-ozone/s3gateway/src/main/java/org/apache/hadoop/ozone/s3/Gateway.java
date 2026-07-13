@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayVersionMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -97,7 +98,8 @@ public class Gateway extends GenericCli implements Callable<Void> {
     stsServer = new S3STSHttpServer(OzoneConfigurationHolder.configuration(), "s3g-sts");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     versionMetrics = S3GatewayVersionMetrics.create();
-    nettyMetrics = NettyMetrics.create();
+    nettyMetrics = NettyMetrics.create(
+        MetricUtil.metricsSourceComponent(OzoneConfigurationHolder.configuration(), "S3Gateway"));
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {

@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class is used to track Volume Health metrics for all volumes on a datanode.
@@ -56,10 +57,10 @@ public final class VolumeHealthMetrics implements MetricsSource {
    *
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
    */
-  private VolumeHealthMetrics(StorageVolume.VolumeType volumeType) {
+  private VolumeHealthMetrics(String component, StorageVolume.VolumeType volumeType) {
     this.healthyVolumes = new AtomicInteger(0);
     this.failedVolumes = new AtomicInteger(0);
-    metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
+    metricsSourceName = buildSourceName(component, volumeType);
     registry = new MetricsRegistry(metricsSourceName);
   }
 
@@ -70,9 +71,17 @@ public final class VolumeHealthMetrics implements MetricsSource {
    * @return The registered VolumeHealthMetrics instance
    */
   public static VolumeHealthMetrics create(StorageVolume.VolumeType volumeType) {
+    return create(null, volumeType);
+  }
+
+  public static VolumeHealthMetrics create(String component, StorageVolume.VolumeType volumeType) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    VolumeHealthMetrics metrics = new VolumeHealthMetrics(volumeType);
+    VolumeHealthMetrics metrics = new VolumeHealthMetrics(component, volumeType);
     return ms.register(metrics.metricsSourceName, "Volume Health Statistics", metrics);
+  }
+
+  private static String buildSourceName(String component, StorageVolume.VolumeType volumeType) {
+    return MetricUtil.qualifySourceName(SOURCE_BASENAME, component) + '-' + volumeType.name();
   }
 
   public void unregister() {
