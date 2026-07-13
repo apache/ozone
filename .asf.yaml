@@ -37,6 +37,10 @@ github:
     squash_commit_message: PR_TITLE
     merge: false
     rebase: false
+  copilot_code_review:
+    enabled: true
+    review_drafts: true
+    review_on_push: true
   rulesets:
     - name: "Default Branch Protection"
       type: branch

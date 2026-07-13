@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_NAME;
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.SENT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.TO_BE_SENT;
@@ -689,15 +689,15 @@ public class SCMDeletedBlockTransactionStatusManager {
   private DeletedBlocksTransactionSummary loadDeletedBlocksSummary() throws IOException {
     String propertyName =  DeletedBlocksTransactionSummary.class.getSimpleName();
     try {
-      ByteString byteString = statefulConfigTable.get(SERVICE_NAME);
+      ByteString byteString = statefulConfigTable.get(SERVICE_DEFINITION.getServiceName());
       if (byteString == null) {
         // for a new Ozone cluster, property not found is an expected state.
-        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_NAME);
+        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_DEFINITION.getServiceName());
         return null;
       }
-      return DeletedBlocksTransactionSummary.parseFrom(byteString);
+      return SERVICE_DEFINITION.deserialize(byteString);
     } catch (IOException e) {
-      LOG.error("Failed to get property {} for service {}.", propertyName, SERVICE_NAME, e);
+      LOG.error("Failed to get property {} for service {}.", propertyName, SERVICE_DEFINITION.getServiceName(), e);
       throw new IOException("Failed to get property " + propertyName, e);
     }
   }

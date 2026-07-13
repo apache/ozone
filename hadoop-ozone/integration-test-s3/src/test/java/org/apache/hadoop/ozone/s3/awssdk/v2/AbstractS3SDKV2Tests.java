@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -769,6 +770,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(keyName)
     );
     assertEquals(part1Content, objectBytes.asUtf8String());
+  }
+
+  @Test
+  public void testCompleteMultipartUploadWithNoParts() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.completeMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .multipartUpload(CompletedMultipartUpload.builder().build())));
+
+    assertThat(exception.statusCode()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(exception.awsErrorDetails().errorCode()).isEqualTo("MalformedXML");
   }
 
   @ParameterizedTest

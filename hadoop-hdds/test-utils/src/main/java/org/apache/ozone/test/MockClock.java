@@ -28,16 +28,16 @@ import java.time.temporal.TemporalAmount;
  * moved forward and back. Intended for use only in tests.
  */
 
-public class TestClock extends Clock {
+public class MockClock extends Clock {
 
   private Instant instant;
   private final ZoneId zoneId;
 
-  public static TestClock newInstance() {
-    return new TestClock(Instant.now(), ZoneOffset.UTC);
+  public static MockClock newInstance() {
+    return new MockClock(Instant.now(), ZoneOffset.UTC);
   }
 
-  public TestClock(Instant instant, ZoneId zone) {
+  public MockClock(Instant instant, ZoneId zone) {
     this.instant = instant;
     this.zoneId = zone;
   }
@@ -49,7 +49,7 @@ public class TestClock extends Clock {
 
   @Override
   public Clock withZone(ZoneId zone) {
-    return new TestClock(Instant.now(), zone);
+    return new MockClock(Instant.now(), zone);
   }
 
   @Override

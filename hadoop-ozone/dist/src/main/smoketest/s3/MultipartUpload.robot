@@ -66,7 +66,7 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     [Documentation]    Regression test for HDDS-14760. When CompleteMultipartUpload
     ...                is sent with chunked transfer encoding (no Content-Length, as
     ...                e.g. the AWS C++ SDK does with Expect: 100-continue), it must
-    ...                not be rejected with "You must specify at least one part".
+    ...                not be rejected as an empty part list (MalformedXML).
     ${access_key} =     Execute    aws configure get aws_access_key_id
     ${secret_key} =     Execute    aws configure get aws_secret_access_key
     ${key} =            Set Variable    ${PREFIX}/chunkedCompleteKey
@@ -84,11 +84,11 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     ${result} =         Execute    curl -sS -v -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}" 2>&1
     Should Contain      ${result}    > Transfer-Encoding: chunked
     Should Not Contain  ${result}    > Content-Length:
-    # A success response carries <CompleteMultipartUploadResult>/<ETag>; the
-    # error response would instead contain the "must specify at least one part"
-    # message (the bucket/key alone are not success discriminators, since the
-    # key also appears in the <Resource> element of an error response).
-    Should Not Contain  ${result}    must specify at least one part
+    # A success response carries <CompleteMultipartUploadResult>/<ETag>; an empty
+    # part list would instead be rejected with MalformedXML (the bucket/key alone
+    # are not success discriminators, since the key also appears in the
+    # <Resource> element of an error response).
+    Should Not Contain  ${result}    MalformedXML
     Should Contain      ${result}    CompleteMultipartUploadResult
     Should Contain      ${result}    ETag
     [Teardown]          Run Keywords    Remove File    /tmp/${PREFIX}-complete.xml
@@ -122,8 +122,7 @@ Test Multipart Upload Complete
 
 #complete multipart upload without any parts
     ${result} =         Execute AWSS3APICli and checkrc    complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1    255
-                        Should contain    ${result}    InvalidRequest
-                        Should contain    ${result}    must specify at least one part
+                        Should contain    ${result}    MalformedXML
 
 #complete multipart upload
     ${resultETag} =     Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    {ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}

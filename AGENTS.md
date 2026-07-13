@@ -10,7 +10,7 @@
 - Reuse existing Ozone and Ratis utilities when the surrounding code already uses them.
   Prefer extending an existing helper over duplicating logic or adding a new one-off abstraction.
 - If there are multiple reasonable interpretations, state the tradeoff and ask instead of guessing.
-- Do not wrap lines early just to make them look uniform. The project limit is 120 characters; use the space.
+- Do not wrap lines early just to make them look uniform. The checkstyle maximum (see `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`) is 120 characters for Java. Use the full 120 characters before wrapping; never break a line that fits on one line.
 - Use established Ozone vocabulary in code, docs, and PR text:
   SCM, OM, datanode, container, pipeline, volume, bucket, key, snapshot,
   Recon, FSO, OBS, and S3 Gateway.
