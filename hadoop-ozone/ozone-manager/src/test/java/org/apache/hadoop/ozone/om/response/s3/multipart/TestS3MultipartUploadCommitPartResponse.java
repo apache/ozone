@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * Test multipart upload commit part response.
  */
 public class TestS3MultipartUploadCommitPartResponse
-    extends TestS3MultipartResponse {
+    extends S3MultipartResponseTests {
 
   @Test
   public void testAddDBToBatch() throws Exception {

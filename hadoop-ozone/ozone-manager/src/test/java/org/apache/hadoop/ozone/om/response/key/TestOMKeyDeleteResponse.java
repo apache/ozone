@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMKeyDeleteResponse.
  */
-public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
+public class TestOMKeyDeleteResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToDBBatch() throws Exception {
