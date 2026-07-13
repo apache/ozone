@@ -28,6 +28,7 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -35,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -310,7 +312,19 @@ public final class ReplicationSupervisor {
           k -> new AtomicInteger()).incrementAndGet();
     }
     queuedCounter.get(task.getMetricName()).incrementAndGet();
-    selectExecutor(task).execute(new TaskRunner(task));
+    try {
+      selectExecutor(task).execute(new TaskRunner(task));
+    } catch (RejectedExecutionException e) {
+      LOG.warn("Rejected {} in ReplicationSupervisor: replication handler "
+          + "thread pool unavailable", task, e);
+      rollbackQueuedTask(task);
+    }
+  }
+
+  private void rollbackQueuedTask(AbstractReplicationTask task) {
+    queuedCounter.get(task.getMetricName()).decrementAndGet();
+    inFlight.remove(task);
+    decrementTaskCounter(task);
   }
 
   private ExecutorService selectExecutor(AbstractReplicationTask task) {
@@ -321,9 +335,6 @@ public final class ReplicationSupervisor {
       return executor;
     }
     ReplicationTask replicationTask = (ReplicationTask) task;
-    if (!replicationTask.isPushReplication()) {
-      return executor;
-    }
     return resolveVolumeExecutor(replicationTask.getContainerId());
   }
 
@@ -387,7 +398,7 @@ public final class ReplicationSupervisor {
       Thread.currentThread().interrupt();
     }
     if (volumePools != null) {
-      volumePools.shutdownAll();
+      cancelDrainedTaskRunners(volumePools.shutdownAll());
     }
   }
 
@@ -397,8 +408,8 @@ public final class ReplicationSupervisor {
 
   public void setPerVolumePoolSize(int newSize) {
     if (volumePools != null) {
-      volumePools.setPoolSize(newSize);
       replicationConfig.setPerVolumeStreamsLimit(newSize);
+      resize(state.get());
     }
   }
 
@@ -407,7 +418,20 @@ public final class ReplicationSupervisor {
       return;
     }
     for (StorageVolume volume : volumeSet.getFailedVolumesList()) {
-      volumePools.shutdownVolume(volume.getStorageDir().getPath());
+      cancelDrainedTaskRunners(
+          volumePools.shutdownVolume(volume.getStorageDir().getPath()));
+    }
+  }
+
+  private void cancelDrainedTaskRunners(List<Runnable> drained) {
+    for (Runnable runnable : drained) {
+      if (!(runnable instanceof TaskRunner)) {
+        continue;
+      }
+      AbstractReplicationTask task = ((TaskRunner) runnable).getTask();
+      queuedCounter.get(task.getMetricName()).decrementAndGet();
+      inFlight.remove(task);
+      decrementTaskCounter(task);
     }
   }
 
@@ -502,6 +526,10 @@ public final class ReplicationSupervisor {
 
     public TaskRunner(AbstractReplicationTask task) {
       this.task = task;
+    }
+
+    AbstractReplicationTask getTask() {
+      return task;
     }
 
     @Override

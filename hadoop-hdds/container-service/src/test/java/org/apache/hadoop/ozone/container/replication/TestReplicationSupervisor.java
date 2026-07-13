@@ -67,6 +67,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -1128,6 +1129,8 @@ public class TestReplicationSupervisor {
             .contains(volume.getStorageDir().getPath());
       }
     } finally {
+      supervisorLogs.stopCapturing();
+      poolLogs.stopCapturing();
       supervisor.stop();
     }
   }
@@ -1214,6 +1217,39 @@ public class TestReplicationSupervisor {
       datanode.setPersistedOpState(IN_SERVICE);
       supervisor.nodeStateUpdated(
           HddsProtos.NodeOperationalState.DECOMMISSIONING);
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      int expected = repConf.scaleOutOfServiceLimit(2);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertEquals(expected,
+            pools.getPoolSize(volume.getStorageDir().getPath()));
+      }
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePoolResizeDuringDecommission(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 2);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    try {
+      datanode.setPersistedOpState(IN_SERVICE);
+      supervisor.nodeStateUpdated(DECOMMISSIONING);
+      supervisor.setPerVolumePoolSize(2);
       VolumeReplicationThreadPools pools =
           supervisor.getVolumeReplicationThreadPools();
       int expected = repConf.scaleOutOfServiceLimit(2);
@@ -1327,14 +1363,70 @@ public class TestReplicationSupervisor {
       assertTrue(vol1Started.await(10, TimeUnit.SECONDS));
 
       supervisor.addTask(createPushTask(2L));
-      GenericTestUtils.waitFor(() ->
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
           supervisor.getReplicationSuccessCount() >= 1, 100, 10000);
 
       assertEquals(1, supervisor.getReplicationSuccessCount());
       vol1Release.countDown();
-      GenericTestUtils.waitFor(() ->
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
           supervisor.getReplicationSuccessCount() == 2, 100, 10000);
     } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void volumeFailureCleansUpQueuedTasks(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    addContainerOnVolume(1L, vol1, conf);
+    addContainerOnVolume(2L, vol1, conf);
+
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    CountDownLatch task1Started = new CountDownLatch(1);
+    CountDownLatch task1Block = new CountDownLatch(1);
+    replicatorRef.set(task -> {
+      if (task.getContainerId() == 1L) {
+        task1Started.countDown();
+        assertDoesNotThrow(() -> task1Block.await(30, TimeUnit.SECONDS));
+      }
+      task.setStatus(DONE);
+    });
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    String volumeRoot = vol1.getStorageDir().getPath();
+    try {
+      supervisor.addTask(createPushTask(1L));
+      assertTrue(task1Started.await(10, TimeUnit.SECONDS));
+
+      supervisor.addTask(createPushTask(2L));
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getTotalInFlightReplications() == 2, 100, 5000);
+
+      volumeSet.failVolume(volumeRoot);
+      supervisor.shutdownFailedVolumePools(volumeSet);
+
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getTotalInFlightReplications() == 0, 100, 5000);
+      task1Block.countDown();
+
+      supervisor.addTask(createPushTask(2L));
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getReplicationSuccessCount() >= 1, 100, 5000);
+    } finally {
+      task1Block.countDown();
       supervisor.stop();
     }
   }

@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,15 +82,16 @@ final class VolumeReplicationThreadPools {
     return pools.get(volumeRoot);
   }
 
-  void shutdownVolume(String volumeRoot) {
+  List<Runnable> shutdownVolume(String volumeRoot) {
     ThreadPoolExecutor pool = pools.remove(volumeRoot);
     if (pool == null) {
-      return;
+      return Collections.emptyList();
     }
     LOG.info("Shutting down per-volume replication thread pool for failed "
         + "volume {}", volumeRoot);
+    List<Runnable> drained = Collections.emptyList();
     try {
-      pool.shutdownNow();
+      drained = pool.shutdownNow();
       if (!pool.awaitTermination(3, TimeUnit.SECONDS)) {
         LOG.warn("Per-volume replication thread pool for volume {} did not "
             + "terminate within timeout", volumeRoot);
@@ -102,12 +104,15 @@ final class VolumeReplicationThreadPools {
       LOG.warn("Failed to shut down per-volume replication thread pool for "
           + "volume {}: {}", volumeRoot, e.getMessage(), e);
     }
+    return drained;
   }
 
-  void shutdownAll() {
+  List<Runnable> shutdownAll() {
+    List<Runnable> drained = new ArrayList<>();
     for (String volumeRoot : new ArrayList<>(pools.keySet())) {
-      shutdownVolume(volumeRoot);
+      drained.addAll(shutdownVolume(volumeRoot));
     }
+    return drained;
   }
 
   void setPoolSize(int newSize) {

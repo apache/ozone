@@ -105,14 +105,6 @@ public class ReplicationTask extends AbstractReplicationTask {
     return cmd.getTargetDatanode();
   }
 
-  /**
-   * @return true if this is a push replication task (source datanode sends
-   *     container to target).
-   */
-  public boolean isPushReplication() {
-    return cmd.getTargetDatanode() != null;
-  }
-
   @Override
   public void runTask() {
     replicator.replicate(this);
