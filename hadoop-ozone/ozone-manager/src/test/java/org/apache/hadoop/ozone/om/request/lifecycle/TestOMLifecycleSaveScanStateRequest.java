@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +34,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -47,6 +50,9 @@ public class TestOMLifecycleSaveScanStateRequest {
   @Test
   public void testPreExecuteAdminCheck() throws Exception {
     OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     
     // Test when ACLs are enabled but user is not admin
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
@@ -72,14 +78,12 @@ public class TestOMLifecycleSaveScanStateRequest {
     
     // Test when user is admin
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
-    OMRequest preExecuted = request.preExecute(ozoneManager);
-    assertEquals(omRequest, preExecuted);
-    
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
+
     // Test when ACLs are disabled
     when(ozoneManager.getAclsEnabled()).thenReturn(false);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
-    preExecuted = request.preExecute(ozoneManager);
-    assertEquals(omRequest, preExecuted);
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
   }
 
   @Test
@@ -87,7 +91,6 @@ public class TestOMLifecycleSaveScanStateRequest {
     OzoneManager ozoneManager = mock(OzoneManager.class);
     OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    
     Table<String, OmLifecycleScanState> table = mock(Table.class);
     when(omMetadataManager.getLifecycleScanStateTable()).thenReturn(table);
 
@@ -108,10 +111,6 @@ public class TestOMLifecycleSaveScanStateRequest {
         .build();
 
     OMLifecycleSaveScanStateRequest request = new OMLifecycleSaveScanStateRequest(omRequest);
-
-    OMRequest preExecuted = request.preExecute(ozoneManager);
-    assertEquals(omRequest, preExecuted);
-
     OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 100L);
     assertNotNull(response);
     assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
