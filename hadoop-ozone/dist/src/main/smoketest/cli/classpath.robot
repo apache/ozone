@@ -21,7 +21,8 @@ Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${TEMP_DIR}    /tmp
+${TEMP_DIR}                    /tmp
+@{OZONE_INSTALL_COPY_DIRS}     bin    etc    libexec    share
 
 *** Keywords ***
 Append missing jar path to classpath descriptor
@@ -29,11 +30,22 @@ Append missing jar path to classpath descriptor
     ${cp_file} =    Set Variable    ${ozone_home}/share/ozone/classpath/${artifact}.classpath
     Execute    sed -i 's_$_:${bogus_jar}_' '${cp_file}'
 
+Copy Ozone install for classpath test
+    # Copy only the directories the classpath scripts need, so data left in the
+    # install dir by other acceptance environments (e.g. compose volumes owned
+    # by another user) cannot break the copy.
+    [arguments]    ${ozone_copy}
+    Run Keyword And Ignore Error    Remove Directory    ${ozone_copy}    recursive=True
+    Create Directory    ${ozone_copy}
+    FOR    ${entry}    IN    @{OZONE_INSTALL_COPY_DIRS}
+        Copy Directory    ${OZONE_DIR}/${entry}    ${ozone_copy}
+    END
+
 Copy Ozone install and inject missing jar classpath entry
     [arguments]    ${copy_subdir}    ${bogus_jar_basename}    ${artifact}
     ${OZONE_COPY} =    Set Variable    ${TEMP_DIR}/${copy_subdir}
     ${bogus_jar} =    Set Variable    ${TEMP_DIR}/${bogus_jar_basename}
-    Copy Directory    ${OZONE_DIR}    ${OZONE_COPY}
+    Copy Ozone install for classpath test    ${OZONE_COPY}
     Append missing jar path to classpath descriptor    ${OZONE_COPY}    ${artifact}    ${bogus_jar}
     [return]    ${OZONE_COPY}    ${bogus_jar}
 
@@ -57,7 +69,7 @@ Picks up items from OZONE_CLASSPATH
 Adds optional dir entries
     Set Environment Variable   OZONE_CLASSPATH  ${EMPTY}
     ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-copy
-    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
+    Copy Ozone install for classpath test    ${OZONE_COPY}
     ${jars_dir} =       Find Jars Dir    ${OZONE_COPY}
     Create File         ${jars_dir}/ozone-insight/optional.jar
 
