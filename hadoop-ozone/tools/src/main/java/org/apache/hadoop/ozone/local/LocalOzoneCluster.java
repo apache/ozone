@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HO
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
@@ -485,6 +486,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     setLocalOverrideDuration(conf, HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "3s");
     conf.setIfUnset(OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT,
         "1s");
+    // All services share this JVM.
+    setLocalOverride(conf, HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED, true);
 
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setMaxRetryTimeout(SCM_CLIENT_MAX_RETRY_TIMEOUT_MILLIS);
@@ -1140,6 +1143,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private void enableSameJvmMetricsMode() {
+    // Safety net for sources that register without passing a component:
+    // DefaultMetricsSystem.setMiniClusterMode makes a duplicate name non-fatal by appending a
+    // numeric suffix instead of throwing.
     if (!metricsMiniClusterModeEnabled) {
       previousMetricsMiniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
       DefaultMetricsSystem.setMiniClusterMode(true);
