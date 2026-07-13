@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -42,7 +43,8 @@ public class OMLifecycleSaveScanStateRequest extends OMClientRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws OMException {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
     if (ozoneManager.getAclsEnabled()) {
       UserGroupInformation ugi = createUGIForApi();
       if (!ozoneManager.isAdmin(ugi)) {
@@ -51,7 +53,7 @@ public class OMLifecycleSaveScanStateRequest extends OMClientRequest {
             OMException.ResultCodes.ACCESS_DENIED);
       }
     }
-    return getOmRequest();
+    return omRequest;
   }
 
   @Override
