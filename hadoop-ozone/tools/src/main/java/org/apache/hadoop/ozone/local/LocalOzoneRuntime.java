@@ -74,6 +74,20 @@ public interface LocalOzoneRuntime extends AutoCloseable {
   String getS3Endpoint();
 
   /**
+   * Returns the Recon HTTP port for this local runtime.
+   *
+   * @return Recon port
+   */
+  int getReconPort();
+
+  /**
+   * Returns the full Recon endpoint shown to users.
+   *
+   * @return Recon endpoint, including scheme, host, and port
+   */
+  String getReconEndpoint();
+
+  /**
    * Returns the configuration keys whose user-supplied value the local runtime had to replace.
    *
    * <p>Callers report these: {@code ozone local} runs with service logging off, so a warning that

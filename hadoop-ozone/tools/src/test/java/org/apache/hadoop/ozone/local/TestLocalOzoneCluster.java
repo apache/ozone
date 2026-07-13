@@ -22,6 +22,8 @@ import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -413,6 +415,100 @@ class TestLocalOzoneCluster {
   }
 
   @Test
+  void reconOverrideReportsDiscardedUserValue() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "9m");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setReconEnabled(true)
+        .build();
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
+      cluster.prepareConfiguration();
+
+      // configureRecon() runs after configureLocalDefaults(), so the override has to be reported
+      // where it is applied rather than from a list checked earlier.
+      assertTrue(cluster.getDiscardedUserConfigKeys()
+              .contains(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD),
+          cluster.getDiscardedUserConfigKeys().toString());
+    }
+  }
+
+  @Test
+  void reconDefaultFromModuleXmlIsNotReportedAsUserConfigured() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setReconEnabled(true)
+        .build();
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config,
+        new OzoneConfiguration())) {
+      cluster.prepareConfiguration();
+
+      // The Recon default ships in ozone-recon-default.xml, not ozone-default.xml.
+      assertTrue(cluster.getDiscardedUserConfigKeys().isEmpty(),
+          cluster.getDiscardedUserConfigKeys().toString());
+    }
+  }
+
+  @Test
+  void prepareConfigurationReservesReconPortsWhenEnabled() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setReconEnabled(true)
+        .setReconPort(9888)
+        .build();
+
+    try (LocalOzoneCluster cluster = newCluster(config)) {
+      LocalOzoneCluster.PreparedConfiguration prepared =
+          cluster.prepareConfiguration();
+      OzoneConfiguration conf = prepared.getConfiguration();
+
+      assertEquals(9888, prepared.getReconPort());
+      assertEquals(9888, cluster.getReconPort());
+      assertEquals("http://127.0.0.1:9888", cluster.getReconEndpoint());
+      assertTrue(conf.get(OZONE_RECON_HTTP_ADDRESS_KEY).endsWith(":9888"));
+      assertTrue(Files.isDirectory(dataDir.resolve("recon")));
+    }
+    Properties properties = loadPortState(dataDir);
+    assertPositivePort(properties, "recon.http");
+    assertPositivePort(properties, "recon.https");
+    assertPositivePort(properties, "recon.datanode");
+  }
+
+  @Test
+  void prepareConfigurationSkipsReconWhenDisabled() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config =
+        LocalOzoneClusterConfig.builder(dataDir).build();
+
+    try (LocalOzoneCluster cluster = newCluster(config)) {
+      LocalOzoneCluster.PreparedConfiguration prepared =
+          cluster.prepareConfiguration();
+
+      assertEquals(-1, prepared.getReconPort());
+      assertEquals(-1, cluster.getReconPort());
+      assertEquals("", cluster.getReconEndpoint());
+    }
+    assertFalse(loadPortState(dataDir).stringPropertyNames().stream()
+        .anyMatch(key -> key.startsWith("recon.")));
+  }
+
+  @Test
+  void formatNeverRejectsPortStateMissingReconPorts() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    prepare(LocalOzoneClusterConfig.builder(dataDir).build());
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.NEVER)
+        .setReconEnabled(true)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertMessageContains(error, "recon.");
+  }
+
+  @Test
   void formatNeverRejectsPortStateMissingS3GatewayPorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     prepare(LocalOzoneClusterConfig.builder(dataDir)
@@ -658,6 +754,46 @@ class TestLocalOzoneCluster {
 
       assertEquals(0, cluster.getDatanodeCount());
     }
+  }
+
+  @Test
+  void executeWithinStartupTimeoutReturnsStartupResult() throws Exception {
+    assertEquals(0, LocalOzoneCluster.executeWithinStartupTimeout("Recon", () -> 0,
+        () -> { }, Duration.ofSeconds(30)));
+  }
+
+  @Test
+  void executeWithinStartupTimeoutFailsFastWhenStartupBlocks() throws Exception {
+    CountDownLatch interrupted = new CountDownLatch(1);
+
+    IOException error =
+        assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
+            "Recon", () -> {
+              try {
+                // Simulate an in-JVM startup that blocks until it leaves safe
+                // mode; the deadline must interrupt it rather than hang.
+                Thread.sleep(TimeUnit.MINUTES.toMillis(5));
+              } catch (InterruptedException e) {
+                interrupted.countDown();
+                Thread.currentThread().interrupt();
+              }
+              return 0;
+            }, () -> { }, Duration.ofMillis(200)));
+
+    assertMessageContains(error, "did not start within");
+    assertTrue(interrupted.await(30, TimeUnit.SECONDS),
+        "blocked startup should be interrupted on timeout");
+  }
+
+  @Test
+  void executeWithinStartupTimeoutPropagatesStartupFailure() {
+    IOException error =
+        assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
+            "Recon", () -> {
+              throw new IOException("startup boom");
+            }, () -> { }, Duration.ofSeconds(30)));
+
+    assertMessageContains(error, "startup boom");
   }
 
   private LocalOzoneCluster.PreparedConfiguration prepare(
