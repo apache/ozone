@@ -26,7 +26,6 @@ public enum ContainerBalancerStopReason {
   COMPLETED_ALL_ITERATIONS("Completed all configured number of iterations."),
   CAN_NOT_BALANCE_ANY_MORE("No more eligible container moves were found."),
   INITIALIZATION_FAILED("Failed to initialize a container balancer iteration."),
-  STOPPED("Stopped."),
   ERROR("Stopped because of an unexpected error."),
   UNKNOWN("Stopped for an unknown reason.");
   

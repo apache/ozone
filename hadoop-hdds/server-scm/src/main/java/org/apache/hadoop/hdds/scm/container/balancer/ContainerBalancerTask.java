@@ -203,7 +203,7 @@ public class ContainerBalancerTask implements Runnable {
           stoppedAt = now();
         }
         if (stopReason == null) {
-          recordStopReason(ContainerBalancerStopReason.STOPPED);
+          recordStopReason(ContainerBalancerStopReason.UNKNOWN);
         }
         taskStatus = Status.STOPPED;
       }
@@ -451,8 +451,9 @@ public class ContainerBalancerTask implements Runnable {
             reason.name(), stopMessage);
         stop();
       } catch (IOException | TimeoutException e) {
+        recordStopReason(reason, details);
         LOG.warn("Save configuration failed. Reason for " +
-                "stopping: {}", reason.name(), e);
+                "stopping: {}, Message: {}", reason.name(), stopMessage, e);
       }
     }
   }
@@ -473,9 +474,11 @@ public class ContainerBalancerTask implements Runnable {
    * @param details optional details appended to the message
    */
   public void recordStopReason(ContainerBalancerStopReason reason, String details) {
-    if (stopReason == null) {
-      stopReason = reason.name();
-      stopMessage = reason.formatMessage(details);
+    synchronized (this) {
+      if (stopReason == null) {
+        stopReason = reason.name();
+        stopMessage = reason.formatMessage(details);
+      }
     }
   }
 

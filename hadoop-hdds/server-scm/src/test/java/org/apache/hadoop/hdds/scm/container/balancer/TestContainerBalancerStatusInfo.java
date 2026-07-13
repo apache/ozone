@@ -284,8 +284,8 @@ class TestContainerBalancerStatusInfo {
     LambdaTestUtils.await(5000, 10,
         () -> task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
     assertNotNull(task.getStoppedAt());
-    assertEquals(ContainerBalancerStopReason.STOPPED.name(), task.getStopReason());
-    assertEquals(ContainerBalancerStopReason.STOPPED.getMessage(), task.getStopMessage());
+    assertEquals(ContainerBalancerStopReason.UNKNOWN.name(), task.getStopReason());
+    assertEquals(ContainerBalancerStopReason.UNKNOWN.getMessage(), task.getStopMessage());
 
     boolean hasInterruptedIteration = task.getCurrentIterationsStatistic().stream()
         .anyMatch(it -> "ITERATION_INTERRUPTED".equals(it.getIterationResult()));
