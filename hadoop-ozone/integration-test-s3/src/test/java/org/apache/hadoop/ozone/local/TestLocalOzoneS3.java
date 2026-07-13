@@ -17,17 +17,24 @@
 
 package org.apache.hadoop.ozone.local;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 
 /**
  * Integration tests for the S3 Gateway of the {@code ozone local} runtime.
@@ -69,6 +76,46 @@ class TestLocalOzoneS3 {
         .build()) {
       s3.createBucket(request -> request.bucket("local-smoke"));
       assertTrue(s3.listBuckets().buckets().stream().anyMatch(bucket -> "local-smoke".equals(bucket.name())));
+    }
+  }
+
+  @Test
+  void awsSdkCanCreateListPutAndGetAgainstLocalRuntime() throws Exception {
+    // Non-default credentials prove the launcher provisions whatever key pair is configured.
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone-s3-sdk"))
+        .setS3AccessKey("localuser")
+        .setS3SecretKey("localsecret")
+        .setStartupTimeout(Duration.ofMinutes(3))
+        .build();
+
+    String bucketName = "local-" + UUID.randomUUID().toString().replace("-", "");
+    String keyName = "key-" + UUID.randomUUID().toString().replace("-", "");
+    String payload = "local-ozone-s3";
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+      cluster.start();
+
+      try (S3Client client = S3Client.builder()
+          .region(Region.of(config.getS3Region()))
+          .endpointOverride(URI.create(cluster.getS3Endpoint()))
+          .credentialsProvider(StaticCredentialsProvider.create(
+              AwsBasicCredentials.create(config.getS3AccessKey(), config.getS3SecretKey())))
+          .forcePathStyle(true)
+          .build()) {
+        client.createBucket(builder -> builder.bucket(bucketName));
+
+        ListBucketsResponse buckets = client.listBuckets();
+        assertTrue(buckets.buckets().stream()
+            .anyMatch(bucket -> bucketName.equals(bucket.name())));
+
+        client.putObject(builder -> builder.bucket(bucketName).key(keyName),
+            RequestBody.fromString(payload));
+
+        ResponseBytes<GetObjectResponse> response = client.getObjectAsBytes(
+            builder -> builder.bucket(bucketName).key(keyName));
+        assertEquals(payload, response.asUtf8String());
+      }
     }
   }
 }
