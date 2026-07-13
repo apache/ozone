@@ -56,7 +56,11 @@ public final class LocalOzoneClusterConfig {
   static final int DEFAULT_DATANODES =
       Integer.parseInt(DEFAULT_DATANODES_VALUE);
   static final String DEFAULT_HOST = "127.0.0.1";
-  static final String DEFAULT_BIND_HOST = "0.0.0.0";
+  // Loopback, not the wildcard address: the local runtime leaves security off, and
+  // S3SecurityUtil#validateS3Credential only checks a signature when it is on, so listening on
+  // every interface would serve a writable S3 endpoint to anyone who can reach the port.
+  static final String DEFAULT_BIND_HOST = "127.0.0.1";
+  static final String WILDCARD_HOST = "0.0.0.0";
   static final int DEFAULT_PORT = Integer.parseInt(DEFAULT_PORT_VALUE);
   static final boolean DEFAULT_S3G_ENABLED =
       Boolean.parseBoolean(DEFAULT_S3G_ENABLED_VALUE);
@@ -64,9 +68,13 @@ public final class LocalOzoneClusterConfig {
       Boolean.parseBoolean(DEFAULT_EPHEMERAL_VALUE);
   static final Duration DEFAULT_STARTUP_TIMEOUT =
       Duration.parse(DEFAULT_STARTUP_TIMEOUT_VALUE);
-  static final String DEFAULT_S3_ACCESS_KEY = "admin";
-  static final String DEFAULT_S3_SECRET_KEY = "admin123";
-  static final String DEFAULT_S3_REGION = "us-east-1";
+  // Printed for client setup, not enforced: with security off any credentials are accepted. The
+  // access key id still names the caller, so OMClientRequest records it as the request user and
+  // RpcClient stores it as the owner of buckets created through the gateway. Keeping one fixed
+  // value keeps that ownership stable across restarts.
+  static final String LOCAL_S3_ACCESS_KEY = "admin";
+  static final String LOCAL_S3_SECRET_KEY = "admin123";
+  static final String LOCAL_S3_REGION = "us-east-1";
 
   private final Path dataDir;
   private final FormatMode formatMode;
@@ -79,9 +87,6 @@ public final class LocalOzoneClusterConfig {
   private final boolean s3gEnabled;
   private final boolean ephemeral;
   private final Duration startupTimeout;
-  private final String s3AccessKey;
-  private final String s3SecretKey;
-  private final String s3Region;
 
   private LocalOzoneClusterConfig(Builder builder) {
     dataDir = Objects.requireNonNull(builder.dataDir, "dataDir")
@@ -98,9 +103,6 @@ public final class LocalOzoneClusterConfig {
     ephemeral = builder.ephemeral;
     startupTimeout = Objects.requireNonNull(builder.startupTimeout,
         "startupTimeout");
-    s3AccessKey = Objects.requireNonNull(builder.s3AccessKey, "s3AccessKey");
-    s3SecretKey = Objects.requireNonNull(builder.s3SecretKey, "s3SecretKey");
-    s3Region = Objects.requireNonNull(builder.s3Region, "s3Region");
   }
 
   public Path getDataDir() {
@@ -170,27 +172,6 @@ public final class LocalOzoneClusterConfig {
     return startupTimeout;
   }
 
-  /**
-   * Returns the suggested local-only S3 access key printed for client setup.
-   */
-  public String getS3AccessKey() {
-    return s3AccessKey;
-  }
-
-  /**
-   * Returns the suggested local-only S3 secret key printed for client setup.
-   */
-  public String getS3SecretKey() {
-    return s3SecretKey;
-  }
-
-  /**
-   * Returns the suggested local-only S3 region printed for client setup.
-   */
-  public String getS3Region() {
-    return s3Region;
-  }
-
   public static Builder builder() {
     return new Builder(DEFAULT_DATA_DIR);
   }
@@ -247,9 +228,6 @@ public final class LocalOzoneClusterConfig {
     private boolean s3gEnabled = DEFAULT_S3G_ENABLED;
     private boolean ephemeral = DEFAULT_EPHEMERAL;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
-    private String s3AccessKey = DEFAULT_S3_ACCESS_KEY;
-    private String s3SecretKey = DEFAULT_S3_SECRET_KEY;
-    private String s3Region = DEFAULT_S3_REGION;
 
     private Builder(Path dataDir) {
       this.dataDir = dataDir;
@@ -302,21 +280,6 @@ public final class LocalOzoneClusterConfig {
 
     public Builder setStartupTimeout(Duration value) {
       startupTimeout = value;
-      return this;
-    }
-
-    public Builder setS3AccessKey(String value) {
-      s3AccessKey = value;
-      return this;
-    }
-
-    public Builder setS3SecretKey(String value) {
-      s3SecretKey = value;
-      return this;
-    }
-
-    public Builder setS3Region(String value) {
-      s3Region = value;
       return this;
     }
 

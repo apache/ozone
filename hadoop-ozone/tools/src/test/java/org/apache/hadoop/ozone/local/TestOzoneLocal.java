@@ -101,7 +101,7 @@ class TestOzoneLocal {
   @Test
   void runCommandStartsRuntimeAndPrintsStartupSummary() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "http://localhost:9878");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
     commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
@@ -117,12 +117,39 @@ class TestOzoneLocal {
     assertTrue(text.contains("SCM RPC: localhost:9860"), text);
     assertTrue(text.contains("OM RPC: localhost:9862"), text);
     assertFalse(text.contains("Datanodes:"), text);
+    assertTrue(text.contains("S3 endpoint: http://localhost:9878"), text);
+    assertTrue(text.contains("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY), text);
+    assertTrue(text.contains("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY), text);
+    assertTrue(text.contains("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION), text);
+    assertTrue(text.contains("AWS_ENDPOINT_URL_S3=http://localhost:9878"), text);
+    assertTrue(text.contains("aws configure set default.s3.addressing_style path"), text);
+    // The printed pair is an example, not a credential the gateway enforces. Saying so is what
+    // keeps a reader from treating the local endpoint as access-controlled.
+    assertTrue(text.contains("accepts any credentials"), text);
+    assertTrue(text.contains("Press Ctrl+C to stop."), text);
+  }
+
+  @Test
+  void runCommandOmitsS3SummaryWhenS3gDisabled() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
+        true));
+
+    int exitCode = commandLine.execute("--no-s3g");
+
+    assertEquals(0, exitCode);
+    String text = out.toString(UTF_8.name());
+    assertFalse(text.contains("S3 endpoint:"), text);
+    assertFalse(text.contains("AWS_ACCESS_KEY_ID="), text);
     assertTrue(text.contains("Press Ctrl+C to stop."), text);
   }
 
   @Test
   void runCommandClosesRuntimeWhenStartupFails() {
-    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     runtime.failStart = true;
     TestableRunCommand command = new TestableRunCommand(runtime);
 
@@ -136,7 +163,7 @@ class TestOzoneLocal {
   @Test
   void runCommandPreservesStartupFailureAsTheCause() throws Exception {
     ByteArrayOutputStream err = new ByteArrayOutputStream();
-    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     runtime.failStart = true;
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
@@ -273,12 +300,6 @@ class TestOzoneLocal {
         LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE);
     assertEnvDefault("startupTimeout", OzoneLocal.ENV_STARTUP_TIMEOUT,
         LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT_VALUE);
-    assertEnvDefault("s3AccessKey", OzoneLocal.ENV_S3_ACCESS_KEY,
-        LocalOzoneClusterConfig.DEFAULT_S3_ACCESS_KEY);
-    assertEnvDefault("s3SecretKey", OzoneLocal.ENV_S3_SECRET_KEY,
-        LocalOzoneClusterConfig.DEFAULT_S3_SECRET_KEY);
-    assertEnvDefault("s3Region", OzoneLocal.ENV_S3_REGION,
-        LocalOzoneClusterConfig.DEFAULT_S3_REGION);
   }
 
   @Test
@@ -291,16 +312,13 @@ class TestOzoneLocal {
         config.getFormatMode());
     assertEquals(1, config.getDatanodes());
     assertEquals("127.0.0.1", config.getHost());
-    assertEquals("0.0.0.0", config.getBindHost());
+    assertEquals("127.0.0.1", config.getBindHost());
     assertEquals(0, config.getScmPort());
     assertEquals(0, config.getOmPort());
     assertEquals(0, config.getS3gPort());
     assertTrue(config.isS3gEnabled());
     assertFalse(config.isEphemeral());
     assertEquals(Duration.ofMinutes(2), config.getStartupTimeout());
-    assertEquals("admin", config.getS3AccessKey());
-    assertEquals("admin123", config.getS3SecretKey());
-    assertEquals("us-east-1", config.getS3Region());
   }
 
   @Test
@@ -310,16 +328,13 @@ class TestOzoneLocal {
         "--format", "always",
         "--datanodes", "3",
         "--host", "cli-host",
-        "--bind-host", "127.0.0.1",
+        "--bind-host", "0.0.0.0",
         "--scm-port", "200",
         "--om-port", "201",
         "--s3g-port", "202",
         "--no-s3g",
         "--ephemeral",
-        "--startup-timeout", "45s",
-        "--s3-access-key", "cli-access",
-        "--s3-secret-key", "cli-secret",
-        "--s3-region", "cli-region");
+        "--startup-timeout", "45s");
 
     assertEquals(Paths.get("target/cli-local").toAbsolutePath().normalize(),
         config.getDataDir());
@@ -327,16 +342,13 @@ class TestOzoneLocal {
         config.getFormatMode());
     assertEquals(3, config.getDatanodes());
     assertEquals("cli-host", config.getHost());
-    assertEquals("127.0.0.1", config.getBindHost());
+    assertEquals("0.0.0.0", config.getBindHost());
     assertEquals(200, config.getScmPort());
     assertEquals(201, config.getOmPort());
     assertEquals(202, config.getS3gPort());
     assertFalse(config.isS3gEnabled());
     assertTrue(config.isEphemeral());
     assertEquals(Duration.ofSeconds(45), config.getStartupTimeout());
-    assertEquals("cli-access", config.getS3AccessKey());
-    assertEquals("cli-secret", config.getS3SecretKey());
-    assertEquals("cli-region", config.getS3Region());
   }
 
   @Test
@@ -508,14 +520,16 @@ class TestOzoneLocal {
     private final String displayHost;
     private final int scmPort;
     private final int omPort;
+    private final String s3Endpoint;
     private boolean failStart;
     private boolean started;
     private boolean closed;
 
-    private StubRuntime(String displayHost, int scmPort, int omPort) {
+    private StubRuntime(String displayHost, int scmPort, int omPort, String s3Endpoint) {
       this.displayHost = displayHost;
       this.scmPort = scmPort;
       this.omPort = omPort;
+      this.s3Endpoint = s3Endpoint;
     }
 
     @Override
@@ -548,7 +562,7 @@ class TestOzoneLocal {
 
     @Override
     public String getS3Endpoint() {
-      return "";
+      return s3Endpoint;
     }
 
     @Override
@@ -586,12 +600,6 @@ class TestOzoneLocal {
         return LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE;
       } else if ("--startup-timeout".equals(option)) {
         return LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT_VALUE;
-      } else if ("--s3-access-key".equals(option)) {
-        return LocalOzoneClusterConfig.DEFAULT_S3_ACCESS_KEY;
-      } else if ("--s3-secret-key".equals(option)) {
-        return LocalOzoneClusterConfig.DEFAULT_S3_SECRET_KEY;
-      } else if ("--s3-region".equals(option)) {
-        return LocalOzoneClusterConfig.DEFAULT_S3_REGION;
       }
       return null;
     }

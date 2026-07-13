@@ -62,9 +62,6 @@ public class OzoneLocal extends GenericCli {
   static final String ENV_S3G_PORT = "OZONE_LOCAL_S3G_PORT";
   static final String ENV_EPHEMERAL = "OZONE_LOCAL_EPHEMERAL";
   static final String ENV_STARTUP_TIMEOUT = "OZONE_LOCAL_STARTUP_TIMEOUT";
-  static final String ENV_S3_ACCESS_KEY = "OZONE_LOCAL_S3_ACCESS_KEY";
-  static final String ENV_S3_SECRET_KEY = "OZONE_LOCAL_S3_SECRET_KEY";
-  static final String ENV_S3_REGION = "OZONE_LOCAL_S3_REGION";
 
   private static final String DEFAULT_DATA_DIR_VALUE = "${env:" + ENV_DATA_DIR
       + ":-" + LocalOzoneClusterConfig.DEFAULT_DATA_DIR_VALUE + "}";
@@ -93,14 +90,6 @@ public class OzoneLocal extends GenericCli {
   private static final String DEFAULT_STARTUP_TIMEOUT_VALUE = "${env:"
       + ENV_STARTUP_TIMEOUT + ":-"
       + LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT_VALUE + "}";
-  private static final String DEFAULT_S3_ACCESS_KEY_VALUE = "${env:"
-      + ENV_S3_ACCESS_KEY + ":-"
-      + LocalOzoneClusterConfig.DEFAULT_S3_ACCESS_KEY + "}";
-  private static final String DEFAULT_S3_SECRET_KEY_VALUE = "${env:"
-      + ENV_S3_SECRET_KEY + ":-"
-      + LocalOzoneClusterConfig.DEFAULT_S3_SECRET_KEY + "}";
-  private static final String DEFAULT_S3_REGION_VALUE = "${env:"
-      + ENV_S3_REGION + ":-" + LocalOzoneClusterConfig.DEFAULT_S3_REGION + "}";
 
   public OzoneLocal() {
     super();
@@ -164,7 +153,7 @@ public class OzoneLocal extends GenericCli {
   }
 
   @Command(name = "run",
-      description = "Start SCM, OM, and datanodes in one local process")
+      description = "Start SCM, OM, datanodes, and optional S3 Gateway in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -190,7 +179,7 @@ public class OzoneLocal extends GenericCli {
 
     @Option(names = "--bind-host",
         defaultValue = DEFAULT_BIND_HOST_VALUE,
-        description = "Bind host for HTTP and RPC listeners")
+        description = "Bind host for HTTP and RPC listeners (use 0.0.0.0 to listen on all interfaces)")
     private String bindHost;
 
     @Option(names = "--scm-port",
@@ -228,21 +217,6 @@ public class OzoneLocal extends GenericCli {
         description = "How long to wait for the local cluster to become ready")
     private Duration startupTimeout;
 
-    @Option(names = "--s3-access-key",
-        defaultValue = DEFAULT_S3_ACCESS_KEY_VALUE,
-        description = "Suggested local AWS access key to print on startup")
-    private String s3AccessKey;
-
-    @Option(names = "--s3-secret-key",
-        defaultValue = DEFAULT_S3_SECRET_KEY_VALUE,
-        description = "Suggested local AWS secret key to print on startup")
-    private String s3SecretKey;
-
-    @Option(names = "--s3-region",
-        defaultValue = DEFAULT_S3_REGION_VALUE,
-        description = "Suggested local AWS region to print on startup")
-    private String s3Region;
-
     @Override
     public Void call() throws Exception {
       LocalOzoneClusterConfig config = resolveConfig();
@@ -272,6 +246,17 @@ public class OzoneLocal extends GenericCli {
       writer.println("Local Ozone is running from " + config.getDataDir());
       writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
       writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      if (config.isS3gEnabled()) {
+        writer.println("S3 endpoint: " + runtime.getS3Endpoint());
+        writer.println("Suggested local AWS settings:");
+        writer.println("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY);
+        writer.println("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY);
+        writer.println("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION);
+        writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
+        writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
+        writer.println("Local Ozone runs without security, so the S3 Gateway accepts any credentials;");
+        writer.println("the access key id is the identity buckets are created under.");
+      }
       writer.println("Press Ctrl+C to stop.");
       writer.flush();
     }
@@ -324,9 +309,6 @@ public class OzoneLocal extends GenericCli {
           .setS3gEnabled(s3gEnabled)
           .setEphemeral(ephemeral)
           .setStartupTimeout(startupTimeout)
-          .setS3AccessKey(s3AccessKey)
-          .setS3SecretKey(s3SecretKey)
-          .setS3Region(s3Region)
           .build();
     }
 

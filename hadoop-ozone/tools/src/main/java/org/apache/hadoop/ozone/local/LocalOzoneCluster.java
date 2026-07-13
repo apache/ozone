@@ -72,10 +72,20 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -90,6 +100,11 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
@@ -111,13 +126,13 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.s3.Gateway;
+import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Starts the SCM, OM, and datanode portion of the {@code ozone local} runtime.
- *
- * <p>S3 Gateway and Recon are added by later local runtime tickets.</p>
+ * Starts the SCM, OM, datanode, and optional S3 Gateway portion of the {@code ozone local} runtime.
  */
 public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
@@ -145,6 +160,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private static final String OM_HTTP_PORT_KEY = "om.http";
   private static final String OM_HTTPS_PORT_KEY = "om.https";
   private static final String OM_RATIS_PORT_KEY = "om.ratis";
+  private static final String S3G_HTTP_PORT_KEY = "s3g.http";
+  private static final String S3G_WEBADMIN_HTTP_PORT_KEY = "s3g.web.http";
   private static final String DATANODE_PORT_KEY_PREFIX = "dn.";
   private static final String DATANODE_HTTP_PORT_KEY_SUFFIX = "http";
   private static final String DATANODE_CLIENT_PORT_KEY_SUFFIX = "client";
@@ -205,6 +222,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private PreparedConfiguration preparedConfiguration;
   private StorageContainerManager scm;
   private OzoneManager om;
+  private Gateway s3Gateway;
   private final List<HddsDatanodeService> datanodes = new ArrayList<>();
   private boolean previousMetricsMiniClusterMode;
   private boolean metricsMiniClusterModeEnabled;
@@ -236,6 +254,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       startOm(prepared.getConfiguration());
       startDatanodes(prepared.getDatanodeConfigurations());
       waitForClusterReadiness(config.getStartupTimeout());
+      if (config.isS3gEnabled()) {
+        startS3Gateway(prepared.getConfiguration());
+      }
     } catch (Exception ex) {
       // Roll back without latching closed: the caller's close() still owns the
       // ephemeral data dir lifecycle.
@@ -262,6 +283,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     PortAllocator portAllocator = new PortAllocator();
     int scmPort = configureScm(conf, persistedPorts, portAllocator);
     int omPort = configureOm(conf, persistedPorts, portAllocator);
+    int s3gPort = configureS3Gateway(conf, persistedPorts, portAllocator);
     List<OzoneConfiguration> datanodeConfigurations =
         configureDatanodes(conf, persistedPorts, portAllocator);
 
@@ -269,13 +291,13 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     createServiceDirectories();
     persistedPorts.store();
     preparedConfiguration = new PreparedConfiguration(conf, scmPort, omPort,
-        datanodeConfigurations);
+        s3gPort, datanodeConfigurations);
     return preparedConfiguration;
   }
 
   @Override
   public String getDisplayHost() {
-    return LocalOzoneClusterConfig.DEFAULT_BIND_HOST.equals(config.getHost())
+    return LocalOzoneClusterConfig.WILDCARD_HOST.equals(config.getHost())
         ? LocalOzoneClusterConfig.DEFAULT_HOST : config.getHost();
   }
 
@@ -298,12 +320,23 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
   @Override
   public int getS3gPort() {
-    return -1;
+    InetSocketAddress address = getS3gBoundAddress();
+    return address != null ? address.getPort() : -1;
   }
 
   @Override
   public String getS3Endpoint() {
-    return "";
+    int port = getS3gPort();
+    return port > 0 ? "http://" + getDisplayHost() + ":" + port : "";
+  }
+
+  /**
+   * Returns the address the S3 Gateway HTTP listener is bound to, or null when there is none to
+   * report: {@code BaseHttpServer} assigns an address only for a server it enables. Keyed off the
+   * field rather than {@code isS3gEnabled()}, which says what was asked for, not what is running.
+   */
+  InetSocketAddress getS3gBoundAddress() {
+    return s3Gateway != null ? s3Gateway.getHttpAddress() : null;
   }
 
   @Override
@@ -333,9 +366,17 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       // Shutdown is best-effort so one failed service cannot leak the others,
       // but the failures are logged: stopServices() also runs as start()
       // rollback, where a silent failure hides leaked threads and ports.
-      IOUtils.close(LOG, this::stopDatanodes, this::stopOm, this::stopScm);
+      IOUtils.close(LOG, this::stopS3Gateway, this::stopDatanodes, this::stopOm, this::stopScm);
     } finally {
       restoreSameJvmMetricsMode();
+    }
+  }
+
+  private void stopS3Gateway() throws Exception {
+    Gateway service = s3Gateway;
+    s3Gateway = null;
+    if (service != null) {
+      service.stop();
     }
   }
 
@@ -371,7 +412,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
   private void configureLocalDefaults(OzoneConfiguration conf) throws IOException {
     conf.set(OZONE_METADATA_DIRS, metadataDir().toString());
-    // SCM and OM share one configuration and JVM, so the Jetty base dir is a
+    // SCM, OM, and the S3 Gateway share one configuration and JVM, so the Jetty base dir is a
     // single service-neutral location; Jetty keeps per-context temp dirs.
     conf.setIfUnset(OZONE_HTTP_BASEDIR, metadataDir() + SERVER_DIR);
     setLocalOverrideReplication(conf, OZONE_REPLICATION, ReplicationFactor.ONE);
@@ -641,6 +682,41 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
         omMetadataDir.toString());
   }
 
+  private int configureS3Gateway(OzoneConfiguration conf,
+      PersistedPortState persistedPorts, PortAllocator portAllocator)
+      throws IOException {
+    if (!config.isS3gEnabled()) {
+      return -1;
+    }
+    // The runtime advertises an http:// endpoint and reads the bound port back off this
+    // listener, so a configuration that switches it off leaves nothing to report.
+    setLocalOverride(conf, OZONE_S3G_HTTP_ENABLED_KEY, true);
+
+    int s3gHttpPort = reservePort(portAllocator, persistedPorts,
+        S3G_HTTP_PORT_KEY, config.getS3gPort());
+    int s3gWebHttpPort = reservePort(portAllocator, persistedPorts,
+        S3G_WEBADMIN_HTTP_PORT_KEY, 0);
+    // Port 0, not a reservation: the local runtime runs the default HTTP-only policy, so these
+    // connectors never bind, and a port reserved for a listener that never claims it is a window
+    // for another process rather than a stable endpoint.
+    int s3gHttpsPort = 0;
+    int s3gWebHttpsPort = 0;
+
+    conf.set(OZONE_S3G_HTTP_ADDRESS_KEY,
+        address(config.getHost(), s3gHttpPort));
+    conf.set(OZONE_S3G_HTTP_BIND_HOST_KEY, config.getBindHost());
+    conf.set(OZONE_S3G_HTTPS_ADDRESS_KEY,
+        address(config.getHost(), s3gHttpsPort));
+    conf.set(OZONE_S3G_HTTPS_BIND_HOST_KEY, config.getBindHost());
+    conf.set(OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY,
+        address(config.getHost(), s3gWebHttpPort));
+    conf.set(OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY, config.getBindHost());
+    conf.set(OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY,
+        address(config.getHost(), s3gWebHttpsPort));
+    conf.set(OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY, config.getBindHost());
+    return s3gHttpPort;
+  }
+
   private List<OzoneConfiguration> configureDatanodes(OzoneConfiguration conf,
       PersistedPortState persistedPorts, PortAllocator portAllocator)
       throws IOException {
@@ -793,6 +869,61 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
       datanodes.add(datanode);
       datanode.start(dnConf);
+    }
+  }
+
+  private void startS3Gateway(OzoneConfiguration conf) throws Exception {
+    // Gateway reads its configuration from the static holder, and the reset is what lets a second
+    // in-JVM start win: setConfiguration() keeps the first value. Same pair as S3GatewayService.
+    OzoneConfigurationHolder.resetConfiguration();
+    OzoneConfigurationHolder.setConfiguration(new OzoneConfiguration(conf));
+    Gateway gateway = new Gateway();
+    // Start through call(), not execute(): GenericCli's execution-exception handler reduces the
+    // startup failure cause to a bare exit code and can even System.exit the JVM on an
+    // AccessControlException. parseArgs() primes the picocli state that Gateway.start() reads.
+    gateway.getCmd().parseArgs();
+    // call() returns only after Jetty has bound the gateway's ports and serves requests, so no
+    // readiness poll follows.
+    executeWithinStartupTimeout("S3 Gateway", gateway::call, gateway::stop, config.getStartupTimeout());
+    s3Gateway = gateway;
+  }
+
+  /**
+   * Runs a blocking in-JVM service startup under {@code timeout}, so the launcher fails fast and
+   * rolls back instead of hanging if a startup ever blocks. {@code startupCleanup} is the only
+   * stopper for an attempt that did not finish: a startup that ignores the interrupt keeps running
+   * after {@code stopServices()} has rolled back, so on a timeout or an interrupt the cleanup is
+   * queued behind it on the same single thread rather than run here. The caller assigns its field
+   * only after this returns, so a failed attempt is never reachable from the rollback.
+   */
+  static void executeWithinStartupTimeout(String serviceName, Callable<Void> startup,
+      AutoCloseable startupCleanup, Duration timeout) throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "local-startup-" + serviceName);
+      thread.setDaemon(true);
+      return thread;
+    });
+    Future<Void> future = executor.submit(startup);
+    try {
+      future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException ex) {
+      future.cancel(true);
+      executor.submit(() -> IOUtils.close(LOG, startupCleanup));
+      throw new IOException("Local " + serviceName + " did not start within " + timeout + ".", ex);
+    } catch (InterruptedException ex) {
+      // Queued, not run here, for the reason given on this method: the startup may finish late.
+      future.cancel(true);
+      executor.submit(() -> IOUtils.close(LOG, startupCleanup));
+      Thread.currentThread().interrupt();
+      throw ex;
+    } catch (ExecutionException ex) {
+      IOUtils.close(LOG, startupCleanup);
+      Throwable cause = ex.getCause();
+      throw cause instanceof Exception ? (Exception) cause : ex;
+    } finally {
+      // shutdown(), not shutdownNow(): the timeout path queues the cleanup, which shutdownNow()
+      // would discard. The worker is a daemon thread, so it cannot keep the JVM alive.
+      executor.shutdown();
     }
   }
 
@@ -980,6 +1111,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private String[] requiredPersistedPortKeys() {
     List<String> keys =
         new ArrayList<>(Arrays.asList(REQUIRED_PERSISTED_PORT_KEYS));
+    if (config.isS3gEnabled()) {
+      keys.add(S3G_HTTP_PORT_KEY);
+      keys.add(S3G_WEBADMIN_HTTP_PORT_KEY);
+    }
     for (int index = 0; index < config.getDatanodes(); index++) {
       for (String suffix : DATANODE_PORT_KEY_SUFFIXES) {
         keys.add(datanodePortKey(index, suffix));
@@ -1042,14 +1177,16 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     private final OzoneConfiguration configuration;
     private final int scmPort;
     private final int omPort;
+    private final int s3gPort;
     private final List<OzoneConfiguration> datanodeConfigurations;
 
-    PreparedConfiguration(OzoneConfiguration configuration, int scmPort,
-        int omPort, List<OzoneConfiguration> datanodeConfigurations) {
+    PreparedConfiguration(OzoneConfiguration configuration, int scmPort, int omPort, int s3gPort,
+        List<OzoneConfiguration> datanodeConfigurations) {
       this.configuration = Objects.requireNonNull(configuration,
           "configuration");
       this.scmPort = scmPort;
       this.omPort = omPort;
+      this.s3gPort = s3gPort;
       this.datanodeConfigurations = Collections.unmodifiableList(
           new ArrayList<>(Objects.requireNonNull(datanodeConfigurations,
               "datanodeConfigurations")));
@@ -1065,6 +1202,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
     int getOmPort() {
       return omPort;
+    }
+
+    int getS3gPort() {
+      return s3gPort;
     }
 
     List<OzoneConfiguration> getDatanodeConfigurations() {
