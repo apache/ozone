@@ -471,7 +471,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         // Revert the in-memory changes if the DB update fails
         for (DeletedBlocksTransaction tx: txList) {
           if (tx.hasTotalBlockSize()) {
-            descDeletedBlocksSummary(tx);
+            rollbackDeletedBlocksSummary(tx);
             LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
           }
         }
@@ -482,7 +482,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     deletedBlockLogStateManager.addTransactionsToDB(txList);
   }
 
-  private void incrDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
+  private void rollbackDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
     totalTxCount.addAndGet(1);
     totalBlockCount.addAndGet(txBlockInfo.getTotalBlockCount());
     totalBlocksSize.addAndGet(txBlockInfo.getTotalBlockSize());
@@ -519,7 +519,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         // Revert the in-memory changes if the DB update fails
         for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
           txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
-          incrDeletedBlocksSummary(txBlockInfo);
+          rollbackDeletedBlocksSummary(txBlockInfo);
           LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
         }
         throw e;
@@ -623,7 +623,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     LOG.debug("Decrease summary for {} to {}", txBlockInfo, summaryToString(getSummary()));
   }
 
-  private void descDeletedBlocksSummary(DeletedBlocksTransaction tx) {
+  private void rollbackDeletedBlocksSummary(DeletedBlocksTransaction tx) {
     totalTxCount.addAndGet(-1);
     totalBlockCount.addAndGet(-tx.getLocalIDCount());
     totalBlocksSize.addAndGet(-tx.getTotalBlockSize());

@@ -508,7 +508,7 @@ public class DeletedBlockLogImpl
     }
 
     if (!scmContext.isLeaderReady()) {
-      LOG.warn("SCM is not ready to commit transactions.");
+      LOG.debug("SCM is not ready to commit transactions.");
       return;
     }
 
