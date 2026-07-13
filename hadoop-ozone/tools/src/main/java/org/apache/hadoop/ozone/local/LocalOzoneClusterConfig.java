@@ -43,6 +43,7 @@ public final class LocalOzoneClusterConfig {
   static final String DEFAULT_DATANODES_VALUE = "1";
   static final String DEFAULT_PORT_VALUE = "0";
   static final String DEFAULT_S3G_ENABLED_VALUE = "true";
+  static final String DEFAULT_RECON_ENABLED_VALUE = "false";
   static final String DEFAULT_EPHEMERAL_VALUE = "false";
   static final String DEFAULT_STARTUP_TIMEOUT_VALUE = "PT2M";
 
@@ -65,6 +66,8 @@ public final class LocalOzoneClusterConfig {
   static final int DEFAULT_PORT = Integer.parseInt(DEFAULT_PORT_VALUE);
   static final boolean DEFAULT_S3G_ENABLED =
       Boolean.parseBoolean(DEFAULT_S3G_ENABLED_VALUE);
+  static final boolean DEFAULT_RECON_ENABLED =
+      Boolean.parseBoolean(DEFAULT_RECON_ENABLED_VALUE);
   static final boolean DEFAULT_EPHEMERAL =
       Boolean.parseBoolean(DEFAULT_EPHEMERAL_VALUE);
   static final Duration DEFAULT_STARTUP_TIMEOUT =
@@ -86,6 +89,8 @@ public final class LocalOzoneClusterConfig {
   private final int omPort;
   private final int s3gPort;
   private final boolean s3gEnabled;
+  private final int reconPort;
+  private final boolean reconEnabled;
   private final boolean ephemeral;
   private final Duration startupTimeout;
 
@@ -101,6 +106,8 @@ public final class LocalOzoneClusterConfig {
     omPort = builder.omPort;
     s3gPort = builder.s3gPort;
     s3gEnabled = builder.s3gEnabled;
+    reconPort = builder.reconPort;
+    reconEnabled = builder.reconEnabled;
     ephemeral = builder.ephemeral;
     startupTimeout = Objects.requireNonNull(builder.startupTimeout,
         "startupTimeout");
@@ -155,6 +162,21 @@ public final class LocalOzoneClusterConfig {
    */
   public boolean isS3gEnabled() {
     return s3gEnabled;
+  }
+
+  /**
+   * Returns the Recon HTTP port. Port {@code 0} asks the runtime to choose an
+   * available local port.
+   */
+  public int getReconPort() {
+    return reconPort;
+  }
+
+  /**
+   * Returns whether the local runtime should include Recon.
+   */
+  public boolean isReconEnabled() {
+    return reconEnabled;
   }
 
   /**
@@ -227,6 +249,8 @@ public final class LocalOzoneClusterConfig {
     private int omPort = DEFAULT_PORT;
     private int s3gPort = DEFAULT_PORT;
     private boolean s3gEnabled = DEFAULT_S3G_ENABLED;
+    private int reconPort = DEFAULT_PORT;
+    private boolean reconEnabled = DEFAULT_RECON_ENABLED;
     private boolean ephemeral = DEFAULT_EPHEMERAL;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
 
@@ -271,6 +295,16 @@ public final class LocalOzoneClusterConfig {
 
     public Builder setS3gEnabled(boolean value) {
       s3gEnabled = value;
+      return this;
+    }
+
+    public Builder setReconPort(int value) {
+      reconPort = value;
+      return this;
+    }
+
+    public Builder setReconEnabled(boolean value) {
+      reconEnabled = value;
       return this;
     }
 

@@ -126,6 +126,40 @@ class TestOzoneLocal {
   }
 
   @Test
+  void runCommandPrintsReconEndpointWhenEnabled() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862,
+        "http://localhost:9878");
+    runtime.reconEndpoint = "http://localhost:9888";
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
+        true));
+
+    int exitCode = commandLine.execute("--recon");
+
+    assertEquals(0, exitCode);
+    String text = out.toString(UTF_8.name());
+    assertTrue(text.contains("Recon endpoint: http://localhost:9888"), text);
+  }
+
+  @Test
+  void runCommandOmitsReconEndpointWhenDisabled() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862,
+        "http://localhost:9878");
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
+        true));
+
+    int exitCode = commandLine.execute();
+
+    assertEquals(0, exitCode);
+    assertFalse(out.toString(UTF_8.name()).contains("Recon endpoint:"));
+  }
+
+  @Test
   void runCommandOmitsS3SummaryWhenS3gDisabled() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
@@ -220,6 +254,10 @@ class TestOzoneLocal {
         LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE);
     assertEnvDefault("s3gPort", OzoneLocal.ENV_S3G_PORT,
         LocalOzoneClusterConfig.DEFAULT_PORT_VALUE);
+    assertEnvDefault("reconEnabled", OzoneLocal.ENV_RECON_ENABLED,
+        LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE);
+    assertEnvDefault("reconPort", OzoneLocal.ENV_RECON_PORT,
+        LocalOzoneClusterConfig.DEFAULT_PORT_VALUE);
     assertEnvDefault("ephemeral", OzoneLocal.ENV_EPHEMERAL,
         LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE);
     assertEnvDefault("startupTimeout", OzoneLocal.ENV_STARTUP_TIMEOUT,
@@ -241,6 +279,8 @@ class TestOzoneLocal {
     assertEquals(0, config.getOmPort());
     assertEquals(0, config.getS3gPort());
     assertTrue(config.isS3gEnabled());
+    assertEquals(0, config.getReconPort());
+    assertFalse(config.isReconEnabled());
     assertFalse(config.isEphemeral());
     assertEquals(Duration.ofMinutes(2), config.getStartupTimeout());
   }
@@ -257,6 +297,8 @@ class TestOzoneLocal {
         "--om-port", "201",
         "--s3g-port", "202",
         "--no-s3g",
+        "--recon-port", "203",
+        "--recon",
         "--ephemeral",
         "--startup-timeout", "45s");
 
@@ -271,6 +313,8 @@ class TestOzoneLocal {
     assertEquals(201, config.getOmPort());
     assertEquals(202, config.getS3gPort());
     assertFalse(config.isS3gEnabled());
+    assertEquals(203, config.getReconPort());
+    assertTrue(config.isReconEnabled());
     assertTrue(config.isEphemeral());
     assertEquals(Duration.ofSeconds(45), config.getStartupTimeout());
   }
@@ -288,6 +332,18 @@ class TestOzoneLocal {
 
     assertTrue(config.isS3gEnabled());
     assertFalse(config.isEphemeral());
+  }
+
+  @Test
+  void resolveConfigAllowsReconToBeNegated() {
+    LocalOzoneClusterConfig config = resolve("--no-recon");
+
+    assertFalse(config.isReconEnabled());
+  }
+
+  @Test
+  void resolveConfigRejectsInvalidReconPort() {
+    assertConfigError("--recon-port", "65536", "--recon-port");
   }
 
   @Test
@@ -446,6 +502,7 @@ class TestOzoneLocal {
     private final int scmPort;
     private final int omPort;
     private final String s3Endpoint;
+    private String reconEndpoint = "";
     private boolean failStart;
     private boolean started;
     private boolean closed;
@@ -491,6 +548,16 @@ class TestOzoneLocal {
     }
 
     @Override
+    public int getReconPort() {
+      return 0;
+    }
+
+    @Override
+    public String getReconEndpoint() {
+      return reconEndpoint;
+    }
+
+    @Override
     public void close() {
       closed = true;
     }
@@ -519,8 +586,12 @@ class TestOzoneLocal {
           || "--om-port".equals(option)
           || "--s3g-port".equals(option)) {
         return LocalOzoneClusterConfig.DEFAULT_PORT_VALUE;
+      } else if ("--recon-port".equals(option)) {
+        return LocalOzoneClusterConfig.DEFAULT_PORT_VALUE;
       } else if ("--s3g".equals(option)) {
         return LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE;
+      } else if ("--recon".equals(option)) {
+        return LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE;
       } else if ("--ephemeral".equals(option)) {
         return LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE;
       } else if ("--startup-timeout".equals(option)) {
