@@ -185,10 +185,9 @@ public class ContainerHealthSchemaManager {
    * (container_id, state) pairs, update existing pairs, and delete only stale
    * pairs that are no longer unhealthy.
    *
-   * <p>Unlike {@link #replaceUnhealthyContainerRecordsAtomically}, this does not
-   * delete all SCM states for every container that previously had a row. It
-   * removes only keys present in {@code existingByKey} but absent from the
-   * desired scan result (containers that recovered or changed state).</p>
+   * <p>This does not delete all SCM states for every container that previously
+   * had a row. It removes only keys present in {@code existingByKey} but absent
+   * from the desired scan result (containers that recovered or changed state).</p>
    *
    * <p>Rows whose desired content is identical to the existing row are left
    * untouched, so an UPDATE is issued only when replica counts, delta, reason
@@ -266,30 +265,6 @@ public class ContainerHealthSchemaManager {
         && existing.getActualReplicaCount() == desired.getActualReplicaCount()
         && existing.getReplicaDelta() == desired.getReplicaDelta()
         && Objects.equals(existing.getReason(), desired.getReason());
-  }
-
-  /**
-   * Atomically replaces unhealthy rows for a given set of containers.
-   * Delete and insert happen in the same DB transaction.
-   */
-  public void replaceUnhealthyContainerRecordsAtomically(
-      List<Long> containerIdsToDelete,
-      List<UnhealthyContainerRecord> recordsToInsert) {
-    if ((containerIdsToDelete == null || containerIdsToDelete.isEmpty())
-        && (recordsToInsert == null || recordsToInsert.isEmpty())) {
-      return;
-    }
-
-    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    dslContext.transaction(configuration -> {
-      DSLContext txContext = configuration.dsl();
-      if (containerIdsToDelete != null && !containerIdsToDelete.isEmpty()) {
-        deleteScmStatesForContainers(txContext, containerIdsToDelete);
-      }
-      if (recordsToInsert != null && !recordsToInsert.isEmpty()) {
-        batchInsertInChunks(txContext, recordsToInsert);
-      }
-    });
   }
 
   private int deleteScmStatesForContainers(DSLContext dslContext,
