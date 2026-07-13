@@ -2814,24 +2814,18 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       s3Client.createBucket(b -> b.bucket(bucketA));
       s3Client.createBucket(b -> b.bucket(bucketB));
       try {
-        List<String> found = new ArrayList<>();
-        String continuationToken = null;
-
-        do {
+        List<String> found = S3SDKTestUtils.collectBucketsOnePerPage((token, max) -> {
           ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder()
-              .maxBuckets(1);
-          if (continuationToken != null) {
-            reqBuilder.continuationToken(continuationToken);
+              .maxBuckets(max);
+          if (token != null) {
+            reqBuilder.continuationToken(token);
           }
-
           ListBucketsResponse page = s3Client.listBuckets(reqBuilder.build());
-          assertEquals(1, page.buckets().size());
-          found.add(page.buckets().get(0).name());
-          continuationToken = page.continuationToken();
-        } while (continuationToken != null
-            && !(found.contains(bucketA) && found.contains(bucketB)));
-
-        assertThat(found).contains(bucketA, bucketB);
+          return new S3SDKTestUtils.BucketListPage(
+              page.buckets().stream().map(Bucket::name).collect(Collectors.toList()),
+              page.continuationToken());
+        });
+        assertThat(found).containsExactlyInAnyOrder(bucketA, bucketB);
       } finally {
         s3Client.deleteBucket(b -> b.bucket(bucketA));
         s3Client.deleteBucket(b -> b.bucket(bucketB));

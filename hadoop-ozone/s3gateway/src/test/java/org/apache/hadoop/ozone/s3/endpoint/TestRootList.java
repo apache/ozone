@@ -107,9 +107,7 @@ public class TestRootList {
       clientStub.getObjectStore().createS3Bucket(bucketBaseName + i);
     }
 
-    rootEndpoint.queryParamsForTest().setInt(QueryParams.MAX_BUCKETS, 2);
-    ListBucketResponse response =
-        (ListBucketResponse) rootEndpoint.get().getEntity();
+    ListBucketResponse response = listWithMaxBuckets(2);
 
     assertEquals(2, response.getBucketsNum());
     assertEquals(bucketBaseName + 0, response.getBuckets().get(0).getName());

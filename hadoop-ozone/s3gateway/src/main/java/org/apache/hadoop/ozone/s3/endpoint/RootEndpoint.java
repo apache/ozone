@@ -156,10 +156,8 @@ public class RootEndpoint extends EndpointBase {
       final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
       final String maxBucketsParam = queryParams().get(QueryParams.MAX_BUCKETS);
       final boolean paginated = maxBucketsParam != null || continueToken != null;
-      final int maxBuckets = paginated
-          ? validateMaxBuckets(queryParams().getInt(QueryParams.MAX_BUCKETS,
-              S3Consts.MAX_BUCKETS_LIMIT))
-          : Integer.MAX_VALUE;
+      final int maxBuckets = getMaxBuckets(paginated,
+          queryParams().getInt(QueryParams.MAX_BUCKETS, S3Consts.MAX_BUCKETS_LIMIT));
 
       ListBucketResponse response = new ListBucketResponse();
       String previousBucket = null;
@@ -211,11 +209,14 @@ public class RootEndpoint extends EndpointBase {
     }
   }
 
-  private int validateMaxBuckets(int maxBuckets) throws OS3Exception {
-    if (maxBuckets < 1) {
+  private int getMaxBuckets(boolean paginated, int requestedMaxBuckets) throws OS3Exception {
+    if (!paginated) {
+      return Integer.MAX_VALUE;
+    }
+    if (requestedMaxBuckets < 1) {
       throw newError(INVALID_ARGUMENT, "max-buckets must be >= 1");
     }
-    return Math.min(maxBuckets, S3Consts.MAX_BUCKETS_LIMIT);
+    return Math.min(requestedMaxBuckets, S3Consts.MAX_BUCKETS_LIMIT);
   }
 
   private int validateMaxDirectoryBuckets(int maxDirectoryBuckets) throws OS3Exception {
