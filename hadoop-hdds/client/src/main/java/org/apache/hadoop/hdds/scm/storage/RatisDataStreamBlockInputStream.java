@@ -47,13 +47,10 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.client.api.DataStreamInput;
 import org.apache.ratis.client.impl.ClientProtoUtils;
-import org.apache.ratis.datastream.impl.DataStreamReplyByteBuf;
-import org.apache.ratis.datastream.impl.DataStreamReplyByteBuffer;
 import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto.Type;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
@@ -311,7 +308,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       }
       dataBuffer.position(Math.toIntExact(
           Math.min(position - blockOffset, dataBuffer.limit())));
-      if (readBlockData.retainReply && dataBuffer.hasRemaining()) {
+      if (dataBuffer.hasRemaining()) {
         retainedDataReply = ref;
         releaseReply = false;
       }
@@ -340,50 +337,16 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private ReadBlockData parseReadBlockData(DataStreamReply reply)
       throws IOException {
     try {
-      if (reply instanceof DataStreamReplyByteBuffer) {
-        return parseReadBlockData(((DataStreamReplyByteBuffer) reply).slice(),
-            false);
-      } else if (reply instanceof DataStreamReplyByteBuf) {
-        return parseReadBlockData(((DataStreamReplyByteBuf) reply).slice(),
-            true);
-      }
-      throw new IOException("Unexpected reply class " + reply.getClass()
-          + " for " + blockID);
+      return parseReadBlockData(reply.nioBuffer());
     } catch (InvalidProtocolBufferException e) {
       releaseClient(true);
       throw new IOException("Failed to parse ReadBlock response", e);
     }
   }
 
-  private ReadBlockData parseReadBlockData(ByteBuf buf, boolean retainReply)
+  private ReadBlockData parseReadBlockData(ByteBuffer replyBuffer)
       throws InvalidProtocolBufferException {
-    if (buf.readableBytes() < RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
-      throw new InvalidProtocolBufferException(
-          "Missing Ratis ReadBlock metadata length");
-    }
-    final int metadataLength = buf.getInt(buf.readerIndex());
-    if (metadataLength < 0
-        || metadataLength > buf.readableBytes()
-            - RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
-      throw new InvalidProtocolBufferException(
-          "Invalid Ratis ReadBlock metadata length " + metadataLength);
-    }
-    final int metadataOffset =
-        buf.readerIndex() + RATIS_READ_BLOCK_STREAM_HEADER_BYTES;
-    final int dataOffset = metadataOffset + metadataLength;
-    final int dataLength =
-        buf.readerIndex() + buf.readableBytes() - dataOffset;
-    final ContainerCommandResponseProto response =
-        ContainerCommandResponseProto.parseFrom(
-            buf.slice(metadataOffset, metadataLength).nioBuffer());
-    final ByteBuffer data =
-        buf.slice(dataOffset, dataLength).nioBuffer();
-    return new ReadBlockData(response, data, retainReply);
-  }
-
-  private ReadBlockData parseReadBlockData(ByteBuffer buffer,
-      boolean retainReply) throws InvalidProtocolBufferException {
-    final ByteBuffer duplicate = buffer.duplicate();
+    final ByteBuffer duplicate = replyBuffer.duplicate();
     if (duplicate.remaining() < RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
       throw new InvalidProtocolBufferException(
           "Missing Ratis ReadBlock metadata length");
@@ -402,19 +365,17 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     duplicate.position(duplicate.position() + metadataLength);
     final ByteBuffer data = duplicate.slice();
     return new ReadBlockData(
-        ContainerCommandResponseProto.parseFrom(metadata), data, retainReply);
+        ContainerCommandResponseProto.parseFrom(metadata), data);
   }
 
   private static final class ReadBlockData {
     private final ContainerCommandResponseProto response;
     private final ByteBuffer data;
-    private final boolean retainReply;
 
     private ReadBlockData(ContainerCommandResponseProto response,
-        ByteBuffer data, boolean retainReply) {
+        ByteBuffer data) {
       this.response = response;
       this.data = data;
-      this.retainReply = retainReply;
     }
   }
 
