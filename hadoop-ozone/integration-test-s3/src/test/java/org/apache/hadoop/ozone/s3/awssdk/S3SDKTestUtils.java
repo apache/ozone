@@ -28,11 +28,14 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ozone.test.InputSubstream;
@@ -92,6 +95,17 @@ public final class S3SDKTestUtils {
       continuationToken = page.getContinuationToken();
     } while (continuationToken != null);
     return found;
+  }
+
+  /**
+   * Filters a paginated bucket list down to the buckets created by the test.
+   */
+  public static List<String> filterToExpectedBuckets(
+      List<String> paginatedBuckets, String... expectedBuckets) {
+    Set<String> expected = new HashSet<>(Arrays.asList(expectedBuckets));
+    return paginatedBuckets.stream()
+        .filter(expected::contains)
+        .collect(Collectors.toList());
   }
 
   private S3SDKTestUtils() {

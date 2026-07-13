@@ -2825,7 +2825,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
               page.buckets().stream().map(Bucket::name).collect(Collectors.toList()),
               page.continuationToken());
         });
-        assertThat(found).containsExactlyInAnyOrder(bucketA, bucketB);
+        List<String> foundTestBuckets = S3SDKTestUtils.filterToExpectedBuckets(
+            found, bucketA, bucketB);
+        assertThat(foundTestBuckets).containsExactlyInAnyOrder(bucketA, bucketB);
       } finally {
         s3Client.deleteBucket(b -> b.bucket(bucketA));
         s3Client.deleteBucket(b -> b.bucket(bucketB));
