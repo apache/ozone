@@ -49,7 +49,8 @@ public class DefragSubCommand extends AbstractSubcommand implements Callable<Voi
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM to trigger snapshot defragmentation on.",
+      description = "NodeID of the OM to trigger snapshot defragmentation on. "
+          + "Required when OM HA is configured.",
       required = false
   )
   private String nodeId;

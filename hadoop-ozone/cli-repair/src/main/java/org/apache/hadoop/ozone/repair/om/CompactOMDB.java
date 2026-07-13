@@ -56,7 +56,8 @@ public class CompactOMDB extends RepairTool {
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM for which db needs to be compacted.",
+      description = "NodeID of the OM for which db needs to be compacted. "
+          + "Required when OM HA is configured.",
       required = false
   )
   private String nodeId;
