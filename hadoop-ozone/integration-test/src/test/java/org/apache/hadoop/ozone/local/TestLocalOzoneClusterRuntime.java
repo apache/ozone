@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.local;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,25 +38,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Integration tests for the SCM and OM portion of {@link LocalOzoneCluster}.
+ * Integration tests for {@link LocalOzoneCluster}.
  */
 class TestLocalOzoneClusterRuntime {
+
+  private static final String KEY_CONTENT = "local ozone key content";
 
   @TempDir
   private Path tempDir;
 
   @Test
-  void scmAndOmStartAndReuseExistingMetadata() throws Exception {
+  void clusterStartsAndReusesExistingData() throws Exception {
     String volumeName = uniqueName("vol");
     String bucketName = uniqueName("bucket");
+    String keyName = uniqueName("key");
     Path dataDir = tempDir.resolve("local-ozone-runtime");
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
         .setS3gEnabled(false)
         .setStartupTimeout(Duration.ofMinutes(2))
         .build();
 
-    startRuntimeAndCreateBucket(config, volumeName, bucketName);
-    restartRuntimeAndVerifyBucket(config, volumeName, bucketName);
+    startRuntimeAndCreateKey(config, volumeName, bucketName, keyName);
+    restartRuntimeAndVerifyKey(config, volumeName, bucketName, keyName);
   }
 
   @Test
@@ -83,34 +87,44 @@ class TestLocalOzoneClusterRuntime {
         error.getMessage());
   }
 
-  private void startRuntimeAndCreateBucket(LocalOzoneClusterConfig config,
-      String volumeName, String bucketName) throws Exception {
+  private void startRuntimeAndCreateKey(LocalOzoneClusterConfig config,
+      String volumeName, String bucketName, String keyName) throws Exception {
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
       OzoneConfiguration clientConf =
           cluster.prepareConfiguration().getConfiguration();
       cluster.start();
 
+      assertEquals(config.getDatanodes(), cluster.getDatanodeCount());
       assertServicePortsReachable(cluster);
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(clientConf)) {
-        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+        OzoneBucket bucket =
+            TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+        // Writing and reading back a key proves the datanodes registered and
+        // SCM left safe mode, so the cluster is actually usable.
+        TestDataUtil.createKey(bucket, keyName, KEY_CONTENT.getBytes(UTF_8));
+        assertEquals(KEY_CONTENT, TestDataUtil.getKey(bucket, keyName));
       }
     }
   }
 
-  private void restartRuntimeAndVerifyBucket(LocalOzoneClusterConfig config,
-      String volumeName, String bucketName) throws Exception {
+  private void restartRuntimeAndVerifyKey(LocalOzoneClusterConfig config,
+      String volumeName, String bucketName, String keyName) throws Exception {
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
       OzoneConfiguration clientConf =
           cluster.prepareConfiguration().getConfiguration();
       cluster.start();
 
+      assertEquals(config.getDatanodes(), cluster.getDatanodeCount());
       assertServicePortsReachable(cluster);
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(clientConf)) {
         OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
         OzoneBucket bucket = volume.getBucket(bucketName);
         assertEquals(bucketName, bucket.getName());
+        // Key data written before the restart is still readable from the
+        // persistent datanode storage.
+        assertEquals(KEY_CONTENT, TestDataUtil.getKey(bucket, keyName));
       }
     }
   }
