@@ -265,7 +265,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testFinalizeInProgressIterationOnStop() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config =
         new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
@@ -294,7 +294,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testAbnormalStopRecordsErrorReasonAndFinalizesIteration() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config =
         new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
