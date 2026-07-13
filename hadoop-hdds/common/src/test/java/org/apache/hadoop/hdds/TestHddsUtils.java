@@ -59,6 +59,21 @@ public class TestHddsUtils {
         HddsUtils.getHostName(":1234"));
   }
 
+  @Test
+  void testGetHostPortString() {
+    // Hostnames and IPv4 literals are joined with a plain colon.
+    assertEquals("host1:9858", HddsUtils.getHostPortString("host1", 9858));
+    assertEquals("1.2.3.4:9858", HddsUtils.getHostPortString("1.2.3.4", 9858));
+
+    // Bare IPv6 literals must be bracketed so the result is an unambiguous
+    // Ratis/gRPC target.
+    assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("2001:db8::1", 9858));
+    assertEquals("[::1]:9858", HddsUtils.getHostPortString("::1", 9858));
+
+    // Already-bracketed IPv6 literals keep a single pair of brackets.
+    assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
   static List<Arguments> validPaths() {
     return Arrays.asList(
         Arguments.of("/", "/"),

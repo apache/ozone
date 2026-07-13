@@ -46,7 +46,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetIterationStatistics() {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -67,7 +67,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testReRequestIterationStatistics() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -87,7 +87,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsRequestInPeriodBetweenIterations() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -108,7 +108,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testCurrentStatisticsDoesntChangeWhenReRequestInPeriodBetweenIterations() throws InterruptedException {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -132,7 +132,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsWithDelay() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -152,7 +152,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsWhileBalancingInProgress() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -242,7 +242,7 @@ class TestContainerBalancerStatusInfo {
    */
   @Test
   void testGetCurrentIterationsStatisticDoesNotThrowNullPointerExceptionWhenBalancingThreadIsSleeping() {
-    MockedSCM mockedScm = new MockedSCM(new TestableCluster(10, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(10, OzoneConsts.GB));
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ContainerBalancerConfiguration config = ozoneConfig.getObject(ContainerBalancerConfiguration.class);
 
