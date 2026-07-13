@@ -591,7 +591,7 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
       = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
-      = 1000;
+      = 5000;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
       = "ozone.om.snapshot.diff.thread.pool.size";
@@ -638,7 +638,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.max.allowed.keys.changed.per.job";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
-      = 10_000_000;
+      = 1_000_000_000L;
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";

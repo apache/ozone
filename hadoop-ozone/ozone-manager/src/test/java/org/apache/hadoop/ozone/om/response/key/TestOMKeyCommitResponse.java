@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * Tests OMKeyCommitResponse.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMKeyCommitResponse extends TestOMKeyResponse {
+public class TestOMKeyCommitResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToDBBatch() throws Exception {

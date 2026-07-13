@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -72,6 +74,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -406,10 +409,10 @@ public class TestSCMSafeModeManager {
     assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     if (healthyPipelinePercent > 0) {
       validateRuleStatus("HealthyPipelineSafeModeRule",
-          "healthy Ratis/THREE pipelines");
+          "healthy RATIS/THREE pipelines");
     }
     validateRuleStatus("OneReplicaPipelineSafeModeRule",
-        "reported Ratis/THREE pipelines with at least one datanode");
+        "reported RATIS/THREE pipelines with at least one datanode");
 
     testContainerThreshold(containers, 1.0);
 
@@ -481,7 +484,7 @@ public class TestSCMSafeModeManager {
       if (entry.getKey().equals(safeModeRule)) {
         Pair<Boolean, String> value = entry.getValue();
         assertEquals(false, value.getLeft());
-        assertThat(value.getRight()).contains(stringToMatch);
+        assertThat(value.getRight()).containsIgnoringCase(stringToMatch);
       }
     }
   }
@@ -820,6 +823,81 @@ public class TestSCMSafeModeManager {
             scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
         100, 1000 * 5);
     pipelineManager.close();
+  }
+
+  @Test
+  public void testEcDefaultDisablesHealthyPipelineRuleWhenRatisThreeDisabled() {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        false);
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 5);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipelines(any(), any()))
+        .thenReturn(Collections.emptyList());
+    when(pipelineManager.getPipelines())
+        .thenReturn(Collections.emptyList());
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers())
+        .thenReturn(Collections.emptyList());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager,
+        pipelineManager, containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNull();
+    ECMinDataNodeSafeModeRule ecMinDnRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECMinDataNodeSafeModeRule.class);
+    assertThat(ecMinDnRule).isNotNull();
+    assertThat(ecMinDnRule.isEnabled()).isTrue();
+    assertThat(ecMinDnRule.getRequiredDns()).isEqualTo(5);
+  }
+
+  @Test
+  public void testEcDefaultKeepsHealthyPipelineRuleWhenRatisThreeEnabled() {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        true);
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 5);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipelines(any(), any()))
+        .thenReturn(Collections.emptyList());
+    when(pipelineManager.getPipelines())
+        .thenReturn(Collections.emptyList());
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers())
+        .thenReturn(Collections.emptyList());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager,
+        pipelineManager, containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNotNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNotNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECMinDataNodeSafeModeRule.class)).isNotNull();
   }
 
   @Test

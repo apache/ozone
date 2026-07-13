@@ -115,7 +115,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -1203,7 +1203,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
       throws IOException {
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
-    final TestClock testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    final MockClock testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),

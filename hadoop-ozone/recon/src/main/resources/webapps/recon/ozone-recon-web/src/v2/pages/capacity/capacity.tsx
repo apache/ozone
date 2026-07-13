@@ -90,15 +90,24 @@ const Capacity: React.FC<object> = () => {
     }
   );
 
-  const [selectedDatanode, setSelectedDatanode] = React.useState<string>(storageDistribution.data.dataNodeUsage[0]?.hostName ?? "");
+  const [selectedDatanode, setSelectedDatanode] = React.useState<string>("");
+
+  // Only show DNs that appear in the pending deletion response (max 15), so the
+  // dropdown and the pending-block-size values are always in sync.
+  const filteredDNs = React.useMemo(() => {
+    const pendingHostNames = new Set(
+      (dnPendingDeletes.data.pendingDeletionPerDataNode ?? []).map(dn => dn.hostName)
+    );
+    return storageDistribution.data.dataNodeUsage.filter(dn => pendingHostNames.has(dn.hostName));
+  }, [storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
   // Seed selected datanode once data loads so dependent calculations work
   React.useEffect(() => {
-    const firstHost = storageDistribution.data.dataNodeUsage[0]?.hostName;
-    if (!selectedDatanode && firstHost) {
-      setSelectedDatanode(firstHost);
+    const hostNames = filteredDNs.map(dn => dn.hostName);
+    if (!hostNames.includes(selectedDatanode)) {
+      setSelectedDatanode(hostNames[0] ?? "");
     }
-  }, [selectedDatanode, storageDistribution.data.dataNodeUsage]);
+  }, [filteredDNs]);
 
   const loadData = () => {
     storageDistribution.refetch();
@@ -127,6 +136,9 @@ const Capacity: React.FC<object> = () => {
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
       ?? storageDistribution.data.dataNodeUsage[0];
+    const dnPendingEntry = dnPendingDeletes.data.pendingDeletionPerDataNode?.find(
+      dn => dn.hostName === (selected?.hostName ?? selectedDatanode)
+    ) ?? { hostName: "unknown-host", datanodeUuid: "unknown-uuid", pendingBlockSize: 0 };
     return {
       ...(selected ?? {
         datanodeUuid: "unknown-uuid",
@@ -138,11 +150,8 @@ const Capacity: React.FC<object> = () => {
         minimumFreeSpace: 0,
         reserved: 0
       }),
-      ...dnPendingDeletes.data.pendingDeletionPerDataNode?.find(dn => dn.hostName === (selected?.hostName ?? selectedDatanode)) ?? {
-        hostName: "unknown-host",
-        datanodeUuid: "unknown-uuid",
-        pendingBlockSize: 0
-      }
+      ...dnPendingEntry,
+      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize)
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
@@ -444,7 +453,7 @@ const Capacity: React.FC<object> = () => {
             downloadUrl={DN_CSV_DOWNLOAD_URL}
             onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}
-            dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
+            dropdownItems={filteredDNs.map(datanode => ({
               label: (
                 <>
                   <span>{datanode.hostName}</span>

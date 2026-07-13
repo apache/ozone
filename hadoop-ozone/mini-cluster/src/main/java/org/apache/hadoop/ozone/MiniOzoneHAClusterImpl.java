@@ -78,7 +78,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
-  public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
+  private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
@@ -376,12 +376,15 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId);
     String omHttpsAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId);
+    String omGrpcPortKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_GRPC_PORT_KEY, omServiceId, omNodeId);
     String omRatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
     conf.set(omAddrKey, localhostWithFreePort());
     conf.set(omHttpAddrKey, localhostWithFreePort());
     conf.set(omHttpsAddrKey, localhostWithFreePort());
+    conf.setInt(omGrpcPortKey, getFreePort());
     conf.setInt(omRatisPortKey, getFreePort());
   }
 
@@ -509,10 +512,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
       prepareForNextBuild();
       return cluster;
-    }
-
-    protected int numberOfOzoneManagers() {
-      return numOfOMs;
     }
 
     protected void initOMRatisConf() {
@@ -1308,6 +1307,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
+  @Override
   public List<StorageContainerManager> getStorageContainerManagers() {
     return new ArrayList<>(this.scmhaService.getServices());
   }

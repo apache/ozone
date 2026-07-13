@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -238,6 +239,41 @@ public class TestOmSnapshotLocalDataYaml {
     IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
+  }
+
+  @Test
+  public void testLoadYamlLargerThanDefaultSnakeYamlLimit() throws IOException {
+    UUID snapshotId = UUID.randomUUID();
+    File yamlFile = new File(testRoot, "large-snapshot.yaml");
+    StringBuilder yaml = new StringBuilder(4 * 1024 * 1024);
+    yaml.append("!<OmSnapshotLocalData>\n")
+        .append("checksum: \"0000000000000000000000000000000000000000000000000000000000000000\"\n")
+        .append("dbTxSequenceNumber: 10\n")
+        .append("isSSTFiltered: false\n")
+        .append("lastDefragTime: 0\n")
+        .append("needsDefrag: false\n")
+        .append("snapshotId: \"").append(snapshotId).append("\"\n")
+        .append("version: 0\n")
+        .append("versionSstFileInfos:\n")
+        .append("  0: !<VersionMeta>\n")
+        .append("    previousSnapshotVersion: 0\n")
+        .append("    sstFiles:\n");
+    int sstFileCount = 0;
+    while (yaml.length() <= 3 * 1024 * 1024 + 1024) {
+      yaml.append("    - !<SstFileInfo>\n")
+          .append("      fileName: file-").append(sstFileCount).append(".sst\n")
+          .append("      startKey: key-start-").append(sstFileCount).append("-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
+          .append("      endKey: key-end-").append(sstFileCount).append("-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n")
+          .append("      columnFamily: fileTable\n");
+      sstFileCount++;
+    }
+    FileUtils.writeStringToFile(yamlFile, yaml.toString(), StandardCharsets.UTF_8);
+    assertThat(yamlFile.length()).isGreaterThan(3L * 1024 * 1024);
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertThat(snapshotData.getSnapshotId()).isEqualTo(snapshotId);
+    assertThat(snapshotData.getVersionSstFileInfos().get(0).getSstFiles()).hasSize(sstFileCount);
   }
 
   @Test

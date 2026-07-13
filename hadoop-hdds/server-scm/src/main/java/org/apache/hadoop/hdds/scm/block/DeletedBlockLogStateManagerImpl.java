@@ -21,18 +21,16 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.ha.invoker.DeletedBlockLogStateManagerInvoker;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -53,16 +51,17 @@ public class DeletedBlockLogStateManagerImpl
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
   private Table<String, ByteString> statefulConfigTable;
-  private ContainerManager containerManager;
   private final SCMHADBTransactionBuffer transactionBuffer;
-  private final Set<Long> deletingTxIDs;
-  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
+  private volatile Set<Long> deletingTxIDs;
+  private static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
+
+  public static final StatefulServiceDefinition<DeletedBlocksTransactionSummary> SERVICE_DEFINITION =
+      new StatefulServiceDefinition<>(SERVICE_NAME, DeletedBlocksTransactionSummary.parser());
 
   public DeletedBlockLogStateManagerImpl(Table<Long, DeletedBlocksTransaction> deletedTable,
              Table<String, ByteString> statefulServiceConfigTable,
              ContainerManager containerManager, SCMHADBTransactionBuffer txBuffer) {
     this.deletedTable = deletedTable;
-    this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
     this.statefulConfigTable = statefulServiceConfigTable;
@@ -74,6 +73,7 @@ public class DeletedBlockLogStateManagerImpl
     return new Table.KeyValueIterator<Long, DeletedBlocksTransaction>() {
 
       private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
+      private final Set<Long> snapshotDeletingTxIDs = deletingTxIDs;
       private TypedTable.KeyValue<Long, DeletedBlocksTransaction> nextTx;
 
       {
@@ -85,7 +85,7 @@ public class DeletedBlockLogStateManagerImpl
           final TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter.next();
           final long txID = next.getKey();
 
-          if ((!deletingTxIDs.contains(txID))) {
+          if (!snapshotDeletingTxIDs.contains(txID)) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
               LOG.trace("DeletedBlocksTransaction matching txID:{}", txID);
@@ -146,17 +146,12 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
-    Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
     for (DeletedBlocksTransaction tx : txs) {
-      long tid = tx.getTxID();
-      containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
-          (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
     if (summary != null) {
       transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
     }
-    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
 
   @Override
@@ -177,7 +172,8 @@ public class DeletedBlockLogStateManagerImpl
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Objects.requireNonNull(deletingTxIDs, "deletingTxIDs == null");
-    deletingTxIDs.clear();
+    // avoid synchronization of deletingTxIDs as onFlush is called by SCM statemachine thread
+    deletingTxIDs = ConcurrentHashMap.newKeySet();
   }
 
   @Override

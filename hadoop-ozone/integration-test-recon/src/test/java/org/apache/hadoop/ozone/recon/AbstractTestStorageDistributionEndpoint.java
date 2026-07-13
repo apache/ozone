@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
@@ -313,8 +313,8 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(300, pendingDeletion.getTotalPendingDeletionSize());
       assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
@@ -336,8 +336,8 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(0, pendingDeletion.getTotalPendingDeletionSize());
       assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
@@ -358,8 +358,8 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(1, pendingDeletion.getTotalNodeQueryFailures());
       assertTrue(pendingDeletion.getPendingDeletionPerDataNode()

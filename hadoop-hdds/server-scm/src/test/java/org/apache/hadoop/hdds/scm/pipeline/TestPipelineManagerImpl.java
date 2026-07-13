@@ -103,7 +103,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.assertj.core.util.Lists;
@@ -124,11 +124,11 @@ public class TestPipelineManagerImpl {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private StorageContainerManager scm;
-  private TestClock testClock;
+  private MockClock testClock;
 
   @BeforeEach
   void init(@TempDir File testDir, @TempDir File dbDir) throws Exception {
-    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf(dbDir);
     scm = HddsTestUtils.getScm(SCMTestUtils.getConf(testDir));
 
@@ -179,7 +179,7 @@ public class TestPipelineManagerImpl {
         new EventQueue(),
         SCMContext.emptyContext(),
         serviceManager,
-        new TestClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @Test
