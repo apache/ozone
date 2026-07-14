@@ -121,34 +121,34 @@ DiskBalancer 通过 `ozone admin datanode diskbalancer` 命令进行管理。
 ### 命令语法
 **启动 DiskBalancer：**
 ```bash
-ozone admin datanode diskbalancer start [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+ozone admin datanode diskbalancer start [<datanode-address or -id> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
 **停止 DiskBalancer：**
 ```bash
-ozone admin datanode diskbalancer stop [<datanode-address> ...] [--in-service-datanodes]
+ozone admin datanode diskbalancer stop [<datanode-address or -id> ...] [--in-service-datanodes]
 ```
 
 **更新配置：**
 ```bash
-ozone admin datanode diskbalancer update [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+ozone admin datanode diskbalancer update [<datanode-address or -id> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
 **获取状态：**
 ```bash
-ozone admin datanode diskbalancer status [<datanode-address> ...] [--in-service-datanodes] [--json]
+ozone admin datanode diskbalancer status [<datanode-address or -id> ...] [--in-service-datanodes] [--json]
 ```
 
 **获取报告：**
 ```bash
-ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-datanodes] [--json]
+ozone admin datanode diskbalancer report [<datanode-address or -id> ...] [--in-service-datanodes] [--json]
 ```
 
 ### 命令选项
 
 | Option                              | Description                                                                                                                                                                                                      | Example                                        |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| `<datanode-address>`                | 一个或多个数据节点地址作为位置参数。地址可以是：<br>- 主机名（例如，`DN-1`）- 使用默认的 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如，`DN-1:19864`）<br>- IP 地址（例如，`192.168.1.10`）<br>- 带端口的 IP 地址（例如，`192.168.1.10:19864`）<br>- 标准输入 (`-`) - 从标准输入读取数据节点地址，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
+| `<datanode-address-or-id>`          | 一个或多个数据节点标识符作为位置参数。每个可以是：<br>- 主机名（例如 `DN-1`）- 使用默认 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如 `DN-1:19864`）<br>- IP 地址（例如 `192.168.1.10`）<br>- 带端口的 IP 地址（例如 `192.168.1.10:19864`）<br>- 数据节点 UUID（例如 `a3b63511-bdf8-4fa1-8ab6-d19c0e806f84`）- 通过 SCM 解析<br>- 标准输入 (`-`) - 从标准输入读取标识符，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`a3b63511-bdf8-4fa1-8ab6-d19c0e806f84`<br>`-` |
 | `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 且 HEALTHY 的数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
 | `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
 | `-t/--threshold-percentage`         | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
@@ -163,6 +163,9 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 ```bash
 # 在多个数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
+
+# 使用数据节点 UUID 启动 DiskBalancer
+ozone admin datanode diskbalancer start a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
 
 # 在所有 IN_SERVICE 且 HEALTHY 的数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start --in-service-datanodes

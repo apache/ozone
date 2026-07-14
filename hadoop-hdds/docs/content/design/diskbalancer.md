@@ -70,6 +70,7 @@ Administrators use the `ozone admin datanode diskbalancer` CLI to manage and mon
   - Query DiskBalancer status and volume density reports
 * Each datanode performs its own **authentication** (via RPC) and **authorization** checks (using `OzoneAdmins` based on `ozone.administrators` configuration).
 * For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE and HEALTHY datanodes and execute commands on all of them.
+* When a datanode UUID is provided as a positional argument, the CLI resolves it to the CLIENT_RPC address through SCM before issuing the datanode RPC.
 
 **DN - DiskBalancer Service:**
 
@@ -81,8 +82,10 @@ A daemon thread, the **Scheduler**, runs periodically on each Datanode.
 from the most over-utilized disk (source) to the least utilized disk (destination).
 3.  The scheduler dispatches these move tasks to a pool of **Worker** threads for parallel execution.
 
-**Note:** SCM is used **only** for datanode discovery when using the `--in-service-datanodes` flag. SCM provides a list of IN_SERVICE and HEALTHY datanodes for batch operations but
-does **not** participate in DiskBalancer control operations (start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
+**Note:** SCM is used for datanode discovery when using the `--in-service-datanodes` flag and to resolve
+datanode UUID arguments to CLIENT_RPC addresses. SCM provides a list of IN_SERVICE and HEALTHY datanodes for
+batch operations and node metadata for UUID lookup, but does **not** participate in DiskBalancer control operations
+(start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
 
 ## Container Move Process
 
@@ -149,10 +152,11 @@ The DiskBalancer CLI provides five main commands that communicate directly with 
 5. **report** - Retrieves volume density report showing imbalance analysis.
 
 The CLI supports:
-- **Direct datanode addressing**: Commands can target specific datanodes by hostname or IP address
+- **Direct datanode addressing**: Commands can target specific datanodes by hostname, IP address, or hyphenated datanode UUID
+- **UUID resolution**: UUID arguments are resolved to CLIENT_RPC addresses through SCM before RPC execution; resolution failures are reported per node
 - **Batch operations**: The `--in-service-datanodes` flag queries SCM for all IN_SERVICE and HEALTHY datanodes and executes commands on all of them
-- **Flexible input**: Datanode addresses can be provided as positional arguments or read from stdin
-- **Output formats**: Results can be displayed in human-readable format or JSON for programmatic access
+- **Flexible input**: Datanode identifiers can be provided as positional arguments or read from stdin
+- **Output formats**: Results can be displayed in human-readable format or JSON for programmatic access; resolved nodes are shown as `hostname (ip:port / uuid)`
 
 ### Operational State Awareness
 

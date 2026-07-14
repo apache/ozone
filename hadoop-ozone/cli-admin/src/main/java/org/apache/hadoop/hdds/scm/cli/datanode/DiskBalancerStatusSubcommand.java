@@ -46,6 +46,11 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       new LinkedHashMap<>();
 
   @Override
+  protected void resetCommandState() {
+    statuses.clear();
+  }
+
+  @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
@@ -93,7 +98,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   private String generateStatus(List<DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-60s %-12s %-15s %-15s %-12s %-20s %-40s %-12s %-12s %-15s %-18s %-20s%n");
+        "%-90s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -110,7 +115,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto : protos) {
-      formatBuilder.append("%-60s %-12s %-15s %-15s %-12s %-20s %-40s %-12s %-12s %-15s %-18s %-20s%n");
+      formatBuilder.append("%-90s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesMovedMB = (long) Math.ceil(proto.getBytesMoved() / (1024.0 * 1024.0));
       long bytesToMoveMB = (long) Math.ceil(proto.getBytesToMove() / (1024.0 * 1024.0));

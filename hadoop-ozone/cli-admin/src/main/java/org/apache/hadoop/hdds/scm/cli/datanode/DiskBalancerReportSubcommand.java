@@ -50,6 +50,11 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private static final String PERCENT_FORMAT = "%.2f%%";
 
   @Override
+  protected void resetCommandState() {
+    reports.clear();
+  }
+
+  @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
