@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
-import java.util.concurrent.CompletionException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -31,11 +30,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
-import org.apache.ratis.server.DataStreamReadResolver;
-import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.server.api.DataStreamApi;
 
 /** Resolves group-independent reads against immutable local containers. */
-final class ClosedContainerReadResolver implements DataStreamReadResolver {
+final class ClosedContainerReadResolver implements DataStreamApi.Resolver {
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final String datanodeUuid;
@@ -48,7 +46,7 @@ final class ClosedContainerReadResolver implements DataStreamReadResolver {
   }
 
   @Override
-  public StateMachine.DataApi resolve(RaftClientRequest request)
+  public DataStreamApi resolve(RaftClientRequest request)
       throws IOException {
     final ContainerCommandRequestProto requestProto = ContainerCommandRequestMessage.toProto(
         request.getMessage().getContent(), request.getRaftGroupId());
@@ -64,15 +62,11 @@ final class ClosedContainerReadResolver implements DataStreamReadResolver {
       return null;
     }
 
-    return new StateMachine.DataApi() {
+    return new DataStreamApi() {
       @Override
-      public void query(Message ignored, WritableByteChannel stream) {
-        try {
-          ContainerStateMachine.streamReadBlock(
-              dispatcher, requestProto, stream);
-        } catch (IOException e) {
-          throw new CompletionException(e);
-        }
+      public long transferTo(Message ignored, WritableByteChannel stream)
+          throws IOException {
+        return ContainerStateMachine.streamReadBlock(dispatcher, requestProto, stream);
       }
     };
   }

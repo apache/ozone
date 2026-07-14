@@ -55,6 +55,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -861,36 +862,38 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void query(Message request, WritableByteChannel stream) {
+  public long transferTo(Message request, WritableByteChannel stream)
+      throws IOException {
     try {
       metrics.incNumQueryStateMachineOps();
       final ContainerCommandRequestProto requestProto =
           message2ContainerCommandRequestProto(request);
       if (requestProto.getCmdType() == Type.ReadBlock) {
-        streamReadBlock(dispatcher, requestProto, stream);
+        return streamReadBlock(dispatcher, requestProto, stream);
       } else {
-        writeAndClose(stream, dispatchCommand(requestProto, null));
+        return writeAndClose(stream, dispatchCommand(requestProto, null));
       }
     } catch (IOException e) {
       metrics.incNumQueryStateMachineFails();
-      throw new CompletionException(e);
+      throw e;
     }
   }
 
-  static void streamReadBlock(
+  static long streamReadBlock(
       ContainerDispatcher dispatcher,
       ContainerCommandRequestProto requestProto,
       WritableByteChannel stream) throws IOException {
     final AtomicReference<Throwable> error = new AtomicReference<>();
     final AtomicBoolean responseSeen = new AtomicBoolean(false);
+    final AtomicLong bytesTransferred = new AtomicLong();
     final DataStreamObserver<ReadBlockResponse> observer =
         new DataStreamObserver<ReadBlockResponse>() {
           @Override
           public void onNext(ReadBlockResponse response) {
             responseSeen.set(true);
             try {
-              writeReadBlockStreamResponse(stream, response.getResponse(),
-                  response.getData());
+              long wirttenLength = writeReadBlockStreamResponse(stream, response.getResponse(), response.getData());
+              bytesTransferred.addAndGet(wirttenLength);
             } catch (IOException e) {
               error.compareAndSet(null, e);
               throw new CompletionException(e);
@@ -931,26 +934,28 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     stream.close();
+    return bytesTransferred.get();
   }
 
-  private static void writeAndClose(
+  private static long writeAndClose(
       WritableByteChannel stream, ContainerCommandResponseProto response)
       throws IOException {
     try {
-      writeFully(stream, response.toByteString().asReadOnlyByteBuffer());
+      return writeFully(stream, response.toByteString().asReadOnlyByteBuffer());
     } finally {
       stream.close();
     }
   }
 
-  private static void writeReadBlockStreamResponse(
+  private static long writeReadBlockStreamResponse(
       WritableByteChannel stream, ContainerCommandResponseProto response,
       ByteBuffer data) throws IOException {
-    writeFully(stream, encodeReadBlockStreamResponse(response, data));
+    return writeFully(stream, encodeReadBlockStreamResponse(response, data));
   }
 
-  private static void writeFully(WritableByteChannel stream, ByteBuffer buffer)
+  private static long writeFully(WritableByteChannel stream, ByteBuffer buffer)
       throws IOException {
+    final int bytes = buffer.remaining();
     while (buffer.hasRemaining()) {
       final int position = buffer.position();
       final int remaining = buffer.remaining();
@@ -973,6 +978,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             + written + ", advanced=" + advanced);
       }
     }
+    return bytes;
   }
 
   private static ByteBuffer encodeReadBlockStreamResponse(
