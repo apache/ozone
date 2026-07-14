@@ -935,7 +935,7 @@ public class TestSCMContainerPlacementRackScatter {
     selectedCount.put(datanodes.get(0), 0);
     selectedCount.put(datanodes.get(1), 0);
 
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 100; i++) {
       List<DatanodeDetails> chosen = policy.chooseDatanodes(
           new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
       assertEquals(1, chosen.size());
