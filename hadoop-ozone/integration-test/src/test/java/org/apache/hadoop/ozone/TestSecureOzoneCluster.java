@@ -102,12 +102,10 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -190,7 +188,7 @@ final class TestSecureOzoneCluster {
   private static OzoneConfiguration kdcConf;
   private static File scmKeytab;
   private static File spnegoKeytab;
-  private static File omKeyTab;
+  private static File omKeytab;
   private static File testUserKeytab;
   private static String testUserPrincipal;
   private static String host;
@@ -220,7 +218,7 @@ final class TestSecureOzoneCluster {
     testUserPrincipal = "test@" + realm;
     scmKeytab = new File(workDir, "scm.keytab");
     spnegoKeytab = new File(workDir, "http.keytab");
-    omKeyTab = new File(workDir, "om.keytab");
+    omKeytab = new File(workDir, "om.keytab");
     testUserKeytab = new File(workDir, "testuser.keytab");
     kdcConf = new OzoneConfiguration();
     setSecureConfig(kdcConf);
@@ -256,8 +254,6 @@ final class TestSecureOzoneCluster {
       conf.set(HDDS_X509_RENEW_GRACE_DURATION,
           Duration.ofMillis(CERT_GRACE_TIME_MS).toString());
       conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
-      conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
-          Duration.ofMillis(CERT_GRACE_TIME_MS - 1000).toString());
       conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
           Duration.ofMillis(CERT_GRACE_TIME_MS - 1000).toString());
       conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
@@ -291,11 +287,9 @@ final class TestSecureOzoneCluster {
   }
 
   private static void createCredentialsInKDC(OzoneConfiguration conf) throws Exception {
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    SCMHTTPServerConfig httpServerConfig = conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(scmKeytab, scmConfig.getKerberosPrincipal());
-    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
-    createPrincipal(omKeyTab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
+    createPrincipal(scmKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
+    createPrincipal(spnegoKeytab, conf.get(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY));
+    createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
     createPrincipal(testUserKeytab, testUserPrincipal);
   }
 
@@ -331,7 +325,7 @@ final class TestSecureOzoneCluster {
 
     conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, scmKeytab.getAbsolutePath());
     conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeyTab.getAbsolutePath());
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeytab.getAbsolutePath());
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
   }
 
