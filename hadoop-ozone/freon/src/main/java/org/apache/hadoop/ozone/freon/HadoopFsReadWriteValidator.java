@@ -66,13 +66,6 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
    */
   private static final int MAX_HISTORY_PER_THREAD = 1000;
 
-  /**
-   * Digest algorithm used for the write-side hash. Must match the algorithm
-   * used by {@link #getDigest} so the read-back validation compares equivalent
-   * digests.
-   */
-  private static final String DIGEST_ALGORITHM = "MD5";
-
   @Option(names = {"-s", "--size"},
       description = "Size of the generated files. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
