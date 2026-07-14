@@ -385,8 +385,18 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
 
     @Override
     public ConnectionId getConnectionId() {
+      // Read the proxy through the synchronized accessor instead of the
+      // inherited public field. With DNS-refresh-on-failure, OMProxyInfo
+      // mutates the proxy field under its monitor, so a direct
+      // unsynchronized field read can return a stale reference long
+      // after the refresh has installed the replacement (no happens-
+      // before edge between the writer's swap and an unsynchronized
+      // reader). Reference reads are atomic per JLS so this is a
+      // visibility hazard, not a tearing one -- but the outcome is the
+      // same: a stale proxy whose underlying connection has been
+      // stopped is dialed instead of the live replacement.
       return RPC.getConnectionIdForProxy(useFollowerRead
-          ? getCurrentProxy().proxy : leaderProxy.getProxy().getProxy());
+          ? getCurrentProxy().getProxy() : leaderProxy.getProxy().getProxy());
     }
   }
 

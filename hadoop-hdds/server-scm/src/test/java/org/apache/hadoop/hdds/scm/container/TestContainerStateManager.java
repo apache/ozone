@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -64,7 +65,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.junit.jupiter.api.AfterEach;
@@ -85,18 +85,19 @@ public class TestContainerStateManager {
   private File testDir;
   private DBStore dbStore;
   private Pipeline pipeline;
+  private PipelineManager pipelineManager;
   private MockNodeManager nodeManager;
   private ContainerManager containerManager;
   private SCMContext scmContext;
   private EventPublisher publisher;
 
   @BeforeEach
-  public void init() throws IOException, TimeoutException, InvalidStateTransitionException {
+  public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    PipelineManager pipelineManager = mock(PipelineManager.class);
+    pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
@@ -302,28 +303,33 @@ public class TestContainerStateManager {
   }
 
   /**
-   * DELETED EC container in SCM.
+   * DELETED/DELETING EC container in SCM.
    * Expected: Should send force delete to DN
    */
-  @Test
-  public void testDeletedECContainerWithStaleClosedReplicaShouldNotForceDelete()
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  public void testECContainerWithStaleClosedReplicaShouldForceDelete(HddsProtos.LifeCycleState state)
       throws IOException {
-    final DatanodeDetails datanode = randomDatanodeDetails();
-    nodeManager.register(datanode, null, null);
-    // Create a DELETED EC container
+    //Get the first node from our list
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).get(0);
+    // Create an EC container
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo ecContainer = getECContainer(
-        HddsProtos.LifeCycleState.DELETED,
+        state,
         PipelineID.randomId(),
         repConfig);
     containerStateManager.addContainer(ecContainer.getProtobuf());
     assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
 
     // Verify delete command sent
-    sendReportAndCaptureDeleteCommand(ecContainer, datanode,
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(ecContainer, datanode,
         ecContainer.getSequenceId(), false, 1, true);
-    // Container should remain as DELETED
-    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.DELETED);
+    verifyForceDeleteCommand(deleteCmd, ecContainer.containerID(), true, 
+        "Delete command should have force=true for stale EC non-empty replica");
+    // Container should be deleted
+    verifyContainerState(ecContainer.containerID(), state);
   }
 
   private DeleteContainerCommand sendReportAndCaptureDeleteCommand(
@@ -360,7 +366,7 @@ public class TestContainerStateManager {
   private void verifyForceDeleteCommand(DeleteContainerCommand deleteCmd,
       ContainerID expectedContainerId, boolean expectedForce, String message) {
     assertEquals(expectedForce, deleteCmd.isForce(), message);
-    assertEquals(expectedContainerId.getId(), deleteCmd.getContainerID());
+    assertEquals(expectedContainerId.getIdForTesting(), deleteCmd.getContainerID());
   }
 
   /**
@@ -403,12 +409,37 @@ public class TestContainerStateManager {
   }
 
   @Test
+  public void testReinitializeWithOpenContainerWithoutPipelineID()
+      throws Exception {
+    ContainerID containerID = ContainerID.valueOf(3L);
+    ContainerInfo openContainerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerID.getIdForTesting())
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setSequenceId(100L)
+        .setOwner("scm")
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
+        .build();
+
+    SCMDBDefinition.CONTAINERS.getTable(dbStore)
+        .put(containerID, openContainerInfo);
+
+    assertDoesNotThrow(() -> containerStateManager.reinitialize(
+        SCMDBDefinition.CONTAINERS.getTable(dbStore)));
+    assertEquals(HddsProtos.LifeCycleState.OPEN,
+        containerStateManager.getContainer(containerID).getState());
+    verify(pipelineManager, times(0))
+        .addContainerToPipelineSCMStart(isNull(), eq(containerID));
+  }
+
+  @Test
   public void testSequenceIdOnStateUpdate() throws Exception {
     ContainerID containerID = ContainerID.valueOf(3L);
     long sequenceId = 100L;
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
+        .setContainerID(containerID.getIdForTesting())
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setSequenceId(sequenceId)
         .setOwner("scm")

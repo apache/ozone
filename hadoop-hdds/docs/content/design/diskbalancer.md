@@ -69,7 +69,7 @@ Administrators use the `ozone admin datanode diskbalancer` CLI to manage and mon
   - Update configuration parameters
   - Query DiskBalancer status and volume density reports
 * Each datanode performs its own **authentication** (via RPC) and **authorization** checks (using `OzoneAdmins` based on `ozone.administrators` configuration).
-* For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE datanodes and execute commands on all of them.
+* For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE and HEALTHY datanodes and execute commands on all of them.
 
 **DN - DiskBalancer Service:**
 
@@ -81,7 +81,7 @@ A daemon thread, the **Scheduler**, runs periodically on each Datanode.
 from the most over-utilized disk (source) to the least utilized disk (destination).
 3.  The scheduler dispatches these move tasks to a pool of **Worker** threads for parallel execution.
 
-**Note:** SCM is used **only** for datanode discovery when using the `--in-service-datanodes` flag. SCM provides a list of IN_SERVICE datanodes for batch operations but
+**Note:** SCM is used **only** for datanode discovery when using the `--in-service-datanodes` flag. SCM provides a list of IN_SERVICE and HEALTHY datanodes for batch operations but
 does **not** participate in DiskBalancer control operations (start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
 
 ## Container Move Process
@@ -165,7 +165,7 @@ This ensures DiskBalancer respects datanode lifecycle management and does not in
 
 ## Feature Flag
 
-The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is disabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands are hidden from the main help output to prevent accidental usage.
+The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is enabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands refuse to run until the flag is set back to true.
 
 ## DiskBalancer Metrics
 

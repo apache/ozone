@@ -139,6 +139,17 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .channelType(channelType)
         .withOption(ChannelOption.SO_BACKLOG, soBacklog)
         .executor(readExecutors)
+        // If a client does not send an actual functional business RPC for 15 minutes,
+        // the server kicks them off with a GOAWAY frame.
+        .maxConnectionIdle(15, TimeUnit.MINUTES)
+        // If the server receives absolutely zero network traffic from a client for
+        // 5 minutes, the server proactively sends an HTTP/2 PING frame to verify
+        // if the network wire or client machine is still alive.
+        .keepAliveTime(5, TimeUnit.MINUTES)
+        // If the server fires a ping and the client fails to respond with a
+        // PING ACK within 30 seconds, the server assumes the socket is a dead
+        // "zombie connection" and immediately destroys the TCP socket.
+        .keepAliveTimeout(30, TimeUnit.SECONDS)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
             new GrpcServerInterceptor()));

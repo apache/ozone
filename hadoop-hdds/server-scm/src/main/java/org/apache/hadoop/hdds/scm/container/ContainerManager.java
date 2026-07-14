@@ -21,7 +21,6 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -30,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * ContainerManager is responsible for keeping track of all Containers and
@@ -125,6 +123,24 @@ public interface ContainerManager {
   int getContainerStateCount(LifeCycleState state);
 
   /**
+   * Returns the total number of containers across all lifecycle states.
+   *
+   * <p>Default implementation sums {@link #getContainerStateCount(LifeCycleState)}
+   * for every {@link LifeCycleState} value — each call is O(1), so the total
+   * is O(number of states) rather than O(total containers). Automatically
+   * includes any new states added to the enum in the future.
+   *
+   * @return total container count
+   */
+  default long getTotalContainerCount() {
+    long total = 0;
+    for (LifeCycleState state : LifeCycleState.values()) {
+      total += getContainerStateCount(state);
+    }
+    return total;
+  }
+
+  /**
    * Returns true if the container exist, false otherwise.
    * @param id Container ID
    * @return true if container exist, else false
@@ -145,11 +161,10 @@ public interface ContainerManager {
    * @param containerID - Container ID
    * @param event - container life cycle event
    * @throws IOException
-   * @throws InvalidStateTransitionException
    */
   void updateContainerState(ContainerID containerID,
                             LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException;
 
   /**
    * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
@@ -186,16 +201,6 @@ public interface ContainerManager {
    */
   void removeContainerReplica(ContainerID containerID, ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException;
-
-  /**
-   * Update deleteTransactionId according to deleteTransactionMap.
-   *
-   * @param deleteTransactionMap Maps the containerId to latest delete
-   *                             transaction id for the container.
-   * @throws IOException
-   */
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
-      throws IOException;
 
   default ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline) {

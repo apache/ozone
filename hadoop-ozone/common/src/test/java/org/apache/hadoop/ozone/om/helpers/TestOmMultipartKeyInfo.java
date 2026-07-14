@@ -118,17 +118,17 @@ public class TestOmMultipartKeyInfo {
   }
 
   @Test
-  public void addPartKeyInfoSupportsSchemaVersionOne() {
+  public void addPartKeyInfoRejectsSchemaVersionOne() {
     OmMultipartKeyInfo subject = createSubject()
         .setSchemaVersion(1)
         .build();
 
-    subject.addPartKeyInfo(createPart(createKeyInfo()).build());
-    assertEquals(1, subject.getPartKeyInfoMap().size());
+    assertThrows(IllegalStateException.class,
+        () -> subject.addPartKeyInfo(createPart(createKeyInfo()).build()));
   }
 
   @Test
-  public void getProtoSupportsPartListForSchemaVersionOne() {
+  public void getProtoRejectsPartListForSchemaVersionOne() {
     PartKeyInfo part = createPart(createKeyInfo()).build();
     TreeMap<Integer, PartKeyInfo> legacyMap = new TreeMap<>();
     legacyMap.put(part.getPartNumber(), part);
@@ -142,10 +142,7 @@ public class TestOmMultipartKeyInfo {
         .setPartKeyInfoList(legacyMap)
         .build();
 
-    OzoneManagerProtocolProtos.MultipartKeyInfo proto = subject.getProto();
-    OmMultipartKeyInfo fromProto = OmMultipartKeyInfo.getFromProto(proto);
-    assertEquals(1, fromProto.getSchemaVersion());
-    assertEquals(1, fromProto.getPartKeyInfoMap().size());
+    assertThrows(IllegalStateException.class, subject::getProto);
   }
 
   @Test

@@ -24,17 +24,16 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpc
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -45,13 +44,16 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -114,12 +116,14 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconReplicationManager;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ratis.util.ExitUtils;
@@ -168,6 +172,160 @@ public class ReconStorageContainerManagerFacade
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
   private final ReconStorageContainerSyncHelper containerSyncHelper;
+  private final ReconScmContainerSyncMetrics containerSyncMetrics;
+  private final ExecutorService scmSnapshotExecutor;
+  private final Object scmSnapshotLock = new Object();
+  private Future<?> scmSnapshotFuture;
+  private ScmDbSnapshotSyncStatus scmSnapshotStatus =
+      ScmDbSnapshotSyncStatus.IDLE;
+  private ScmDbSnapshotSyncPhase scmSnapshotPhase =
+      ScmDbSnapshotSyncPhase.NONE;
+  private long scmSnapshotStartedAt;
+  private long scmSnapshotFinishedAt;
+  private boolean scmSnapshotCancelAllowed;
+  private boolean scmSnapshotTaskStarted;
+  private String scmSnapshotLastError;
+
+  /**
+   * Status values for an explicitly triggered SCM DB snapshot sync.
+   */
+  public enum ScmDbSnapshotSyncStatus {
+    IDLE,
+    IN_PROGRESS,
+    SUCCESS,
+    FAILED,
+    CANCELLED
+  }
+
+  /**
+   * Phase values for an explicitly triggered SCM DB snapshot sync.
+   */
+  public enum ScmDbSnapshotSyncPhase {
+    NONE,
+    DOWNLOADING_CHECKPOINT,
+    INITIALIZING_DB,
+    SWAPPING_DB,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+  }
+
+  /**
+   * Response payload for the SCM DB snapshot sync status endpoint.
+   */
+  public static final class ScmDbSnapshotStatusResponse {
+    private final ScmDbSnapshotSyncStatus status;
+    private final ScmDbSnapshotSyncPhase phase;
+    private final long startedAt;
+    private final long finishedAt;
+    private final long durationMs;
+    private final boolean cancelAllowed;
+    private final String lastError;
+
+    public ScmDbSnapshotStatusResponse(ScmDbSnapshotSyncStatus status,
+        ScmDbSnapshotSyncPhase phase, long startedAt, long finishedAt,
+        boolean cancelAllowed, String lastError) {
+      this.status = status;
+      this.phase = phase;
+      this.startedAt = startedAt;
+      this.finishedAt = finishedAt;
+      long endTime = finishedAt > 0 ? finishedAt : System.currentTimeMillis();
+      this.durationMs = startedAt > 0 ? endTime - startedAt : 0;
+      this.cancelAllowed = cancelAllowed;
+      this.lastError = lastError;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public ScmDbSnapshotSyncPhase getPhase() {
+      return phase;
+    }
+
+    public long getStartedAt() {
+      return startedAt;
+    }
+
+    public long getFinishedAt() {
+      return finishedAt;
+    }
+
+    public long getDurationMs() {
+      return durationMs;
+    }
+
+    public boolean isCancelAllowed() {
+      return cancelAllowed;
+    }
+
+    public String getLastError() {
+      return lastError;
+    }
+  }
+
+  /**
+   * Response payload for the SCM DB snapshot sync trigger endpoint.
+   */
+  public static final class ScmDbSnapshotTriggerResponse {
+    private final boolean accepted;
+    private final ScmDbSnapshotSyncStatus status;
+    private final String message;
+
+    public ScmDbSnapshotTriggerResponse(boolean accepted,
+        ScmDbSnapshotSyncStatus status, String message) {
+      this.accepted = accepted;
+      this.status = status;
+      this.message = message;
+    }
+
+    public boolean isAccepted() {
+      return accepted;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public String getMessage() {
+      return message;
+    }
+  }
+
+  /**
+   * Response payload for the SCM DB snapshot sync cancellation endpoint.
+   */
+  public static final class ScmDbSnapshotCancelResponse {
+    private final boolean cancelled;
+    private final ScmDbSnapshotSyncStatus status;
+    private final ScmDbSnapshotSyncPhase phase;
+    private final String message;
+
+    public ScmDbSnapshotCancelResponse(boolean cancelled,
+        ScmDbSnapshotSyncStatus status, ScmDbSnapshotSyncPhase phase,
+        String message) {
+      this.cancelled = cancelled;
+      this.status = status;
+      this.phase = phase;
+      this.message = message;
+    }
+
+    public boolean isCancelled() {
+      return cancelled;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public ScmDbSnapshotSyncPhase getPhase() {
+      return phase;
+    }
+
+    public String getMessage() {
+      return message;
+    }
+  }
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -249,6 +407,11 @@ public class ReconStorageContainerManagerFacade
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
+    this.scmSnapshotExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "-SCM-Snapshot-Trigger-%d")
+            .setDaemon(true)
+            .build());
     this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
@@ -381,10 +544,12 @@ public class ReconStorageContainerManagerFacade
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
 
+    containerSyncMetrics = ReconScmContainerSyncMetrics.create();
     containerSyncHelper = new ReconStorageContainerSyncHelper(
         scmServiceProvider,
         ozoneConfiguration,
-        containerManager
+        containerManager,
+        containerSyncMetrics
     );
   }
 
@@ -432,34 +597,40 @@ public class ReconStorageContainerManagerFacade
     } else {
       initializePipelinesFromScm();
     }
-    LOG.debug("Started the SCM Container Info sync scheduler.");
-    long interval = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    long initialDelay = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+    // -----------------------------------------------------------------------
+    // Scheduler (SCM container sync): runs on the configured interval.
+    // Each cycle directly runs SCM container reconciliation. The sync itself already
+    // fetches the SCM state counts needed for pagination, so a separate drift
+    // preflight would duplicate SCM calls before doing the same work.
+    // -----------------------------------------------------------------------
+    long syncInterval = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    long syncInitialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT,
         TimeUnit.MILLISECONDS);
-    // This periodic sync with SCM container cache is needed because during
-    // the window when recon will be down and any container being added
-    // newly and went missing, that container will not be reported as missing by
-    // recon till there is a difference of container count equivalent to
-    // threshold value defined in "ozone.recon.scm.container.threshold"
-    // between SCM container cache and recon container cache.
+    LOG.debug("Started the SCM Container Info sync scheduler (interval={}ms, initialDelay={}ms).",
+        syncInterval, syncInitialDelay);
     scheduler.scheduleWithFixedDelay(() -> {
+      if (!isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+        LOG.debug("SCM container info sync is already running; skipping this cycle.");
+        return;
+      }
       try {
-        boolean isSuccess = syncWithSCMContainerInfo();
-        if (!isSuccess) {
-          LOG.debug("SCM container info sync is already running.");
+        boolean success = runScmContainerSyncWithMetrics();
+        if (!success) {
+          LOG.warn("SCM container sync completed with one or more phase failures. "
+              + "Check logs above for details.");
         }
       } catch (Throwable t) {
-        LOG.error("Unexpected exception while syncing data from SCM.", t);
+        LOG.error("Unexpected exception during periodic SCM container sync.", t);
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     },
-        initialDelay,
-        interval,
+        syncInitialDelay,
+        syncInterval,
         TimeUnit.MILLISECONDS);
     getDatanodeProtocolServer().start();
     reconSafeModeMgrTask.start();
@@ -499,6 +670,8 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
+    containerSyncMetrics.unRegister();
+    scmSnapshotExecutor.shutdownNow();
     IOUtils.close(LOG, dbStore);
   }
 
@@ -543,62 +716,276 @@ public class ReconStorageContainerManagerFacade
       LOG.error("Exception encountered while getting SCM DB.");
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
-    } finally {
-      isSyncDataFromSCMRunning.compareAndSet(true, false);
     }
   }
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-        LOG.info("Got new checkpoint from SCM : " +
-            dbSnapshot.getCheckpointLocation());
-        try {
-          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-        } catch (IOException e) {
-          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
-        }
-      } else {
-        LOG.error("Null snapshot location got from SCM.");
+      try {
+        updateReconSCMDBWithNewSnapshotWithoutGuard();
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     } else {
       LOG.warn("SCM DB sync is already running.");
     }
   }
 
-  public boolean syncWithSCMContainerInfo() {
+  private void updateReconSCMDBWithNewSnapshotWithoutGuard()
+      throws IOException {
+    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+      LOG.info("Got new checkpoint from SCM : {}",
+          dbSnapshot.getCheckpointLocation());
+      initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+    } else {
+      throw new IOException("Null snapshot location got from SCM.");
+    }
+  }
+
+  public ScmDbSnapshotTriggerResponse triggerScmDbSnapshotSync() {
+    synchronized (scmSnapshotLock) {
+      if (!isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+        return new ScmDbSnapshotTriggerResponse(false, scmSnapshotStatus,
+            "SCM DB sync is already running.");
+      }
+      scmSnapshotStatus = ScmDbSnapshotSyncStatus.IN_PROGRESS;
+      scmSnapshotPhase = ScmDbSnapshotSyncPhase.DOWNLOADING_CHECKPOINT;
+      scmSnapshotStartedAt = System.currentTimeMillis();
+      scmSnapshotFinishedAt = 0;
+      scmSnapshotCancelAllowed = true;
+      scmSnapshotTaskStarted = false;
+      scmSnapshotLastError = null;
+      scmSnapshotFuture = scmSnapshotExecutor.submit(this::runScmSnapshotSync);
+      return new ScmDbSnapshotTriggerResponse(true, scmSnapshotStatus,
+          "SCM DB snapshot sync started.");
+    }
+  }
+
+  public ScmDbSnapshotStatusResponse getScmDbSnapshotSyncStatus() {
+    synchronized (scmSnapshotLock) {
+      return new ScmDbSnapshotStatusResponse(scmSnapshotStatus,
+          scmSnapshotPhase, scmSnapshotStartedAt, scmSnapshotFinishedAt,
+          scmSnapshotCancelAllowed, scmSnapshotLastError);
+    }
+  }
+
+  public ScmDbSnapshotCancelResponse cancelScmDbSnapshotSync() {
+    synchronized (scmSnapshotLock) {
+      if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.IN_PROGRESS) {
+        return new ScmDbSnapshotCancelResponse(false, scmSnapshotStatus,
+            scmSnapshotPhase, "No SCM DB snapshot sync is running.");
+      }
+      if (!scmSnapshotCancelAllowed) {
+        return new ScmDbSnapshotCancelResponse(false, scmSnapshotStatus,
+            scmSnapshotPhase,
+            "Cancellation is not allowed after DB initialization has started.");
+      }
+      boolean cancelled = scmSnapshotFuture != null &&
+          scmSnapshotFuture.cancel(true);
+      if (cancelled) {
+        scmSnapshotStatus = ScmDbSnapshotSyncStatus.CANCELLED;
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.CANCELLED;
+        scmSnapshotFinishedAt = System.currentTimeMillis();
+        scmSnapshotCancelAllowed = false;
+        if (!scmSnapshotTaskStarted) {
+          isSyncDataFromSCMRunning.compareAndSet(true, false);
+        }
+      }
+      return new ScmDbSnapshotCancelResponse(cancelled, scmSnapshotStatus,
+          scmSnapshotPhase, cancelled ? "SCM DB snapshot sync cancelled." :
+          "Unable to cancel SCM DB snapshot sync.");
+    }
+  }
+
+  private void runScmSnapshotSync() {
+    File checkpointLocation = null;
+    boolean initialized = false;
+    try {
+      synchronized (scmSnapshotLock) {
+        scmSnapshotTaskStarted = true;
+        if (scmSnapshotStatus == ScmDbSnapshotSyncStatus.CANCELLED) {
+          return;
+        }
+      }
+      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("SCM DB snapshot sync interrupted.");
+      }
+      if (dbSnapshot == null || dbSnapshot.getCheckpointLocation() == null) {
+        throw new IOException("Null snapshot location got from SCM.");
+      }
+      checkpointLocation = dbSnapshot.getCheckpointLocation().toFile();
+      synchronized (scmSnapshotLock) {
+        if (scmSnapshotStatus == ScmDbSnapshotSyncStatus.CANCELLED) {
+          return;
+        }
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.INITIALIZING_DB;
+        scmSnapshotCancelAllowed = false;
+      }
+      initializeNewRdbStore(checkpointLocation);
+      initialized = true;
+      synchronized (scmSnapshotLock) {
+        scmSnapshotStatus = ScmDbSnapshotSyncStatus.SUCCESS;
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.COMPLETED;
+        scmSnapshotFinishedAt = System.currentTimeMillis();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      markScmSnapshotCancelled();
+    } catch (Throwable t) {
+      LOG.error("Unable to refresh Recon SCM DB Snapshot.", t);
+      synchronized (scmSnapshotLock) {
+        if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.CANCELLED) {
+          scmSnapshotStatus = ScmDbSnapshotSyncStatus.FAILED;
+          scmSnapshotPhase = ScmDbSnapshotSyncPhase.FAILED;
+          scmSnapshotLastError = t.getMessage();
+          scmSnapshotFinishedAt = System.currentTimeMillis();
+        }
+      }
+    } finally {
+      cleanupFailedOrCancelledCheckpoint(checkpointLocation, initialized);
+      synchronized (scmSnapshotLock) {
+        scmSnapshotCancelAllowed = false;
+      }
+      isSyncDataFromSCMRunning.compareAndSet(true, false);
+    }
+  }
+
+  private void markScmSnapshotCancelled() {
+    synchronized (scmSnapshotLock) {
+      scmSnapshotStatus = ScmDbSnapshotSyncStatus.CANCELLED;
+      scmSnapshotPhase = ScmDbSnapshotSyncPhase.CANCELLED;
+      scmSnapshotFinishedAt = System.currentTimeMillis();
+      scmSnapshotCancelAllowed = false;
+    }
+  }
+
+  private void cleanupFailedOrCancelledCheckpoint(File checkpointLocation,
+      boolean initialized) {
+    if (checkpointLocation == null || initialized) {
+      return;
+    }
+    synchronized (scmSnapshotLock) {
+      if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.FAILED &&
+          scmSnapshotStatus != ScmDbSnapshotSyncStatus.CANCELLED) {
+        return;
+      }
+    }
+    try {
+      FileUtils.deleteDirectory(checkpointLocation);
+    } catch (IOException e) {
+      LOG.warn("Unable to clean up SCM DB snapshot checkpoint directory {}.",
+          checkpointLocation, e);
+    }
+  }
+
+  /**
+   * Runs targeted reconciliation immediately rather than waiting for the next
+   * scheduled cycle.
+   */
+  public boolean triggerSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      return containerSyncHelper.syncWithSCMContainerInfo();
+      try {
+        return runScmContainerSyncWithMetrics();
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
+      }
     } else {
       LOG.debug("SCM DB sync is already running.");
       return false;
     }
   }
 
-  private void deleteOldSCMDB() throws IOException {
-    if (dbStore != null) {
-      File oldDBLocation = dbStore.getDbLocation();
-      if (oldDBLocation.exists()) {
-        LOG.info("Cleaning up old SCM snapshot db at {}.",
-            oldDBLocation.getAbsolutePath());
-        FileUtils.deleteDirectory(oldDBLocation);
-      }
+  private boolean runScmContainerSyncWithMetrics() {
+    long startTime = Time.monotonicNow();
+    containerSyncMetrics.setScmContainerSyncStatus(
+        ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_IN_PROGRESS);
+    try {
+      boolean success = containerSyncHelper.syncWithSCMContainerInfo();
+      containerSyncMetrics.setScmContainerSyncStatus(success
+          ? ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_SUCCESS
+          : ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_FAILURE);
+      return success;
+    } catch (RuntimeException | Error e) {
+      containerSyncMetrics.setScmContainerSyncStatus(
+          ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_FAILURE);
+      throw e;
+    } finally {
+      containerSyncMetrics.setScmContainerSyncDurationMs(
+          Time.monotonicNow() - startTime);
     }
   }
 
-  private void initializeNewRdbStore(File dbFile) throws IOException {
+  private void cleanupOldSCMDB(File oldDbLocation, File newDbLocation) {
+    if (oldDbLocation == null || !oldDbLocation.exists() ||
+        oldDbLocation.equals(newDbLocation)) {
+      return;
+    }
     try {
-      final DBStore newStore = DBStoreBuilder.newBuilder(ozoneConfiguration, ReconSCMDBDefinition.get(), dbFile)
-          .build();
-      final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(dbStore);
-      final Table<DatanodeID, DatanodeDetails> newNodeTable = ReconSCMDBDefinition.NODES.getTable(newStore);
-      try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeTable.iterator()) {
-        while (iterator.hasNext()) {
-          final KeyValue<DatanodeID, DatanodeDetails> keyValue = iterator.next();
-          newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+      LOG.info("Cleaning up old SCM snapshot db at {}.",
+          oldDbLocation.getAbsolutePath());
+      FileUtils.deleteDirectory(oldDbLocation);
+    } catch (IOException e) {
+      LOG.warn("Unable to clean up old SCM snapshot db at {}.",
+          oldDbLocation.getAbsolutePath(), e);
+    }
+  }
+
+  /**
+   * Moves the active snapshot to Recon's stable SCM DB name so that the next
+   * Recon restart reopens the snapshot-backed DB instead of creating a new one.
+   */
+  private File renameSnapshotToReconScmDb(File dbFile) throws IOException {
+    File reconScmDb = new File(dbFile.getParentFile(),
+        ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+    if (dbFile.equals(reconScmDb)) {
+      return dbFile;
+    }
+    if (reconScmDb.exists()) {
+      FileUtils.deleteDirectory(reconScmDb);
+    }
+    if (!dbFile.renameTo(reconScmDb)) {
+      throw new IOException("Unable to rename SCM snapshot db from " +
+          dbFile.getAbsolutePath() + " to " + reconScmDb.getAbsolutePath());
+    }
+    LOG.info("SCM snapshot linked to Recon DB at {}.",
+        reconScmDb.getAbsolutePath());
+    return reconScmDb;
+  }
+
+  private void initializeNewRdbStore(File dbFile) throws IOException {
+    final DBStore oldStore = dbStore;
+    final File oldDbLocation = oldStore != null ? oldStore.getDbLocation() :
+        null;
+    Map<DatanodeID, DatanodeDetails> preservedNodes = new HashMap<>();
+    DBStore newStore = null;
+    try {
+      if (oldStore != null) {
+        final Table<DatanodeID, DatanodeDetails> nodeTable =
+            ReconSCMDBDefinition.NODES.getTable(oldStore);
+        try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID,
+            DatanodeDetails>> iterator = nodeTable.iterator()) {
+          while (iterator.hasNext()) {
+            final KeyValue<DatanodeID, DatanodeDetails> keyValue =
+                iterator.next();
+            preservedNodes.put(keyValue.getKey(), keyValue.getValue());
+          }
         }
       }
+
+      IOUtils.close(LOG, oldStore);
+      File activeDbLocation = renameSnapshotToReconScmDb(dbFile);
+
+      newStore = DBStoreBuilder.newBuilder(ozoneConfiguration,
+          ReconSCMDBDefinition.get(), activeDbLocation).build();
+      final Table<DatanodeID, DatanodeDetails> newNodeTable =
+          ReconSCMDBDefinition.NODES.getTable(newStore);
+      for (Map.Entry<DatanodeID, DatanodeDetails> entry :
+          preservedNodes.entrySet()) {
+        newNodeTable.put(entry.getKey(), entry.getValue());
+      }
+
       sequenceIdGen.reinitialize(
           ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
       pipelineManager.reinitialize(
@@ -607,19 +994,14 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
-      IOUtils.close(LOG, dbStore);
-      deleteOldSCMDB();
       dbStore = newStore;
-      File newDb = new File(dbFile.getParent() +
-          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
-      boolean success = dbFile.renameTo(newDb);
-      if (success) {
-        LOG.info("SCM snapshot linked to Recon DB.");
-      }
+      cleanupOldSCMDB(oldDbLocation, activeDbLocation);
       LOG.info("Created SCM DB handle from snapshot at {}.",
-          dbFile.getAbsolutePath());
-    } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
+          activeDbLocation.getAbsolutePath());
+    } catch (IOException | RuntimeException ex) {
+      IOUtils.close(LOG, newStore);
+      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ex);
+      throw ex;
     }
   }
 

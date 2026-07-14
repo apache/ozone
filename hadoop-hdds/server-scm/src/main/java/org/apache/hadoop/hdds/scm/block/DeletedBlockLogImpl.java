@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.block;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -53,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -240,7 +240,7 @@ public class DeletedBlockLogImpl
       long currentBatchSizeBytes = 0;
       for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
-        long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
+        long nextTXID = sequenceIdGen.getNextId(SequenceIdType.delTxnId);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);
@@ -330,8 +330,8 @@ public class DeletedBlockLogImpl
   private void addTxToTxSizeMap(DeletedBlocksTransaction tx) {
     if (tx.hasTotalBlockReplicatedSize()) {
       transactionStatusManager.getTxSizeMap().put(tx.getTxID(),
-          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getLocalIDCount(),
-              tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
+          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getTxID(), tx.getContainerID(),
+              tx.getLocalIDCount(), tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
     }
   }
 
@@ -504,6 +504,11 @@ public class DeletedBlockLogImpl
       DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
     if (!scmContext.isLeader()) {
       LOG.info("Skip commit transactions since current SCM is not leader.");
+      return;
+    }
+
+    if (!scmContext.isLeaderReady()) {
+      LOG.debug("SCM is not ready to commit transactions.");
       return;
     }
 

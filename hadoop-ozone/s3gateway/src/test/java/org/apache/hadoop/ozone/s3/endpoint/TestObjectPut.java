@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.FailingInputStream;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
@@ -44,8 +45,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -55,19 +58,17 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -82,6 +83,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -174,13 +176,27 @@ class TestObjectPut {
     assertEquals("value2", tags.get("tag2"));
   }
 
-  @Test
-  public void testPutObjectWithOnlyTagKey() {
-    // Try to send with only the key (no value)
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1");
+  static Stream<Arguments> onlyTagKeyCases() {
+    return Stream.of(
+        Arguments.of("tag1", ImmutableMap.of("tag1", "")),
+        Arguments.of("foo=bar&bar", ImmutableMap.of("foo", "bar", "bar", ""))
+    );
+  }
 
-    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
-    assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
+  /**
+   * Put Object with {@code x-amz-tagging} header where key with a null value is treated as
+   * an empty string value (AWS), e.g. foo=bar&bar, here bar = " ".
+   */
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCases")
+  void testPutObjectWithOnlyTagKey(String tagHeader,
+      Map<String, String> expectedTags) throws Exception {
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn(tagHeader);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertThat(bucket.getKey(KEY_NAME).getTags())
+        .containsExactlyInAnyOrderEntriesOf(expectedTags);
   }
 
   @Test
@@ -250,15 +266,18 @@ class TestObjectPut {
   @Test
   public void testPutObjectMessageDigestResetDuringException() {
     MessageDigest messageDigest = mock(MessageDigest.class);
-    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class);
-        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
+    try (MockedStatic<EndpointBase> endpoint =
+        mockStatic(EndpointBase.class, CALLS_REAL_METHODS)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
-              anyLong(), any(byte[].class)))
-          .thenThrow(IOException.class);
+      when(messageDigest.getAlgorithm()).thenReturn(OzoneConsts.MD5_HASH);
       endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
+      setPutRequestLength(CONTENT.length());
 
-      assertThrows(IOException.class, () -> putObject(CONTENT).close());
+      IOException ex = assertThrows(IOException.class,
+          () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME,
+              new FailingInputStream(CONTENT.getBytes(StandardCharsets.UTF_8), 5)).close());
+      assertEquals("upload interrupted", ex.getMessage());
+      assertThrows(IOException.class, () -> bucket.getKey(KEY_NAME));
 
       // Verify that the message digest is reset so that the instance can be reused for the
       // next request in the same thread
@@ -364,6 +383,42 @@ class TestObjectPut {
   }
 
   @Test
+  void testContentTypeStoredAndCopied() throws Exception {
+    // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("audio/mpeg");
+
+    assertSucceeds(() -> putObject(CONTENT));
+    OzoneKeyDetails source = bucket.getKey(KEY_NAME);
+    assertEquals("audio/mpeg",
+        source.getMetadata().get(HttpHeaders.CONTENT_TYPE));
+
+    // COPY directive: destination keeps the source Content-Type, ignoring the
+    // Content-Type on the copy request.
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("COPY");
+    when(headers.getHeaderString(COPY_SOURCE_HEADER))
+        .thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("text/plain");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals("audio/mpeg",
+        destBucket.getKey(DEST_KEY).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+
+    // REPLACE directive: destination takes the Content-Type from the request.
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("REPLACE");
+    when(headers.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("application/json");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals("application/json",
+        destBucket.getKey(DEST_KEY).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+  }
+
+  @Test
   public void testCopyObjectMessageDigestResetDuringException() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
@@ -372,20 +427,21 @@ class TestObjectPut {
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
 
     MessageDigest messageDigest = mock(MessageDigest.class);
-    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class);
-        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
+    try (MockedStatic<EndpointBase> endpoint =
+        mockStatic(EndpointBase.class, CALLS_REAL_METHODS)) {
       // Add the mocked methods only during the copy request
       endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
-      endpoint.when(() -> EndpointBase.parseSourceHeader(any())).thenCallRealMethod();
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
-              anyLong(), any(byte[].class)))
-          .thenThrow(IOException.class);
+      doThrow(new RuntimeException("digest interrupted"))
+          .when(messageDigest).update(any(byte[].class), anyInt(), anyInt());
 
       // Add copy header, and then call put
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
           BUCKET_NAME  + "/" + urlEncode(KEY_NAME));
 
-      assertThrows(IOException.class, () -> putObject(DEST_BUCKET_NAME, DEST_KEY).close());
+      RuntimeException ex = assertThrows(RuntimeException.class,
+          () -> putObject(DEST_BUCKET_NAME, DEST_KEY).close());
+      assertEquals("digest interrupted", ex.getMessage());
+      assertThrows(IOException.class, () -> destBucket.getKey(DEST_KEY));
       // Verify that the message digest is reset so that the instance can be reused for the
       // next request in the same thread
       verify(messageDigest, times(1)).reset();
@@ -628,6 +684,14 @@ class TestObjectPut {
   }
 
   @Test
+  public void testPutObjectRejectsIncompleteBody() {
+    assertErrorResponse(INVALID_REQUEST,
+        () -> put(objectEndpoint, BUCKET_NAME, KEY_NAME, 0,
+            null, CONTENT.length() + 1, CONTENT));
+    assertThrows(IOException.class, () -> bucket.getKey(KEY_NAME));
+  }
+
+  @Test
   public void testPutObjectWithContentMD5() throws Exception {
     // GIVEN
     byte[] contentBytes = CONTENT.getBytes(StandardCharsets.UTF_8);
@@ -789,5 +853,11 @@ class TestObjectPut {
   /** Put object at {@link #BUCKET_NAME}/{@link #KEY_NAME} with the specified content. */
   private Response putObject(String content) throws IOException, OS3Exception {
     return put(objectEndpoint, BUCKET_NAME, KEY_NAME, content);
+  }
+
+  private void setPutRequestLength(long length) {
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(length));
   }
 }

@@ -64,7 +64,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class TestKeyInputStream extends TestInputStreamBase {
+class TestKeyInputStream extends InputStreamTests {
 
   /**
    * This method does random seeks and reads and validates the reads are

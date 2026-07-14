@@ -22,6 +22,9 @@ description: Add real PVC based persistence
   trigger:
     kind: StatefulSet
   value:
+      persistentVolumeClaimRetentionPolicy:
+        whenDeleted: Delete
+        whenScaled: Retain
       volumeClaimTemplates:
       - metadata:
           name: data

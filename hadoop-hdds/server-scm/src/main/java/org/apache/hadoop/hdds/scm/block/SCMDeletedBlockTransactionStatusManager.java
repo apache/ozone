@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_NAME;
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.SENT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.TO_BE_SENT;
@@ -427,10 +427,8 @@ public class SCMDeletedBlockTransactionStatusManager {
     try {
       initDataDistributionData();
     } catch (IOException e) {
-      LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current " +
-              "totalTxCount {}, totalBlockCount {}, totalBlocksSize {} and totalReplicatedBlocksSize {}. " +
-              "There is a high chance that the real data and current data has a gap.",
-          totalTxCount.get(), totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+      LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current {}." +
+          " There is a high chance that the real data and current data has a gap.", summaryToString(getSummary()));
     }
   }
 
@@ -467,10 +465,29 @@ public class SCMDeletedBlockTransactionStatusManager {
           incrDeletedBlocksSummary(tx);
         }
       }
-      deletedBlockLogStateManager.addTransactionsToDB(txList, getSummary());
+      try {
+        deletedBlockLogStateManager.addTransactionsToDB(txList, getSummary());
+      } catch (IOException e) {
+        // Revert the in-memory changes if the DB update fails
+        for (DeletedBlocksTransaction tx: txList) {
+          if (tx.hasTotalBlockSize()) {
+            rollbackDeletedBlocksSummary(tx);
+            LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
+          }
+        }
+        throw e;
+      }
       return;
     }
     deletedBlockLogStateManager.addTransactionsToDB(txList);
+  }
+
+  private void rollbackDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
+    totalTxCount.addAndGet(1);
+    totalBlockCount.addAndGet(txBlockInfo.getTotalBlockCount());
+    totalBlocksSize.addAndGet(txBlockInfo.getTotalBlockSize());
+    totalReplicatedBlocksSize.addAndGet(txBlockInfo.getTotalReplicatedBlockSize());
+    LOG.debug("Increase summary for {} to {}", txBlockInfo, summaryToString(getSummary()));
   }
 
   private void incrDeletedBlocksSummary(DeletedBlocksTransaction tx) {
@@ -478,6 +495,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     totalBlockCount.addAndGet(tx.getLocalIDCount());
     totalBlocksSize.addAndGet(tx.getTotalBlockSize());
     totalReplicatedBlocksSize.addAndGet(tx.getTotalBlockReplicatedSize());
+    LOG.debug("Increase summary for {} to {}", transactionToString(tx), summaryToString(getSummary()));
   }
 
   @VisibleForTesting
@@ -487,13 +505,25 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
+      List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
       for (Long txID: txIDs) {
         TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
         if (txBlockInfo != null) {
           descDeletedBlocksSummary(txBlockInfo);
+          removedTxBlockInfos.add(txBlockInfo);
         }
       }
-      deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
+      try {
+        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
+      } catch (IOException e) {
+        // Revert the in-memory changes if the DB update fails
+        for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
+          txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
+          rollbackDeletedBlocksSummary(txBlockInfo);
+          LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
+        }
+        throw e;
+      }
       return;
     }
 
@@ -590,6 +620,15 @@ public class SCMDeletedBlockTransactionStatusManager {
     totalBlockCount.addAndGet(-txBlockInfo.getTotalBlockCount());
     totalBlocksSize.addAndGet(-txBlockInfo.getTotalBlockSize());
     totalReplicatedBlocksSize.addAndGet(-txBlockInfo.getTotalReplicatedBlockSize());
+    LOG.debug("Decrease summary for {} to {}", txBlockInfo, summaryToString(getSummary()));
+  }
+
+  private void rollbackDeletedBlocksSummary(DeletedBlocksTransaction tx) {
+    totalTxCount.addAndGet(-1);
+    totalBlockCount.addAndGet(-tx.getLocalIDCount());
+    totalBlocksSize.addAndGet(-tx.getTotalBlockSize());
+    totalReplicatedBlocksSize.addAndGet(-tx.getTotalBlockReplicatedSize());
+    LOG.debug("Decrease summary for {} to {}", transactionToString(tx), summaryToString(getSummary()));
   }
 
   @VisibleForTesting
@@ -674,43 +713,68 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   private void initDataDistributionData() throws IOException {
-    DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
-    if (summary != null) {
-      totalTxCount.set(summary.getTotalTransactionCount());
-      totalBlockCount.set(summary.getTotalBlockCount());
-      totalBlocksSize.set(summary.getTotalBlockSize());
-      totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-      LOG.info("Storage space distribution is initialized with totalTxCount {}, totalBlockCount {}, " +
-              "totalBlocksSize {} and totalReplicatedBlocksSize {}", totalTxCount.get(),
-          totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+    DeletedBlocksTransactionSummary newSummary = loadDeletedBlocksSummary();
+    if (newSummary != null) {
+      DeletedBlocksTransactionSummary currentSummary = getSummary();
+      totalTxCount.set(newSummary.getTotalTransactionCount());
+      totalBlockCount.set(newSummary.getTotalBlockCount());
+      totalBlocksSize.set(newSummary.getTotalBlockSize());
+      totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
+      if (!isSummaryEqual(currentSummary, newSummary)) {
+        LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+      }
     }
+    LOG.info("Storage space distribution is initialized with {}", summaryToString(getSummary()));
   }
 
   private DeletedBlocksTransactionSummary loadDeletedBlocksSummary() throws IOException {
     String propertyName =  DeletedBlocksTransactionSummary.class.getSimpleName();
     try {
-      ByteString byteString = statefulConfigTable.get(SERVICE_NAME);
+      ByteString byteString = statefulConfigTable.get(SERVICE_DEFINITION.getServiceName());
       if (byteString == null) {
         // for a new Ozone cluster, property not found is an expected state.
-        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_NAME);
+        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_DEFINITION.getServiceName());
         return null;
       }
-      return DeletedBlocksTransactionSummary.parseFrom(byteString);
+      return SERVICE_DEFINITION.deserialize(byteString);
     } catch (IOException e) {
-      LOG.error("Failed to get property {} for service {}.", propertyName, SERVICE_NAME, e);
+      LOG.error("Failed to get property {} for service {}.", propertyName, SERVICE_DEFINITION.getServiceName(), e);
       throw new IOException("Failed to get property " + propertyName, e);
     }
+  }
+
+  private String summaryToString(DeletedBlocksTransactionSummary summary) {
+    return String.format("Summary {TotalTransactionCount: %d, TotalBlockCount: %d, " +
+            "TotalBlockSize: %d, TotalBlockReplicatedSize: %d}", summary.getTotalTransactionCount(),
+        summary.getTotalBlockCount(), summary.getTotalBlockSize(), summary.getTotalBlockReplicatedSize());
+  }
+
+  private String transactionToString(DeletedBlocksTransaction tx) {
+    return String.format("Tx {TxId: %d, ContainerId: %d, TotalBlockCount: %d, TotalBlockSize: %d, " +
+            "TotalBlockReplicatedSize: %d}", tx.getTxID(), tx.getContainerID(), tx.getLocalIDCount(),
+        tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize());
+  }
+
+  private boolean isSummaryEqual(DeletedBlocksTransactionSummary summaryA, DeletedBlocksTransactionSummary summaryB) {
+    return summaryA.getTotalTransactionCount() == summaryB.getTotalTransactionCount() &&
+        summaryA.getTotalBlockCount() == summaryB.getTotalBlockCount() &&
+        summaryA.getTotalBlockSize() == summaryB.getTotalBlockSize() &&
+        summaryA.getTotalBlockReplicatedSize() == summaryB.getTotalBlockReplicatedSize();
   }
 
   /**
    * Block size information of a transaction.
    */
   public static class TxBlockInfo {
-    private long totalBlockCount;
-    private long totalBlockSize;
-    private long totalReplicatedBlockSize;
+    private final long txId;
+    private final long containerId;
+    private final long totalBlockCount;
+    private final long totalBlockSize;
+    private final long totalReplicatedBlockSize;
 
-    public TxBlockInfo(long blockCount, long blockSize, long replicatedSize) {
+    public TxBlockInfo(long txId, long containerId, long blockCount, long blockSize, long replicatedSize) {
+      this.txId = txId;
+      this.containerId = containerId;
       this.totalBlockCount = blockCount;
       this.totalBlockSize = blockSize;
       this.totalReplicatedBlockSize = replicatedSize;
@@ -726,6 +790,25 @@ public class SCMDeletedBlockTransactionStatusManager {
 
     public long getTotalReplicatedBlockSize() {
       return totalReplicatedBlockSize;
+    }
+
+    public long getTxId() {
+      return txId;
+    }
+
+    public long getContainerId() {
+      return containerId;
+    }
+
+    @Override
+    public String toString() {
+      return "TxBlockInfo{" +
+          "txId=" + txId +
+          ", containerId=" + containerId +
+          ", totalBlockCount=" + totalBlockCount +
+          ", totalBlockSize=" + totalBlockSize +
+          ", totalReplicatedBlockSize=" + totalReplicatedBlockSize +
+          '}';
     }
   }
 }

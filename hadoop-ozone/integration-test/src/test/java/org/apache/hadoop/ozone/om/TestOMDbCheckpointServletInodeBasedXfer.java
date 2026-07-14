@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -118,10 +119,15 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
@@ -135,6 +141,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -152,29 +160,46 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOMDbCheckpointServletInodeBasedXfer.class);
 
-  @BeforeEach
-  void init() throws Exception {
+  @BeforeAll
+  void initCluster() throws Exception {
     conf = new OzoneConfiguration();
     // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 60_000);
+    client = cluster.newClient();
   }
 
   @AfterEach
-  void shutdown() {
-    IOUtils.closeQuietly(client, cluster);
-    cluster = null;
+  void resumeServices() {
+    OzoneManager realOm = cluster.getOzoneManager();
+    realOm.getKeyManager().getSnapshotSstFilteringService().resume();
+    realOm.getKeyManager().getSnapshotDeletingService().resume();
   }
 
-  private void setupCluster() throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  @AfterAll
+  void shutdown() {
+    IOUtils.closeQuietly(client, cluster);
+  }
+
+  @BeforeEach
+  void init() {
+    setupOmSpy();
+  }
+
+  private void setupOmSpy() {
     OzoneManager normalOm = cluster.getOzoneManager();
     om = spy(normalOm);
+  }
+
+  private void setupCluster() {
+    setupOmSpy();
   }
 
   private void setupMocks() throws Exception {
@@ -264,9 +289,15 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshots);
     long maxFileSizeLimit = 4096;
-    om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxFileSizeLimit);
-    // Get the tarball.
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    long previousMaxFileSizeLimit =
+        om.getConfiguration().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, Long.MAX_VALUE);
+    try {
+      om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxFileSizeLimit);
+      // Get the tarball.
+      omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    } finally {
+      om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, previousMaxFileSizeLimit);
+    }
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);
@@ -354,9 +385,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
             inodesFromOmDataDir, hardLinkMapFromOmData);
         numSnapshots++;
       }
+      populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
+          inodesFromOmDataDir, hardLinkMapFromOmData);
     }
-    populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
-        inodesFromOmDataDir, hardLinkMapFromOmData);
     Path hardlinkFilePath =
         newDbDir.toPath().resolve(OmSnapshotManager.OM_HARDLINK_FILE);
     Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(hardlinkFilePath.toString());
@@ -375,11 +406,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertFalse(inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
-    long actualYamlFiles = Files.list(newDbDir.toPath())
-        .filter(f -> f.getFileName().toString()
-            .endsWith(".yaml")).count();
-    assertEquals(numSnapshots, actualYamlFiles,
-        "Number of generated YAML files should match the number of snapshots.");
+    long actualYamlFiles;
+    try (Stream<Path> files = Files.list(newDbDir.toPath())) {
+      actualYamlFiles = files.filter(f -> f.getFileName().toString().endsWith(".yaml")).count();
+    }
+    if (includeSnapshot) {
+      assertThat(actualYamlFiles)
+          .as("Generated YAML files should include this test's snapshots.")
+          .isGreaterThanOrEqualTo(numSnapshots);
+    } else {
+      assertEquals(0, actualYamlFiles,
+          "Snapshot YAML files should not be included when snapshot data is disabled.");
+    }
 
     InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
         new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());

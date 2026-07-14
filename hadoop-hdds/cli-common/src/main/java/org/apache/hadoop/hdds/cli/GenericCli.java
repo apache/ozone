@@ -56,7 +56,8 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"-conf"})
+  @Option(names = {"--conf"},
+      description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
     config.addResource(new Path(configPath));
   }
@@ -67,12 +68,16 @@ public abstract class GenericCli implements GenericParentCommand {
 
   public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
+    ExtensibleParentCommand.addSubcommands(cmd);
+    cmd.getCommandSpec().preprocessor((args, commandSpec, argSpec, info) -> {
+      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, cmd.getErr()));
+      return false;
+    });
+
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
-
-    ExtensibleParentCommand.addSubcommands(cmd);
   }
 
   public void run(String[] argv) {
