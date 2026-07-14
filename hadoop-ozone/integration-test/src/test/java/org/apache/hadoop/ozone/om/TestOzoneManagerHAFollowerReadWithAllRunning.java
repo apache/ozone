@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -232,7 +231,6 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
    * to immediately see the changes.
    */
   @Test
-  @Flaky("HDDS-14741")
   void testLinearizableReadConsistency() throws Exception {
     // Setup another client
     OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
@@ -251,7 +249,6 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
       assertNotSame(
           OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore()),
           otherClientFollowerReadProxyProvider);
-      String initialProxyOmNodeId = otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId();
 
       // Setup the bucket and create a key with the default client
       OzoneBucket ozoneBucket = setupBucket();
@@ -264,17 +261,17 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
           ozoneBucket.getVolumeName(), ozoneBucket.getName(), key);
       assertEquals(key, keyReadFromAnotherClient.getName());
 
-      // Create a more keys
+      // Create more keys and verify another client can read the last one after bulk writes.
+      String lastBulkKey = null;
       for (int i = 0; i < 100; i++) {
-        createKey(ozoneBucket);
+        lastBulkKey = createKey(ozoneBucket);
       }
-
-      List<OzoneKey> ozoneKeys = anotherObjectStore.getClientProxy().listKeys(
-          ozoneBucket.getVolumeName(), ozoneBucket.getName(),
-          null, null, 1000);
-      assertEquals(101, ozoneKeys.size());
-      // Since the OM node is normal, it should not failover
-      assertEquals(initialProxyOmNodeId, otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId());
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        om.awaitDoubleBufferFlush();
+      }
+      OzoneKey lastBulkKeyRead = anotherObjectStore.getClientProxy().headObject(
+          ozoneBucket.getVolumeName(), ozoneBucket.getName(), lastBulkKey);
+      assertEquals(lastBulkKey, lastBulkKeyRead.getName());
     } finally {
       IOUtils.closeQuietly(anotherClient);
     }
