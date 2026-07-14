@@ -156,6 +156,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.MetadataDirective;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
@@ -167,6 +168,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
+import software.amazon.awssdk.services.s3.model.TaggingDirective;
 import software.amazon.awssdk.services.s3.model.UploadPartCopyRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
@@ -1204,6 +1206,63 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", copyObjectResponse.copyObjectResult().eTag());
+  }
+
+  @Test
+  public void testCopyObjectToSelfWithMetadataReplace() {
+    final String bucketName = getBucketName();
+    final String key = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(key).metadata(Collections.singletonMap("meta1", "v1")),
+        RequestBody.fromString(content));
+
+    // Copying an object onto itself is allowed when the metadata is replaced.
+    CopyObjectRequest copyReq = CopyObjectRequest.builder()
+        .sourceBucket(bucketName)
+        .sourceKey(key)
+        .destinationBucket(bucketName)
+        .destinationKey(key)
+        .metadataDirective(MetadataDirective.REPLACE)
+        .metadata(Collections.singletonMap("meta2", "v2"))
+        .build();
+
+    CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
+    assertNotNull(copyObjectResponse.copyObjectResult().eTag());
+
+    // The object is still readable with its original content after the in-place copy.
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(key));
+    assertEquals(content, objectBytes.asUtf8String());
+  }
+
+  @Test
+  public void testCopyObjectToSelfWithTaggingReplace() {
+    final String bucketName = getBucketName();
+    final String key = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(key).tagging("tag1=value1"),
+        RequestBody.fromString(content));
+
+    // Copying an object onto itself is allowed when the tag set is replaced.
+    CopyObjectRequest copyReq = CopyObjectRequest.builder()
+        .sourceBucket(bucketName)
+        .sourceKey(key)
+        .destinationBucket(bucketName)
+        .destinationKey(key)
+        .taggingDirective(TaggingDirective.REPLACE)
+        .tagging("tag2=value2")
+        .build();
+
+    CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
+    assertNotNull(copyObjectResponse.copyObjectResult().eTag());
+
+    // The tag set was replaced in place.
+    GetObjectTaggingResponse tagging = s3Client.getObjectTagging(b -> b.bucket(bucketName).key(key));
+    assertEquals(1, tagging.tagSet().size());
+    assertEquals("tag2", tagging.tagSet().get(0).key());
+    assertEquals("value2", tagging.tagSet().get(0).value());
   }
 
   @Test

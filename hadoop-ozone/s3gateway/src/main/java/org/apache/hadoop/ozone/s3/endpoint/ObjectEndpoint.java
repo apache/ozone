@@ -1096,13 +1096,19 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
+      // The tagging and metadata directives are read up front because a
+      // self-copy is only legal when at least one attribute is being changed.
+      String tagCopyDirective = getHeaders().getHeaderString(TAG_DIRECTIVE_HEADER);
+      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      boolean replacingTags = CopyDirective.REPLACE.name().equals(tagCopyDirective);
+      boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
+
       // Checking whether we trying to copying to it self.
-      if (sourceBucket.equals(destBucket) && sourceKey
-          .equals(destkey)) {
-        // When copying to same storage type when storage type is provided,
-        // we should not throw exception, as aws cli checks if any of the
-        // options like storage type are provided or not when source and
-        // dest are given same
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
+          && !replacingTags && !replacingMetadata) {
+        // Self-copy without a metadata or tag replacement. AWS still allows it
+        // when a storage class is provided (aws cli passes storage type), so
+        // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
           OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
@@ -1133,7 +1139,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Object tagging in copyObject with tagging directive
       Map<String, String> tags;
-      String tagCopyDirective = getHeaders().getHeaderString(TAG_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(tagCopyDirective) || tagCopyDirective.equals(CopyDirective.COPY.name())) {
         // Tag-set will be copied from the source directly
         tags = sourceKeyDetails.getTags();
@@ -1150,7 +1155,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
-      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = sourceKeyDetails.getMetadata();
