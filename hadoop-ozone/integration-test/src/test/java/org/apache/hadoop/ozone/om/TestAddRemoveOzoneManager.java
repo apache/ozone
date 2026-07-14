@@ -21,7 +21,7 @@ import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZ
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.apache.hadoop.ozone.om.OzoneManagerHATests.createKey;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

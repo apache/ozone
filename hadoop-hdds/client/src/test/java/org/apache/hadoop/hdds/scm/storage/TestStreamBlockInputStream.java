@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
@@ -55,6 +58,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
@@ -604,6 +608,142 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * The server may end the stream (onCompleted) after a request has been sent but before any
+   * data is delivered, e.g. when the datanode shuts down gracefully. poll() then returns null
+   * (stream done, queue drained) while readFromQueue() is waiting for data. The premature end
+   * of the stream must surface as EOF, not as a NullPointerException that bypasses
+   * handleExceptions() retry handling.
+   */
+  @Test
+  public void testStreamCompletedMidReadWithEmptyQueueSurfacesEof() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    BlockID blockID = new BlockID(1L, 14L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    // The server closes the stream without delivering any of the requested data, so the
+    // reader ends up polling a drained queue with the future already completed.
+    doAnswer(inv -> {
+      readerRef.get().onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 4L, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(4);
+      int bytesRead = assertDoesNotThrow(() -> sbis.read(buf),
+          "premature stream completion must not throw NullPointerException");
+      assertEquals(-1, bytesRead, "premature stream completion should surface as EOF");
+      assertEquals(0, buf.position());
+    }
+  }
+
+  /**
+   * A truncated payload fails checksum verification in onNext(). The failure handling must
+   * record the real failure via setFailed() and propagate it, even though the payload is
+   * shorter than the 10-byte hex preview included in the warning log.
+   */
+  @Test
+  public void testChecksumFailureOnShortPayloadSurfacesRealError() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setChecksumVerify(true);
+    BlockID blockID = new BlockID(1L, 15L);
+    byte[] data = {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    // Deliver a payload shorter than 10 bytes whose checksum does not match the data.
+    doAnswer(inv -> {
+      readerRef.get().onNext(buildCorruptResponseProto(data, 0));
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
+          "checksum failure should surface as an IOException");
+      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
+    }
+    verify(requestObserver, times(1)).onError(any(OzoneChecksumException.class));
+  }
+
+  /**
+   * onNext() may fail before XceiverClientGrpc has registered the StreamingReadResponse, so
+   * getResponse() is still null while the failure is reported. The real failure must still be
+   * recorded and surfaced to the reader.
+   */
+  @Test
+  public void testChecksumFailureBeforeResponseRegistered() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setChecksumVerify(true);
+    BlockID blockID = new BlockID(1L, 16L);
+    byte[] data = {1, 2, 3};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      // The corrupt response arrives before setStreamingReadResponse() has been called.
+      reader.onNext(buildCorruptResponseProto(data, 0));
+      reader.setStreamingReadResponse(streamingReadResponse);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
+          "checksum failure should surface as an IOException");
+      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
+    }
+    verify(requestObserver, never()).onError(any());
+  }
+
   private ReadBlockResponseProto buildReadBlockResponse(byte[] data) {
     return ReadBlockResponseProto.newBuilder()
         .setOffset(0)
@@ -625,6 +765,22 @@ public class TestStreamBlockInputStream {
             .setChecksumData(ChecksumData.newBuilder()
                 .setType(ContainerProtos.ChecksumType.NONE)
                 .setBytesPerChecksum(data.length)
+                .build())
+            .build())
+        .build();
+  }
+
+  private ContainerCommandResponseProto buildCorruptResponseProto(byte[] data, long offset) {
+    return ContainerCommandResponseProto.newBuilder()
+        .setCmdType(Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .setReadBlock(ReadBlockResponseProto.newBuilder()
+            .setOffset(offset)
+            .setData(ByteString.copyFrom(data))
+            .setChecksumData(ChecksumData.newBuilder()
+                .setType(ContainerProtos.ChecksumType.CRC32)
+                .setBytesPerChecksum(data.length)
+                .addChecksums(ByteString.copyFrom(new byte[4]))
                 .build())
             .build())
         .build();

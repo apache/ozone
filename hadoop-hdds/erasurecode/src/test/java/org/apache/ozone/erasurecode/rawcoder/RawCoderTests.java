@@ -24,21 +24,21 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.ozone.erasurecode.CoderTests;
 import org.apache.ozone.erasurecode.ECChunk;
-import org.apache.ozone.erasurecode.TestCoderBase;
 import org.junit.jupiter.api.Test;
 
 /**
  * Raw coder test base with utilities.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public abstract class TestRawCoderBase extends TestCoderBase {
+public abstract class RawCoderTests extends CoderTests {
   private final Class<? extends RawErasureCoderFactory> encoderFactoryClass;
   private final Class<? extends RawErasureCoderFactory> decoderFactoryClass;
   private RawErasureEncoder encoder;
   private RawErasureDecoder decoder;
 
-  public TestRawCoderBase(
+  public RawCoderTests(
       Class<? extends RawErasureCoderFactory> encoderFactoryClass,
       Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
     this.encoderFactoryClass = encoderFactoryClass;

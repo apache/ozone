@@ -70,7 +70,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test class to ContainerStateMachine class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class TestContainerStateMachine {
+abstract class ContainerStateMachineTests {
   private ContainerDispatcher dispatcher;
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private ContainerStateMachine stateMachine;
@@ -82,7 +82,7 @@ abstract class TestContainerStateMachine {
   private final boolean isLeader;
   private static final String CONTAINER_DATA = "Test Data";
 
-  TestContainerStateMachine(boolean isLeader) {
+  ContainerStateMachineTests(boolean isLeader) {
     this.isLeader = isLeader;
   }
 

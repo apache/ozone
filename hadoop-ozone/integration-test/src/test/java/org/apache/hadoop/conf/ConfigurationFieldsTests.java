@@ -43,16 +43,16 @@ import org.slf4j.LoggerFactory;
  * Copied from Hadoop until the original one is migrated to JUnit5.
  */
 @SuppressWarnings("VisibilityModifier")
-public abstract class TestConfigurationFieldsBase {
+public abstract class ConfigurationFieldsTests {
 
   private static final Logger LOG = LoggerFactory.getLogger(
-      TestConfigurationFieldsBase.class);
+      ConfigurationFieldsTests.class);
 
   private static final Logger LOG_CONFIG = LoggerFactory.getLogger(
-      "org.apache.hadoop.conf.TestConfigurationFieldsBase.config");
+      "org.apache.hadoop.conf.ConfigurationFieldsTests.config");
 
   private static final Logger LOG_XML = LoggerFactory.getLogger(
-      "org.apache.hadoop.conf.TestConfigurationFieldsBase.xml");
+      "org.apache.hadoop.conf.ConfigurationFieldsTests.xml");
 
   /**
    * Member variable for storing xml filename.

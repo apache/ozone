@@ -92,7 +92,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))
-        .build();
+        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
   protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,

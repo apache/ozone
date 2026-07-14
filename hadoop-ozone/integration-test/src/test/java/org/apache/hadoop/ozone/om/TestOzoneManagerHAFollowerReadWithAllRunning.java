@@ -86,7 +86,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Ozone Manager HA follower read tests where all OMs are running throughout all tests.
  * @see TestOzoneManagerHAFollowerReadWithAllRunning
  */
-public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManagerHAFollowerRead {
+public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHAFollowerReadTests {
 
   @Test
   void testOMFollowerReadProxyProviderInitialization() {

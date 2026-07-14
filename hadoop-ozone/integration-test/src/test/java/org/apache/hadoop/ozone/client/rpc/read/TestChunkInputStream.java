@@ -38,7 +38,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests {@link ChunkInputStream}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestChunkInputStream extends TestInputStreamBase {
+class TestChunkInputStream extends InputStreamTests {
 
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
