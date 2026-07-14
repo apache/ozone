@@ -168,8 +168,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setParentID(pathInfoFSO.getLastKnownParentId())
-          .setSchemaVersion(
-              resolveMultipartSchemaVersion(multipartInfoInitiateRequest))
+          // Source of truth is the value stamped onto the proto in preExecute
+          // (before Ratis). Never re-check MLV here in the replicated apply path.
+          .setSchemaVersion(multipartInfoInitiateRequest.getSchemaVersion())
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()

@@ -429,8 +429,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
-    if (!multipartKeyInfo.hasSchemaVersion()
-        || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
+    if (!multipartKeyInfo.hasSchemaVersion() || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
       multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
           list.put(partKeyInfo.getPartNumber(), partKeyInfo));
     }
@@ -458,8 +457,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
         .setParentID(multipartKeyInfo.getParentID())
-        .setSchemaVersion(validateAndConvertSchemaVersion(
-            multipartKeyInfo.getSchemaVersion()));
+        .setSchemaVersion(validateAndConvertSchemaVersion(multipartKeyInfo.getSchemaVersion()));
   }
 
   /**
@@ -519,8 +517,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   }
 
   private static int validateAndConvertSchemaVersion(int schemaVersion) {
-    if (schemaVersion != LEGACY_SCHEMA_VERSION
-        && schemaVersion != SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+    if (schemaVersion != LEGACY_SCHEMA_VERSION && schemaVersion != SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
       throw new IllegalArgumentException("Unsupported schemaVersion: "
           + schemaVersion + ". Expected one of [0, 1].");
     }
