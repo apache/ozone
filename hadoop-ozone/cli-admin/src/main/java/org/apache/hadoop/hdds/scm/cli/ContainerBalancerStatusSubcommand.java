@@ -56,6 +56,9 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (verboseWithHistory && !isVerbose()) {
+      System.err.println("Warning: -H/--history has no effect without -v/--verbose.");
+    }
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
     ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();

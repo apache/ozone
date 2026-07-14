@@ -1383,7 +1383,7 @@ public class SCMClientProtocolServer implements
 
     return ContainerBalancerStatusInfoResponseProto
         .newBuilder()
-        .setIsRunning(scm.getContainerBalancer().isBalancerRunning())
+        .setIsRunning(balancerStatusInfo.getConfiguration().getShouldRun())
         .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
         .build();
   }
