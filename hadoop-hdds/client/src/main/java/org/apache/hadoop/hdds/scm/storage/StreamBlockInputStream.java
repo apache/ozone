@@ -532,7 +532,46 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          if (checksumData.getChecksumType() == ContainerProtos.ChecksumType.NONE) {
+            // Checksum is set to NONE. No further verification is required.
+          } else if (readBlock.hasChunkInfoList()) {
+            int bytesPerChecksum = checksumData.getBytesPerChecksum();
+            long blockOffset = readBlock.getOffset();
+            long readLength = data.remaining();
+            long currentChunkOffset = 0;
+            int checksumIndex = 0;
+            int dataOffset = 0;
+
+            for (ContainerProtos.ChunkInfo chunk : readBlock.getChunkInfoList().getChunksList()) {
+              long chunkStart = currentChunkOffset;
+              long chunkEnd = chunkStart + chunk.getLen();
+
+              long overlapStart = Math.max(blockOffset, chunkStart);
+              long overlapEnd = Math.min(blockOffset + readLength, chunkEnd);
+
+              if (overlapStart < overlapEnd) {
+                int overlapLen = Math.toIntExact(overlapEnd - overlapStart);
+                ByteBuffer chunkData = data.duplicate();
+                chunkData.position(data.position() + dataOffset);
+                chunkData.limit(data.position() + dataOffset + overlapLen);
+
+                Checksum.verifyChecksum(chunkData, checksumData, checksumIndex);
+
+                dataOffset += overlapLen;
+
+                long offsetInChunk = overlapStart - chunkStart;
+                long endOffsetInChunk = overlapEnd - chunkStart;
+
+                int firstChecksumIndex = Math.toIntExact(offsetInChunk / bytesPerChecksum);
+                int lastChecksumIndex = Math.toIntExact((endOffsetInChunk - 1) / bytesPerChecksum);
+
+                checksumIndex += (lastChecksumIndex - firstChecksumIndex + 1);
+              }
+              currentChunkOffset += chunk.getLen();
+            }
+          } else {
+            Checksum.verifyChecksum(data, checksumData, 0);
+          }
         }
         offerToQueue(readBlock);
       } catch (Exception e) {

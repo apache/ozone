@@ -341,17 +341,16 @@ public final class ContainerCommandResponseBuilders {
       ContainerCommandRequestProto request, ChecksumData checksumData,
       ByteBuffer data, long offset, List<ChunkInfo> chunkInfoList, boolean verifyChecksum) {
 
-    ContainerProtos.ReadBlockResponseProto.Builder builder = ReadBlockResponseProto.newBuilder()
+    ContainerProtos.ReadBlockResponseProto response = ReadBlockResponseProto.newBuilder()
         .setChecksumData(checksumData.getProtoBufMessage())
         .setData(ByteString.copyFrom(data))
-        .setOffset(offset);
+        .setOffset(offset)
+        .setChunkInfoList(ChunkInfoList.newBuilder().addAllChunks(chunkInfoList).build())
+        .build();
 
-    if (verifyChecksum) {
-      builder.setChunkInfoList(ChunkInfoList.newBuilder().addAllChunks(chunkInfoList));
-    }
 
     return getSuccessResponseBuilder(request)
-        .setReadBlock(builder)
+        .setReadBlock(response)
         .build();
   }
 

@@ -301,4 +301,42 @@ public class TestStreamRead {
     print(name, keySizeByte, elapsedNanos, bufferSize, computedMD5);
     return computedMD5;
   }
+
+  @Test
+  void testSmallChunksWithLargeChecksum() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
+    System.out.println("cluster starting ...");
+    try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
+      cluster.waitForClusterToBeReady();
+      System.out.println("cluster ready");
+      
+      OzoneConfiguration conf = cluster.getConf();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setStreamReadBlock(true);
+      final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
+      steamReadConf.setFromObject(clientConfig);
+
+      try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(steamReadConf)) {
+        final TestBucket testBucket = TestBucket.newBuilder(streamReadClient).build();
+        final String keyName = "keySmallChunks";
+
+        // Write a key with multiple small chunks
+        byte[] data = new byte[]{1, 2, 3, 4, 5};
+        try (OutputStream out = testBucket.delegate().createKey(keyName, data.length, RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+          for (byte b : data) {
+            out.write(b);
+            out.flush(); // Forces a chunk to be created
+          }
+        }
+
+        // Read it back using stream read
+        try (InputStream in = testBucket.delegate().readKey(keyName)) {
+          byte[] readData = new byte[data.length];
+          int bytesRead = in.read(readData);
+          assertEquals(data.length, bytesRead);
+          org.junit.jupiter.api.Assertions.assertArrayEquals(data, readData);
+        }
+      }
+    }
+  }
 }
