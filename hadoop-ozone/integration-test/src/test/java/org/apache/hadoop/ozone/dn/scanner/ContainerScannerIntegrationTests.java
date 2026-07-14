@@ -60,7 +60,7 @@ import org.junit.jupiter.api.AfterAll;
 /**
  * This class tests the data scanner functionality.
  */
-public abstract class TestContainerScannerIntegrationAbstract {
+public abstract class ContainerScannerIntegrationTests {
 
   private static MiniOzoneCluster cluster;
   private static OzoneClient ozClient = null;

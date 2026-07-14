@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * Test OM prepare against actual mini cluster.
  */
 @Flaky("HDDS-5990")
-public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
+public class TestOzoneManagerPrepare extends OzoneManagerHATests {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
   private static final String KEY_PREFIX = "key";

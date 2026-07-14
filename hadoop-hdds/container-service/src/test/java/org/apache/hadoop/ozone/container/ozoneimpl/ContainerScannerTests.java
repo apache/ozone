@@ -58,7 +58,7 @@ import org.mockito.verification.VerificationMode;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public abstract class TestContainerScannersAbstract {
+public abstract class ContainerScannerTests {
 
   private static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
 

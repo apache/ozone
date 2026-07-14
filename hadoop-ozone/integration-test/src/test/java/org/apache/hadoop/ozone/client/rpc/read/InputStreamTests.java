@@ -41,7 +41,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class TestInputStreamBase {
+abstract class InputStreamTests {
 
   static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
   static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB

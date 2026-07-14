@@ -22,7 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 /**
  * Base class for Ozone Manager HA tests.
  */
-public abstract class TestOzoneManagerHA extends AbstractOzoneManagerHATest {
+public abstract class OzoneManagerHATests extends AbstractOzoneManagerHATest {
 
   @BeforeAll
   public static void init() throws Exception {
