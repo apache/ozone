@@ -54,7 +54,7 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] rawData = OmKeyInfo.getCodec().toPersistedFormat(keyInfo);
+    byte[] rawData = OmKeyInfo.getKeyTableCodec().toPersistedFormat(keyInfo);
 
     SnapshotDiffValueParser.ParsedRequiredInfo parsed =
         SnapshotDiffValueParser.parseKeyInfoRequiredFields(rawData, true);
@@ -67,7 +67,7 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo metadataChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "two"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] metadataRaw = OmKeyInfo.getCodec().toPersistedFormat(metadataChanged);
+    byte[] metadataRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(metadataChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(metadataRaw)));
 
@@ -76,49 +76,49 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo hsyncChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         hsyncMetadata, createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] hsyncRaw = OmKeyInfo.getCodec().toPersistedFormat(hsyncChanged);
+    byte[] hsyncRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(hsyncChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(hsyncRaw)));
 
     OmKeyInfo tagsChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "two"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] tagsRaw = OmKeyInfo.getCodec().toPersistedFormat(tagsChanged);
+    byte[] tagsRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(tagsChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(tagsRaw)));
 
     OmKeyInfo aclsChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls("user:other:rw"),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] aclsRaw = OmKeyInfo.getCodec().toPersistedFormat(aclsChanged);
+    byte[] aclsRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(aclsChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(aclsRaw)));
 
     OmKeyInfo checksumChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 2),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] checksumRaw = OmKeyInfo.getCodec().toPersistedFormat(checksumChanged);
+    byte[] checksumRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(checksumChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(checksumRaw)));
 
     OmKeyInfo dataSizeChanged = createKeyInfo(100L, 200L, 2048L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    byte[] dataSizeRaw = OmKeyInfo.getCodec().toPersistedFormat(dataSizeChanged);
+    byte[] dataSizeRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(dataSizeChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(dataSizeRaw)));
 
     OmKeyInfo locationCountChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         createKeyLocationGroups(1L, 2L));
-    byte[] locationCountRaw = OmKeyInfo.getCodec().toPersistedFormat(locationCountChanged);
+    byte[] locationCountRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(locationCountChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(locationCountRaw)));
 
     OmKeyInfo latestLocationChanged = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         createKeyLocationGroups(1L, 3L));
-    byte[] latestLocationRaw = OmKeyInfo.getCodec().toPersistedFormat(latestLocationChanged);
+    byte[] latestLocationRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(latestLocationChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(locationCountRaw),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(latestLocationRaw)));
   }
@@ -132,8 +132,8 @@ class TestSnapshotDiffValueParser {
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
 
-    byte[] rawData = OmKeyInfo.getCodec().toPersistedFormat(keyInfo);
-    byte[] rawTimeChanged = OmKeyInfo.getCodec().toPersistedFormat(timeChanged);
+    byte[] rawData = OmKeyInfo.getKeyTableCodec().toPersistedFormat(keyInfo);
+    byte[] rawTimeChanged = OmKeyInfo.getKeyTableCodec().toPersistedFormat(timeChanged);
 
     assertArrayEquals(
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(rawData),
