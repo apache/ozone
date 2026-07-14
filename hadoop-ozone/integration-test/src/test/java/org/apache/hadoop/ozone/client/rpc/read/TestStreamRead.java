@@ -313,6 +313,7 @@ public class TestStreamRead {
       OzoneConfiguration conf = cluster.getConf();
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamReadBlock(true);
+      clientConfig.setStreamBufferFlushDelay(false);
       final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
       steamReadConf.setFromObject(clientConfig);
 
