@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.test.LambdaTestUtils.await;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -106,14 +107,14 @@ public class TestOzoneManagerHASnapshot {
   @Test
   public void testSnapshotDiffWhenOmLeaderRestart()
       throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
 
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+    createFileKey(ozoneBucket, uniqueObjectName("key-"));
     store.createSnapshot(volumeName, bucketName, snapshot1);
 
     for (int i = 0; i < 100; i++) {
-      createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+      createFileKey(ozoneBucket, uniqueObjectName("key-"));
     }
 
     store.createSnapshot(volumeName, bucketName, snapshot2);
@@ -161,9 +162,9 @@ public class TestOzoneManagerHASnapshot {
 
   @Test
   public void testSnapshotIdConsistency() throws Exception {
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+    createFileKey(ozoneBucket, uniqueObjectName("key-"));
 
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshotName = uniqueObjectName("snap-");
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
@@ -247,8 +248,8 @@ public class TestOzoneManagerHASnapshot {
       for (int j = 0; j < 10; j++) {
         OzoneBucket bucket = ozoneBuckets.get(j);
         // Create a new key to generate state change.
-        createFileKey(bucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
-        String snapshotName = "snapshot-" + RandomStringUtils.secure().nextNumeric(10);
+        createFileKey(bucket, uniqueObjectName("key-"));
+        String snapshotName = uniqueObjectName("snapshot-");
         store.createSnapshot(volumeNames.get(j), bucketNames.get(j), snapshotName);
         snapshotNamesList.get(j).add(snapshotName);
       }
@@ -317,8 +318,8 @@ public class TestOzoneManagerHASnapshot {
 
     // Create numSnapshots snapshots, each capturing distinct state.
     for (int i = 0; i < numSnapshots; i++) {
-      createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
-      String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+      createFileKey(ozoneBucket, uniqueObjectName("key-"));
+      String snapshotName = uniqueObjectName("snap-");
       createSnapshot(volumeName, bucketName, snapshotName);
       snapshotNames.add(snapshotName);
       tableKeys.add(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
@@ -401,7 +402,7 @@ public class TestOzoneManagerHASnapshot {
     int numKeys = 5;
     List<String> keys = new ArrayList<>();
     for (int i = 0; i < numKeys; i++) {
-      String keyName = "key-" + RandomStringUtils.secure().nextNumeric(10);
+      String keyName = uniqueObjectName("key-");
       createFileKey(ozoneBucket, keyName);
       keys.add(keyName);
     }
@@ -416,7 +417,7 @@ public class TestOzoneManagerHASnapshot {
       ozoneBucket.deleteKey(keys.get(i));
     }
 
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshotName = uniqueObjectName("snap-");
     createSnapshot(volumeName, bucketName, snapshotName);
 
     // Wait for double buffer flush on follower to ensure that

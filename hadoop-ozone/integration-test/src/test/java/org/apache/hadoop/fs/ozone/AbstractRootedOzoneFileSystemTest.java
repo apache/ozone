@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIS
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.security.UserGroupInformation.createUserForTesting;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -415,11 +416,10 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    * OFS: Helper function for tests. Return a volume name that doesn't exist.
    */
   protected String getRandomNonExistVolumeName() throws IOException {
-    final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;
     while (name == null && retriesLeft-- > 0) {
-      name = "volume-" + RandomStringUtils.secure().nextNumeric(numDigit);
+      name = uniqueObjectName("volume-");
       // Check volume existence.
       Iterator<? extends OzoneVolume> iter =
           objectStore.listVolumesByUser(null, name, null);
@@ -447,7 +447,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
             "tuned for FS Path yet");
 
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketNameLocal = uniqueObjectName("bucket-");
     Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -488,7 +488,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testMkdirNonExistentVolumeBucket() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketNameLocal = uniqueObjectName("bucket-");
     Path newVolBucket = new Path(
         "/" + volumeNameLocal + "/" + bucketNameLocal);
     fs.mkdirs(newVolBucket);
@@ -654,7 +654,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   private Path createRandomVolumeBucketWithDirs() throws IOException {
     String volume1 = getRandomNonExistVolumeName();
-    String bucket1 = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucket1 = uniqueObjectName("bucket-");
     Path bucketPath1 = new Path(OZONE_URI_DELIMITER + volume1 +
         OZONE_URI_DELIMITER + bucket1);
 
@@ -693,7 +693,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     objectStore.createVolume(volName);
     OzoneVolume ozoneVolume = objectStore.getVolume(volName);
 
-    String buckName = "bucket-" + RandomStringUtils.secure().nextNumeric(5);
+    String buckName = uniqueObjectName("bucket-");
     UserGroupInformation currUgi = UserGroupInformation.getCurrentUser();
     String bucketOwner = currUgi.getUserName() + RandomStringUtils.secure().nextNumeric(5);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -1813,7 +1813,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
+    String bucketNameLocal = uniqueObjectName("bucket");
     Path volume = new Path("/" + volumeNameLocal);
     fs.mkdirs(volume);
     assertThrows(OMException.class,
@@ -2157,7 +2157,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   private List<String> createFiles(Path srcBucketPath, int fileCount, short factor) throws IOException {
     List<String> createdFiles = new ArrayList<>();
     for (int i = 1; i <= fileCount; i++) {
-      String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+      String keyName = uniqueObjectName("key");
       Path file = new Path(srcBucketPath, keyName);
       try (FSDataOutputStream fsDataOutputStream = fs.create(file, factor)) {
         fsDataOutputStream.writeBytes("Hello");

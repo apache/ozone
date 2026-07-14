@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -86,7 +87,6 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -284,8 +284,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testTarballBatching(boolean includeSnapshots) throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshots);
     long maxFileSizeLimit = 4096;
@@ -346,8 +346,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testContentsOfTarballWithSnapshot(boolean includeSnapshot) throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshot);
     DBStore dbStore = om.getMetadataManager().getStore();
@@ -448,8 +448,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testSnapshotDBConsistency() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, true);
     List<OzoneSnapshot> snapshots = new ArrayList<>();
@@ -540,8 +540,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testBootstrapOnFollowerConsistency() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     setupCluster();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
     om.getKeyManager().getSnapshotDeletingService().suspend();
@@ -804,8 +804,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testCheckpointIncludesSnapshotsFromFrozenState() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
 
     setupCluster();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
