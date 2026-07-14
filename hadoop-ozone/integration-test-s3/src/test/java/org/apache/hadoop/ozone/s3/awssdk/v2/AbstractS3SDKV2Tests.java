@@ -2791,14 +2791,21 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     @Test
     public void testListBuckets() throws Exception {
-      final String bucketName = getBucketName();
-      final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
-
-      s3Client.createBucket(b -> b.bucket(bucketName));
+      List<String> bucketNames = new ArrayList<>();
+      for (int i = 0; i <= 5; i++) {
+        String bucketName = getBucketName(String.valueOf(i));
+        s3Client.createBucket(b -> b.bucket(bucketName));
+        bucketNames.add(bucketName);
+      }
 
       ListBucketsResponse syncResponse = s3Client.listBuckets();
-      assertEquals(1, syncResponse.buckets().size());
-      assertEquals(bucketName, syncResponse.buckets().get(0).name());
+      List<String> listBucketNames = syncResponse.buckets().stream()
+          .map(Bucket::name)
+          .collect(Collectors.toList());
+
+      assertThat(listBucketNames).containsAll(bucketNames);
+
+      String expectedOwner = UserGroupInformation.getCurrentUser().getShortUserName();
       assertEquals(expectedOwner, syncResponse.owner().displayName());
       assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
     }
