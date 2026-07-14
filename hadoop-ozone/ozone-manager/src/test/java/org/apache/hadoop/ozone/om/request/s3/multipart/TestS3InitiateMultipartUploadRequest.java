@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
  * Tests S3 Initiate Multipart Upload request.
  */
 public class TestS3InitiateMultipartUploadRequest
-    extends TestS3MultipartRequest {
+    extends S3MultipartRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

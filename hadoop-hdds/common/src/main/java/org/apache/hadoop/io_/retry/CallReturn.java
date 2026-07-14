@@ -30,12 +30,9 @@ class CallReturn {
     EXCEPTION,
     /** Call should be retried according to the {@link RetryPolicy}. */
     RETRY,
-    /** Call should wait and then retry according to the {@link RetryPolicy}. */
-    WAIT_RETRY,
   }
 
   static final CallReturn RETRY = new CallReturn(State.RETRY);
-  static final CallReturn WAIT_RETRY = new CallReturn(State.WAIT_RETRY);
 
   private final Object returnValue;
   private final Throwable thrown;

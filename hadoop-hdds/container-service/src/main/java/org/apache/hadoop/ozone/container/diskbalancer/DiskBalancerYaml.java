@@ -76,10 +76,9 @@ public final class DiskBalancerYaml {
         throw new IOException("Unable to parse yaml file.", e);
       }
 
-      // getContainerStates() may be null if the key is absent; isNotBlank(null) is false.
-      String cs = diskBalancerInfoYaml.getContainerStates();
-      String containerStates = StringUtils.isNotBlank(cs)
-          ? cs.trim() : DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES;
+      validateRequiredFields(diskBalancerInfoYaml);
+      DiskBalancerVersion version = getValidatedVersion(diskBalancerInfoYaml);
+      String containerStates = getValidatedContainerStates(diskBalancerInfoYaml);
       diskBalancerInfo = new DiskBalancerInfo(
           diskBalancerInfoYaml.operationalState,
           diskBalancerInfoYaml.getThreshold(),
@@ -87,11 +86,51 @@ public final class DiskBalancerYaml {
           diskBalancerInfoYaml.getParallelThread(),
           diskBalancerInfoYaml.isStopAfterDiskEven(),
           containerStates,
-          DiskBalancerVersion.getDiskBalancerVersion(
-              diskBalancerInfoYaml.version));
+          version);
+      validatePersistedConfiguration(diskBalancerInfo);
     }
 
     return diskBalancerInfo;
+  }
+
+  private static void validateRequiredFields(
+      DiskBalancerInfoYaml diskBalancerInfoYaml) throws IOException {
+    if (diskBalancerInfoYaml.getOperationalState() == null) {
+      throw new IOException("DiskBalancer operationalState is missing from persisted info.");
+    }
+    if (diskBalancerInfoYaml.getVersion() == null) {
+      throw new IOException("DiskBalancer info version is missing from persisted info.");
+    }
+  }
+
+  private static DiskBalancerVersion getValidatedVersion(
+      DiskBalancerInfoYaml diskBalancerInfoYaml) throws IOException {
+    int rawVersion = diskBalancerInfoYaml.getVersion();
+    DiskBalancerVersion version =
+        DiskBalancerVersion.getDiskBalancerVersion(rawVersion);
+    if (version == null) {
+      throw new IOException("Unsupported DiskBalancer info version: " + rawVersion);
+    }
+    return version;
+  }
+
+  private static String getValidatedContainerStates(
+      DiskBalancerInfoYaml diskBalancerInfoYaml) {
+    // getContainerStates() may be null if the key is absent; isNotBlank(null) is false.
+    String containerStates = diskBalancerInfoYaml.getContainerStates();
+    return StringUtils.isNotBlank(containerStates)
+        ? containerStates.trim() : DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES;
+  }
+
+  private static void validatePersistedConfiguration(
+      DiskBalancerInfo diskBalancerInfo) throws IOException {
+    try {
+      diskBalancerInfo.toConfiguration();
+    } catch (IllegalArgumentException ex) {
+      throw new IOException(
+          "Invalid DiskBalancer configuration in persisted info: "
+              + ex.getMessage(), ex);
+    }
   }
 
   /**
@@ -105,7 +144,7 @@ public final class DiskBalancerYaml {
     private boolean stopAfterDiskEven;
     private String containerStates;
 
-    private int version;
+    private Integer version;
 
     public DiskBalancerInfoYaml() {
       // Needed for snake-yaml introspection.
@@ -163,11 +202,11 @@ public final class DiskBalancerYaml {
       this.stopAfterDiskEven = stopAfterDiskEven;
     }
 
-    public void setVersion(int version) {
+    public void setVersion(Integer version) {
       this.version = version;
     }
 
-    public int getVersion() {
+    public Integer getVersion() {
       return this.version;
     }
 

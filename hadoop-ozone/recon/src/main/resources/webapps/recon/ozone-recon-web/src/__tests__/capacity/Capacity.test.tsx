@@ -17,10 +17,12 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { rest } from 'msw';
 
 import Capacity from '@/v2/pages/capacity/capacity';
 import { capacityServer } from '@tests/mocks/capacityMocks/capacityServer';
+import * as mockResponses from '@tests/mocks/capacityMocks/capacityResponseMocks';
 
 vi.mock('@/components/autoReloadPanel/autoReloadPanel', () => ({
   default: () => <div data-testid="auto-reload-panel" />,
@@ -91,5 +93,218 @@ describe('Capacity Page', () => {
       expect(datanodeCard).toHaveTextContent(/USED SPACE\s*5\s*KB/i)
     );
     expect(datanodeCard).toHaveTextContent(/FREE SPACE\s*3\s*KB/i);
+  });
+
+  test('clamps pendingBlockSize to 0 when selected datanode reports -1 (offline/unreachable)', async () => {
+    capacityServer.use(
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        if (component === 'dn') {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              ...mockResponses.DnPendingDeletion,
+              pendingDeletionPerDataNode: [
+                { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
+                { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: 2048 }
+              ]
+            })
+          );
+        }
+        const map: Record<string, object> = {
+          scm: mockResponses.ScmPendingDeletion,
+          om: mockResponses.OmPendingDeletion
+        };
+        const body = component ? map[component] : undefined;
+        return body
+          ? res(ctx.status(200), ctx.json(body))
+          : res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+      })
+    );
+
+    render(<Capacity />);
+
+    const downloadLink = await screen.findByText('Download Insights');
+    const datanodeCard = downloadLink.closest('.ant-card');
+    expect(datanodeCard).not.toBeNull();
+    if (!datanodeCard) {
+      return;
+    }
+    // dn-1 is selected by default; its pendingBlockSize is -1 (offline sentinel).
+    // PENDING DELETION should show 0 B, not a negative value.
+    await waitFor(() =>
+      expect(datanodeCard).toHaveTextContent(/PENDING DELETION\s*0\s*B/i)
+    );
+    // USED SPACE = used (4096) + clamped pendingBlockSize (0) = 4 KB
+    expect(datanodeCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
+  });
+
+  test('shows scm-only error state when SCM pending deletion returns sentinel failure values', async () => {
+    capacityServer.use(
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        switch (component) {
+        case 'scm':
+          return res(
+            ctx.status(200),
+            ctx.json({
+              totalBlocksize: -1,
+              totalReplicatedBlockSize: -1,
+              totalBlocksCount: -1
+            })
+          );
+        case 'om':
+          return res(
+            ctx.status(200),
+            ctx.json(mockResponses.OmPendingDeletion)
+          );
+        case 'dn':
+          return res(
+            ctx.status(200),
+            ctx.json(mockResponses.DnPendingDeletion)
+          );
+        default:
+          return res(
+            ctx.status(400),
+            ctx.json({ message: 'Unsupported pending deletion component.' })
+          );
+        }
+      })
+    );
+
+    render(<Capacity />);
+
+    const pendingDeletionTitle = await screen.findByText('Pending Deletion');
+    const pendingDeletionCard = pendingDeletionTitle.closest('.ant-card');
+    expect(pendingDeletionCard).not.toBeNull();
+    if (!pendingDeletionCard) {
+      return;
+    }
+
+    await waitFor(() =>
+      expect(pendingDeletionCard).toHaveTextContent(/OZONE MANAGER\s*2\s*KB/i)
+    );
+    expect(pendingDeletionCard).toHaveTextContent(/DATANODES\s*3\s*KB/i);
+    expect(pendingDeletionCard).toHaveTextContent(/STORAGE CONTAINER MANAGER\s*N\/A/i);
+    expect(await screen.findByTestId('pending-deletion-scm-error')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByTestId('echart')).toHaveLength(4));
+  });
+
+  test('node selector dropdown only lists datanodes from pending deletion API when cluster has more than 15 DNs', async () => {
+    const totalDatanodes = 17;
+    const pendingDeletionLimit = 15;
+
+    const allDataNodeUsage = Array.from({ length: totalDatanodes }, (_, index) => {
+      const datanodeNumber = index + 1;
+      return {
+        datanodeUuid: `uuid-${datanodeNumber}`,
+        hostName: `dn-${datanodeNumber}`,
+        capacity: 8192,
+        used: 2048,
+        remaining: 2048,
+        committed: 1024,
+        minimumFreeSpace: 256,
+        reserved: 128
+      };
+    });
+
+    const pendingDeletionPerDataNode = Array.from({ length: pendingDeletionLimit }, (_, index) => {
+      const datanodeNumber = index + 1;
+      return {
+        hostName: `dn-${datanodeNumber}`,
+        datanodeUuid: `uuid-${datanodeNumber}`,
+        pendingBlockSize: 1024 * datanodeNumber
+      };
+    });
+    let pendingDeletionLimitParam: string | null = null;
+
+    capacityServer.use(
+      rest.get('api/v1/storageDistribution', (req, res, ctx) => {
+        return res(
+          ctx.status(200),
+          ctx.json({
+            ...mockResponses.StorageDistribution,
+            dataNodeUsage: allDataNodeUsage
+          })
+        );
+      }),
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        switch (component) {
+        case 'scm':
+          return res(
+            ctx.status(200),
+            ctx.json(mockResponses.ScmPendingDeletion)
+          );
+        case 'om':
+          return res(
+            ctx.status(200),
+            ctx.json(mockResponses.OmPendingDeletion)
+          );
+        case 'dn':
+          pendingDeletionLimitParam = req.url.searchParams.get('limit');
+          return res(
+            ctx.status(200),
+            ctx.json({
+              status: 'FINISHED',
+              totalPendingDeletionSize: pendingDeletionPerDataNode.reduce(
+                (total, datanode) => total + datanode.pendingBlockSize,
+                0
+              ),
+              pendingDeletionPerDataNode,
+              totalNodesQueried: totalDatanodes,
+              totalNodeQueriesFailed: 0
+            })
+          );
+        default:
+          return res(
+            ctx.status(400),
+            ctx.json({ message: 'Unsupported pending deletion component.' })
+          );
+        }
+      })
+    );
+
+    render(<Capacity />);
+
+    await waitFor(() => expect(pendingDeletionLimitParam).toBe('15'));
+
+    const downloadLink = await screen.findByText('Download Insights');
+    const datanodeCard = downloadLink.closest('.ant-card');
+    expect(datanodeCard).not.toBeNull();
+    if (!datanodeCard) {
+      return;
+    }
+
+    await waitFor(() =>
+      expect(datanodeCard).toHaveTextContent(/PENDING DELETION\s*1\s*KB/i)
+    );
+    expect(datanodeCard).toHaveTextContent(/OZONE USED\s*2\s*KB/i);
+    expect(datanodeCard).toHaveTextContent(/USED SPACE\s*3\s*KB/i);
+
+    const nodeSelector = within(datanodeCard as HTMLElement).getByRole('combobox');
+    fireEvent.mouseDown(nodeSelector);
+
+    await waitFor(() => {
+      expect(document.querySelector('.ant-select-dropdown')).toBeInTheDocument();
+    });
+
+    const visibleDropdownHostNames = Array.from(
+      document.querySelectorAll('.ant-select-item-option-content span:first-child')
+    ).map(option => option.textContent);
+    expect(visibleDropdownHostNames.length).toBeGreaterThan(0);
+    expect(visibleDropdownHostNames.length).toBeLessThan(totalDatanodes);
+    expect(visibleDropdownHostNames).toContain('dn-1');
+    expect(visibleDropdownHostNames).not.toContain('dn-16');
+    expect(visibleDropdownHostNames).not.toContain('dn-17');
+
+    fireEvent.change(nodeSelector, { target: { value: 'dn-15' } });
+    expect(await screen.findByRole('option', { name: 'dn-15' })).toBeInTheDocument();
+
+    fireEvent.change(nodeSelector, { target: { value: 'dn-16' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: 'dn-16' })).not.toBeInTheDocument()
+    );
+    expect(screen.queryByRole('option', { name: 'dn-17' })).not.toBeInTheDocument();
   });
 });

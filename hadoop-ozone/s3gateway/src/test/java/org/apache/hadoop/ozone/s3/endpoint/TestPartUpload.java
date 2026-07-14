@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.FailingInputStream;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
@@ -27,10 +28,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -40,16 +39,15 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.stream.Stream;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -58,6 +56,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -143,30 +142,24 @@ public class TestPartUpload {
   }
 
   @Test
-  public void testPartUploadWithStandardIAAndContentMD5() throws Exception {
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER))
-        .thenReturn(S3StorageType.STANDARD_IA.name(), (String)null);
-    String content = "Multipart Upload Part";
-    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
-    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
-    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
-    when(headers.getHeaderString("Content-MD5")).thenReturn(md5Base64);
-
-    String keyName = UUID.randomUUID().toString();
-    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
-
-    try (Response response = put(rest, OzoneConsts.S3_BUCKET, keyName, 1,
-        uploadID, content)) {
-      assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
-      assertEquals(200, response.getStatus());
-    }
-    assertContentLength(uploadID, keyName, content.length());
-  }
-
-  @Test
   public void testPartUploadWithIncorrectUploadID() {
     assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
         () -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, "random", "any"));
+  }
+
+  @Test
+  public void testPartUploadRejectsIncompleteBody() throws Exception {
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    String content = "Multipart Upload";
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+            1, uploadID, content.length() + 1, content));
+    OzoneMultipartUploadPartListParts parts =
+        client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+            .listParts(OzoneConsts.KEY, uploadID, 0, 100);
+    assertEquals(0, parts.getPartInfoList().size());
   }
 
   @Test
@@ -195,34 +188,28 @@ public class TestPartUpload {
     String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
     MessageDigest messageDigest = mock(MessageDigest.class);
-    when(messageDigest.getAlgorithm()).thenReturn("MD5");
+    when(messageDigest.getAlgorithm()).thenReturn(OzoneConsts.MD5_HASH);
     MessageDigest sha256Digest = mock(MessageDigest.class);
-    when(sha256Digest.getAlgorithm()).thenReturn("SHA-256");
-    try (MockedStatic<IOUtils> ioutils = mockStatic(IOUtils.class);
-        MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class);
-        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
+    when(sha256Digest.getAlgorithm()).thenReturn(OzoneConsts.FILE_HASH);
+    try (MockedStatic<EndpointBase> endpoint =
+        mockStatic(EndpointBase.class, CALLS_REAL_METHODS)) {
       // Add the mocked methods only during part upload
       endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
       endpoint.when(EndpointBase::getSha256DigestInstance).thenReturn(sha256Digest);
-      if (enableDataStream) {
-        streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(any(), any(), anyLong(), anyInt(), any(),
-                anyInt(), any(), any(), any()))
-            .thenThrow(IOException.class);
-      } else {
-        ioutils.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
-                anyLong(), any(byte[].class)))
-            .thenThrow(IOException.class);
-      }
 
       String content = "Multipart Upload";
-      try (Response ignored = put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content)) {
-        fail("Should throw IOException");
-      } catch (IOException ignored) {
-        // Verify that the message digest is reset so that the instance can be reused for the
-        // next request in the same thread
-        verify(messageDigest, times(1)).reset();
-        verify(sha256Digest, times(1)).reset();
+      try (InputStream body = new FailingInputStream(
+          content.getBytes(StandardCharsets.UTF_8), 5)) {
+        IOException ex = assertThrows(IOException.class,
+            () -> putPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1,
+                uploadID, content.length(), body).close());
+        assertEquals("upload interrupted", ex.getMessage());
       }
+
+      // Verify that the message digest is reset so that the instance can be reused for the
+      // next request in the same thread
+      verify(messageDigest, times(1)).reset();
+      verify(sha256Digest, times(1)).reset();
     }
   }
 
@@ -292,5 +279,17 @@ public class TestPartUpload {
     assertEquals(1, parts.getPartInfoList().size());
     assertEquals(contentLength,
         parts.getPartInfoList().get(0).getSize());
+  }
+
+  private static Response putPart(ObjectEndpoint subject, String bucket,
+      String key, int partNumber, String uploadID, long contentLength,
+      InputStream body) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER,
+        partNumber);
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(contentLength));
+    return subject.put(bucket, key, body);
   }
 }

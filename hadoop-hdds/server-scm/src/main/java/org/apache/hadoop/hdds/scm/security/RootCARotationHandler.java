@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.security;
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
-import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 /**
@@ -61,7 +60,4 @@ public interface RootCARotationHandler extends SCMHandler {
     return RequestType.CERT_ROTATE;
   }
 
-  static void main(String[] args) {
-    ScmInvokerCodeGenerator.generate(RootCARotationHandler.class, true);
-  }
 }

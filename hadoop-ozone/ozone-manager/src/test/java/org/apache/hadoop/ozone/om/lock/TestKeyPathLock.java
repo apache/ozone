@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
  */
-class TestKeyPathLock extends TestOzoneManagerLock {
+class TestKeyPathLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);

@@ -87,7 +87,7 @@ public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStat
       }
 
       @Override
-      public void reinitialize(Table<String, String> arg0) throws IOException {
+      public void reinitialize(Table arg0) throws IOException {
         invoker.getImpl().reinitialize(arg0);
       }
 
@@ -131,7 +131,7 @@ public class FinalizationStateManagerInvoker extends ScmInvoker<FinalizationStat
       break;
 
     case "reinitialize":
-      final Table<String, String> arg2 = p.length > 0 ? (Table<String, String>) p[0] : null;
+      final Table arg2 = p.length > 0 ? (Table) p[0] : null;
       getImpl().reinitialize(arg2);
       return Message.EMPTY;
 

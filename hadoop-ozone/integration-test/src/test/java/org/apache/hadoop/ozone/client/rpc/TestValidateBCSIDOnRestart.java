@@ -122,7 +122,6 @@ public class TestValidateBCSIDOnRestart {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -141,36 +140,40 @@ public class TestValidateBCSIDOnRestart {
 
   @Test
   public void testValidateBCSIDOnDnRestart() throws Exception {
-    OzoneOutputStream key =
+    long containerID;
+    OmKeyLocationInfo omKeyLocationInfo;
+    HddsDatanodeService dn;
+    KeyValueContainerData keyValueContainerData;
+    try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
-                    ReplicationFactor.ONE), new HashMap<>());
-    // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
-        cluster);
-    ContainerData containerData =
-        TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
-            .getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerData();
-    KeyValueContainerData keyValueContainerData =
-        assertInstanceOf(KeyValueContainerData.class, containerData);
-    key.close();
+                    ReplicationFactor.ONE), new HashMap<>())) {
+      // First write and flush creates a container in the datanode.
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
+      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+          cluster);
+      ContainerData containerData =
+          TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+              .getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(omKeyLocationInfo.getContainerID())
+              .getContainerData();
+      keyValueContainerData =
+          assertInstanceOf(KeyValueContainerData.class, containerData);
+      containerID = omKeyLocationInfo.getContainerID();
+    }
 
-    long containerID = omKeyLocationInfo.getContainerID();
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
-    // delete the container db file
+    // Delete the container DB file.
     FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
 
     HddsDatanodeService dnService = cluster.getHddsDatanodes().get(index);
@@ -192,41 +195,41 @@ public class TestValidateBCSIDOnRestart {
     // applyTransactions, we should see snapshots
     assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
 
-    // make sure the missing containerSet is not empty
+    // Make sure the missing containerSet is not empty.
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
     assertThat(dispatcher.getMissingContainerSet()).isNotEmpty();
     assertThat(dispatcher.getMissingContainerSet()).contains(containerID);
-    // write a new key
-    key = objectStore.getVolume(volumeName).getBucket(bucketName)
+    // Write a new key.
+    try (OzoneOutputStream key2 = objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey("ratis", 1024,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                ReplicationFactor.ONE), new HashMap<>());
-    // First write and flush creates a container in the datanode
-    key.write("ratis1".getBytes(UTF_8));
-    key.flush();
-    groupOutputStream = (KeyOutputStream) key.getOutputStream();
-    locationInfoList = groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    omKeyLocationInfo = locationInfoList.get(0);
-    key.close();
-    containerID = omKeyLocationInfo.getContainerID();
-    dn = TestHelper.getDatanodeService(omKeyLocationInfo,
-        cluster);
-    containerData = dn.getDatanodeStateMachine()
-        .getContainer().getContainerSet()
-        .getContainer(omKeyLocationInfo.getContainerID())
-        .getContainerData();
-    keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
+                ReplicationFactor.ONE), new HashMap<>())) {
+      // First write and flush creates a container in the datanode.
+      key2.write("ratis1".getBytes(UTF_8));
+      key2.flush();
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key2.getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
+      containerID = omKeyLocationInfo.getContainerID();
+      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+          cluster);
+      ContainerData containerData = dn.getDatanodeStateMachine()
+          .getContainer().getContainerSet()
+          .getContainer(omKeyLocationInfo.getContainerID())
+          .getContainerData();
+      keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
+    }
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, conf)) {
 
-      // modify the bcsid for the container in the ROCKS DB thereby inducing
-      // corruption
+      // Modify the BCSID for the container in RocksDB, thereby inducing
+      // corruption.
       db.getStore().getMetadataTable()
           .put(keyValueContainerData.getBcsIdKey(), 0L);
     }
-    // after the restart, there will be a mismatch in BCSID of what is recorded
-    // in the and what is there in RockSDB and hence the container would be
-    // marked unhealthy
+    // After the restart, there will be a mismatch in BCSID between what is
+    // recorded in the container file and what is in RocksDB, so the container
+    // will be marked unhealthy.
     index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy

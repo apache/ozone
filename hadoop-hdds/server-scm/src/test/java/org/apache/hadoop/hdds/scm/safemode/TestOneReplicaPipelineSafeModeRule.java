@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -59,7 +58,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
@@ -104,7 +103,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         eventQueue,
         scmContext,
         serviceManager,
-        new TestClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC));
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
@@ -217,7 +216,7 @@ public class TestOneReplicaPipelineSafeModeRule {
                 java.util.Collections.singletonList(mock(DatanodeDetails.class))));
 
     when(mockedPipelineManager.getPipelines(
-        Mockito.any(ReplicationConfig.class),
+        Mockito.any(),
         Mockito.eq(Pipeline.PipelineState.OPEN)))
         .thenReturn(java.util.Collections.singletonList(mockedPipeline));
 

@@ -75,7 +75,7 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Retrieves all IN_SERVICE datanode addresses with their hostnames from SCM.
+   * Retrieves all IN_SERVICE and HEALTHY datanode addresses with their hostnames from SCM.
    * Used for batch operations with --in-service-datanodes flag.
    *
    * @param scmClient the SCM client

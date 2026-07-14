@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,11 +37,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -461,6 +465,25 @@ public final class TestHelper {
         200, 30000);
   }
 
+  /**
+   * Wait until SCM reports exactly {@code count} replicas for the container and every replica is in {@code state}.
+   * Unlike {@link #waitForContainerStateInSCM}, which checks the container's aggregate state (it flips as soon as the
+   * first replica reaches the state), this requires all replicas to have settled, so a lagging replica cannot trip
+   * later report handling.
+   */
+  public static void waitForReplicaState(ContainerManager containerManager, ContainerID containerID,
+      int count, ContainerReplicaProto.State state) throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerID);
+        return replicas.size() == count
+            && replicas.stream().allMatch(replica -> replica.getState() == state);
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 100, 60000);
+  }
+
   /** Helper to set config even if {@code value} is null, which
    * {@link OzoneConfiguration#set(String, String) does not allow. */
   public static void setConfig(OzoneConfiguration conf, String key, String value) {
@@ -485,5 +508,29 @@ public final class TestHelper {
         return false;
       }
     }, 2000, 20000);
+  }
+
+  /**
+   * Defines the replication configs and required DN counts for different replication types (such as RATIS and EC).
+   */
+  public enum ReplicationInput {
+    RATIS(3, RatisReplicationConfig.getInstance(THREE)),
+    EC(5, new ECReplicationConfig(3, 2));
+
+    private final int numDatanodes;
+    private final ReplicationConfig replicationConfig;
+
+    ReplicationInput(int numDatanodes, ReplicationConfig replicationConfig) {
+      this.numDatanodes = numDatanodes;
+      this.replicationConfig = replicationConfig;
+    }
+
+    int getNumDatanodes() {
+      return numDatanodes;
+    }
+
+    ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
   }
 }

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -71,7 +72,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<String, TransactionInfo> transactionInfoTable;
 
-  private Table<String, Long> sequenceIdTable;
+  private Table<SequenceIdType, Long> sequenceIdTable;
 
   private Table<ContainerID, MoveDataNodePair> moveTable;
 
@@ -214,7 +215,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   }
 
   @Override
-  public Table<String, Long> getSequenceIdTable() {
+  public Table<SequenceIdType, Long> getSequenceIdTable() {
     return sequenceIdTable;
   }
 

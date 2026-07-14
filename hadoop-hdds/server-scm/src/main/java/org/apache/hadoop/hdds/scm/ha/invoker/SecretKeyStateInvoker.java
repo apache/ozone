@@ -74,12 +74,12 @@ public class SecretKeyStateInvoker extends ScmInvoker<SecretKeyState> {
       }
 
       @Override
-      public void reinitialize(List<ManagedSecretKey> arg0) {
+      public void reinitialize(List arg0) {
         invoker.getImpl().reinitialize(arg0);
       }
 
       @Override
-      public void updateKeys(List<ManagedSecretKey> arg0) throws SCMException {
+      public void updateKeys(List arg0) throws SCMException {
         final Object[] args = {arg0};
         invoker.invokeReplicateDirect(ReplicateMethod.updateKeys, args);
       }
@@ -109,12 +109,12 @@ public class SecretKeyStateInvoker extends ScmInvoker<SecretKeyState> {
       break;
 
     case "reinitialize":
-      final List<ManagedSecretKey> arg1 = p.length > 0 ? (List<ManagedSecretKey>) p[0] : null;
+      final List arg1 = p.length > 0 ? (List) p[0] : null;
       getImpl().reinitialize(arg1);
       return Message.EMPTY;
 
     case "updateKeys":
-      final List<ManagedSecretKey> arg2 = p.length > 0 ? (List<ManagedSecretKey>) p[0] : null;
+      final List arg2 = p.length > 0 ? (List) p[0] : null;
       getImpl().updateKeys(arg2);
       return Message.EMPTY;
 
