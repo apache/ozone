@@ -541,7 +541,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         final StreamingReadResponse r = getResponse();
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
-            offset, data.size(), StringUtils.bytes2Hex(data.substring(0, 10).asReadOnlyByteBuffer()),
+            offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer()),
             readBlock.getChecksumData(), e);
         setFailed(e);
         r.getRequestObserver().onError(e);

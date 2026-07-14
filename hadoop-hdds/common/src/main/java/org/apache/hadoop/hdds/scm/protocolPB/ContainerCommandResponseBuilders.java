@@ -27,6 +27,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfoList;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto.Builder;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
@@ -336,16 +338,20 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getReadBlockResponse(
-      ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
+      ContainerCommandRequestProto request, ChecksumData checksumData,
+      ByteBuffer data, long offset, List<ChunkInfo> chunkInfoList, boolean verifyChecksum) {
 
-    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
+    ContainerProtos.ReadBlockResponseProto.Builder builder = ReadBlockResponseProto.newBuilder()
         .setChecksumData(checksumData.getProtoBufMessage())
         .setData(ByteString.copyFrom(data))
-        .setOffset(offset)
-        .build();
+        .setOffset(offset);
+
+    if (verifyChecksum) {
+      builder.setChunkInfoList(ChunkInfoList.newBuilder().addAllChunks(chunkInfoList));
+    }
 
     return getSuccessResponseBuilder(request)
-        .setReadBlock(response)
+        .setReadBlock(builder)
         .build();
   }
 
