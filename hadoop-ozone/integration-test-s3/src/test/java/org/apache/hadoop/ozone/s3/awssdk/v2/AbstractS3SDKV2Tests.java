@@ -214,20 +214,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
-  public void listBuckets() throws Exception {
-    final String bucketName = getBucketName();
-    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
-
-    s3Client.createBucket(b -> b.bucket(bucketName));
-
-    ListBucketsResponse syncResponse = s3Client.listBuckets();
-    assertEquals(1, syncResponse.buckets().size());
-    assertEquals(bucketName, syncResponse.buckets().get(0).name());
-    assertEquals(expectedOwner, syncResponse.owner().displayName());
-    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
-  }
-
-  @Test
   public void testPutObject() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -2798,10 +2784,24 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   /**
-   * Integration tests for paginated ListBuckets (GET / ListAllMyBuckets).
+   * Integration tests for ListBuckets (GET / ListAllMyBuckets).
    */
   @Nested
-  class ListBucketsPaginationTests {
+  class ListBucketsTests {
+
+    @Test
+    public void testListBuckets() throws Exception {
+      final String bucketName = getBucketName();
+      final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
+
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      ListBucketsResponse syncResponse = s3Client.listBuckets();
+      assertEquals(1, syncResponse.buckets().size());
+      assertEquals(bucketName, syncResponse.buckets().get(0).name());
+      assertEquals(expectedOwner, syncResponse.owner().displayName());
+      assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
+    }
 
     /**
      * Verifies {@code maxBuckets=1} returns one bucket per page and a continuation token

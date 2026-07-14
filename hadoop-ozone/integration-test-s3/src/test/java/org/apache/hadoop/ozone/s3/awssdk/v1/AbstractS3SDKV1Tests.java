@@ -264,35 +264,35 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
   }
 
-  @Test
-  public void testListBuckets() throws IOException {
-    List<String> bucketNames = new ArrayList<>();
-    for (int i = 0; i <= 5; i++) {
-      String bucketName = getBucketName(String.valueOf(i));
-      s3Client.createBucket(bucketName);
-      bucketNames.add(bucketName);
-    }
-
-    List<Bucket> bucketList = s3Client.listBuckets();
-    List<String> listBucketNames = bucketList.stream()
-        .map(Bucket::getName).collect(Collectors.toList());
-
-    assertThat(listBucketNames).containsAll(bucketNames);
-
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    String expectOwner = ugi.getShortUserName();
-
-    Owner s3AccountOwner = s3Client.getS3AccountOwner();
-
-    assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
-    assertThat(s3AccountOwner.getId()).isEqualTo(S3Owner.DEFAULT_S3OWNER_ID);
-  }
-
   /**
-   * Integration tests for paginated ListBuckets (GET / ListAllMyBuckets).
+   * Integration tests for ListBuckets (GET / ListAllMyBuckets).
    */
   @Nested
-  class ListBucketsPaginationTests {
+  class ListBucketsTests {
+
+    @Test
+    public void testListBuckets() throws IOException {
+      List<String> bucketNames = new ArrayList<>();
+      for (int i = 0; i <= 5; i++) {
+        String bucketName = getBucketName(String.valueOf(i));
+        s3Client.createBucket(bucketName);
+        bucketNames.add(bucketName);
+      }
+
+      List<Bucket> bucketList = s3Client.listBuckets();
+      List<String> listBucketNames = bucketList.stream()
+          .map(Bucket::getName).collect(Collectors.toList());
+
+      assertThat(listBucketNames).containsAll(bucketNames);
+
+      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      String expectOwner = ugi.getShortUserName();
+
+      Owner s3AccountOwner = s3Client.getS3AccountOwner();
+
+      assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
+      assertThat(s3AccountOwner.getId()).isEqualTo(S3Owner.DEFAULT_S3OWNER_ID);
+    }
 
     /**
      * Verifies {@code maxBuckets=1} returns one bucket per page and a continuation token
