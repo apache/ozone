@@ -536,15 +536,18 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
+        // Record the failure first: the log and observer calls below must not mask it.
+        setFailed(e);
         final ByteString data = readBlock.getData();
         final long offset = readBlock.getOffset();
         final StreamingReadResponse r = getResponse();
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
-            offset, data.size(), StringUtils.bytes2Hex(data.substring(0, 10).asReadOnlyByteBuffer()),
+            offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
             readBlock.getChecksumData(), e);
-        setFailed(e);
-        r.getRequestObserver().onError(e);
+        if (r != null) {
+          r.getRequestObserver().onError(e);
+        }
         releaseResources();
       }
     }
