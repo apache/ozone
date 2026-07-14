@@ -82,9 +82,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
@@ -657,14 +659,27 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     assertNotNull(omMultipartKeyInfo);
 
-    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
-        omMultipartKeyInfo.getPartKeyInfoMap()) {
-      String partKeyName = partKeyInfo.getPartName();
+    // Collect the part names as stored in the DB. For the split parts-table
+    // schema the parts live in the multipart parts table rather than inline
+    // in the multipart info table.
+    List<String> dbPartNames = new ArrayList<>();
+    if (omMultipartKeyInfo.getSchemaVersion()
+        == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+      for (OmMultipartPartInfo partInfo :
+          OMMultipartUploadUtils.scanParts(metadataMgr, uploadID).values()) {
+        dbPartNames.add(partInfo.getPartName());
+      }
+    } else {
+      for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+          omMultipartKeyInfo.getPartKeyInfoMap()) {
+        dbPartNames.add(partKeyInfo.getPartName());
+      }
+    }
 
-      // reconstruct full part name with volume, bucket, partKeyName
-      String fullKeyPartName =
-          metadataMgr.getOzoneKey(volumeName, bucketName, keyName);
-
+    // reconstruct full part name with volume, bucket, partKeyName
+    String fullKeyPartName =
+        metadataMgr.getOzoneKey(volumeName, bucketName, keyName);
+    for (String partKeyName : dbPartNames) {
       // partKeyName format in DB - partKeyName + ClientID
       assertTrue(partKeyName.startsWith(fullKeyPartName),
           "Invalid partKeyName format in DB: " + partKeyName

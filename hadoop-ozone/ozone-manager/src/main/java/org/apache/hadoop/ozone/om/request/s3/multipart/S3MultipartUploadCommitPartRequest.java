@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -223,7 +222,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
       } else {
-        validateSplitPartInfo(omKeyInfo, partNumber);
         multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
         omMetadataManager.getMultipartPartsTable().addCacheEntry(
             new CacheKey<>(multipartPartKey),
@@ -408,14 +406,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       String keyName, OMMetadataManager omMetadataManager, String uploadID) {
     return omMetadataManager.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
-  }
-
-  private void validateSplitPartInfo(OmKeyInfo omKeyInfo, int partNumber)
-      throws OMException {
-    if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
-      throw new OMException("Missing ETag for multipart upload part "
-          + partNumber, OMException.ResultCodes.INVALID_REQUEST);
-    }
   }
 
   @RequestFeatureValidator(

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
@@ -70,9 +69,10 @@ public final class OmMultipartPartInfo {
     if (b.partNumber <= 0) {
       throw new IllegalArgumentException("partNumber is required and > 0");
     }
-    if (StringUtils.isBlank(b.eTag)) {
-      throw new IllegalArgumentException("eTag is required");
-    }
+    // eTag is optional: not all MPU clients supply an ETag at commit time
+    // (e.g. the Ozone native client), matching the legacy inline flow which
+    // never required it. It is stored when present and used for validation
+    // during CompleteMultipartUpload only when the client provides one.
     if (b.keyLocationInfos == null || b.keyLocationInfos.isEmpty()) {
       throw new IllegalArgumentException("keyLocationList is required");
     }
@@ -151,10 +151,8 @@ public final class OmMultipartPartInfo {
     }
 
     public Builder setETag(String eTagValue) {
-      if (StringUtils.isBlank(eTagValue)) {
-        throw new IllegalArgumentException("eTag is required");
-      }
-      this.eTag = eTagValue;
+      // eTag is optional; store null when blank so it is omitted on serialize.
+      this.eTag = StringUtils.isBlank(eTagValue) ? null : eTagValue;
       return this;
     }
 
@@ -187,9 +185,12 @@ public final class OmMultipartPartInfo {
         .setPartNumber(multipartPartInfo.getPartNumber())
         .setDataSize(multipartPartInfo.getDataSize())
         .setModificationTime(multipartPartInfo.getModificationTime())
-        .setETag(multipartPartInfo.getETag())
         .setKeyLocationInfos(getKeyLocationInfosFromProto(multipartPartInfo))
         .setEncInfo(null);
+
+    if (multipartPartInfo.hasETag()) {
+      builder.setETag(multipartPartInfo.getETag());
+    }
 
     if (!multipartPartInfo.hasObjectID()) {
       LOG.warn("MultipartPartInfo missing objectID for part {}",
@@ -239,8 +240,12 @@ public final class OmMultipartPartInfo {
         .setDataSize(dataSize)
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .setETag(Objects.requireNonNull(eTag, "eTag is required"));
+        .setUpdateID(updateID);
+
+    // eTag is optional; only persist it when present.
+    if (StringUtils.isNotBlank(eTag)) {
+      builder.setETag(eTag);
+    }
 
     if (encInfo != null) {
       builder.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
@@ -355,9 +360,7 @@ public final class OmMultipartPartInfo {
     if (!partInfo.hasPartNumber()) {
       throw new IllegalArgumentException("MultipartPartInfo missing partNumber");
     }
-    if (!partInfo.hasETag() || StringUtils.isBlank(partInfo.getETag())) {
-      throw new IllegalArgumentException("MultipartPartInfo missing eTag");
-    }
+    // eTag is optional (see constructor); not validated here.
     if (!partInfo.hasKeyLocationList()) {
       throw new IllegalArgumentException("MultipartPartInfo missing keyLocationList");
     }

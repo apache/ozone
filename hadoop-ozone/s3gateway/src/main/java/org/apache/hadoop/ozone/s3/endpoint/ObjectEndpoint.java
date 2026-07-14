@@ -537,6 +537,23 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  /**
+   * Guarantees that an S3-originated multipart upload part carries an ETag
+   * before it is committed. S3 requires every uploaded part to have an ETag
+   * (see UploadPart and CompleteMultipartUpload), and all S3 gateway
+   * part-write paths stamp the MD5 of the part as its ETag. This pre-commit
+   * check enforces that invariant so no S3 part can be committed without one
+   * (e.g. an UploadPartCopy whose source key has no ETag).
+   */
+  private static void requirePartETag(Map<String, String> metadata)
+      throws IOException {
+    if (metadata == null
+        || StringUtils.isBlank(metadata.get(OzoneConsts.ETAG))) {
+      throw new IOException(
+          "S3 multipart upload part cannot be committed without an ETag");
+    }
+  }
+
   static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
     String eTag = key.getMetadata().get(OzoneConsts.ETAG);
     if (eTag != null) {
@@ -936,6 +953,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             if (raw != null) {
               writeGuard.getMetadata().put(OzoneConsts.ETAG, stripQuotes(raw));
             }
+            writeGuard.addPreCommit(
+                () -> requirePartETag(writeGuard.getMetadata()));
             outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -960,6 +979,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
+          writeGuard.addPreCommit(
+              () -> requirePartETag(writeGuard.getMetadata()));
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
