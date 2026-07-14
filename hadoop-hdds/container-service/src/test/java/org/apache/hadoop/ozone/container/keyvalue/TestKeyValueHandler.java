@@ -119,6 +119,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1205,7 +1206,7 @@ public class TestKeyValueHandler {
     List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2, chunk3);
 
     // Read full block (1024 + 10 + 2048)
-    List<org.apache.ratis.thirdparty.com.google.protobuf.ByteString> checksums = KeyValueHandler.getChecksums(0, 3082, bytesPerChunk, bytesPerChecksum, chunks);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(0, 3082, bytesPerChunk, bytesPerChecksum, chunks);
     assertEquals(4, checksums.size());
     assertEquals("chk1", checksums.get(0).toStringUtf8());
     assertEquals("chk2", checksums.get(1).toStringUtf8());

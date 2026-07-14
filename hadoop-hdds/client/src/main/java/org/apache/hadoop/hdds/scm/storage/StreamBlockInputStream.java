@@ -532,9 +532,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          if (checksumData.getChecksumType() == ContainerProtos.ChecksumType.NONE) {
-            // Checksum is set to NONE. No further verification is required.
-          } else if (readBlock.hasChunkInfoList()) {
+          if (readBlock.hasChunkInfoList()) {
             int bytesPerChecksum = checksumData.getBytesPerChecksum();
             long blockOffset = readBlock.getOffset();
             long readLength = data.remaining();

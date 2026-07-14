@@ -323,7 +323,8 @@ public class TestStreamRead {
 
         // Write a key with multiple small chunks
         byte[] data = new byte[]{1, 2, 3, 4, 5};
-        try (OutputStream out = testBucket.delegate().createKey(keyName, data.length, RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+        try (OutputStream out = testBucket.delegate()
+            .createKey(keyName, data.length, RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
           for (byte b : data) {
             out.write(b);
             out.flush(); // Forces a chunk to be created
