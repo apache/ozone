@@ -570,7 +570,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
               currentChunkOffset += chunk.getLen();
             }
           } else {
-            Checksum.verifyChecksum(data, checksumData, 0);
+            throw new IOException("Checksum data is missing for block " + getBlockID());
           }
         }
         offerToQueue(readBlock);
