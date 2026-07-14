@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.service.CompactDBUtil.getBottommostLevelCompaction;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -34,6 +34,9 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@link CompactDBUtil}.
@@ -49,25 +52,11 @@ class TestCompactDBUtil {
     omMetadataManager = new OmMetadataManagerImpl(conf, null);
   }
 
-  @Test
-  void testCompactWithKSkip() {
+  @ParameterizedTest
+  @EnumSource(ManagedCompactRangeOptions.BottommostLevelCompaction.class)
+  void testCompactionAlgorithms(ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) {
     assertDoesNotThrow(() ->
-        CompactDBUtil.compactTable(omMetadataManager, "keyTable",
-            ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip));
-  }
-
-  @Test
-  void testCompactWithKForce() {
-    assertDoesNotThrow(() ->
-        CompactDBUtil.compactTable(omMetadataManager, "keyTable",
-            ManagedCompactRangeOptions.BottommostLevelCompaction.kForce));
-  }
-
-  @Test
-  void testCompactWithKIfHaveCompactionFilter() {
-    assertDoesNotThrow(() ->
-        CompactDBUtil.compactTable(omMetadataManager, "keyTable",
-            ManagedCompactRangeOptions.BottommostLevelCompaction.kIfHaveCompactionFilter));
+        CompactDBUtil.compactTable(omMetadataManager, "keyTable", bottommostLevelCompaction));
   }
 
   @Test
@@ -79,40 +68,25 @@ class TestCompactDBUtil {
 
   @Test
   void testDefaultConfigValueMapsToKSkip() {
-    int defaultValue = OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
-    assertEquals(0, defaultValue);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(defaultValue));
-  }
-
-  @Test
-  void testConfigValueMapsToCorrectEnum() {
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(0));
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kIfHaveCompactionFilter,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(1));
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(2));
-  }
-
-  @Test
-  void testInvalidConfigValueReturnsNull() {
-    assertNull(ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(99));
-  }
-
-  @Test
-  void testConfigKeyIsReadFromOzoneConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    // Default - not set, should use the default value
-    assertEquals(0, conf.getInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
-
-    // Override to kForce
-    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 2);
-    int compactionType = conf.getInt(
-        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
         OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
-    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce,
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "kForceeee"})
+  void testDefaultConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
+    // unset or invalid values should use the default value
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
+    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip, getBottommostLevelCompaction(conf));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"kForce", " kForce", "kForce ", " kForce "})
+  void testConfigKeyIsReadFromOzoneConfiguration(String compactionType) {
+    // have trailing spaces in the config values to ensure they are trimmed and handled correctly
+    OzoneConfiguration  conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, compactionType);
+    assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce, getBottommostLevelCompaction(conf));
   }
 }
