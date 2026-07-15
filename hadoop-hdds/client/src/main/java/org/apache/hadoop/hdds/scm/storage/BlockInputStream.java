@@ -110,7 +110,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private BlockData blockData;
 
-  private Pipeline failedPipeline;
+  private Pipeline currentPipeline;
 
   private ReentrantLock lock = new ReentrantLock();
 
@@ -217,9 +217,20 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private void refreshBlockInfo(IOException cause) throws IOException {
     lock.lock();
     try {
-      if (failedPipeline != pipelineRef.get()) {
+      refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void refreshBlockInfoForPositionRead(IOException cause, Pipeline pipeline) throws IOException {
+    lock.lock();
+    try {
+      if (currentPipeline == pipeline) {
         refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
-        failedPipeline = pipelineRef.get();
+        if (pipelineRef.get() != currentPipeline) {
+          currentPipeline = pipelineRef.get();
+        }
       }
 
     } finally {
@@ -325,8 +336,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
       chunkIdx = -chunkIdx - 2;
     }
 
+    int totalReadLen = 0;
     while (len > 0) {
       if (chunkIdx >= chunkStreams.size()) {
+        if (totalReadLen == 0) {
+          throw new EOFException(
+              "EOF encountered at pos: " + pos + " for block: " + blockID);
+        }
         return true;
       }
 
@@ -335,6 +351,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
       long offsetInChunk = pos - chunkOffsets[chunkIdx];
       int numBytesToRead = Math.min(len, (int)(current.getLength() - offsetInChunk));
       if (numBytesToRead <= 0) {
+        if (totalReadLen == 0) {
+          throw new EOFException(
+              "EOF encountered at pos: " + pos + " for block: " + blockID);
+        }
         return true;
       }
       int numBytesRead;
@@ -346,11 +366,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
         numBytesRead = current.read(offsetInChunk, buffer);
         innerRetries = 0;
 
-      }  catch (SCMSecurityException ex) {
+      } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e, retryPolicy, ++innerRetries)) {
-          handleReadError(e);
+          handlePositionReadError(e, pipelineRef.get());
           continue;
         } else {
           throw e;
@@ -358,7 +378,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (IOException ex) {
         if (shouldRetryRead(ex, retryPolicy, ++innerRetries)) {
           if (isConnectivityIssue(ex)) {
-            handleReadError(ex);
+            handlePositionReadError(ex, pipelineRef.get());
           } else {
             current.releaseClient();
           }
@@ -380,6 +400,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
       len -= numBytesRead;
       pos += numBytesRead;
+      totalReadLen += numBytesRead;
       chunkIdx++;
     }
     return true;
@@ -626,6 +647,22 @@ public class BlockInputStream extends BlockExtendedInputStream {
         }
       }
       refreshBlockInfo(cause);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void handlePositionReadError(IOException cause, Pipeline pipeline) throws IOException {
+    lock.lock();
+    try {
+      releaseClient();
+      final List<ChunkInputStream> inputStreams = this.chunkStreams;
+      if (inputStreams != null) {
+        for (ChunkInputStream is : inputStreams) {
+          is.releaseClient();
+        }
+      }
+      refreshBlockInfoForPositionRead(cause);
     } finally {
       lock.unlock();
     }
