@@ -62,7 +62,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -1051,7 +1050,7 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
     for (int i = 0; i < 10; i++) {
       DatanodeDetails target = datanodes.get(i % datanodes.size());
-      rs.addTask(new ReplicationTask(toTarget(i, target), noopReplicator));
+      rs.addTask(new ReplicationTask(toTarget(i, target, HDDSVersion.SOFTWARE_VERSION), noopReplicator));
     }
   }
 }

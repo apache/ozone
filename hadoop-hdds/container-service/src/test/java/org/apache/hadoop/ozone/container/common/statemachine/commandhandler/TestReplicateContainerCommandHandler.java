@@ -84,16 +84,16 @@ public class TestReplicateContainerCommandHandler {
       DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
       ReplicateContainerCommand command =
-          ReplicateContainerCommand.toTarget(1, target);
+          ReplicateContainerCommand.toTarget(1, target, HDDSVersion.SOFTWARE_VERSION);
       commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
       String metricsName = ReplicationTask.METRIC_NAME;
       assertEquals(commandHandler.getMetricsName(), metricsName);
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 1);
 
-      commandHandler.handle(ReplicateContainerCommand.toTarget(2, target),
+      commandHandler.handle(ReplicateContainerCommand.toTarget(2, target, HDDSVersion.SOFTWARE_VERSION),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.toTarget(3, target),
+      commandHandler.handle(ReplicateContainerCommand.toTarget(3, target, HDDSVersion.SOFTWARE_VERSION),
           ozoneContainer, stateContext, connectionManager);
       commandHandler.handle(
           ReplicateContainerCommand.toTarget(4, target,
@@ -131,8 +131,7 @@ public class TestReplicateContainerCommandHandler {
     ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
 
     ReplicateContainerCommandHandler handler =
-        new ReplicateContainerCommandHandler(conf, supervisor,
-            downloadReplicator, pushReplicator);
+        new ReplicateContainerCommandHandler(supervisor, pushReplicator);
 
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(

@@ -201,7 +201,7 @@ class TestGrpcReplicationService {
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
     ReplicationTask task = new ReplicationTask(
-        toTarget(CONTAINER_ID, datanode), pushReplicator);
+        toTarget(CONTAINER_ID, datanode, HDDSVersion.SOFTWARE_VERSION), pushReplicator);
 
     // WHEN
     pushReplicator.replicate(task);

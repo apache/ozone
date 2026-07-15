@@ -168,7 +168,7 @@ public class TestReplicationManager {
     DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
     when(defaultNodeInfo.getLastKnownApparentVersion())
         .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(nodeManager.getDatanodeInfo(any(DatanodeDetails.class)))
+    when(nodeManager.getNode(any(DatanodeID.class)))
         .thenReturn(defaultNodeInfo);
 
     clock = new MockClock(Instant.now(), ZoneId.systemDefault());
@@ -1765,7 +1765,7 @@ public class TestReplicationManager {
       DatanodeDetails dn, HDDSVersion version) {
     DatanodeInfo info = mock(DatanodeInfo.class);
     when(info.getLastKnownApparentVersion()).thenReturn(version);
-    when(nodeManager.getDatanodeInfo(dn)).thenReturn(info);
+    when(nodeManager.getNode(dn.getID())).thenReturn(info);
     return info;
   }
 
@@ -1804,7 +1804,7 @@ public class TestReplicationManager {
 
     mockDatanodeWithApparentVersion(source, HDDSVersion.SOFTWARE_VERSION);
     // SCM has no information for the target.
-    when(nodeManager.getDatanodeInfo(target)).thenReturn(null);
+    when(nodeManager.getNode(target.getID())).thenReturn(null);
     when(nodeManager.getLowestApparentVersion(source, target))
         .thenCallRealMethod();
 

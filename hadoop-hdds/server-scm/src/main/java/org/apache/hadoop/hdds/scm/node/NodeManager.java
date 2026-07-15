@@ -203,7 +203,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException {
     ComponentVersion[] versions = new ComponentVersion[nodes.length];
     for (int i = 0; i < nodes.length; i++) {
-      DatanodeInfo info = getDatanodeInfo(nodes[i]);
+      DatanodeInfo info = getNode(nodes[i].getID());
       if (info == null) {
         throw new NodeNotFoundException(nodes[i].getID());
       }

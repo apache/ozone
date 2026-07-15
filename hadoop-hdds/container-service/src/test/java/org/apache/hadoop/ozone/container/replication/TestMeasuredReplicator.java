@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -69,9 +70,9 @@ public class TestMeasuredReplicator {
   @Test
   public void measureFailureSuccessAndBytes() {
     //WHEN
-    measuredReplicator.replicate(new ReplicationTask(toTarget(1, TARGET), replicator));
-    measuredReplicator.replicate(new ReplicationTask(toTarget(2, TARGET), replicator));
-    measuredReplicator.replicate(new ReplicationTask(toTarget(3, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(1, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(2, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(3, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
 
     //THEN
     //even containers should be failed
@@ -89,9 +90,9 @@ public class TestMeasuredReplicator {
   public void testReplicationTime() throws Exception {
     //WHEN
     //will wait at least the 300ms
-    measuredReplicator.replicate(new ReplicationTask(toTarget(101, TARGET), replicator));
-    measuredReplicator.replicate(new ReplicationTask(toTarget(201, TARGET), replicator));
-    measuredReplicator.replicate(new ReplicationTask(toTarget(300, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(101, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(201, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(300, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
 
     //THEN
     //even containers should be failed
@@ -109,7 +110,7 @@ public class TestMeasuredReplicator {
   public void testFailureTimeSuccessExcluded() {
     //WHEN
     //will wait at least the 15ms
-    measuredReplicator.replicate(new ReplicationTask(toTarget(15, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(15, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
 
 
     //THEN
@@ -121,7 +122,7 @@ public class TestMeasuredReplicator {
   public void testSuccessTimeFailureExcluded() {
     //WHEN
     //will wait at least the 10ms
-    measuredReplicator.replicate(new ReplicationTask(toTarget(10, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(10, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator));
 
 
     //THEN
@@ -132,7 +133,7 @@ public class TestMeasuredReplicator {
   @Test
   public void testReplicationQueueTimeMetrics() {
     final Instant queued = Instant.now().minus(1, ChronoUnit.SECONDS);
-    ReplicationTask task = new ReplicationTask(toTarget(100, TARGET), replicator) {
+    ReplicationTask task = new ReplicationTask(toTarget(100, TARGET, HDDSVersion.SOFTWARE_VERSION), replicator) {
       @Override
       public Instant getQueued() {
         return queued;

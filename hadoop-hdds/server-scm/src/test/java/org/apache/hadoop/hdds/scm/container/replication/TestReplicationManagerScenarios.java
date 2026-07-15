@@ -208,7 +208,7 @@ public class TestReplicationManagerScenarios {
     DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
     when(defaultNodeInfo.getLastKnownApparentVersion())
         .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(nodeManager.getDatanodeInfo(any(DatanodeDetails.class)))
+    when(nodeManager.getNode(any(DatanodeID.class)))
         .thenReturn(defaultNodeInfo);
 
     final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();

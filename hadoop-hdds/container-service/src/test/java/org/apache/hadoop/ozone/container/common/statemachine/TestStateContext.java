@@ -48,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -703,10 +704,13 @@ public class TestStateContext {
   @Test
   public void testCommandQueueSummary() throws IOException {
     StateContext ctx = createSubject();
-    ctx.addCommand(ReplicateContainerCommand.toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ReplicateContainerCommand
+        .toTarget(1, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.SOFTWARE_VERSION));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(ReplicateContainerCommand.toTarget(2, MockDatanodeDetails.randomDatanodeDetails()));
-    ctx.addCommand(ReplicateContainerCommand.toTarget(3, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ReplicateContainerCommand
+        .toTarget(2, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.SOFTWARE_VERSION));
+    ctx.addCommand(ReplicateContainerCommand
+        .toTarget(3, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.SOFTWARE_VERSION));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
     ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
@@ -773,7 +777,8 @@ public class TestStateContext {
   }
 
   private static SCMCommand<?> someCommand() {
-    return ReplicateContainerCommand.toTarget(1, MockDatanodeDetails.randomDatanodeDetails());
+    return ReplicateContainerCommand
+        .toTarget(1, MockDatanodeDetails.randomDatanodeDetails(), HDDSVersion.SOFTWARE_VERSION);
   }
 
 }

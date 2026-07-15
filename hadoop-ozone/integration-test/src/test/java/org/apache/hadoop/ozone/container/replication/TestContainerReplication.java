@@ -138,7 +138,7 @@ class TestContainerReplication {
     poisonBytesUsed(source, containerID, containerSize);
 
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
+        ReplicateContainerCommand.toTarget(containerID, target, HDDSVersion.SOFTWARE_VERSION);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
