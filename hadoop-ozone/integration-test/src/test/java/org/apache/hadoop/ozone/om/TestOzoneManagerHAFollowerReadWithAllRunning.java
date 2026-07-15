@@ -437,7 +437,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
   @Test
   public void testAllBucketOperations() throws Exception {
     String volumeName = uniqueObjectName("volume");
-    String bucketName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
