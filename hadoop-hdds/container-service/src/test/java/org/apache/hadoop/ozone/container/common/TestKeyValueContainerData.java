@@ -42,12 +42,11 @@ public class TestKeyValueContainerData {
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private OzoneConfiguration conf;
 
   private void initVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
@@ -92,7 +91,7 @@ public class TestKeyValueContainerData {
     statistics.updateRead(10);
     statistics.incrementBlockCount();
     kvData.updateWriteStats(10, true);
-    kvData.incrPendingDeletionBlocks(1);
+    kvData.incrPendingDeletionBlocks(1, 256);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
     long expectedDataHash =  1234L;

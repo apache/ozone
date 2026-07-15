@@ -115,7 +115,7 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
    * will receive the same Future.
    */
   @Override
-  public Optional<ListenableFuture<V>> schedule(
+  public synchronized Optional<ListenableFuture<V>> schedule(
       Checkable<K, V> target, K context) {
     if (checksInProgress.containsKey(target)) {
       return Optional.empty();

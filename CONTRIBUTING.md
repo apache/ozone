@@ -75,9 +75,12 @@ cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
 OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 
-See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/current/start.html).
+See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/developer-guide/run/docker-compose/).
 
 ## Jira guideline
+
+If you do not have an ASF Jira account yet, please request one from the official ASF self-service page:
+[Request a Jira account](https://selfserve.apache.org/jira-account.html?project=ozone).
 
 When creating a new jira for any kind of new feature, improvement or bug, please follow below guideline: 
 

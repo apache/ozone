@@ -26,14 +26,8 @@ import org.junit.jupiter.api.BeforeAll;
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
 
-public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
+public class TestDataValidateWithSafeByteOperations extends DataValidateTests {
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -42,9 +36,6 @@ public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
     startCluster(conf);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     shutdownCluster();

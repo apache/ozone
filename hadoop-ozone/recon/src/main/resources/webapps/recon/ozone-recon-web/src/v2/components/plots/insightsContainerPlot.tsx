@@ -67,7 +67,7 @@ const ContainerSizeDistribution: React.FC<ContainerSizeDistributionProps> = ({
 
   React.useEffect(() => {
     updatePlotData();
-  }, []);
+  }, [containerCountResponse]);
 
   const { containerCountMap, containerCountValues } = containerPlotData;
 

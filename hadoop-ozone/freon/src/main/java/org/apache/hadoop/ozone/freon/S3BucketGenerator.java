@@ -38,7 +38,7 @@ import picocli.CommandLine.Command;
  */
 @Command(name = "s3bg",
     aliases = "s3-bucket-generator",
-    description = "Create buckets via the s3 interface.\n" +
+    description = "Create buckets via the s3 interface.%n" +
         "Command requires AWS authentication environment " +
         "variables set, AWS_ACCESS_KEY_ID and " +
         "AWS_SECRET_ACCESS_KEY",

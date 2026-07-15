@@ -29,7 +29,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.debug.segmentparser.DatanodeRatisLogParser;
+import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +70,10 @@ public class TestDnRatisLogParser {
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+    GenericTestUtils.waitFor(
+        () -> !cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines().isEmpty(),
+        100, 60000);
     UUID pid = cluster.getStorageContainerManager().getPipelineManager()
         .getPipelines().get(0).getId().getId();
     File pipelineDir = new File(path, pid.toString());
@@ -78,11 +82,11 @@ public class TestDnRatisLogParser {
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     assertThat(logFile).isFile();
 
-    DatanodeRatisLogParser datanodeRatisLogParser =
-        new DatanodeRatisLogParser();
+    RatisLogParser datanodeRatisLogParser =
+        new RatisLogParser();
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
-        DatanodeRatisLogParser::smToContainerLogString);
+        RatisLogParser::smToContainerLogString);
     assertThat(out.toString(StandardCharsets.UTF_8.name()))
         .contains("Num Total Entries:");
   }

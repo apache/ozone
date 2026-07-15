@@ -80,9 +80,9 @@ public class HDDSLayoutVersionManager extends
           if (feature.layoutVersion() > getMetadataLayoutVersion()) {
             LOG.info("Registering Upgrade Action : {}", action.name());
             if (annotation.component() == SCM) {
-              feature.addScmAction(annotation.type(), action);
+              feature.addScmAction(action);
             } else {
-              feature.addDatanodeAction(annotation.type(), action);
+              feature.addDatanodeAction(action);
             }
           } else {
             LOG.debug("Skipping Upgrade Action {} since it has been finalized" +

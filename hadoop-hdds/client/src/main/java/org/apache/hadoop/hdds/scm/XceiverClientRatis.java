@@ -392,8 +392,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
               // able to connect to leader in the pipeline, though the
               // pipeline can still be functional.
               RaftException exception = reply.getException();
-              Preconditions.checkNotNull(exception, "Raft reply failure but " +
-                  "no exception propagated.");
+              Objects.requireNonNull(exception, "Raft reply failure but no exception propagated.");
               throw new CompletionException(exception);
             }
             ContainerCommandResponseProto response =

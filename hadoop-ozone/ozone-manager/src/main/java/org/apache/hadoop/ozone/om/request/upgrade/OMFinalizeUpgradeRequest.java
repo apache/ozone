@@ -68,7 +68,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     Exception exception = null;
 
     try {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "

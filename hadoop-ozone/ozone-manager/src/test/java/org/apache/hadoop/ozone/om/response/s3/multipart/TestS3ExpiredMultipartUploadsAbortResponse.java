@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -54,7 +53,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests S3 Expired Multipart Upload Abort Responses.
  */
 public class TestS3ExpiredMultipartUploadsAbortResponse
-    extends TestS3MultipartResponse {
+    extends S3MultipartResponseTests {
 
   private BucketLayout bucketLayout;
 
@@ -278,13 +277,16 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
           bucket, omMetadataManager, getBucketLayout());
 
       ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ONE);
-      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
-              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
-          .build();
+      OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
+              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true));
 
       if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        omKeyInfo.setParentObjectID(omBucketInfo.getObjectID());
-        omKeyInfo.setFileName(OzoneFSUtils.getFileName(keyName));
+        keyInfoBuilder.setParentObjectID(omBucketInfo.getObjectID());
+      }
+
+      final OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+
+      if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             omKeyInfo.getFileName(), omKeyInfo, uploadId, 0L,
             omMetadataManager);

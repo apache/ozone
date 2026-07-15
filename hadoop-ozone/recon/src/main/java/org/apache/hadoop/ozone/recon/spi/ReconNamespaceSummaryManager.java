@@ -20,15 +20,20 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 
 /**
  * Interface for DB operations on NSSummary.
  */
 @InterfaceStability.Unstable
 public interface ReconNamespaceSummaryManager {
+
+  ReconNamespaceSummaryManager getStagedNsSummaryManager(DBStore dbStore) throws IOException;
+
+  void reinitialize(ReconDBProvider reconDBProvider) throws IOException;
 
   void clearNSSummaryTable() throws IOException;
 
@@ -46,6 +51,4 @@ public interface ReconNamespaceSummaryManager {
 
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException;
-
-  void rebuildNSSummaryTree(OMMetadataManager omMetadataManager);
 }

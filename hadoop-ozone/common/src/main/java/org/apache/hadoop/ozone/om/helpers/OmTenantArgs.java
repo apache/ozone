@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * This class is used for storing Ozone tenant arguments.
@@ -104,8 +104,8 @@ public class OmTenantArgs {
     }
 
     public OmTenantArgs build() {
-      Preconditions.checkNotNull(tenantId);
-      Preconditions.checkNotNull(volumeName);
+      Objects.requireNonNull(tenantId, "tenantId == null");
+      Objects.requireNonNull(volumeName, "volumeName == null");
       return new OmTenantArgs(tenantId, volumeName,
           forceCreationWhenVolumeExists);
     }

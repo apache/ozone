@@ -538,20 +538,19 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append('{');
-    b.append(" Id: ").append(id.getId());
-    b.append(", Nodes: [");
+        new StringBuilder(getClass().getSimpleName()).append('{')
+            .append(" Id: ").append(id.getId())
+            .append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
-      b.append(" {").append(datanodeDetails);
-      b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
+      b.append(" {").append(datanodeDetails)
+          .append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
-    b.append(']');
-    b.append(", ReplicationConfig: ").append(replicationConfig);
-    b.append(", State:").append(getPipelineState());
-    b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
-    b.append(", CreationTimestamp").append(getCreationTimestamp()
-        .atZone(ZoneId.systemDefault()));
-    b.append('}');
+    b.append(']')
+        .append(", ReplicationConfig: ").append(replicationConfig)
+        .append(", State:").append(getPipelineState())
+        .append(", leaderId:").append(leaderId != null ? leaderId.toString() : "")
+        .append(", CreationTimestamp").append(getCreationTimestamp().atZone(ZoneId.systemDefault()))
+        .append('}');
     return b.toString();
   }
 

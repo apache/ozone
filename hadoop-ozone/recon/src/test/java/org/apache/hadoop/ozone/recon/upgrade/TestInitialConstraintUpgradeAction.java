@@ -61,7 +61,6 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
     when(mockScmFacade.getDataSource()).thenReturn(dataSource);
 
     // Set the DataSource and DSLContext directly
-    upgradeAction.setDataSource(dataSource);
     upgradeAction.setDslContext(dslContext);
 
     // Check if the table already exists

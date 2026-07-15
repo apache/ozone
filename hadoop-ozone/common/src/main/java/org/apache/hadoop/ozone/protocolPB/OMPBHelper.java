@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getByteString;
 import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getFixedByteString;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
@@ -366,11 +367,11 @@ public final class OMPBHelper {
     }
   }
 
-  public static OMRequest processForDebug(OMRequest msg) {
-    return msg;
+  public static String processForDebug(OMRequest msg) {
+    return TextFormat.shortDebugString(msg);
   }
 
-  public static OMResponse processForDebug(OMResponse msg) {
+  public static String processForDebug(OMResponse msg) {
     if (msg == null) {
       return null;
     }
@@ -381,9 +382,9 @@ public final class OMPBHelper {
       builder.getDbUpdatesResponseBuilder()
           .clearData().addData(REDACTED);
 
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 }

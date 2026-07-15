@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -89,7 +90,7 @@ public final class RocksDatabase implements Closeable {
   private final ManagedRocksDB db;
   private final ManagedDBOptions dbOptions;
   private final ManagedWriteOptions writeOptions;
-  private final List<ColumnFamilyDescriptor> descriptors;
+  private final Map<String, ColumnFamilyDescriptor> descriptors;
   /** column family names -> {@link ColumnFamily}. */
   private final Map<String, ColumnFamily> columnFamilies;
   /** {@link ColumnFamilyHandle#getID()} -> column family names. */
@@ -104,7 +105,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   static String bytes2String(ByteBuffer bytes) {
-    return StringCodec.get().decode(bytes);
+    return StringCodec.get().decodeWithFallback(bytes);
   }
 
   static RocksDatabaseException toRocksDatabaseException(Object name, String op, RocksDBException e) {
@@ -130,7 +131,7 @@ public final class RocksDatabase implements Closeable {
         .stream()
         .map(TableConfig::toName)
         .filter(familyName -> !existingFamilyNames.contains(familyName))
-        .map(TableConfig::newTableConfig)
+        .map(familyName -> TableConfig.newTableConfig(file.toPath(), familyName))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);
@@ -159,8 +160,9 @@ public final class RocksDatabase implements Closeable {
     List<ColumnFamilyDescriptor> descriptors = null;
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
+    List<TableConfig> extra = null;
     try {
-      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
+      extra = getExtraColumnFamilies(dbFile, families);
       descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
@@ -178,6 +180,10 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
       throw toRocksDatabaseException(RocksDatabase.class, "open " + dbFile, e);
+    } finally {
+      if (extra != null) {
+        extra.forEach(TableConfig::close);
+      }
     }
   }
 
@@ -196,7 +202,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   private static void close(Map<String, ColumnFamily> columnFamilies,
-      ManagedRocksDB db, List<ColumnFamilyDescriptor> descriptors,
+      ManagedRocksDB db, Collection<ColumnFamilyDescriptor> descriptors,
       ManagedWriteOptions writeOptions, ManagedDBOptions dbOptions) {
     if (columnFamilies != null) {
       for (ColumnFamily f : columnFamilies.values()) {
@@ -293,26 +299,12 @@ public final class RocksDatabase implements Closeable {
       return handle;
     }
 
-    public void batchDelete(ManagedWriteBatch writeBatch, byte[] key)
+    public void batchDelete(ManagedWriteBatch writeBatch, ByteBuffer key)
         throws RocksDatabaseException {
       try (UncheckedAutoCloseable ignored = acquire()) {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDelete key " + bytes2String(key), e);
-      }
-    }
-
-    public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
-        throws RocksDatabaseException {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("batchPut array key {}", bytes2String(key));
-        LOG.debug("batchPut array value {}", bytes2String(value));
-      }
-
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        writeBatch.put(getHandle(), key, value);
-      } catch (RocksDBException e) {
-        throw toRocksDatabaseException(this, "batchPut key " + bytes2String(key), e);
       }
     }
 
@@ -355,18 +347,21 @@ public final class RocksDatabase implements Closeable {
     this.db = db;
     this.dbOptions = dbOptions;
     this.writeOptions = writeOptions;
-    this.descriptors = descriptors;
+    this.descriptors = descriptors.stream().collect(Collectors.toMap(d -> bytes2String(d.getName()), d -> d,
+        (d1, d2) -> {
+        throw new IllegalStateException("Duplicate key " + bytes2String(d1.getName()));
+      }, ConcurrentHashMap::new));
     this.columnFamilies = toColumnFamilyMap(handles);
     this.columnFamilyNames = MemoizedSupplier.valueOf(() -> toColumnFamilyNameMap(columnFamilies.values()));
   }
 
   private Map<String, ColumnFamily> toColumnFamilyMap(List<ColumnFamilyHandle> handles) throws RocksDBException {
-    final Map<String, ColumnFamily> map = new HashMap<>();
+    final Map<String, ColumnFamily> map = new ConcurrentHashMap<>(handles.size());
     for (ColumnFamilyHandle h : handles) {
       final ColumnFamily f = new ColumnFamily(h);
       map.put(f.getName(), f);
     }
-    return Collections.unmodifiableMap(map);
+    return map;
   }
 
   private static Map<Integer, String> toColumnFamilyNameMap(Collection<ColumnFamily> families) {
@@ -401,19 +396,21 @@ public final class RocksDatabase implements Closeable {
   }
 
   private void waitAndClose() {
-    // wait till all access to rocks db is process to avoid crash while close
+    // Wait until all active operations (including open iterators) complete.
+    // Iterators acquired after DB close is triggered will fast-fail in
+    // hasNext(), so this loop is expected to complete quickly in practice.
     while (!counter.compareAndSet(0, Long.MIN_VALUE)) {
       try {
         Thread.currentThread().sleep(1);
       } catch (InterruptedException e) {
-        close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+        close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
         Thread.currentThread().interrupt();
         return;
       }
     }
 
     // close when counter is 0, no more operation
-    close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+    close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
   }
 
   private void closeOnError(RocksDBException e) {
@@ -432,7 +429,7 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  private UncheckedAutoCloseable acquire() throws RocksDatabaseException {
+  UncheckedAutoCloseable acquire() throws RocksDatabaseException {
     if (isClosed()) {
       throw new RocksDatabaseException("Rocks Database is closed");
     }
@@ -629,8 +626,11 @@ public final class RocksDatabase implements Closeable {
   Supplier<Integer> keyMayExist(ColumnFamily family,
       ByteBuffer key, ByteBuffer out) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
+      // keyMayExist may advance the input ByteBuffer position in native code.
+      // Always pass a duplicate so callers can safely reuse the original key
+      // buffer for a follow-up point-get.
       final KeyMayExist result = db.get().keyMayExist(
-          family.getHandle(), key, out);
+          family.getHandle(), key.duplicate(), out);
       switch (result.exists) {
       case kNotExist: return null;
       case kExistsWithValue: return () -> result.valueLength;
@@ -648,6 +648,27 @@ public final class RocksDatabase implements Closeable {
 
   public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
+  }
+
+  public void dropColumnFamily(String tableName) throws RocksDatabaseException {
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      ColumnFamily columnFamily = columnFamilies.get(tableName);
+      if (columnFamily != null) {
+        try {
+          getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+          ColumnFamilyDescriptor descriptor = descriptors.get(tableName);
+          columnFamily.getHandle().close();
+          if (descriptor != null) {
+            RocksDatabase.close(descriptor);
+          }
+          columnFamilies.remove(tableName);
+          descriptors.remove(tableName);
+        } catch (RocksDBException e) {
+          closeOnError(e);
+          throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
+        }
+      }
+    }
   }
 
   byte[] get(ColumnFamily family, byte[] key) throws RocksDatabaseException {
@@ -754,17 +775,24 @@ public final class RocksDatabase implements Closeable {
 
   public ManagedRocksIterator newIterator(ColumnFamily family)
       throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().newIterator(family.getHandle()));
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return managed(db.get().newIterator(family.getHandle()), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
       boolean fillCache) throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire();
-         ManagedReadOptions readOptions = new ManagedReadOptions()) {
+    final UncheckedAutoCloseable ref = acquire();
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return managed(db.get().newIterator(family.getHandle(), readOptions));
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
@@ -839,34 +867,36 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs a map of TableName to prefixUsed.
+   * @param prefixInfo a map of TableName to prefixUsed.
    */
-  public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs) throws RocksDatabaseException {
+  public void deleteFilesNotMatchingPrefix(TablePrefixInfo prefixInfo) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
       for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
 
-        if (!prefixPairs.containsKey(sstFileColumnFamily)) {
-          continue;
-        }
-
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
+        // Restrict deletion to files at the last level (and skip entirely when
+        // the last level is 0). The old RocksDB #deleteFile API could only
+        // delete last-level SST files (and the last file of level 0);
+        // deleteSstFileRange, used below, no longer has that limitation, but
+        // this method keeps the last-level restriction to preserve its existing
+        // pruning behavior.
         if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
           continue;
         }
 
-        String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
+        String prefixForColumnFamily = prefixInfo.getTablePrefix(sstFileColumnFamily);
         String firstDbKey = StringUtils.bytes2String(liveFileMetaData.smallestKey());
         String lastDbKey = StringUtils.bytes2String(liveFileMetaData.largestKey());
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {
+          ColumnFamilyHandle handle = getColumnFamilyHandle(sstFileColumnFamily);
+          if (handle == null) {
+            LOG.warn("Skipping sst file deletion for {}: no handle found for column family {}",
+                liveFileMetaData.fileName(), sstFileColumnFamily);
+            continue;
+          }
           LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
                   + "corresponding to column family {} from db: {}. "
                   + "Prefix for the column family: {}.",
@@ -875,7 +905,15 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+          // deleteSstFileRange uses deleteFilesInRanges over this file's
+          // [smallestKey, largestKey]. It may also drop other files fully
+          // contained in that range, which is safe here: any such file's key
+          // range is a subset of this non-matching file's range. Because
+          // isKeyWithPrefixPresent is a monotone prefix-range test, a subset
+          // range cannot contain the prefix when the enclosing range does not,
+          // so every collaterally deleted file is likewise non-matching. This
+          // invariant holds only while isKeyWithPrefixPresent stays monotone.
+          db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }
     }

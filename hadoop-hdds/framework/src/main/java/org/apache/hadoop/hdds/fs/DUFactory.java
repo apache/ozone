@@ -60,7 +60,7 @@ public class DUFactory implements SpaceUsageCheckFactory {
   public static class Conf {
 
     @Config(
-        key = "refresh.period",
+        key = "hdds.datanode.du.refresh.period",
         defaultValue = "1h",
         type = ConfigType.TIME,
         tags = { ConfigTag.DATANODE },

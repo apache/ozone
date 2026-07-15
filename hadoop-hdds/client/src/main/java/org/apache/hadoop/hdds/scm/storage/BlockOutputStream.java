@@ -31,6 +31,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -573,10 +574,10 @@ public class BlockOutputStream extends OutputStream {
     long flushPos = totalWriteChunkLength;
     final List<ChunkBuffer> byteBufferList;
     if (!force) {
-      Preconditions.checkNotNull(bufferList);
+      Objects.requireNonNull(bufferList, "bufferList == null");
       byteBufferList = bufferList;
       bufferList = null;
-      Preconditions.checkNotNull(byteBufferList);
+      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       byteBufferList = null;
     }
@@ -945,10 +946,10 @@ public class BlockOutputStream extends OutputStream {
         containerBlockData.addChunks(chunkInfo);
       }
       if (putBlockPiggybacking) {
-        Preconditions.checkNotNull(bufferList);
+        Objects.requireNonNull(bufferList, "bufferList == null");
         byteBufferList = bufferList;
         bufferList = null;
-        Preconditions.checkNotNull(byteBufferList);
+        Objects.requireNonNull(byteBufferList, "byteBufferList == null");
 
         blockData = containerBlockData.build();
         LOG.debug("piggyback chunk list {}", blockData);

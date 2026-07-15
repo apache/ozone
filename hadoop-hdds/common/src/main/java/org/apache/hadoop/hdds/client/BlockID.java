@@ -93,8 +93,8 @@ public class BlockID {
 
   public void appendTo(StringBuilder sb) {
     containerBlockID.appendTo(sb);
-    sb.append(" bcsId: ").append(blockCommitSequenceId);
-    sb.append(" replicaIndex: ").append(replicaIndex);
+    sb.append(" bcsId: ").append(blockCommitSequenceId)
+        .append(" replicaIndex: ").append(replicaIndex);
   }
 
   @JsonIgnore

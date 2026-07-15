@@ -51,6 +51,28 @@ public class OmSnapshotInternalMetrics {
   @Metric("Total no. of snapshot move table keys failures")
   private MutableCounterLong numSnapshotMoveTableKeysFails;
 
+  /*
+   * Snapshot defragmentation metrics since last restart.
+   */
+  @Metric("Total no. of snapshot defragmentation operations (full and incremental)")
+  private MutableCounterLong numSnapshotDefrag;
+  @Metric("Total no. of snapshot defragmentation failures (full and incremental)")
+  private MutableCounterLong numSnapshotDefragFails;
+  @Metric("Total no. of snapshots skipped for defragmentation (non-active or already defragmented)")
+  private MutableCounterLong numSnapshotDefragSnapshotSkipped;
+  @Metric("Total no. of full defragmentation operations")
+  private MutableCounterLong numSnapshotFullDefrag;
+  @Metric("Total no. of full defragmentation failures")
+  private MutableCounterLong numSnapshotFullDefragFails;
+  @Metric("Total no. of tables compacted during full defragmentation")
+  private MutableCounterLong numSnapshotFullDefragTablesCompacted;
+  @Metric("Total no. of incremental defragmentation operations")
+  private MutableCounterLong numSnapshotIncDefrag;
+  @Metric("Total no. of incremental defragmentation failures")
+  private MutableCounterLong numSnapshotIncDefragFails;
+  @Metric("Total no. of delta files processed during incremental defragmentation")
+  private MutableCounterLong numSnapshotIncDefragDeltaFilesProcessed;
+
   public OmSnapshotInternalMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
@@ -114,5 +136,77 @@ public class OmSnapshotInternalMetrics {
 
   public long getNumSnapshotMoveTableKeysFails() {
     return numSnapshotMoveTableKeysFails.value();
+  }
+
+  public void incNumSnapshotDefrag() {
+    numSnapshotDefrag.incr();
+  }
+
+  public void incNumSnapshotDefragFails() {
+    numSnapshotDefragFails.incr();
+  }
+
+  public void incNumSnapshotDefragSnapshotSkipped() {
+    numSnapshotDefragSnapshotSkipped.incr();
+  }
+
+  public void incNumSnapshotFullDefrag() {
+    numSnapshotFullDefrag.incr();
+  }
+
+  public void incNumSnapshotFullDefragFails() {
+    numSnapshotFullDefragFails.incr();
+  }
+
+  public void incNumSnapshotFullDefragTablesCompacted(long count) {
+    numSnapshotFullDefragTablesCompacted.incr(count);
+  }
+
+  public void incNumSnapshotIncDefrag() {
+    numSnapshotIncDefrag.incr();
+  }
+
+  public void incNumSnapshotIncDefragFails() {
+    numSnapshotIncDefragFails.incr();
+  }
+
+  public void incNumSnapshotIncDefragDeltaFilesProcessed(long count) {
+    numSnapshotIncDefragDeltaFilesProcessed.incr(count);
+  }
+
+  public long getNumSnapshotDefrag() {
+    return numSnapshotDefrag.value();
+  }
+
+  public long getNumSnapshotDefragFails() {
+    return numSnapshotDefragFails.value();
+  }
+
+  public long getNumSnapshotDefragSnapshotSkipped() {
+    return numSnapshotDefragSnapshotSkipped.value();
+  }
+
+  public long getNumSnapshotFullDefrag() {
+    return numSnapshotFullDefrag.value();
+  }
+
+  public long getNumSnapshotFullDefragFails() {
+    return numSnapshotFullDefragFails.value();
+  }
+
+  public long getNumSnapshotFullDefragTablesCompacted() {
+    return numSnapshotFullDefragTablesCompacted.value();
+  }
+
+  public long getNumSnapshotIncDefrag() {
+    return numSnapshotIncDefrag.value();
+  }
+
+  public long getNumSnapshotIncDefragFails() {
+    return numSnapshotIncDefragFails.value();
+  }
+
+  public long getNumSnapshotIncDefragDeltaFilesProcessed() {
+    return numSnapshotIncDefragDeltaFilesProcessed.value();
   }
 }

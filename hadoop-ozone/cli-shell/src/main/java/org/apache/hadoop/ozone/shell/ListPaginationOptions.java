@@ -26,7 +26,7 @@ public class ListPaginationOptions {
   private ListLimitOptions limitOptions;
 
   @CommandLine.Option(names = {"--start", "-s"},
-      description = "The item to start the listing from.\n" +
+      description = "The item to start the listing from.%n" +
           "This will be excluded from the result.")
   private String startItem;
 

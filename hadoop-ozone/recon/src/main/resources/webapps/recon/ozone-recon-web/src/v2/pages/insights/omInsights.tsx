@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import { ValueType } from 'react-select';
 import { Tabs, Tooltip } from 'antd';
 import { TablePaginationConfig } from 'antd/es/table';
@@ -87,7 +86,7 @@ const OMDBInsights: React.FC<{}> = () => {
         ));
         setLoading(false);
       }).catch(error => {
-        showDataFetchError((error as AxiosError).toString());
+        showDataFetchError(error);
       });
     }
   }
@@ -119,7 +118,7 @@ const OMDBInsights: React.FC<{}> = () => {
     </div>
     <div style={{ padding: '24px' }}>
       <div className='content-div'>
-        <Tabs defaultActiveKey={activeTab ?? '1'}>
+        <Tabs defaultActiveKey={activeTab ?? '1'} destroyInactiveTabPane>
           <Tabs.TabPane key='1' tab={
             <label>
               Container Mismatch Info

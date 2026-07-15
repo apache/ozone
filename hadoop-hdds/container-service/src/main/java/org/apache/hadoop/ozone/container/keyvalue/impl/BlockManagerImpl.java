@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -55,7 +56,6 @@ public class BlockManagerImpl implements BlockManager {
 
   private ConfigurationSource config;
 
-  private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
   public static final String FULL_CHUNK = "full";
 
   // Default Read Buffer capacity when Checksum is not present
@@ -70,7 +70,7 @@ public class BlockManagerImpl implements BlockManager {
    * @param conf - Ozone configuration
    */
   public BlockManagerImpl(ConfigurationSource conf) {
-    Preconditions.checkNotNull(conf, "Config cannot be null");
+    Objects.requireNonNull(conf, "conf == null");
     this.config = conf;
     this.defaultReadBufferCapacity = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
@@ -105,7 +105,7 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
           throws IOException {
-    Preconditions.checkNotNull(data, "BlockData cannot be null for put operation.");
+    Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id cannot be negative");
 
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
@@ -113,7 +113,7 @@ public class BlockManagerImpl implements BlockManager {
     // We are not locking the key manager since RocksDB serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
 
       long blockBcsID = data.getBlockCommitSequenceId();
       long containerBcsID = containerData.getBlockCommitSequenceId();
@@ -174,8 +174,7 @@ public class BlockManagerImpl implements BlockManager {
   public long persistPutBlock(KeyValueContainer container,
       BlockData data, boolean endOfBlock)
       throws IOException {
-    Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
-        "operation.");
+    Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
         "cannot be negative");
 
@@ -186,7 +185,7 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
 
       long bcsId = data.getBlockCommitSequenceId();
       long containerBCSId = containerData.getBlockCommitSequenceId();
@@ -293,12 +292,12 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public void finalizeBlock(Container container, BlockID blockId)
       throws IOException {
-    Preconditions.checkNotNull(blockId, "blockId cannot " +
-        "be null for finalizeBlock operation.");
+    Objects.requireNonNull(blockId, "blockId == null");
     Preconditions.checkState(blockId.getContainerID() >= 0,
         "Container Id cannot be negative");
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
+
     long localID = blockId.getLocalID();
 
     kvContainer.removeFromPendingPutBlockCache(localID);
@@ -306,7 +305,7 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(),
         config)) {
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
 
       // persist finalizeBlock
       try (BatchOperation batch = db.getStore().getBatchHandler()
@@ -343,7 +342,7 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
       BlockData blockData = getBlockByID(db, blockID, containerData);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
       if (id < bcsId) {
@@ -363,7 +362,7 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
       BlockData blockData = getBlockByID(db, blockID, containerData);
       return blockData.getSize();
     }
@@ -409,7 +408,7 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {
-    Preconditions.checkNotNull(container, "container cannot be null");
+    Objects.requireNonNull(container, "container == null");
     Preconditions.checkState(startLocalID >= 0 || startLocalID == -1,
         "startLocal ID cannot be negative");
     Preconditions.checkArgument(count > 0,
@@ -442,7 +441,7 @@ public class BlockManagerImpl implements BlockManager {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      Objects.requireNonNull(db, "db == null");
       String blockKey = containerData.getBlockKey(blockID.getLocalID());
       return db.getStore().getBlockDataTable().isExist(blockKey);
     }

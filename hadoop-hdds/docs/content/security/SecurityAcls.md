@@ -32,7 +32,7 @@ Add the following properties to the ozone-site.xml to enable native ACLs.
 Property|Value
 --------|------------------------------------------------------------
 ozone.acl.enabled         | true
-ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.OzoneNativeAuthorizer
+ozone.acl.authorizer.class| org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 

@@ -59,12 +59,11 @@ import org.junit.jupiter.api.Test;
 public class TestDatanodeHddsVolumeFailureToleration {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration ozoneConfig;
   private List<HddsDatanodeService> datanodes;
 
   @BeforeEach
   public void init() throws Exception {
-    ozoneConfig = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     ozoneConfig.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);

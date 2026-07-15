@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * SCM Node Metric that is used in the placement classes.
@@ -33,7 +33,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param stat - SCMNodeStat.
    */
   public SCMNodeMetric(SCMNodeStat stat) {
-    this.stat = stat;
+    this.stat = Objects.requireNonNull(stat, "stat == null");
   }
 
   /**
@@ -46,9 +46,9 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @VisibleForTesting
   public SCMNodeMetric(long capacity, long used, long remaining,
-                       long committed, long freeSpaceToSpare) {
+                       long committed, long freeSpaceToSpare, long reserved) {
     this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare);
+    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare, reserved);
   }
 
   /**
@@ -58,8 +58,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
-    Preconditions.checkNotNull(this.stat, "Argument cannot be null");
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "o == null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
@@ -89,7 +88,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isLess(SCMNodeStat o) {
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "Argument cannot be null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
@@ -160,7 +159,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
   public void set(SCMNodeStat value) {
     stat.set(value.getCapacity().get(), value.getScmUsed().get(),
         value.getRemaining().get(), value.getCommitted().get(),
-        value.getFreeSpaceToSpare().get());
+        value.getFreeSpaceToSpare().get(), value.getReserved().get());
   }
 
   /**

@@ -316,7 +316,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
         loading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

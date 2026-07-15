@@ -26,7 +26,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -76,7 +76,7 @@ public final class OzoneAcl {
   @JsonIgnore
   private final Supplier<String> toStringMethod;
   @JsonIgnore
-  private final Supplier<Integer> hashCodeMethod;
+  private final MemoizedSupplier<Integer> hashCodeMethod;
 
   public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
     return new OzoneAcl(type, name, scope, toInt(acls));
@@ -181,10 +181,10 @@ public final class OzoneAcl {
 
     // Check if acl string contains scope info.
     if (parts[2].matches(ACL_SCOPE_REGEX)) {
-      int indexOfOpenBracket = parts[2].indexOf("[");
+      int indexOfOpenBracket = parts[2].indexOf('[');
       bits = parts[2].substring(0, indexOfOpenBracket);
       aclScope = AclScope.valueOf(parts[2].substring(indexOfOpenBracket + 1,
-          parts[2].indexOf("]")));
+          parts[2].indexOf(']')));
     }
 
     EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
@@ -310,7 +310,7 @@ public final class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return Proto2Utils.unsafeByteString(bytes);
+    return UnsafeByteOperations.unsafeWrap(bytes);
   }
 
   @JsonIgnore
@@ -348,6 +348,13 @@ public final class OzoneAcl {
     return type;
   }
 
+  public boolean sameNameTypeScope(OzoneAcl that) {
+    return this.getType() == that.getType()
+        && this.getAclScope() == that.getAclScope()
+        // compare string at last since it is expensive
+        && this.getName().equals(that.getName());
+  }
+
   /**
    * Indicates whether some other object is "equal to" this one.
    *
@@ -364,11 +371,14 @@ public final class OzoneAcl {
     if (obj == null || getClass() != obj.getClass()) {
       return false;
     }
-    OzoneAcl otherAcl = (OzoneAcl) obj;
-    return otherAcl.getName().equals(this.getName()) &&
-        otherAcl.getType().equals(this.getType()) &&
-        this.aclBits == otherAcl.aclBits &&
-        otherAcl.getAclScope().equals(this.getAclScope());
+    final OzoneAcl that = (OzoneAcl) obj;
+    if (this.hashCodeMethod.isInitialized() && that.hashCodeMethod.isInitialized()) {
+      if (!Objects.equals(this.hashCodeMethod.get(), that.hashCodeMethod.get())) {
+        return false;
+      }
+    }
+    return this.aclBits == that.aclBits
+        && sameNameTypeScope(that);
   }
 
   /**

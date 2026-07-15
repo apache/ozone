@@ -99,10 +99,8 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     when(replicationManager.getConfig())
-        .thenReturn(ozoneConfiguration.getObject(
+        .thenReturn(new OzoneConfiguration().getObject(
             ReplicationManagerConfiguration.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
@@ -139,8 +137,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -166,8 +164,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         0);
@@ -338,8 +336,8 @@ public class TestRatisUnderReplicationHandler {
     replicas.add(shouldDelete);
 
     List<ContainerReplicaOp> pending = Collections.singletonList(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-        shouldDelete.getDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+        shouldDelete.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
 
     assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
@@ -389,8 +387,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.UNHEALTHY, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -504,10 +502,10 @@ public class TestRatisUnderReplicationHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingRemove = MockDatanodeDetails.randomDatanodeDetails();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, System.currentTimeMillis(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0, null, System.currentTimeMillis(), 0));
 
     handler.processAndSendCommands(replicas, pendingOps,
         getUnderReplicatedHealthResult(), 2);

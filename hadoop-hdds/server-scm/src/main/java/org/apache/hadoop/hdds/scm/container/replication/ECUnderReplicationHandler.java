@@ -19,10 +19,9 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,7 +49,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -595,25 +593,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       ContainerInfo container, Iterator<DatanodeDetails> iterator,
       ContainerReplica replica, ECContainerReplicaCount replicaCount)
       throws CommandTargetOverloadedException, NotLeaderException {
-    final boolean push = replicationManager.getConfig().isPush();
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
-    final long containerID = container.getContainerID();
-
-    if (push) {
-      replicationManager.sendThrottledReplicationCommand(
-          container, Collections.singletonList(source), target,
-          replica.getReplicaIndex());
-    } else {
-      ReplicateContainerCommand replicateCommand =
-          ReplicateContainerCommand.fromSources(containerID,
-          ImmutableList.of(source));
-      // For EC containers, we need to track the replica index which is
-      // to be replicated, so add it to the command.
-      replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-      replicationManager.sendDatanodeCommand(replicateCommand, container,
-          target);
-    }
+    replicationManager.sendThrottledReplicationCommand(
+        container, Collections.singletonList(source), target,
+        replica.getReplicaIndex());
     adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
   }
 
@@ -621,7 +605,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                                 DatanodeDetails target, int replicaIndex) {
     replicaCount.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex, null,
-        Long.MAX_VALUE));
+        Long.MAX_VALUE, 0));
   }
 
   static ByteString integers2ByteString(List<Integer> src) {
@@ -630,7 +614,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     for (int i = 0; i < src.size(); i++) {
       dst[i] = src.get(i).byteValue();
     }
-    return Proto2Utils.unsafeByteString(dst);
+
+    return dst.length > 0 ? UnsafeByteOperations.unsafeWrap(dst)
+        : ByteString.EMPTY;
   }
 
   /**

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.net;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
@@ -133,17 +132,5 @@ public interface Node {
   default HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
     return null;
-  }
-
-  static Node fromProtobuf(
-      HddsProtos.NetworkNode networkNode) {
-    if (networkNode.hasDatanodeDetails()) {
-      return DatanodeDetails.getFromProtoBuf(
-          networkNode.getDatanodeDetails());
-    } else if (networkNode.hasInnerNode()) {
-      return InnerNode.fromProtobuf(networkNode.getInnerNode());
-    } else {
-      return null;
-    }
   }
 }

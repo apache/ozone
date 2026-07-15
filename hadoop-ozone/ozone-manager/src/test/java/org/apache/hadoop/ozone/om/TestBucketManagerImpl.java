@@ -86,7 +86,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   public String volumeName() {
-    return getTestName().toLowerCase();
+    return uniqueObjectName();
   }
 
   private void createSampleVol(String volume) throws IOException {
@@ -441,6 +441,12 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertEquals(
         bucketInfo.getUsedNamespace(),
         storedLinkBucket.getUsedNamespace());
+    assertEquals(
+        bucketInfo.getSnapshotUsedBytes(),
+        storedLinkBucket.getSnapshotUsedBytes());
+    assertEquals(
+        bucketInfo.getSnapshotUsedNamespace(),
+        storedLinkBucket.getSnapshotUsedNamespace());
     assertEquals(
         bucketInfo.getDefaultReplicationConfig(),
         storedLinkBucket.getDefaultReplicationConfig());

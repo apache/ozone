@@ -177,10 +177,6 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
-      "ozone.client.max.ec.stripe.write.retries";
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
-      "10";
   public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
       "ozone.client.ec.grpc.retries.enabled";
   public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
@@ -217,6 +213,16 @@ public final class OzoneConfigKeys {
       "ozone.readonly.administrators";
   public static final String OZONE_READONLY_ADMINISTRATORS_GROUPS =
       "ozone.readonly.administrators.groups";
+
+  public static final String OZONE_BLACKLIST_USERS =
+      "ozone.blacklist.users";
+  public static final String OZONE_BLACKLIST_GROUPS =
+      "ozone.blacklist.groups";
+
+  public static final String OZONE_READ_BLACKLIST_USERS =
+      "ozone.read.blacklist.users";
+  public static final String OZONE_READ_BLACKLIST_GROUPS =
+      "ozone.read.blacklist.groups";
 
   /**
    * Used only for testing purpose. Results in making every user an admin.
@@ -276,6 +282,15 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
+
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT =
+      "ozone.snapshot.defrag.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT = "300s";
+  // TODO: Adjust timeout as needed.
+  //  One concern would be that snapdiff can take a long time.
+  //  If snapdiff wait time is included in the timeout it can make it indeterministic.
+  //  -- So don't wait? Trigger and check later?
 
   public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
       "ozone.snapshot.deleting.service.interval";
@@ -460,6 +475,8 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
+  public static final String OZONE_AUTHORIZATION_ENABLED = "ozone.authorization.enabled";
+  public static final boolean OZONE_AUTHORIZATION_ENABLED_DEFAULT = true;
   public static final String OZONE_S3_VOLUME_NAME =
           "ozone.s3g.volume.name";
   public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
@@ -474,10 +491,36 @@ public final class OzoneConfigKeys {
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
       500;
+  /**
+   * When true, RPC clients (DN heartbeat, OM client, SCM client) re-resolve
+   * cached hostnames on connection failure and rebuild the proxy if the
+   * resolved IP has changed. Set to true in environments where server pod
+   * IPs may change while DNS names remain stable, such as Kubernetes.
+   * Default false preserves pre-fix behavior. Mirrors the design intent of
+   * HADOOP-17068 / HDFS-14118.
+   */
+  public static final String OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY =
+          "ozone.client.failover.resolve-needed";
+  public static final boolean OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT =
+          false;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
       2000;
+
+  // Ozone Client Follower Read
+  public static final String OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY =
+      "ozone.client.follower.read.enabled";
+  public static final boolean OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.follower.read.default.consistency";
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "LINEARIZABLE_ALLOW_FOLLOWER";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.leader.read.default.consistency";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "DEFAULT";
 
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
@@ -522,6 +565,7 @@ public final class OzoneConfigKeys {
       "ozone.http.policy";
   public static final String OZONE_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
@@ -593,11 +637,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
       "OBJECT_STORE";
 
-  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
-      "ozone.client.fs.default.bucket.layout";
-  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
-      OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
-
   public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY =
       "ozone.s3g.default.bucket.layout";
   public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT =
@@ -637,7 +676,7 @@ public final class OzoneConfigKeys {
 
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
+      TimeUnit.MINUTES.toMillis(10);
 
   public static final String
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
@@ -680,6 +719,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
+
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
+      "ozone.client.elastic.byte.buffer.pool.max.size";
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
 
   /**
    * There is no need to instantiate this class.

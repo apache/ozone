@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,7 +39,6 @@ import java.util.Optional;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -78,17 +76,13 @@ public class TestOMVersionManager {
       currVersion = lf.layoutVersion();
       lastFeature = lf;
     }
-    for (UpgradeActionType type : UpgradeActionType.values()) {
-      lastFeature.addAction(type, arg -> {
-        String v = arg.getVersion();
-      });
-    }
+    lastFeature.addAction(arg -> {
+      String v = arg.getVersion();
+    });
 
     OzoneManager omMock = mock(OzoneManager.class);
-    for (UpgradeActionType type : UpgradeActionType.values()) {
-      lastFeature.action(type).get().execute(omMock);
-    }
-    verify(omMock, times(UpgradeActionType.values().length)).getVersion();
+    lastFeature.action().get().execute(omMock);
+    verify(omMock, times(1)).getVersion();
   }
 
   @Test
@@ -119,7 +113,7 @@ public class TestOMVersionManager {
 
     // INITIAL_VERSION is finalized, hence should not register.
     Optional<OmUpgradeAction> action =
-        INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
+        INITIAL_VERSION.action();
     assertFalse(action.isPresent());
 
     lvm = mock(OMLayoutVersionManager.class);
@@ -127,7 +121,7 @@ public class TestOMVersionManager {
     doCallRealMethod().when(lvm).registerUpgradeActions(anyString());
     lvm.registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
 
-    action = INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
+    action = INITIAL_VERSION.action();
     assertTrue(action.isPresent());
     assertEquals(MockOmUpgradeAction.class, action.get().getClass());
     OzoneManager omMock = mock(OzoneManager.class);
@@ -138,7 +132,7 @@ public class TestOMVersionManager {
   /**
    * Mock OM upgrade action class.
    */
-  @UpgradeActionOm(type = VALIDATE_IN_PREFINALIZE, feature =
+  @UpgradeActionOm(feature =
       INITIAL_VERSION)
   public static class MockOmUpgradeAction implements OmUpgradeAction {
 

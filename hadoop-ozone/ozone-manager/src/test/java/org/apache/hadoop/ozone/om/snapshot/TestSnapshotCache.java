@@ -17,13 +17,16 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +46,8 @@ import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -51,6 +56,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -76,50 +82,49 @@ class TestSnapshotCache {
   private static IOzoneManagerLock lock;
   private SnapshotCache snapshotCache;
 
+  private OzoneConfiguration conf;
   private OMMetrics omMetrics;
 
   @BeforeAll
   static void beforeAll() throws Exception {
     cacheLoader = mock(CacheLoader.class);
-    // Create a difference mock OmSnapshot instance each time load() is called
-    when(cacheLoader.load(any())).thenAnswer(
-        (Answer<OmSnapshot>) invocation -> {
-          final OmSnapshot omSnapshot = mock(OmSnapshot.class);
-          // Mock the snapshotTable return value for the lookup inside release()
-          final UUID snapshotID = (UUID) invocation.getArguments()[0];
-          when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
-          when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
-
-          OMMetadataManager metadataManager = mock(OMMetadataManager.class);
-          org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
-          when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
-          when(metadataManager.getStore()).thenReturn(store);
-
-          Table<?, ?> table1 = mock(Table.class);
-          Table<?, ?> table2 = mock(Table.class);
-          Table<?, ?> keyTable = mock(Table.class);
-          when(table1.getName()).thenReturn("table1");
-          when(table2.getName()).thenReturn("table2");
-          when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
-          final List<Table<?, ?>> tables = new ArrayList<>();
-          tables.add(table1);
-          tables.add(table2);
-          tables.add(keyTable);
-          when(store.listTables()).thenReturn(tables);
-
-          return omSnapshot;
-        }
-    );
-
     // Set SnapshotCache log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(SnapshotCache.class, Level.DEBUG);
     lock = spy(new OmReadOnlyLock());
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
+    conf = new OzoneConfiguration();
     // Reset cache for each test case
-    omMetrics = OMMetrics.create();
+    omMetrics = OMMetrics.create(conf);
+    // Create a difference mock OmSnapshot instance each time load() is called
+    doAnswer((Answer<OmSnapshot>) invocation -> {
+      final OmSnapshot omSnapshot = mock(OmSnapshot.class);
+      // Mock the snapshotTable return value for the lookup inside release()
+      final UUID snapshotID = (UUID) invocation.getArguments()[0];
+      when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
+      when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
+
+      OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+      org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
+      when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
+      when(metadataManager.getStore()).thenReturn(store);
+
+      Table<?, ?> table1 = mock(Table.class);
+      Table<?, ?> table2 = mock(Table.class);
+      Table<?, ?> keyTable = mock(Table.class);
+      when(table1.getName()).thenReturn("table1");
+      when(table2.getName()).thenReturn("table2");
+      when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
+      final List<Table<?, ?>> tables = new ArrayList<>();
+      tables.add(table1);
+      tables.add(table2);
+      tables.add(keyTable);
+      when(store.listTables()).thenReturn(tables);
+
+      return omSnapshot;
+    }).when(cacheLoader).load(any(UUID.class));
     snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true, lock);
   }
 
@@ -154,6 +159,17 @@ class TestSnapshotCache {
     assertEquals(1, snapshotCache.size());
   }
 
+  @Test
+  @DisplayName("Tests get() releases readLock when load() fails")
+  public void testGetReleasesReadLockOnLoadFailure() throws Exception {
+    clearInvocations(lock);
+    final UUID dbKey = UUID.randomUUID();
+    when(cacheLoader.load(eq(dbKey))).thenThrow(new Exception("Dummy exception thrown"));
+    assertThrows(IllegalStateException.class, () -> snapshotCache.get(dbKey));
+    verify(lock, times(1)).acquireReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
+    verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 5, 10})
   @DisplayName("Tests get() holds a read lock")
@@ -173,12 +189,35 @@ class TestSnapshotCache {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 5, 10})
   @DisplayName("Tests lock() holds a write lock")
-  public void testGetHoldsWriteLock(int numberOfLocks) {
+  public void testLockHoldsWriteLock(int numberOfLocks) {
     clearInvocations(lock);
     for (int i = 0; i < numberOfLocks; i++) {
       snapshotCache.lock();
     }
     verify(lock, times(numberOfLocks)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+  }
+
+  @Test
+  public void testLockSupplierReturnsLockWithAnotherLockReleased() {
+    IOzoneManagerLock ozoneManagerLock = new OzoneManagerLock(conf);
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true, ozoneManagerLock);
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
+      ozoneManagerLock.acquireWriteLock(VOLUME_LOCK, "vol1");
+      ozoneManagerLock.releaseWriteLock(VOLUME_LOCK, "vol1");
+      assertTrue(lockDetails.get().isLockAcquired());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 5, 10})
+  @DisplayName("Tests lock(snapshotId) holds a write lock")
+  public void testLockHoldsWriteLockSnapshotId(int numberOfLocks) {
+    clearInvocations(lock);
+    UUID snapshotId = UUID.randomUUID();
+    for (int i = 0; i < numberOfLocks; i++) {
+      snapshotCache.lock(snapshotId);
+    }
+    verify(lock, times(numberOfLocks)).acquireWriteLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
   }
 
   @Test
@@ -423,7 +462,7 @@ class TestSnapshotCache {
   @Test
   @DisplayName("Snapshot operations not blocked during compaction")
   void testSnapshotOperationsNotBlockedDuringCompaction() throws IOException, InterruptedException, TimeoutException {
-    omMetrics = OMMetrics.create();
+    omMetrics = OMMetrics.create(conf);
     snapshotCache = new SnapshotCache(cacheLoader, 1, omMetrics, 50, true,
         lock);
     final UUID dbKey1 = UUID.randomUUID();
@@ -475,5 +514,138 @@ class TestSnapshotCache {
     verify(store1, times(1)).compactTable("table1");
     verify(store1, times(1)).compactTable("table2");
     verify(store1, times(0)).compactTable("keyTable");
+  }
+
+  private static IOzoneManagerLock newAcquiringLock() {
+    IOzoneManagerLock acquiringLock = mock(IOzoneManagerLock.class);
+    when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+    when(acquiringLock.acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+    when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+    return acquiringLock;
+  }
+
+  private OmSnapshot mockSnapshot(UUID snapshotId) {
+    final OmSnapshot omSnapshot = mock(OmSnapshot.class);
+    when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotId.toString());
+    when(omSnapshot.getSnapshotID()).thenReturn(snapshotId);
+
+    return omSnapshot;
+  }
+
+  @Test
+  @DisplayName("Stale eviction key (invalidate + late close) is cleaned up without throwing")
+  void testStaleEvictionKeyDuringCleanup() throws IOException {
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, newAcquiringLock());
+    final UUID snapshotId = UUID.randomUUID();
+
+    // Acquire a snapshot handle so it is ref-counted in the cache.
+    UncheckedAutoCloseableSupplier<OmSnapshot> handle = snapshotCache.get(snapshotId);
+    assertEquals(1, snapshotCache.size());
+
+    // Invalidate removes the dbMap entry. The handle still exists and will later hit refcount=0.
+    snapshotCache.invalidate(snapshotId);
+    assertEquals(0, snapshotCache.size());
+
+    // Late close triggers ReferenceCounted callback which can re-add snapshotId to pendingEvictionQueue.
+    handle.close();
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+
+    // cleanup(true) is invoked by lock(); it should remove the stale key and not throw.
+    assertDoesNotThrow(() -> {
+      try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
+        assertTrue(lockDetails.get().isLockAcquired());
+      }
+    });
+    assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+  }
+
+  @Test
+  @DisplayName("Close failure keeps snapshot in eviction queue for retry")
+  void testCloseFailureRetriesSnapshot() throws Exception {
+
+    IOzoneManagerLock acquiringLock = newAcquiringLock();
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, acquiringLock);
+    final UUID snapshotId = UUID.randomUUID();
+
+    final AtomicBoolean failCloseOnce = new AtomicBoolean(true);
+    final OmSnapshot failingSnapshot = mockSnapshot(snapshotId);
+
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(failingSnapshot.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getStore()).thenReturn(store);
+    when(store.listTables()).thenReturn(new ArrayList<>());
+
+    doAnswer(invocation -> {
+      if (failCloseOnce.getAndSet(false)) {
+        throw new IOException("close failed");
+      }
+      return null;
+    }).when(failingSnapshot).close();
+
+    when(cacheLoader.load(eq(snapshotId))).thenReturn(failingSnapshot);
+
+    // Load + close handle so refcount transitions to 0 and snapshotId is queued for eviction.
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> ignored = snapshotCache.get(snapshotId)) {
+      assertEquals(1, snapshotCache.size());
+      assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+    }
+    assertEquals(0L, snapshotCache.getDbMap().get(snapshotId).getTotalRefCount());
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+
+    // First cleanup attempt fails to close; entry should remain in dbMap and key should stay queued for retry.
+    assertThrows(IllegalStateException.class, () -> snapshotCache.lock());
+    verify(acquiringLock, times(1)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+    verify(acquiringLock, times(1)).releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+    assertTrue(snapshotCache.getDbMap().containsKey(snapshotId));
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+    assertEquals(1, omMetrics.getNumSnapshotCacheSize());
+
+    // Second cleanup attempt should succeed (close no longer throws), removing entry and eviction key.
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
+      assertTrue(lockDetails.get().isLockAcquired());
+    }
+    assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
+    assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+    assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+  }
+
+  @Test
+  @DisplayName("lock supplier releases write lock if cleanup throws an exception")
+  void testLockSupplierReleasesWriteLockOnCleanupException() throws Exception {
+    IOzoneManagerLock acquiringLock = newAcquiringLock();
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, acquiringLock);
+
+    final UUID snapshotId = UUID.randomUUID();
+    final OmSnapshot failingSnapshot = mockSnapshot(snapshotId);
+
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(failingSnapshot.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getStore()).thenReturn(store);
+    // Trigger an unchecked exception during compaction, which is not caught by cleanup().
+    when(store.listTables()).thenThrow(new RuntimeException("listTables failed"));
+
+    when(cacheLoader.load(eq(snapshotId))).thenReturn(failingSnapshot);
+
+    // Load the snapshot and close so it is enqueued for eviction (refcount reaches 0).
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> ignored = snapshotCache.get(snapshotId)) {
+      assertEquals(1, snapshotCache.size());
+    }
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
+
+    // cleanup(true) will throw -> lock() should release the resource write lock before rethrowing.
+    assertThrows(RuntimeException.class, () -> snapshotCache.lock());
+    verify(acquiringLock, times(1)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+    verify(acquiringLock, times(1)).releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
   }
 }

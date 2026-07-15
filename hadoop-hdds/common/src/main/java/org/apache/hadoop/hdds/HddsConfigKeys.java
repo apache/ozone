@@ -112,6 +112,18 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL =
+      "hdds.scm.safemode.log.interval";
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
+
+  /**
+   * Interval for background refresh of safeMode rules. 0 disables the background thread.
+   */
+  public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
+      "hdds.scm.safemode.rule.refresh.interval";
+  public static final String
+      HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
@@ -119,6 +131,9 @@ public final class HddsConfigKeys {
   // In any real cluster where performance matters, the SCM, OM and DN
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
+
+  public static final String DATANODE_DB_CONFIG_PATH = "hdds.datanode.db.config.path";
+  public static final String DATANODE_DB_CONFIG_PATH_DEFAULT = "";
 
   public static final String HDDS_PROMETHEUS_ENABLED =
       "hdds.prometheus.endpoint.enabled";
@@ -285,6 +300,9 @@ public final class HddsConfigKeys {
       ".test.cert";
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
 
+  public static final String HDDS_GRPC_TLS_PROTOCOLS = "hdds.grpc.tls.protocols";
+  public static final String HDDS_GRPC_TLS_CIPHERS = "hdds.grpc.tls.ciphers";
+
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol
   // when hadoop.security.authorization is true, this needs to be set in
@@ -328,6 +346,9 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
       "ozone.security.reconfigure.protocol.acl";
+
+  public static final String HDDS_SECURITY_CLIENT_DATANODE_DISK_BALANCER_PROTOCOL_ACL =
+      "hdds.security.client.datanode.disk.balancer.protocol.acl";
 
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
@@ -394,6 +415,10 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.volume.io.percentiles.intervals.seconds";
+
+  public static final String HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY =
+      "hdds.datanode.disk.balancer.enabled";
+  public static final boolean HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT = true;
 
   public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
       "hdds.datanode.dns.interface";

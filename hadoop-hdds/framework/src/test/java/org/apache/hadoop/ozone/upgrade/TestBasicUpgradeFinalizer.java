@@ -220,8 +220,7 @@ public class TestBasicUpgradeFinalizer {
       Storage mockStorage = mock(Storage.class);
       InOrder inOrder = inOrder(mockStorage);
 
-      super.finalizeLayoutFeature(lf,
-          lf.action(LayoutFeature.UpgradeActionType.ON_FINALIZE), mockStorage);
+      super.finalizeLayoutFeature(lf, lf.action(), mockStorage);
 
       inOrder.verify(mockStorage).setLayoutVersion(eq(lf.layoutVersion()));
       try {
@@ -231,11 +230,6 @@ public class TestBasicUpgradeFinalizer {
             UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
       }
       finalizeCalled = true;
-    }
-
-    @Override
-    public void runPrefinalizeStateActions(Storage storage, Object service) {
-      // no-op for testing.
     }
   }
 }

@@ -17,10 +17,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.Striped;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -28,39 +25,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * A custom factory to force creation of {@link Striped}
  * locks with fair order policy.
  *
- * The reason of this util is that today guava's {@link Striped} does not
- * support creating locks with fair policy, either supports a mechanism for
- * the client code to do that ({@link Striped#custom(int, Supplier)} is package
- * private). Ref: https://github.com/google/guava/issues/2514
+ * Guava's {@link Striped} does not natively support creating locks with
+ * fair ordering policy. Ref: https://github.com/google/guava/issues/2514
  *
- * So, we have to use reflection to forcibly support fair order policy with
- * {@link Striped}. When the above issue is resolved, we can remove this util.
+ * {@link Striped#custom(int, Supplier)} is now public, so we can call it
+ * directly. When fair policy is natively supported by {@link Striped}, this
+ * util can be removed.
  */
 public final class SimpleStriped {
 
   private SimpleStriped() {
-  }
-
-
-  /**
-   * Creates a {@code Striped<L>} with eagerly initialized, strongly referenced
-   * locks. Every lock is obtained from the passed supplier.
-   *
-   * @param stripes the minimum number of stripes (locks) required.
-   * @param supplier a {@code Supplier<L>} object to obtain locks from.
-   * @return a new {@code Striped<L>}.
-   */
-  @SuppressWarnings("unchecked")
-  public static <L> Striped<L> custom(int stripes, Supplier<L> supplier) {
-    try {
-      Method custom =
-          Striped.class.getDeclaredMethod("custom", int.class, Supplier.class);
-      custom.setAccessible(true);
-      return (Striped<L>) custom.invoke(null, stripes, supplier);
-    } catch (NoSuchMethodException | IllegalAccessException |
-             InvocationTargetException e) {
-      throw new IllegalStateException("Error creating custom Striped.", e);
-    }
   }
 
   /**
@@ -68,11 +42,12 @@ public final class SimpleStriped {
    * strongly referenced read-write locks. Every lock is reentrant.
    *
    * @param stripes the minimum number of stripes (locks) required
+   * @param fair whether to use a fair ordering policy
    * @return a new {@code Striped<ReadWriteLock>}
    */
   public static Striped<ReadWriteLock> readWriteLock(int stripes,
       boolean fair) {
-    return custom(stripes, () -> new ReentrantReadWriteLock(fair));
+    return Striped.custom(stripes, () -> new ReentrantReadWriteLock(fair));
   }
 
 }

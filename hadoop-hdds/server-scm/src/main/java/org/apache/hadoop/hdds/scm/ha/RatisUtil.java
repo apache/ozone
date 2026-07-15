@@ -90,7 +90,7 @@ public final class RatisUtil {
   public static void setRaftStorageDir(final RaftProperties properties,
       final ConfigurationSource conf) {
     RaftServerConfigKeys.setStorageDir(properties, Collections
-        .singletonList(new File(SCMHAUtils.getRatisStorageDir(conf))));
+        .singletonList(new File(SCMHAUtils.getSCMRatisDirectory(conf))));
   }
 
   /**
@@ -197,11 +197,6 @@ public final class RatisUtil {
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
 
-    // This avoids writing commit metadata to Raft Log, which can be used to recover the
-    // commit index even if a majority of servers are dead. We don't need this for StorageContainerManager,
-    // disabling this will avoid the additional disk IO.
-    Log.setLogMetadataEnabled(properties, false);
-
     return logAppenderQueueByteLimit;
   }
 
@@ -236,9 +231,6 @@ public final class RatisUtil {
     Snapshot.setAutoTriggerThreshold(properties,
         ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT));
-    Snapshot.setCreationGap(properties,
-        ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP,
-            ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT));
   }
 
   public static void checkRatisException(IOException e, String port,

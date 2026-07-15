@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
@@ -64,13 +65,14 @@ public final class OMRatisHelper {
   }
 
   /** Convert the given reply with proto 3 {@link ByteString} to a proto 2 response. */
-  public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply) throws IOException {
+  public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply, RaftPeerId leaderOMNodeId)
+      throws IOException {
     final OMResponse response = convertByteStringToOMResponse(reply.getMessage().getContent());
-    if (reply.getReplierId().equals(response.getLeaderOMNodeId())) {
+    if (leaderOMNodeId == null) {
       return response;
     }
     return OMResponse.newBuilder(response)
-        .setLeaderOMNodeId(reply.getReplierId())
+        .setLeaderOMNodeId(leaderOMNodeId.toString())
         .build();
   }
 

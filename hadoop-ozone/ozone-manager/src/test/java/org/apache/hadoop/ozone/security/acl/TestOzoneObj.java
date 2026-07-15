@@ -32,8 +32,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOzoneObj {
 
-  private OzoneObjInfo objInfo;
-  private OzoneObjInfo.Builder builder;
   private String volume = "vol1";
   private String bucket = "bucket1";
   private String key = "key1";
@@ -42,8 +40,8 @@ public class TestOzoneObj {
   @Test
   public void testGetPathViewer() throws IOException {
 
-    builder = getBuilder(volume, bucket, key);
-    objInfo = builder.build();
+    OzoneObjInfo.Builder builder = getBuilder(volume, bucket, key);
+    OzoneObjInfo objInfo = builder.build();
     assertEquals(objInfo.getVolumeName(), volume);
     assertNotNull(objInfo.getOzonePrefixPathViewer(),
         "unexpected path accessor");

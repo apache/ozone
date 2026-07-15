@@ -19,7 +19,23 @@ package org.apache.hadoop.ozone.s3.metrics;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.deleteBucketTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.deleteTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getBucketTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.listParts;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putBucketTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -32,30 +48,29 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-import javax.ws.rs.core.UriInfo;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
+import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
-import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
+import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -75,16 +90,24 @@ public class TestS3GatewayMetrics {
   private static final String ACL_MARKER = "acl";
   private static final String CONTENT = "0123456789";
   private S3GatewayMetrics metrics;
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void setup() throws Exception {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    bucket.createKey("file1", 0).close();
+
+    headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+        "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("UNSIGNED-PAYLOAD");
+
 
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
 
     rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
@@ -93,22 +116,10 @@ public class TestS3GatewayMetrics {
 
     keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
 
-    headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
-    bucketEndpoint.setHeaders(headers);
-    keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
-
-    context = mock(ContainerRequestContext.class);
-    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-    keyEndpoint.setContext(context);
   }
 
   /**
@@ -141,12 +152,7 @@ public class TestS3GatewayMetrics {
   public void testGetBucketSuccess() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
-    clientStub = createClientWithKeys("file1");
-    bucketEndpoint.setClient(clientStub);
-    bucketEndpoint.get(bucketName, null,
-        null, null, 1000, null,
-        null, "random", null,
-        null, null, null, 0).getEntity();
+    bucketEndpoint.get(bucketName).getEntity();
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -157,9 +163,7 @@ public class TestS3GatewayMetrics {
     long oriMetric = metrics.getGetBucketFailure();
 
     // Searching for a bucket that does not exist
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "newBucket", null, null, null, 1000, null, null, "random", null,
-        null, null, null, 0));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("newBucket"));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -171,7 +175,7 @@ public class TestS3GatewayMetrics {
   public void testCreateBucketSuccess() throws Exception {
 
     long oriMetric = metrics.getCreateBucketSuccess();
-    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null, null));
+    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null));
     long curMetric = metrics.getCreateBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -182,7 +186,7 @@ public class TestS3GatewayMetrics {
 
     // Creating an error by trying to create a bucket that already exists
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null));
+        bucketName, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
     assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
 
@@ -194,20 +198,21 @@ public class TestS3GatewayMetrics {
   public void testDeleteBucketSuccess() throws Exception {
     long oriMetric = metrics.getDeleteBucketSuccess();
 
-    bucketEndpoint.delete(bucketName);
+    String newBucket = "new-bucket";
+    clientStub.getObjectStore().createS3Bucket(newBucket);
+    bucketEndpoint.delete(newBucket);
 
     long curMetric = metrics.getDeleteBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testDeleteBucketFailure() throws Exception {
+  public void testDeleteBucketFailure() {
     long oriMetric = metrics.getDeleteBucketFailure();
-    bucketEndpoint.delete(bucketName);
 
     // Deleting a bucket that does not exist will result in delete failure
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.delete(bucketName));
+        bucketEndpoint.delete("no-such-bucket"));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -220,10 +225,8 @@ public class TestS3GatewayMetrics {
   public void testGetAclSuccess() throws Exception {
     long oriMetric = metrics.getGetAclSuccess();
 
-    Response response =
-        bucketEndpoint.get(bucketName, null, null,
-            null, 0, null, null,
-            null, null, "acl", null, null, 0);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
+    Response response = bucketEndpoint.get(bucketName);
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
@@ -233,10 +236,9 @@ public class TestS3GatewayMetrics {
   public void testGetAclFailure() throws Exception {
     long oriMetric = metrics.getGetAclFailure();
 
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
     // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "random_bucket", null, null, null, 0, null,
-        null, null, null, "acl", null, null, 0));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("random_bucket"));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -252,7 +254,8 @@ public class TestS3GatewayMetrics {
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
 
-    bucketEndpoint.put("b1", ACL_MARKER, inputBody);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
+    bucketEndpoint.put("b1", inputBody);
     inputBody.close();
     long curMetric = metrics.getPutAclSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -265,9 +268,9 @@ public class TestS3GatewayMetrics {
 
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
     try {
-      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", ACL_MARKER,
-          inputBody));
+      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", inputBody));
     } finally {
       inputBody.close();
     }
@@ -304,28 +307,18 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCreateKeySuccess() throws Exception {
-
     long oriMetric = metrics.getCreateKeySuccess();
-    // Create an input stream
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    // Create the file
-    keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, null, body);
-    body.close();
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
     long curMetric = metrics.getCreateKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testCreateKeyFailure() throws Exception {
+  public void testCreateKeyFailure() {
     long oriMetric = metrics.getCreateKeyFailure();
 
     // Create the file in a bucket that does not exist
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        "unknownBucket", keyName, CONTENT.length(), 1, null, null,
-        null, null));
-    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET, () -> put(keyEndpoint, "unknownBucket", keyName, CONTENT));
     long curMetric = metrics.getCreateKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -333,19 +326,16 @@ public class TestS3GatewayMetrics {
   @Test
   public void testDeleteKeySuccess() throws Exception {
     long oriMetric = metrics.getDeleteKeySuccess();
-
     bucket.createKey(keyName, 0).close();
-    keyEndpoint.delete(bucketName, keyName, null, null);
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(keyEndpoint, bucketName, keyName));
     long curMetric = metrics.getDeleteKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testDeleteKeyFailure() throws Exception {
+  public void testDeleteKeyFailure() {
     long oriMetric = metrics.getDeleteKeyFailure();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.delete(
-        "unknownBucket", keyName, null, null));
-    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET, () -> delete(keyEndpoint, "unknownBucket", keyName));
     long curMetric = metrics.getDeleteKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -354,14 +344,10 @@ public class TestS3GatewayMetrics {
   public void testGetKeySuccess() throws Exception {
     long oriMetric = metrics.getGetKeySuccess();
 
-    // Create an input stream
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create the file
-    keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, null, body);
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
     // GET the key from the bucket
-    Response response = keyEndpoint.get(bucketName, keyName, 0, null, 0, null, null);
+    Response response = get(keyEndpoint, bucketName, keyName);
     StreamingOutput stream = (StreamingOutput) response.getEntity();
     stream.write(new ByteArrayOutputStream());
     long curMetric = metrics.getGetKeySuccess();
@@ -369,13 +355,12 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testGetKeyFailure() throws Exception {
+  public void testGetKeyFailure() {
     long oriMetric = metrics.getGetKeyFailure();
 
     // Fetching a non-existent key
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.get(
-        bucketName, "unknownKey", 0, null, 0, null, null));
-    assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), e.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> get(keyEndpoint, bucketName, "unknownKey"));
     long curMetric = metrics.getGetKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -384,17 +369,16 @@ public class TestS3GatewayMetrics {
   public void testInitMultiPartUploadSuccess() throws Exception {
 
     long oriMetric = metrics.getInitMultiPartUploadSuccess();
-    keyEndpoint.initializeMultipartUpload(bucketName, keyName);
+    EndpointTestUtils.initiateMultipartUpload(keyEndpoint, bucketName, keyName);
     long curMetric = metrics.getInitMultiPartUploadSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testInitMultiPartUploadFailure() throws Exception {
+  public void testInitMultiPartUploadFailure() {
     long oriMetric = metrics.getInitMultiPartUploadFailure();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint
-        .initializeMultipartUpload("unknownBucket", keyName));
-    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET,
+        () -> keyEndpoint.initializeMultipartUpload("unknownBucket", keyName));
     long curMetric = metrics.getInitMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -408,101 +392,86 @@ public class TestS3GatewayMetrics {
     long oriMetric = metrics.getAbortMultiPartUploadSuccess();
 
     // Abort the Upload Successfully by deleting the key using the Upload-Id
-    keyEndpoint.delete(bucketName, keyName, uploadID, null);
+    abortMultipartUpload(keyEndpoint, bucketName, keyName, uploadID);
 
     long curMetric = metrics.getAbortMultiPartUploadSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testAbortMultiPartUploadFailure() throws Exception {
+  public void testAbortMultiPartUploadFailure() {
     long oriMetric = metrics.getAbortMultiPartUploadFailure();
 
     // Fail the Abort Method by providing wrong uploadID
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.delete(
-        bucketName, keyName, "wrongId", null));
-    assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
+        () -> abortMultipartUpload(keyEndpoint, bucketName, keyName, "wrongId"));
     long curMetric = metrics.getAbortMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
   public void testCompleteMultiPartUploadSuccess() throws Exception {
-
-    // Initiate the Upload and fetch the upload ID
-    String uploadID = initiateMultipartUpload(bucketName, keyName);
-
     long oriMetric = metrics.getCompleteMultiPartUploadSuccess();
-    // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    Response response = keyEndpoint.completeMultipartUpload(bucketName, keyName,
-        uploadID, completeMultipartUploadRequest);
+    String uploadID = initiateMultipartUpload(bucketName, keyName);
+    Part part = uploadPart(keyEndpoint, bucketName, keyName, 1, uploadID, CONTENT);
+
+    completeMultipartUpload(keyEndpoint, bucketName, keyName, uploadID, singletonList(part));
+
     long curMetric = metrics.getCompleteMultiPartUploadSuccess();
-    assertEquals(200, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testCompleteMultiPartUploadFailure() throws Exception {
+  public void testCompleteMultiPartUploadFailure() {
     long oriMetric = metrics.getCompleteMultiPartUploadFailure();
-    CompleteMultipartUploadRequest completeMultipartUploadRequestNew = new
-        CompleteMultipartUploadRequest();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint
-        .completeMultipartUpload(bucketName, "key2", "random",
-            completeMultipartUploadRequestNew));
-    assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
+
+    Part part = new Part();
+    part.setPartNumber(1);
+    part.setETag("etag");
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
+        () -> completeMultipartUpload(keyEndpoint, bucketName, "key2", "random", singletonList(part)));
+
     long curMetric = metrics.getCompleteMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
   public void testCreateMultipartKeySuccess() throws Exception {
-
-    // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
-
     long oriMetric = metrics.getCreateMultipartKeySuccess();
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    keyEndpoint.put(bucketName, keyName, CONTENT.length(),
-        1, uploadID, null, null, body);
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, 1, uploadID, CONTENT));
     long curMetric = metrics.getCreateMultipartKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testCreateMultipartKeyFailure() throws Exception {
+  public void testCreateMultipartKeyFailure() {
     long oriMetric = metrics.getCreateMultipartKeyFailure();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        bucketName, keyName, CONTENT.length(), 1, "randomId", null, null, null));
-    assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD, () -> put(keyEndpoint, bucketName, keyName, 1, "random", CONTENT));
+
     long curMetric = metrics.getCreateMultipartKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
   public void testListPartsSuccess() throws Exception {
-
     long oriMetric = metrics.getListPartsSuccess();
-    // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
 
-    // Listing out the parts by providing the uploadID
-    keyEndpoint.get(bucketName, keyName, 0,
-        uploadID, 3, null, null);
+    assertSucceeds(() -> listParts(keyEndpoint, bucketName, keyName, uploadID, 3, 0));
+
     long curMetric = metrics.getListPartsSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testListPartsFailure() throws Exception {
-
+  public void testListPartsFailure() {
     long oriMetric = metrics.getListPartsFailure();
-    // Listing out the parts by providing the uploadID after aborting
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.get(
-        bucketName, keyName, 0, "wrong_id", 3, null, null));
-    assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
+        () -> listParts(keyEndpoint, bucketName, keyName, "wrong_id", 3, 0));
+
     long curMetric = metrics.getListPartsFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -518,28 +487,24 @@ public class TestS3GatewayMetrics {
 
     // Test for Success of CopyObjectSuccess Metric
     long oriMetric = metrics.getCopyObjectSuccess();
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
-    keyEndpoint.put(bucketName, keyName,
-        CONTENT.length(), 1, null, null, null, body);
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         bucketName + "/" + urlEncode(keyName));
 
-    keyEndpoint.put(destBucket, destKey, CONTENT.length(), 1,
-        null, null, null, body);
+    assertSucceeds(() -> put(keyEndpoint, destBucket, destKey, CONTENT));
+
     long curMetric = metrics.getCopyObjectSuccess();
     assertEquals(1L, curMetric - oriMetric);
 
     // Test for Failure of CopyObjectFailure Metric
     oriMetric = metrics.getCopyObjectFailure();
-    // source and dest same
+
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("");
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        bucketName, keyName, CONTENT.length(), 1, null, null, null, body),
-        "Test for CopyObjectMetric failed");
+    OS3Exception e = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> put(keyEndpoint, bucketName, keyName, CONTENT));
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
     curMetric = metrics.getCopyObjectFailure();
     assertEquals(1L, curMetric - oriMetric);
@@ -548,31 +513,21 @@ public class TestS3GatewayMetrics {
   @Test
   public void testPutObjectTaggingSuccess() throws Exception {
     long oriMetric = metrics.getPutObjectTaggingSuccess();
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
 
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    // Create the file
-    keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, null, body);
-    body.close();
-
-    // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
+    assertSucceeds(() -> putTagging(keyEndpoint, bucketName, keyName, getPutTaggingBody()));
 
     long curMetric = metrics.getPutObjectTaggingSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testPutObjectTaggingFailure() throws Exception {
+  public void testPutObjectTaggingFailure() {
     long oriMetric = metrics.getPutObjectTaggingFailure();
 
     // Put object tagging for nonexistent key
-    OS3Exception ex = assertThrows(OS3Exception.class, () ->
-        keyEndpoint.put(bucketName, "nonexistent", 0, 1, null, "",
-            null, getPutTaggingBody())
-    );
-    assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> putTagging(keyEndpoint, bucketName, "nonexistent", getPutTaggingBody()));
 
     long curMetric = metrics.getPutObjectTaggingFailure();
     assertEquals(1L, curMetric - oriMetric);
@@ -581,34 +536,20 @@ public class TestS3GatewayMetrics {
   @Test
   public void testGetObjectTaggingSuccess() throws Exception {
     long oriMetric = metrics.getGetObjectTaggingSuccess();
-
-    // Create the file
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, null, body);
-    body.close();
-
-    // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
-
-    // Get object tagging
-    keyEndpoint.get(bucketName, keyName, 0,
-        null, 0,  null, "");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
+    assertSucceeds(() -> putTagging(keyEndpoint, bucketName, keyName, getPutTaggingBody()));
+    assertSucceeds(() -> getTagging(keyEndpoint, bucketName, keyName));
 
     long curMetric = metrics.getGetObjectTaggingSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testGetObjectTaggingFailure() throws Exception {
+  public void testGetObjectTaggingFailure() {
     long oriMetric = metrics.getGetObjectTaggingFailure();
 
-    // Get object tagging for nonexistent key
-    OS3Exception ex = assertThrows(OS3Exception.class, () ->
-        keyEndpoint.get(bucketName, "nonexistent", 0, null,
-            0, null, ""));
-    assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY, () -> getTagging(keyEndpoint, bucketName, "nonexistent"));
+
     long curMetric = metrics.getGetObjectTaggingFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -616,61 +557,92 @@ public class TestS3GatewayMetrics {
   @Test
   public void testDeleteObjectTaggingSuccess() throws Exception {
     long oriMetric = metrics.getDeleteObjectTaggingSuccess();
-
-    // Create the file
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, null, body);
-    body.close();
-
-    // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
-
-    // Delete object tagging
-    keyEndpoint.delete(bucketName, keyName, null, "");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, CONTENT));
+    assertSucceeds(() -> putTagging(keyEndpoint, bucketName, keyName, getPutTaggingBody()));
+    deleteTagging(keyEndpoint, bucketName, keyName);
 
     long curMetric = metrics.getDeleteObjectTaggingSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testDeleteObjectTaggingFailure() throws Exception {
+  public void testDeleteObjectTaggingFailure() {
     long oriMetric = metrics.getDeleteObjectTaggingFailure();
 
-    // Delete object tagging for nonexistent key
-    OS3Exception ex = assertThrows(OS3Exception.class, () ->
-        keyEndpoint.delete(bucketName, "nonexistent", null, ""));
-    assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
+    assertErrorResponse(S3ErrorTable.NO_SUCH_KEY, () -> deleteTagging(keyEndpoint, bucketName, "nonexistent"));
+
     long curMetric = metrics.getDeleteObjectTaggingFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
-  private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    for (String key : keys) {
-      bucket.createKey(key, 0).close();
-    }
-    return clientStub;
+  @Test
+  public void testPutBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getPutBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+
+    long curMetric = metrics.getPutBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
   }
 
-  private String initiateMultipartUpload(String bktName, String key)
-      throws IOException,
-      OS3Exception {
-    // Initiate the Upload
-    Response response =
-        keyEndpoint.initializeMultipartUpload(bktName, key);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    if (response.getStatus() == 200) {
-      // Fetch the Upload-Id
-      String uploadID = multipartUploadInitiateResponse.getUploadID();
-      return uploadID;
-    }
-    return "Invalid-Id";
+  @Test
+  public void testPutBucketTaggingFailure() {
+    long oriMetric = metrics.getPutBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET,
+        () -> putBucketTagging(bucketEndpoint, "nonexistent", getPutBucketTaggingBody()));
+
+    long curMetric = metrics.getPutBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
   }
 
-  private static InputStream getPutTaggingBody() {
-    String xml =
+  @Test
+  public void testGetBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getGetBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+    assertSucceeds(() -> getBucketTagging(bucketEndpoint, bucketName));
+
+    long curMetric = metrics.getGetBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testGetBucketTaggingFailure() {
+    long oriMetric = metrics.getGetBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_TAG_SET,
+        () -> getBucketTagging(bucketEndpoint, bucketName));
+
+    long curMetric = metrics.getGetBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testDeleteBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getDeleteBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+    deleteBucketTagging(bucketEndpoint, bucketName);
+
+    long curMetric = metrics.getDeleteBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testDeleteBucketTaggingFailure() {
+    long oriMetric = metrics.getDeleteBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET,
+        () -> deleteBucketTagging(bucketEndpoint, "nonexistent"));
+
+    long curMetric = metrics.getDeleteBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  private String initiateMultipartUpload(String bktName, String key) throws IOException, OS3Exception {
+    return EndpointTestUtils.initiateMultipartUpload(keyEndpoint, bktName, key);
+  }
+
+  private static String getPutTaggingBody() {
+    return
         "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
             "   <TagSet>" +
             "      <Tag>" +
@@ -679,7 +651,19 @@ public class TestS3GatewayMetrics {
             "      </Tag>" +
             "   </TagSet>" +
             "</Tagging>";
+  }
 
-    return new ByteArrayInputStream(xml.getBytes(UTF_8));
+  private static String getPutBucketTaggingBody() {
+    return getPutTaggingBody();
+  }
+
+  @Test
+  public void testPutObjectAclLatencyMetricsSnapshot() {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    metrics.getMetrics(collector, true);
+    String metricsString = collector.getRecords().toString();
+    assertThat(metricsString)
+        .contains("PutObjectAclSuccessLatencyNs")
+        .contains("PutObjectAclFailureLatencyNs");
   }
 }

@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DA
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
@@ -145,17 +144,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
 
   public DatanodeID getID() {
     return id;
-  }
-
-  /**
-   * Returns the DataNode UUID.
-   *
-   * @return UUID of DataNode
-   */
-  // TODO: Remove this in follow-up Jira (HDDS-12015)
-  @Deprecated
-  public UUID getUuid() {
-    return id.getUuid();
   }
 
   /**
@@ -383,6 +371,17 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       return ratisPort;
     }
     return null;
+  }
+
+  // CHANGE: add a helper to check whether a port is explicitly present
+  // without applying compatibility fallback.
+  public synchronized boolean hasPort(Port.Name name) {
+    for (Port port : ports) {
+      if (port.getName().equals(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -748,7 +747,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       this.id = details.id;
       this.ipAddress = details.getIpAddressAsByteString();
       this.hostName = details.getHostNameAsByteString();
-      this.networkName = details.getHostNameAsByteString();
+      this.networkName = details.getNetworkNameAsByteString();
       this.networkLocation = details.getNetworkLocationAsByteString();
       this.level = details.getLevel();
       this.ports = details.getPorts();
@@ -960,7 +959,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      * @return DatanodeDetails
      */
     public DatanodeDetails build() {
-      Preconditions.checkNotNull(id);
+      Objects.requireNonNull(id, "id == null");
       if (networkLocation == null || networkLocation.getString().isEmpty()) {
         networkLocation = NetConstants.BYTE_STRING_DEFAULT_RACK;
       }

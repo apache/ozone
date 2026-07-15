@@ -62,7 +62,7 @@ repair_and_restart_om() {
   logpath=$(execute_command_in_container ${SCM} bash -c "find / -type f -path '/*/$om_id/*/log_inprogress_0' 2>/dev/null | head -n 1")
   echo "Ratis log segment file path: ${logpath}"
 
-  execute_command_in_container ${SCM} bash -c "ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=2 -s=${logpath}"
+  execute_command_in_container ${SCM} bash -c "echo y | ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=2 -s=${logpath}"
   echo "Repair command executed for ${om_id}."
   docker start "${om_container}"
   echo "Container '${om_container}' started again."
@@ -82,6 +82,7 @@ execute_robot_test ${SCM} repair/ratis-transaction-repair.robot
 repair_and_restart_om "ozonesecure-ha-om1-1" "om1"
 repair_and_restart_om "ozonesecure-ha-om2-1" "om2"
 repair_and_restart_om "ozonesecure-ha-om3-1" "om3"
+wait_for_om_leader
 if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list 1>/dev/null; then
   echo "Command timed out or failed => OMs are not running as expected. Test for repairing ratis transaction failed."
   exit 1
@@ -92,10 +93,36 @@ execute_robot_test ${OM} kinit.robot
 
 echo "Creating test keys to verify om compaction"
 om_container="ozonesecure-ha-om1-1"
-docker exec "${om_container}" ozone freon ockg -n 100000 -t 20 -s 0 > /dev/null 2>&1
+docker exec "${om_container}" ozone freon ockg -n 1000 -t 4 -s 0 > /dev/null 2>&1
 echo "Test keys created"
 
 echo "Restarting OM after key creation to flush and generate sst files"
 docker restart "${om_container}"
+# Delete keys to create tombstones that need compaction
+execute_command_in_container ${OM} ozone fs -rm -R -skipTrash ofs://${OM_SERVICE_ID}/vol1/bucket1
 
-execute_robot_test ${OM} repair/om-compact.robot
+get_om_db_size() {
+  execute_command_in_container ${OM} find /data/metadata/om.db -name '*.sst' -exec du -b {} + \
+      | awk '{ sum += $1}  END { print sum }'
+}
+
+check_om_log() {
+  docker-compose logs "${OM}" | grep "Compaction request for column family \"${1}\" completed"
+}
+
+compact_om_db() {
+  for cf in "$@"; do
+    execute_command_in_container ${OM} ozone repair om compact --cf="${cf}" --service-id "${OM_SERVICE_ID}" --node-id "${OM}" --blc 2
+    retry check_om_log "$cf"
+  done
+}
+
+declare -i size_before_compaction size_after_compaction
+size_before_compaction=$(get_om_db_size)
+compact_om_db fileTable deletedTable deletedDirectoryTable
+size_after_compaction=$(get_om_db_size)
+
+if [[ ${size_before_compaction} -lt ${size_after_compaction} ]]; then
+  echo "OM DB size should be reduced after compaction. Before: ${size_before_compaction}, After: ${size_after_compaction}"
+  exit 1
+fi

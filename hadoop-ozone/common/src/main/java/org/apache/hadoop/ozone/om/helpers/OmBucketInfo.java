@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -57,9 +55,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final String bucketName;
   /**
-   * ACL Information (mutable).
+   * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -76,7 +74,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * modification time of bucket.
    */
-  private long modificationTime;
+  private final long modificationTime;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -96,19 +94,30 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   private long usedNamespace;
   private final long quotaInBytes;
   private final long quotaInNamespace;
+  // Total size of data trapped which is pending to be deleted either because of data trapped in snapshots or
+  // background key deleting service is yet to run.
+  // This also indicates the size exclusively held by all snapshots of this bucket.
+  // i.e. when all snapshots of this bucket are deleted and purged, this much space would be released.
+  private long snapshotUsedBytes;
+  private long snapshotUsedNamespace;
 
   /**
    * Bucket Layout.
    */
   private final BucketLayout bucketLayout;
 
-  private String owner;
+  private final String owner;
+
+  /**
+   * S3-style tags stored on the bucket.
+   */
+  private final ImmutableMap<String, String> tags;
 
   private OmBucketInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
@@ -118,11 +127,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.sourceBucket = b.sourceBucket;
     this.usedBytes = b.usedBytes;
     this.usedNamespace = b.usedNamespace;
+    this.snapshotUsedBytes = b.snapshotUsedBytes;
+    this.snapshotUsedNamespace = b.snapshotUsedNamespace;
     this.quotaInBytes = b.quotaInBytes;
     this.quotaInNamespace = b.quotaInNamespace;
     this.bucketLayout = b.bucketLayout;
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
+    this.tags = b.tags.build();
   }
 
   public static Codec<OmBucketInfo> getCodec() {
@@ -150,36 +162,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
-  }
-
-  /**
-   * Add an ozoneAcl to list of existing Acl set.
-   * @param ozoneAcl
-   * @return true - if successfully added, false if not added or acl is
-   * already existing in the acl list.
-   */
-  public boolean addAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.addAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Remove acl from existing acl list.
-   * @param ozoneAcl
-   * @return true - if successfully removed, false if not able to remove due
-   * to that acl is not in the existing acl list.
-   */
-  public boolean removeAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.removeAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Reset the existing acl list.
-   * @param ozoneAcls
-   * @return true - if successfully able to reset.
-   */
-  public boolean setAcls(List<OzoneAcl> ozoneAcls) {
-    return OzoneAclUtil.setAcl(acls, ozoneAcls);
+    return acls;
   }
 
   /**
@@ -249,6 +232,22 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return sourceBucket;
   }
 
+  public long getTotalBucketSpace() {
+    return usedBytes + snapshotUsedBytes;
+  }
+
+  public long getTotalBucketNamespace() {
+    return usedNamespace + snapshotUsedNamespace;
+  }
+
+  public long getSnapshotUsedBytes() {
+    return snapshotUsedBytes;
+  }
+
+  public long getSnapshotUsedNamespace() {
+    return snapshotUsedNamespace;
+  }
+
   public long getUsedBytes() {
     return usedBytes;
   }
@@ -261,8 +260,38 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.usedBytes += bytes;
   }
 
+  public void decrUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
+    this.usedBytes -= bytes;
+    if (increasePendingDeleteBytes) {
+      incrSnapshotUsedBytes(bytes);
+    }
+  }
+
+  public void incrSnapshotUsedBytes(long bytes) {
+    this.snapshotUsedBytes += bytes;
+  }
+
   public void incrUsedNamespace(long namespaceToUse) {
     this.usedNamespace += namespaceToUse;
+  }
+
+  public void decrUsedNamespace(long namespaceToUse, boolean increasePendingDeleteNamespace) {
+    this.usedNamespace -= namespaceToUse;
+    if (increasePendingDeleteNamespace) {
+      incrSnapshotUsedNamespace(namespaceToUse);
+    }
+  }
+
+  public void incrSnapshotUsedNamespace(long namespaceToUse) {
+    this.snapshotUsedNamespace += namespaceToUse;
+  }
+
+  public void purgeSnapshotUsedBytes(long bytes) {
+    this.snapshotUsedBytes -= bytes;
+  }
+
+  public void purgeSnapshotUsedNamespace(long namespaceToUse) {
+    this.snapshotUsedNamespace -= namespaceToUse;
   }
 
   public long getQuotaInBytes() {
@@ -281,12 +310,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return owner;
   }
 
-  public void setModificationTime(long modificationTime) {
-    this.modificationTime = modificationTime;
-  }
-
-  public void setOwner(String ownerName) {
-    this.owner = ownerName;
+  /**
+   * @return tag map associated with this bucket; never null (may be empty).
+   */
+  public Map<String, String> getTags() {
+    return tags;
   }
 
   /**
@@ -324,6 +352,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
+    auditMap.put(OzoneConsts.SNAPSHOT_USED_BYTES, String.valueOf(this.snapshotUsedBytes));
+    auditMap.put(OzoneConsts.SNAPSHOT_USED_NAMESPACE, String.valueOf(this.snapshotUsedNamespace));
     auditMap.put(OzoneConsts.OWNER, this.owner);
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.defaultReplicationConfig != null) ?
@@ -340,17 +370,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   @Override
   public OmBucketInfo copyObject() {
-    Builder builder = toBuilder();
-
-    if (bekInfo != null) {
-      builder.setBucketEncryptionKey(bekInfo.copy());
-    }
-
-    if (defaultReplicationConfig != null) {
-      builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
-    }
-
-    return builder.build();
+    return toBuilder().build();
   }
 
   public Builder toBuilder() {
@@ -364,23 +384,25 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketEncryptionKey(bekInfo)
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
-        .setAcls(acls)
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
+        .setSnapshotUsedBytes(snapshotUsedBytes)
+        .setSnapshotUsedNamespace(snapshotUsedNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
-        .setDefaultReplicationConfig(defaultReplicationConfig);
+        .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setTags(tags);
   }
 
   /**
    * Builder for OmBucketInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
     private String volumeName;
     private String bucketName;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private final AclListBuilder acls;
     private boolean isVersionEnabled;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
@@ -395,12 +417,19 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private BucketLayout bucketLayout = BucketLayout.DEFAULT;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private final MapBuilder<String, String> tags;
+    private long snapshotUsedBytes;
+    private long snapshotUsedNamespace;
 
     public Builder() {
+      acls = AclListBuilder.empty();
+      tags = MapBuilder.empty();
     }
 
     private Builder(OmBucketInfo obj) {
       super(obj);
+      acls = AclListBuilder.of(obj.acls);
+      tags = MapBuilder.of(obj.tags);
     }
 
     public Builder setVolumeName(String volume) {
@@ -415,12 +444,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls.set(listOfAcls);
       }
       return this;
     }
 
-    public List<OzoneAcl> getAcls() {
+    public AclListBuilder acls() {
       return acls;
     }
 
@@ -464,12 +493,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
 
     @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
-      return this;
-    }
-
-    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
       return this;
@@ -505,6 +528,18 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    /** @param snapshotUsedBytes - Bucket Quota Snapshot Usage in bytes. */
+    public Builder setSnapshotUsedBytes(long snapshotUsedBytes) {
+      this.snapshotUsedBytes = snapshotUsedBytes;
+      return this;
+    }
+
+    /** @param snapshotUsedNamespace - Bucket Quota Snapshot Usage in counts. */
+    public Builder setSnapshotUsedNamespace(long snapshotUsedNamespace) {
+      this.snapshotUsedNamespace = snapshotUsedNamespace;
+      return this;
+    }
+
     /** @param quota Bucket quota in bytes. */
     public Builder setQuotaInBytes(long quota) {
       this.quotaInBytes = quota;
@@ -533,15 +568,25 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
-    /**
-     * Constructs the OmBucketInfo.
-     * @return instance of OmBucketInfo.
-     */
-    public OmBucketInfo build() {
-      Preconditions.checkNotNull(volumeName);
-      Preconditions.checkNotNull(bucketName);
-      Preconditions.checkNotNull(acls);
-      Preconditions.checkNotNull(storageType);
+    public Builder setTags(Map<String, String> tagMap) {
+      if (tagMap != null) {
+        this.tags.set(tagMap);
+      }
+      return this;
+    }
+
+    @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(volumeName, "volumeName == null");
+      Objects.requireNonNull(bucketName, "bucketName == null");
+      Objects.requireNonNull(acls, "acls == null");
+      Objects.requireNonNull(storageType, "storageType == null");
+      Objects.requireNonNull(tags, "tags == null");
+    }
+
+    @Override
+    protected OmBucketInfo buildObject() {
       return new OmBucketInfo(this);
     }
   }
@@ -563,8 +608,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .addAllTags(KeyValueUtil.toProtobuf(tags))
         .setQuotaInBytes(quotaInBytes)
-        .setQuotaInNamespace(quotaInNamespace);
+        .setQuotaInNamespace(quotaInNamespace)
+        .setSnapshotUsedBytes(snapshotUsedBytes)
+        .setSnapshotUsedNamespace(snapshotUsedNamespace);
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -587,20 +635,21 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
-    return getFromProtobuf(bucketInfo, null);
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo, null);
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @param buckLayout
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo,
       BucketLayout buckLayout) {
     Builder obib = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
@@ -614,7 +663,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setModificationTime(bucketInfo.getModificationTime())
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
+        .setSnapshotUsedBytes(bucketInfo.getSnapshotUsedBytes())
+        .setSnapshotUsedNamespace(bucketInfo.getSnapshotUsedNamespace());
+
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
     } else if (bucketInfo.getBucketLayout() != null) {
@@ -636,6 +688,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       obib.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketInfo.getMetadataList()));
     }
+    if (!bucketInfo.getTagsList().isEmpty()) {
+      obib.setTags(KeyValueUtil.getFromProtobuf(bucketInfo.getTagsList()));
+    }
     if (bucketInfo.hasBeinfo()) {
       obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
     }
@@ -648,7 +703,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
     }
-    return obib.build();
+    return obib;
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo).build();
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @param buckLayout
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+      BucketLayout buckLayout) {
+    return builderFromProtobuf(bucketInfo, buckLayout).build();
   }
 
   @Override
@@ -693,12 +768,15 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         getUpdateID() == that.getUpdateID() &&
         usedBytes == that.usedBytes &&
         usedNamespace == that.usedNamespace &&
+        snapshotUsedBytes == that.snapshotUsedBytes &&
+        snapshotUsedNamespace == that.snapshotUsedNamespace &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(getMetadata(), that.getMetadata()) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
-        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
+        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig) &&
+        Objects.equals(tags, that.tags);
   }
 
   @Override
@@ -723,11 +801,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", metadata=" + getMetadata() +
         ", usedBytes=" + usedBytes +
         ", usedNamespace=" + usedNamespace +
+        ", snapshotUsedBytes=" + snapshotUsedBytes +
+        ", snapshotUsedNamespace=" + snapshotUsedNamespace +
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
         ", owner=" + owner +
         ", defaultReplicationConfig=" + defaultReplicationConfig +
+        ", tags=" + tags +
         '}';
   }
 }

@@ -19,23 +19,40 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
@@ -73,6 +90,39 @@ public class TestOzoneManagerRequestHandler {
 
   private OzoneFileStatus getMockedOzoneFileStatus() {
     return new OzoneFileStatus(getMockedOmKeyInfo(), 256, false);
+  }
+
+  /**
+   * Create OmKeyInfo object with or without FileEncryptionInfo.
+   */
+  private OmKeyInfo createOmKeyInfoWithEncryption(String keyName, boolean isEncrypted) {
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName("testVolume")
+        .setBucketName("testBucket")
+        .setKeyName(keyName)
+        .setDataSize(1024L)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, Collections.emptyList())))
+        .setAcls(Collections.emptyList())
+        .setObjectID(1L)
+        .setUpdateID(1L)
+        .setOwnerName("testOwner");
+
+    if (isEncrypted) {
+      FileEncryptionInfo fileEncryptionInfo = new FileEncryptionInfo(
+          CipherSuite.AES_CTR_NOPADDING,
+          CryptoProtocolVersion.ENCRYPTION_ZONES,
+          new byte[32],
+          new byte[16],
+          "testkey1",
+          "testkey1@0"
+      );
+      builder.setFileEncryptionInfo(fileEncryptionInfo);
+    }
+
+    return builder.build();
   }
 
   private void mockOmRequest(OzoneManagerProtocolProtos.OMRequest request,
@@ -166,5 +216,186 @@ public class TestOzoneManagerRequestHandler {
       int expectedSize = Math.max(Math.min(Math.min(10, requestSize), resultSize), 0);
       Assertions.assertEquals(expectedSize, omResponse.getListStatusResponse().getStatusesList().size());
     }
+  }
+
+  /**
+   * Test to verify BasicOmKeyInfo encryption field works in listKeysLight.
+   */
+  @Test
+  public void testListKeysLightEncryptionFromOmKeyInfo() throws IOException {
+    // Create OmKeyInfo objects with and without FileEncryptionInfo
+    OmKeyInfo encryptedOmKeyInfo = createOmKeyInfoWithEncryption("encrypted-key", true);
+    OmKeyInfo normalOmKeyInfo = createOmKeyInfoWithEncryption("normal-key", false);
+
+    // Convert to BasicOmKeyInfo
+    BasicOmKeyInfo encryptedBasicKey = BasicOmKeyInfo.fromOmKeyInfo(encryptedOmKeyInfo);
+    BasicOmKeyInfo normalBasicKey = BasicOmKeyInfo.fromOmKeyInfo(normalOmKeyInfo);
+
+    Assertions.assertTrue(encryptedBasicKey.isEncrypted());
+    Assertions.assertFalse(normalBasicKey.isEncrypted());
+
+    List<BasicOmKeyInfo> keyInfos = Arrays.asList(encryptedBasicKey, normalBasicKey);
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    Mockito.when(ozoneManager.listKeysLight(Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(new ListKeysLightResult(keyInfos, false));
+    OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    mockOmRequest(request, OzoneManagerProtocolProtos.Type.ListKeysLight, 10);
+    OzoneManagerProtocolProtos.OMResponse omResponse = requestHandler.handleReadRequest(request);
+
+    List<OzoneManagerProtocolProtos.BasicKeyInfo> basicKeyInfoList =
+        omResponse.getListKeysLightResponse().getBasicKeyInfoList();
+
+    Assertions.assertEquals(2, basicKeyInfoList.size());
+    Assertions.assertTrue(basicKeyInfoList.get(0).getIsEncrypted(), "encrypted-key should have isEncrypted=true");
+    Assertions.assertFalse(basicKeyInfoList.get(1).getIsEncrypted(), "normal-key should have isEncrypted=false");
+  }
+
+  /**
+   * Verify that when handleWriteRequestImpl encounters an exception during
+   * validateAndUpdateCache, the audit logger is called with the correct
+   * Transaction index and Command type in the audit message.
+   */
+  @Test
+  public void testWriteRequestExceptionAuditLog() {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    // Set up audit logger mock
+    AuditLogger auditLogger = Mockito.mock(AuditLogger.class);
+    Mockito.when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+
+    // Set up perf metrics (needed by captureLatencyNs)
+    OMPerformanceMetrics perfMetrics = Mockito.mock(OMPerformanceMetrics.class);
+    Mockito.when(perfMetrics.getValidateAndUpdateCacheLatencyNs())
+        .thenReturn(Mockito.mock(MutableRate.class));
+    Mockito.when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
+
+    // Disable ACLs so preExecute doesn't need ACL setup
+    Mockito.when(ozoneManager.getAclsEnabled()).thenReturn(false);
+
+    // Leave getMetrics() returning null -> NPE in validateAndUpdateCache
+    // when OMVolumeCreateRequest calls ozoneManager.getMetrics().incNumVolumeCreates()
+
+    // Build a CreateVolume OMRequest
+    OzoneManagerProtocolProtos.VolumeInfo volInfo =
+        OzoneManagerProtocolProtos.VolumeInfo.newBuilder()
+            .setAdminName("admin").setOwnerName("owner")
+            .setVolume("testVol").build();
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCreateVolumeRequest(
+                OzoneManagerProtocolProtos.CreateVolumeRequest.newBuilder()
+                    .setVolumeInfo(volInfo))
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+            .setClientId("test-client")
+            .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+                .setUserName("testUser").setHostName("localhost")
+                .setRemoteAddress("127.0.0.1"))
+            .build();
+
+    ExecutionContext context = ExecutionContext.of(10, TermIndex.valueOf(1, 10));
+
+    // handleWriteRequestImpl should throw (NPE from null getMetrics())
+    // but the catch block logs the audit message first
+    Assertions.assertThrows(NullPointerException.class,
+        () -> handler.handleWriteRequestImpl(omRequest, context));
+
+    // Verify auditLogger.logWrite was called with correct content
+    ArgumentCaptor<AuditMessage> captor =
+        ArgumentCaptor.forClass(AuditMessage.class);
+    Mockito.verify(auditLogger).logWrite(captor.capture());
+
+    String formatted = captor.getValue().getFormattedMessage();
+    Assertions.assertTrue(formatted.contains("Transaction") && formatted.contains("10"),
+        "Audit message should contain Transaction 10, got: " + formatted);
+    Assertions.assertTrue(formatted.contains("Command") && formatted.contains("CreateVolume"),
+        "Audit message should contain Command CreateVolume, got: " + formatted);
+  }
+
+  @Test
+  public void testSnapshotDiffRoutingUsesCorrectServerMethodBasedOnOptionalFlags()
+      throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyInt(), Mockito.anyBoolean(), Mockito.anyBoolean()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 123L));
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyInt()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.NOT_FOUND, 0L));
+
+    OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder commonReqBuilder =
+        OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+            .setVolumeName("vol")
+            .setBucketName("buck")
+            .setFromSnapshot("s1")
+            .setToSnapshot("s2")
+            .setToken("t")
+            .setPageSize(10);
+
+    // Legacy request: presence of these fields is the backwards-compat signal.
+    OzoneManagerProtocolProtos.SnapshotDiffRequest legacySnapshotDiffRequest =
+        commonReqBuilder.clone()
+            .setForceFullDiff(false)
+            .setDisableNativeDiff(false)
+            .build();
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(legacySnapshotDiffRequest)
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        handler.handleReadRequest(request);
+
+    Mockito.verify(ozoneManager).snapshotDiff("vol", "buck", "s1", "s2", "t",
+        10, false, false);
+    Mockito.verify(ozoneManager, Mockito.never()).snapshotDiff(Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyInt());
+
+    Assertions.assertTrue(response.hasSnapshotDiffResponse());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto.IN_PROGRESS,
+        response.getSnapshotDiffResponse().getJobStatus());
+    Assertions.assertEquals(123L, response.getSnapshotDiffResponse().getWaitTimeInMs());
+
+    Mockito.clearInvocations(ozoneManager);
+
+    // Report-only request: do NOT set forceFullDiff/disableNativeDiff.
+    OzoneManagerProtocolProtos.SnapshotDiffRequest reportOnlySnapshotDiffRequest =
+        commonReqBuilder.clone().build();
+    OzoneManagerProtocolProtos.OMRequest reportOnlyRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(reportOnlySnapshotDiffRequest)
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse reportOnlyResponse =
+        handler.handleReadRequest(reportOnlyRequest);
+
+    Mockito.verify(ozoneManager).snapshotDiff("vol", "buck", "s1", "s2", "t", 10);
+    Mockito.verify(ozoneManager, Mockito.never()).snapshotDiff(Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyInt(), Mockito.anyBoolean(), Mockito.anyBoolean());
+
+    Assertions.assertTrue(reportOnlyResponse.hasSnapshotDiffResponse());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto.NOT_FOUND,
+        reportOnlyResponse.getSnapshotDiffResponse().getJobStatus());
+    Assertions.assertEquals(0L, reportOnlyResponse.getSnapshotDiffResponse().getWaitTimeInMs());
   }
 }

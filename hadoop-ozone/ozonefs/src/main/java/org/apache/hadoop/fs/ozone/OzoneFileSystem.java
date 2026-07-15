@@ -19,7 +19,6 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
-import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -60,7 +59,7 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   public OzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
     String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
-    forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
+    forceRecovery = Boolean.parseBoolean(force);
   }
 
   @Override

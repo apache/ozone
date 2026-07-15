@@ -102,6 +102,25 @@ export type MismatchKeysResponse = {
   keys: MismatchKeys[];
 }
 
+export interface RatisInfo {
+  replicationType: 'RATIS';
+  replicationFactor: string;
+  requiredNodes: number;
+  minimumNodes: number;
+}
+
+export interface EcInfo {
+  replicationType: 'EC';
+  data: number;
+  parity: number;
+  ecChunkSize: number;
+  codec: string;
+  requiredNodes: number;
+  minimumNodes: number;
+}
+
+export type ReplicationInfo = RatisInfo | EcInfo;
+
 // Open Keys
 export type OpenKeys = {
   key: string;
@@ -109,14 +128,7 @@ export type OpenKeys = {
   inStateSince: number;
   size: number;
   replicatedSize: number;
-  replicationInfo: {
-    data: number;
-    parity: number;
-    ecChunkSize: number;
-    codec: string;
-    replicationType: string;
-    requiredNodes: number;
-  }
+  replicationInfo: ReplicationInfo;
   creationTime: number;
   modificationTime: number;
   isKey: boolean;

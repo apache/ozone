@@ -76,7 +76,6 @@ import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -122,15 +121,13 @@ import org.junit.jupiter.api.io.TempDir;
  *     └── bucket4 (Legacy)
  *         └── KEY_ELEVEN
  */
-public class TestNSSummaryEndpointWithOBSAndLegacy {
+public class TestNSSummaryEndpointWithOBSAndLegacy extends NSSummaryTests {
   @TempDir
   private Path temporaryFolder;
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration conf;
-  private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
       "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -340,7 +337,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   @BeforeEach
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     // By setting this config our Legacy buckets will behave like OBS buckets.
     conf.set(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, "false");
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
@@ -372,13 +369,12 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
             reconOMMetadataManager, conf, 10);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-    commonUtils = new CommonUtils();
   }
 
   @Test
@@ -529,13 +525,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   @Test
   public void testGetBasicInfoNoPath() throws Exception {
     // Test invalid path
-    commonUtils.testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
+    testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoKey() throws Exception {
     // Test key
-    commonUtils.testNSSummaryBasicInfoKey(nsSummaryEndpoint);
+    testNSSummaryBasicInfoKey(nsSummaryEndpoint);
   }
 
   @Test
@@ -902,7 +898,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_TWO_OBJECT_ID)
         .build();
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     String expectedPath = "vol/bucket1/" + KEY_TWO;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -913,7 +909,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_FIVE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket2/" + KEY_FIVE;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -924,7 +920,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_EIGHT_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol2/bucket3/" + KEY_EIGHT;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -936,7 +932,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_ELEVEN_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol2/bucket4/" + KEY_ELEVEN;
     Assertions.assertEquals(expectedPath, fullPath);
   }
@@ -1450,7 +1446,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
-        ROOT_QUOTA - ROOT_DATA_SIZE, 0L, 0L);
+        ROOT_QUOTA - ROOT_DATA_SIZE, 0L, 0L, 0);
   }
 
 }

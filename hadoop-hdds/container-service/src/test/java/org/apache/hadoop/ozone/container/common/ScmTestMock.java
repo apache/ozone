@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -274,7 +274,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public void updateContainerReport(
       StorageContainerDatanodeProtocolProtos.ContainerReportsProto reports,
       DatanodeDetailsProto datanodeDetails) throws IOException {
-    Preconditions.checkNotNull(reports);
+    Objects.requireNonNull(reports, "reports == null");
     containerReportsCount.incrementAndGet();
     DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
         datanodeDetails);

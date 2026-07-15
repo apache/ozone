@@ -61,7 +61,7 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
     private static final String REFRESH_PERIOD = "refresh.period";
 
     @Config(
-        key = REFRESH_PERIOD,
+        key = "hdds.datanode.df.refresh.period",
         defaultValue = "5m",
         type = ConfigType.TIME,
         tags = { ConfigTag.DATANODE },

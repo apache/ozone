@@ -36,11 +36,12 @@ import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.retry.RetryInvocationHandler;
+import org.apache.hadoop.io_.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -85,7 +86,6 @@ public class TestOzoneTenantShell {
 
   @TempDir
   private static Path path;
-  private static File testFile;
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
@@ -101,12 +101,6 @@ public class TestOzoneTenantShell {
 
   private static final boolean USE_ACTUAL_RANGER = false;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
@@ -126,7 +120,7 @@ public class TestOzoneTenantShell {
       conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     }
 
-    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    File testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
     FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
@@ -360,7 +354,9 @@ public class TestOzoneTenantShell {
   @SuppressWarnings("methodlength")
   public void testOzoneTenantBasicOperations() throws IOException {
 
-    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String) null).stream()
+        .filter(line -> !line.contains("OMSystemAudit"))
+            .collect(Collectors.toList());
     assertEquals(0, lines.size());
 
     executeHA(tenantShell, new String[] {"list"});
@@ -533,14 +529,14 @@ public class TestOzoneTenantShell {
     // Attempt to assign the user to the tenant again
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob"});
+        "--access-id=research$bob"});
     checkOutput(out, "", false);
     checkOutput(err, "accessId 'research$bob' already exists!\n", true);
 
     // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob42"});
+        "--access-id=research$bob42"});
     checkOutput(out, "", false);
     // HDDS-6366: Disallow specifying custom accessId.
     checkOutput(err, "Invalid accessId 'research$bob42'. "

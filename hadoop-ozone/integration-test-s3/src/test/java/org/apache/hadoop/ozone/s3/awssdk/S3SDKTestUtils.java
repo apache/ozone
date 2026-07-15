@@ -20,8 +20,23 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ozone.test.InputSubstream;
 
@@ -29,6 +44,69 @@ import org.apache.ozone.test.InputSubstream;
  * Utilities for S3 SDK tests.
  */
 public final class S3SDKTestUtils {
+
+  /**
+   * Key names from ceph s3-tests {@code test_bucket_create_special_key_names}.
+   */
+  public static final List<String> S3_SPECIAL_KEY_NAMES = Collections.unmodifiableList(
+      Arrays.asList(" ", "\"",
+          "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__"));
+
+  public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
+
+  /**
+   * One page of a paginated ListBuckets response.
+   */
+  public static final class BucketListPage {
+    private final List<String> bucketNames;
+    private final String continuationToken;
+
+    public BucketListPage(List<String> bucketNames, String continuationToken) {
+      this.bucketNames = bucketNames;
+      this.continuationToken = continuationToken;
+    }
+
+    public List<String> getBucketNames() {
+      return bucketNames;
+    }
+
+    public String getContinuationToken() {
+      return continuationToken;
+    }
+  }
+
+  /**
+   * Lists buckets one per page and returns all bucket names from the pages.
+   *
+   * @param listPage fetches one page; first arg is continuation token (nullable),
+   *                 second arg is max buckets per page
+   */
+  public static List<String> collectBucketsOnePerPage(
+      BiFunction<String, Integer, BucketListPage> listPage) {
+    List<String> found = new ArrayList<>();
+    String continuationToken = null;
+    do {
+      BucketListPage page = listPage.apply(continuationToken, 1);
+      if (page.getBucketNames().size() != 1) {
+        throw new AssertionError(
+            "Expected 1 bucket per page, got " + page.getBucketNames().size());
+      }
+      found.add(page.getBucketNames().get(0));
+      continuationToken = page.getContinuationToken();
+    } while (continuationToken != null);
+    return found;
+  }
+
+  /**
+   * Filters a paginated bucket list down to the buckets created by the test.
+   */
+  public static List<String> filterToExpectedBuckets(
+      List<String> paginatedBuckets, String... expectedBuckets) {
+    Set<String> expected = new HashSet<>(Arrays.asList(expectedBuckets));
+    return paginatedBuckets.stream()
+        .filter(expected::contains)
+        .collect(Collectors.toList());
+  }
 
   private S3SDKTestUtils() {
   }
@@ -75,5 +153,47 @@ public final class S3SDKTestUtils {
 
     file.getFD().sync();
     file.close();
+  }
+
+  /**
+   * Extract the UploadId from XML string.
+   *
+   * @param xml The XML string.
+   * @return The UploadId, or null if not found.
+   */
+  public static String extractUploadId(String xml) {
+    Matcher matcher = UPLOAD_ID_PATTERN.matcher(xml);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+
+  /**
+   * Open an HttpURLConnection with the given parameters.
+   *
+   * @param url        The URL to connect to.
+   * @param httpMethod The HTTP method to use (e.g., "GET", "PUT", "POST", etc.).
+   * @param headers    A map of request headers to set. Can be null.
+   * @param body       The request body as a byte array. Can be null.
+   * @return An open HttpURLConnection.
+   * @throws IOException If an I/O error occurs.
+   */
+  public static HttpURLConnection openHttpURLConnection(URL url, String httpMethod, Map<String, List<String>> headers,
+                                                        byte[] body) throws IOException {
+    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    connection.setRequestMethod(httpMethod);
+    if (headers != null) {
+      headers.forEach((key, values) -> values.forEach(value -> connection.addRequestProperty(key, value)));
+    }
+
+    if (body != null) {
+      connection.setDoOutput(true);
+      try (OutputStream os = connection.getOutputStream()) {
+        IOUtils.write(body, os);
+        os.flush();
+      }
+    }
+    return connection;
   }
 }

@@ -17,7 +17,6 @@
 */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import {
   Dropdown,
   Menu,
@@ -33,13 +32,13 @@ import { ValueType } from 'react-select';
 
 import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { getFormattedTime } from '@/v2/utils/momentUtils';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
-import { OpenKeys, OpenKeysResponse } from '@/v2/types/insights.types';
+import { OpenKeys, OpenKeysResponse, ReplicationInfo } from '@/v2/types/insights.types';
 
 
 //--------Types--------
@@ -55,12 +54,43 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
   paginationConfig,
   handleLimitChange
 }) => {
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [data, setData] = React.useState<OpenKeys[]>();
+  const [isFso, setIsFso] = React.useState<boolean>(true);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
-
-  const cancelSignal = React.useRef<AbortController>();
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  const { 
+    data: openKeysResponse, 
+    loading, 
+  } = useApiData<OpenKeysResponse>(
+    `/api/v1/keys/open?includeFso=${isFso}&includeNonFso=${!isFso}&limit=${limit.value}`,
+    { 
+      lastKey: '',
+      replicatedDataSize: 0,
+      unreplicatedDataSize: 0,
+      fso: [], 
+      nonFSO: [] 
+    },
+    {
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  // Transform the data based on FSO selection
+  const data = React.useMemo(() => {
+    let allOpenKeys: OpenKeys[];
+    if (isFso) {
+      allOpenKeys = openKeysResponse['fso']?.map((key: OpenKeys) => ({
+        ...key,
+        type: 'FSO'
+      })) ?? [];
+    } else {
+      allOpenKeys = openKeysResponse['nonFSO']?.map((key: OpenKeys) => ({
+        ...key,
+        type: 'Non FSO'
+      })) ?? [];
+    }
+    return allOpenKeys;
+  }, [openKeysResponse, isFso]);
 
   function filterData(data: OpenKeys[] | undefined) {
     return data?.filter(
@@ -68,44 +98,9 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
     );
   }
 
-  function fetchOpenKeys(isFso: boolean) {
-    setLoading(true);
-
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/keys/open?includeFso=${isFso}&includeNonFso=${!isFso}&limit=${limit.value}`,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const openKeys: OpenKeysResponse = response?.data ?? { 'fso': [] };
-      let allOpenKeys: OpenKeys[];
-      if (isFso) {
-        allOpenKeys = openKeys['fso']?.map((key: OpenKeys) => ({
-          ...key,
-          type: 'FSO'
-        })) ?? [];
-      } else {
-        allOpenKeys = openKeys['nonFSO']?.map((key: OpenKeys) => ({
-          ...key,
-          type: 'Non FSO'
-        })) ?? [];
-      }
-
-      setData(allOpenKeys);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
-
   const handleKeyTypeChange: MenuProps['onClick'] = (e) => {
-    if (e.key === 'fso') {
-      fetchOpenKeys(true);
-    } else {
-      fetchOpenKeys(false);
-    }
+    // The hook will automatically refetch when the URL changes due to isFso change
+    setIsFso(e.key === 'fso');
   }
 
   const COLUMNS: ColumnsType<OpenKeys> = [{
@@ -134,29 +129,30 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
     }
   },
   {
-    title: 'Replication Factor',
+    title: 'Replication Type',
     dataIndex: 'replicationInfo',
-    key: 'replicationfactor',
-    render: (replicationInfo: any) => (
+    key: 'replicationtype',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
-        {Object.values(replicationInfo)[0]}
+        {replicationInfo.replicationType}
       </div>
     )
   },
   {
-    title: 'Replication Type',
+    title: 'Replication Factor',
     dataIndex: 'replicationInfo',
-    key: 'replicationtype',
-    render: (replicationInfo: any) => (
+    key: 'replicationfactor',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          <div >
-            {Object.values(replicationInfo)[2]}
-          </div>
+          (replicationInfo.replicationType === "RATIS")
+          ? replicationInfo.replicationFactor
+          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
         }
       </div>
     )
-  }, {
+  },
+  {
     title: <>
       <Dropdown
         overlay={
@@ -172,13 +168,6 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
     key: 'type',
     render: (type: string) => <div key={type}>{type}</div>
   }];
-
-  React.useEffect(() => {
-    // Fetch FSO open keys by default
-    fetchOpenKeys(true);
-
-    return (() => cancelSignal.current && cancelSignal.current.abort());
-  }, [limit.value]);
 
   return (
     <>

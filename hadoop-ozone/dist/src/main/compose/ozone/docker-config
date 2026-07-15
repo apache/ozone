@@ -28,6 +28,7 @@ OZONE-SITE.XML_ozone.scm.block.size=1MB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
@@ -36,10 +37,21 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
+OZONE-SITE.XML_ozone.recon.scm.container.sync.task.initial.delay=30s
+OZONE-SITE.XML_ozone.recon.scm.container.sync.task.interval.delay=2m
+OZONE-SITE.XML_ozone.recon.scm.snapshot.task.interval.delay=30m
+OZONE-SITE.XML_ozone.recon.scm.container.threshold=20
+OZONE-SITE.XML_ozone.recon.scm.per.state.drift.threshold=1
+OZONE-SITE.XML_ozone.recon.scm.deleted.container.check.batch.size=50
+OZONE-SITE.XML_hdds.heartbeat.recon.interval=5m
+OZONE-SITE.XML_hdds.container.report.interval=1h
+OZONE-SITE.XML_hdds.pipeline.report.interval=5m
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
@@ -48,15 +60,15 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.heartbeat.interval=5s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=15s
-OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=5s
-OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=10s
+OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=2m
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
 OZONE-SITE.XML_ozone.fs.hsync.enabled=true
-
+OZONE-SITE.XML_ozone.recon.dn.metrics.collection.minimum.api.delay=5s
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
@@ -64,3 +76,22 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Periodic snapshot defrag for smoketest snapshot/snapshot-defrag.robot (HDDS-15181)
+OZONE-SITE.XML_ozone.snapshot.defrag.service.interval=30s
+
+# Recon AI Chatbot — DISABLED by default.
+#
+# WARNING: The plaintext API key approach shown below is for LOCAL DOCKER
+# TESTING ONLY. It must NOT be used on production clusters because plaintext
+# keys are exposed via 'hadoop conf | grep api.key' and via Recon's /conf HTTP
+# endpoint. For production clusters, store the key in a Hadoop JCEKS credential
+# store instead (see ozone-site.xml.template for full setup instructions).
+#
+# To enable the chatbot locally for testing:
+#   1. Uncomment the lines below.
+#   2. Replace YOUR_GEMINI_API_KEY_HERE with a real key.
+#   3. Never commit a real key to git — rotate it immediately if you do.
+# OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
+# OZONE-SITE.XML_ozone.recon.chatbot.provider=gemini
+# OZONE-SITE.XML_ozone.recon.chatbot.gemini.api.key=YOUR_GEMINI_API_KEY_HERE

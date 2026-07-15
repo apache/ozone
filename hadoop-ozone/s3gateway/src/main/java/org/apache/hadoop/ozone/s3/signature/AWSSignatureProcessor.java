@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -79,9 +80,11 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     for (SignatureParser parser : signatureParsers) {
       try {
         signatureInfo = parser.parseSignature();
+      } catch (AccessDeniedResourceException e) {
+        AUDIT.logAuthFailure(buildAuthFailureMessage(e));
+        throw S3ErrorTable.newError(ACCESS_DENIED, e.getResource());
       } catch (MalformedResourceException e) {
-        AuditMessage message = buildAuthFailureMessage(e);
-        AUDIT.logAuthFailure(message);
+        AUDIT.logAuthFailure(buildAuthFailureMessage(e));
         throw S3ErrorTable.newError(MALFORMED_HEADER, e.getResource());
       }
       if (signatureInfo != null) {
@@ -197,7 +200,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     @Override
     public String remove(Object key) {
-      return delegate.remove(key.toString());
+      return delegate.remove(key.toString().toLowerCase());
     }
 
     @Override

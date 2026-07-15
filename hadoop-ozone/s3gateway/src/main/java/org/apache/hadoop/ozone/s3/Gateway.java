@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -61,6 +63,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   /** Servlets and static content on separate port. */
   private BaseHttpServer contentServer;
   private S3GatewayMetrics metrics;
+  private NettyMetrics nettyMetrics;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
@@ -81,6 +84,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
     httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
     contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
+    nettyMetrics = NettyMetrics.create();
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -108,10 +112,12 @@ public class Gateway extends GenericCli implements Callable<Void> {
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
-    httpServer.stop();
-    contentServer.stop();
+    IOUtils.closeQuietly(httpServer, contentServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
+    if (nettyMetrics != null) {
+      nettyMetrics.unregister();
+    }
   }
 
   private static void loginS3GUser(OzoneConfiguration conf)

@@ -55,14 +55,13 @@ public class TestXceiverClientMetrics {
   private volatile boolean breakFlag;
   private CountDownLatch latch;
 
-  private static OzoneConfiguration config;
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
   @BeforeAll
   public static void init() throws Exception {
-    config = new OzoneConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(config).build();
     cluster.waitForClusterToBeReady();
     storageContainerLocationClient = cluster

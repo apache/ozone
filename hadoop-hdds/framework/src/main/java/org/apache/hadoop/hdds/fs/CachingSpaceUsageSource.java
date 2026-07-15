@@ -26,6 +26,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -50,7 +51,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   private long cachedUsedSpace;
   private long cachedAvailable;
   private long cachedCapacity;
-  private SpaceUsageSource cachedUsage;
+  private Fixed cachedUsage;
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -102,7 +103,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   @Override
-  public SpaceUsageSource snapshot() {
+  public Fixed snapshot() {
     try (AutoCloseableLock ignored = lock.readLock(null, null)) {
       if (cachedUsage != null) {
         return cachedUsage;
@@ -120,7 +121,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (usedSpace == 0) {
       return;
     }
-    Preconditions.assertTrue(usedSpace > 0, () -> usedSpace + " < 0");
+    if (usedSpace < 0) {
+      LOG.warn("Ignoring negative incrementUsedSpace({}) for {}", usedSpace, source);
+      return;
+    }
+
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedAvailable;
@@ -140,7 +145,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (reclaimedSpace == 0) {
       return;
     }
-    Preconditions.assertTrue(reclaimedSpace > 0, () -> reclaimedSpace + " < 0");
+    if (reclaimedSpace < 0) {
+      LOG.warn("Ignoring negative reclaimedSpace({}) for {}", reclaimedSpace, source);
+      return;
+    }
+
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedUsedSpace;
@@ -251,9 +260,13 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       return null;
     }
 
-    return Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DiskUsage-" + params.getPath() + "-%n")
-            .build());
+    return Executors.newScheduledThreadPool(1, threadFactoryFor(params));
+  }
+
+  static ThreadFactory threadFactoryFor(SpaceUsageCheckParams params) {
+    return new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("DiskUsage-" + params.getPath() + "-%d")
+        .build();
   }
 }

@@ -86,7 +86,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       defaultValue = "10")
   private int numOfWriteOperations;
 
-  private OzoneConfiguration ozoneConfiguration;
   private Timer timer;
   private ContentGenerator contentGenerator;
   private int readThreadCount;
@@ -115,7 +114,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     print("numOfReadOperations: " + numOfReadOperations);
     print("numOfWriteOperations: " + numOfWriteOperations);
 
-    ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     contentGenerator = new ContentGenerator(size.toBytes(), bufferSize);
     timer = getMetrics().timer("om-bucket-read-write-ops");
 

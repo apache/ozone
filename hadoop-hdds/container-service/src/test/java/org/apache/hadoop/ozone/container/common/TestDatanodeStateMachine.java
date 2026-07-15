@@ -27,7 +27,6 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +39,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -70,7 +69,6 @@ public class TestDatanodeStateMachine {
   // Changing it to 1, as current code checks for multiple scm directories,
   // and fail if exists
   private static final int SCM_SERVER_COUNT = 1;
-  private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
   private ExecutorService executorService;
@@ -89,21 +87,13 @@ public class TestDatanodeStateMachine {
         true);
     conf.setBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-    serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
     for (int x = 0; x < SCM_SERVER_COUNT; x++) {
-      int port = SCMTestUtils.getReuseableAddress().getPort();
-      String address = "127.0.0.1";
-      serverAddresses.add(address + ":" + port);
       ScmTestMock mock = new ScmTestMock();
-      scmServers.add(SCMTestUtils.startScmRpcServer(conf, mock,
-          new InetSocketAddress(address, port), 10));
+      scmServers.add(SCMTestUtils.startScmRpcServer(conf, mock));
       mockServers.add(mock);
     }
-
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
-        serverAddresses.toArray(new String[0]));
 
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)

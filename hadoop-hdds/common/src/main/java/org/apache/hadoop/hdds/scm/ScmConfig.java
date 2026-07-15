@@ -31,24 +31,24 @@ import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 public class ScmConfig extends ReconfigurableConfig {
   public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION = "hdds.scm.unknown-container.action";
 
-  @Config(key = "kerberos.principal",
+  @Config(key = "hdds.scm.kerberos.principal",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "This Kerberos principal is used by the SCM service."
+      defaultValue = "SCM/_HOST@REALM",
+      tags = { ConfigTag.SCM, ConfigTag.SECURITY, ConfigTag.OZONE },
+      description = "The SCM service principal. e.g. scm/_HOST@REALM.COM"
   )
   private String principal;
 
-  @Config(key = "kerberos.keytab.file",
+  @Config(key = "hdds.scm.kerberos.keytab.file",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      defaultValue = "/etc/security/keytabs/SCM.keytab",
+      tags = { ConfigTag.SCM, ConfigTag.SECURITY, ConfigTag.OZONE },
       description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )
   private String keytab;
 
-  @Config(key = "unknown-container.action",
+  @Config(key = "hdds.scm.unknown-container.action",
       type = ConfigType.STRING,
       defaultValue = "WARN",
       tags = { ConfigTag.SCM, ConfigTag.MANAGEMENT },

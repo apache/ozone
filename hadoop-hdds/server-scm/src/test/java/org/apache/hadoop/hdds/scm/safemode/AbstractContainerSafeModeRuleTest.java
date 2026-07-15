@@ -1,0 +1,275 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm.safemode;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
+import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
+
+/**
+ * Abstract base class for container safe mode rule tests.
+ */
+public abstract class AbstractContainerSafeModeRuleTest {
+  private final List<ContainerInfo> deletedContainers = new ArrayList<>();
+  private List<ContainerInfo> containers;
+  private SCMSafeModeManager safeModeManager;
+  private ConfigurationSource conf;
+  private ContainerManager containerManager;
+  private EventQueue eventQueue;
+  private AbstractContainerSafeModeRule safeModeRule;
+  private SafeModeMetrics safeModeMetrics;
+
+  @BeforeEach
+  public void setup() throws ContainerNotFoundException {
+    containerManager = mock(ContainerManager.class);
+    conf = mock(ConfigurationSource.class);
+    eventQueue = mock(EventQueue.class);
+    safeModeManager = mock(SCMSafeModeManager.class);
+    safeModeMetrics = mock(SafeModeMetrics.class);
+
+    when(safeModeManager.getSafeModeMetrics()).thenReturn(safeModeMetrics);
+    when(conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
+    containers = new ArrayList<>();
+    when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
+    when(containerManager.getContainers(LifeCycleState.DELETED)).thenReturn(deletedContainers);
+    when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
+      ContainerID id = invocation.getArgument(0);
+      return containers.stream()
+          .filter(c -> c.containerID().equals(id))
+          .findFirst()
+          .orElseThrow(ContainerNotFoundException::new);
+    });
+
+    safeModeRule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    safeModeRule.setValidateBasedOnReportProcessing(false);
+  }
+
+  @Test
+  public void testRefreshInitializeContainers() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 1L));
+    containers.add(mockContainer(LifeCycleState.CLOSED, 2L));
+    containers.add(mockContainer(LifeCycleState.CLOSED, 8L));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+    assertEquals(2, rule.getTotalNumberOfContainers(), "Total number of containers should be 2");
+    deletedContainers.add(mockContainer(LifeCycleState.DELETED, 8L));
+    rule.refresh(true);
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold());
+    assertEquals(1, rule.getTotalNumberOfContainers(), "Total number of containers should be 1 after delete");
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = LifeCycleState.class,
+      names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
+  public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
+    containers.add(mockContainer(state, 1L));
+    if (state == LifeCycleState.DELETED) {
+      deletedContainers.add(mockContainer(state, 1L));
+    }
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+
+    boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
+    assertEquals(expected, rule.validate());
+  }
+
+  @Test
+  public void testProcessContainer() {
+    long containerId = 123L;
+    containers.add(mockContainer(LifeCycleState.CLOSED, containerId));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold());
+
+    // Send as many distinct reports as the container's minReplica requires
+    int minReplica = rule.getMinReplica(ContainerID.valueOf(containerId));
+    for (int i = 0; i < minReplica; i++) {
+      rule.process(getNewContainerReport(containerId));
+    }
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold());
+  }
+
+  private NodeRegistrationContainerReport getNewContainerReport(long containerID) {
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+
+    when(replica.getContainerID()).thenReturn(containerID);
+    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(containerReport);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
+
+    return report;
+  }
+
+  @Test
+  public void testAllContainersClosed() {
+    containers.add(mockContainer(LifeCycleState.CLOSED, 1L));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+    containers.add(mockContainer(LifeCycleState.CLOSED, 11L));
+    containers.add(mockContainer(LifeCycleState.CLOSED, 32L));
+    rule.refresh(true);
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
+    assertFalse(rule.validate(), "Validate should return false when all containers are closed");
+    assertEquals(1, rule.getTotalNumberOfContainers(), "Total number of containers should be 1 even after refresh");
+  }
+
+  @Test
+  public void testAllContainersOpen() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 11L));
+    containers.add(mockContainer(LifeCycleState.OPEN, 32L));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
+    assertTrue(rule.validate(), "Validate should return true when all containers are open");
+
+    containers.add(mockContainer(LifeCycleState.OPEN, 11L));
+    containers.add(mockContainer(LifeCycleState.OPEN, 32L));
+    rule.refresh(true);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 after refresh also");
+    assertTrue(rule.validate(), "Validate should return true when all containers are open");
+  }
+
+  @Test
+  public void testRefreshRecordsDurationAndIncrementsRefreshCount() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 1L));
+    int count = 3;
+    for (int i = 0; i < count; i++) {
+      safeModeRule.refresh(true);
+    }
+
+    ArgumentCaptor<Long> durationCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(safeModeMetrics, times(count)).incNumContainerSafeModeRuleRefreshes();
+    verify(safeModeMetrics, times(count)).setLastContainerSafeModeRuleRefreshDurationMs(
+        eq(getReplicationType()), durationCaptor.capture());
+    durationCaptor.getAllValues().forEach(durationMs -> assertTrue(durationMs >= 0L));
+  }
+
+  @Test
+  public void testRefreshSkippedWhenValidWithoutForce() {
+    containers.add(mockContainer(LifeCycleState.OPEN, 1L));
+
+    safeModeRule.refresh(false);
+
+    verify(safeModeMetrics, never()).incNumContainerSafeModeRuleRefreshes();
+    verify(safeModeMetrics, never()).setLastContainerSafeModeRuleRefreshDurationMs(any(), anyLong());
+  }
+
+  @Test
+  public void testDuplicateContainerIdsInReports() {
+    long containerId = 42L;
+    containers.add(mockContainer(LifeCycleState.OPEN, containerId));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(false);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(containerReport);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
+
+    rule.process(report);
+    rule.process(report);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Duplicated containers should be counted only once");
+  }
+
+  @Test
+  public void testValidateBasedOnReportProcessingTrue() {
+    long containerId = 1L;
+    containers.add(mockContainer(LifeCycleState.OPEN, containerId));
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    rule.setValidateBasedOnReportProcessing(true);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(reportsProto);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
+
+    rule.process(report);
+
+    assertTrue(rule.validate(), "Should validate based on reported containers");
+  }
+
+  protected abstract ReplicationType getReplicationType();
+
+  protected abstract AbstractContainerSafeModeRule createRule(
+      EventQueue eventQueueParam,
+      ConfigurationSource confParam,
+      ContainerManager containerManagerParam,
+      SCMSafeModeManager safeModeManagerParam
+  );
+
+  protected abstract ContainerInfo mockContainer(LifeCycleState state, long containerID);
+}

@@ -54,6 +54,7 @@ class SendContainerRequestHandler
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
+  private long spaceToReserve = 0;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -84,7 +85,12 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
-        volume = importer.chooseNextVolume();
+        
+        // Use container size if available, otherwise fall back to default
+        spaceToReserve = importer.getSpaceToReserve(
+            req.hasSize() ? req.getSize() : null);
+
+        volume = importer.chooseNextVolume(spaceToReserve);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
@@ -117,8 +123,8 @@ class SendContainerRequestHandler
       deleteTarball();
       responseObserver.onError(t);
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }
@@ -146,8 +152,8 @@ class SendContainerRequestHandler
         responseObserver.onError(t);
       }
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }

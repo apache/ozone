@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -107,8 +109,10 @@ public class TestOzoneManagerSnapshotAcl {
   public static void init() throws Exception {
     UserGroupInformation.setLoginUser(ADMIN_UGI);
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
 
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.secure().nextNumeric(32);
@@ -685,7 +689,7 @@ public class TestOzoneManagerSnapshotAcl {
         .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
     // Allow the snapshot to be written to disk
     String fileName =
-        getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
+        getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {

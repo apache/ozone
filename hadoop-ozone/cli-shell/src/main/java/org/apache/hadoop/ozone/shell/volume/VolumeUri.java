@@ -28,7 +28,7 @@ import picocli.CommandLine;
 public class VolumeUri implements CommandLine.ITypeConverter<OzoneAddress> {
 
   private static final String OZONE_VOLUME_URI_DESCRIPTION =
-      "URI of the volume.\n" + Shell.OZONE_URI_DESCRIPTION;
+      "URI of the volume.%n" + Shell.OZONE_URI_DESCRIPTION;
 
   @CommandLine.Parameters(index = "0", arity = "1..1",
       description = OZONE_VOLUME_URI_DESCRIPTION,

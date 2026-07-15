@@ -58,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Single point to schedule the downloading tasks based on priorities.
+ * Single point to schedule container replication tasks based on priorities.
  */
 public final class ReplicationSupervisor {
 
@@ -90,9 +90,9 @@ public final class ReplicationSupervisor {
   }
 
   /**
-   * A set of container IDs that are currently being downloaded
-   * or queued for download. Tracked so we don't schedule > 1
-   * concurrent download for the same container. Note that the uniqueness of a
+   * A set of container IDs that are currently being sent
+   * or queued. Tracked so we don't schedule > 1
+   * concurrent replications for the same container. Note that the uniqueness of a
    * task is defined by the tasks equals and hashCode methods.
    */
   private final Set<AbstractReplicationTask> inFlight;
@@ -227,7 +227,7 @@ public final class ReplicationSupervisor {
   }
 
   /**
-   * Queue an asynchronous download of the given container.
+   * Queue an asynchronous replication of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
     if (queueHasRoomFor(task)) {
@@ -346,21 +346,31 @@ public final class ReplicationSupervisor {
 
   public void nodeStateUpdated(HddsProtos.NodeOperationalState newState) {
     if (state.getAndSet(newState) != newState) {
-      int threadCount = replicationConfig.getReplicationMaxStreams();
-      int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
-
-      if (isMaintenance(newState) || isDecommission(newState)) {
-        threadCount = replicationConfig.scaleOutOfServiceLimit(threadCount);
-        newMaxQueueSize =
-            replicationConfig.scaleOutOfServiceLimit(newMaxQueueSize);
-      }
-
-      LOG.info("Node state updated to {}, scaling executor pool size to {}",
-          newState, threadCount);
-
-      maxQueueSize = newMaxQueueSize;
-      executorThreadUpdater.accept(threadCount);
+      resize(newState);
     }
+  }
+
+  public void setReplicationMaxStreams(int replicationMaxStreams) {
+    replicationConfig.setReplicationMaxStreams(replicationMaxStreams);
+    resize(state.get());
+  }
+
+  private void resize(HddsProtos.NodeOperationalState nodeState) {
+    int threadCount = replicationConfig.getReplicationMaxStreams();
+    int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
+
+    if (isMaintenance(nodeState) || isDecommission(nodeState)) {
+      threadCount = replicationConfig.scaleOutOfServiceLimit(threadCount);
+      newMaxQueueSize =
+          replicationConfig.scaleOutOfServiceLimit(newMaxQueueSize);
+    }
+
+    LOG.info("Scaling replication supervisor for node state {} to executor " +
+        "pool size {} and queue size {}", nodeState, threadCount,
+        newMaxQueueSize);
+
+    maxQueueSize = newMaxQueueSize;
+    executorThreadUpdater.accept(threadCount);
   }
 
   /**
@@ -389,15 +399,6 @@ public final class ReplicationSupervisor {
         }
 
         if (context != null) {
-          DatanodeDetails dn = context.getParent().getDatanodeDetails();
-          if (dn != null && dn.getPersistedOpState() !=
-              HddsProtos.NodeOperationalState.IN_SERVICE
-              && task.shouldOnlyRunOnInServiceDatanodes()) {
-            LOG.info("Ignoring {} since datanode is not in service ({})",
-                this, dn.getPersistedOpState());
-            return;
-          }
-
           final OptionalLong currentTerm = context.getTermOfLeaderSCM();
           final long taskTerm = task.getTerm();
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {

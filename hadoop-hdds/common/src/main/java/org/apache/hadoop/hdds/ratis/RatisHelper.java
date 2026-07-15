@@ -36,6 +36,7 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.net.ssl.TrustManager;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -125,18 +126,13 @@ public final class RatisHelper {
   }
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
-    if (datanodeUseHostName()) {
-      final String address =
-              id.getHostName() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using hostname for raft peer address: {}",
-              address);
-      return address;
-    } else {
-      final String address =
-              id.getIpAddress() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using IP for raft peer address: {}", address);
-      return address;
-    }
+    final boolean useHostName = datanodeUseHostName();
+    final String address = HddsUtils.getHostPortString(
+        useHostName ? id.getHostName() : id.getIpAddress(),
+        id.getPort(port).getValue());
+    LOG.debug("Datanode is using {} for raft peer address: {}",
+        useHostName ? "hostname" : "IP", address);
+    return address;
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {
@@ -544,6 +540,12 @@ public final class RatisHelper {
           + group.getPeers().stream().map(RaftPeer::getId)
               .collect(Collectors.toList()) + ".");
     }
+    if (!group.getPeer(targetPeerId).getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER)) {
+      throw new IOException("Target " + targetPeerId + " not in FOLLOWER role. "
+          + group.getPeers().stream()
+          .map(p -> p.getId() + ":" + p.getStartupRole())
+          .collect(Collectors.toList()) + ".");
+    }
 
     LOG.info("Start transferring leadership to {}", targetPeerId);
     try (RaftClient client = newRaftClient(SupportedRpcType.GRPC, null,
@@ -566,13 +568,19 @@ public final class RatisHelper {
       RaftClientReply setConf = null;
       try {
         // Set priority
-        final List<RaftPeer> peersWithNewPriorities = group.getPeers().stream()
+        final List<RaftPeer> followerWithNewPriorities = group.getPeers().stream()
+            .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER))
+            .map(peer -> newRaftPeer(peer, targetPeerId))
+            .collect(Collectors.toList());
+        final List<RaftPeer> listenerWithNewPriorities = group.getPeers().stream()
+            .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.LISTENER))
             .map(peer -> newRaftPeer(peer, targetPeerId))
             .collect(Collectors.toList());
         // Set new configuration
-        setConf = client.admin().setConfiguration(peersWithNewPriorities);
+        setConf = client.admin().setConfiguration(followerWithNewPriorities, listenerWithNewPriorities);
         if (setConf.isSuccess()) {
-          LOG.info("Successfully set priority: {}", peersWithNewPriorities);
+          LOG.info("Successfully set priority: Follower: {}, Listener: {}", followerWithNewPriorities,
+              listenerWithNewPriorities);
         } else {
           throw new IOException("Failed to set priority.",
               setConf.getException());
@@ -598,13 +606,19 @@ public final class RatisHelper {
   }
 
   private static void resetPriorities(RaftGroup original, RaftClient client) {
-    final List<RaftPeer> resetPeers = original.getPeers().stream()
+    final List<RaftPeer> resetFollower = original.getPeers().stream()
+        .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER))
         .map(originalPeer -> RaftPeer.newBuilder(originalPeer)
             .setPriority(NEUTRAL_PRIORITY).build())
         .collect(Collectors.toList());
-    LOG.info("Resetting Raft peers priorities to {}", resetPeers);
+    final List<RaftPeer> resetListener = original.getPeers().stream()
+        .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.LISTENER))
+        .map(originalPeer -> RaftPeer.newBuilder(originalPeer)
+            .setPriority(NEUTRAL_PRIORITY).build())
+        .collect(Collectors.toList());
+    LOG.info("Resetting Raft peers priorities to Follower: {}, Listener: {}", resetFollower, resetListener);
     try {
-      RaftClientReply reply = client.admin().setConfiguration(resetPeers);
+      RaftClientReply reply = client.admin().setConfiguration(resetFollower, resetListener);
       if (reply.isSuccess()) {
         LOG.info("Successfully reset priorities: {}", original);
       } else {

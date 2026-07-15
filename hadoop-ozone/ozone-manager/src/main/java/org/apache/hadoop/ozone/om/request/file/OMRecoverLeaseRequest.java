@@ -28,13 +28,13 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -75,8 +75,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String volumeName;
   private String bucketName;
   private String keyName;
-  private OmKeyInfo keyInfo;
-  private String dbFileKey;
   private OmKeyInfo openKeyInfo;
   private String dbOpenFileKey;
   private boolean force;
@@ -88,7 +86,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
 
-    Preconditions.checkNotNull(recoverLeaseRequest);
+    Objects.requireNonNull(recoverLeaseRequest, "recoverLeaseRequest == null");
     volumeName = recoverLeaseRequest.getVolumeName();
     bucketName = recoverLeaseRequest.getBucketName();
     keyName = recoverLeaseRequest.getKeyName();
@@ -124,7 +122,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
-    Preconditions.checkNotNull(recoverLeaseRequest);
+    Objects.requireNonNull(recoverLeaseRequest, "recoverLeaseRequest == null");
 
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volumeName);
@@ -198,9 +196,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         .setErrMsg(errMsg)
         .build();
 
-    dbFileKey = fsoFile.getOzonePathKey();
+    String dbFileKey = fsoFile.getOzonePathKey();
 
-    keyInfo = getKey(dbFileKey);
+    OmKeyInfo keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
       throw new OMException("Key:" + keyName + " not found in keyTable.", KEY_NOT_FOUND);
     }
@@ -230,8 +228,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
             KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
       }
-      openKeyInfo.getMetadata().put(OzoneConsts.LEASE_RECOVERY, "true");
-      openKeyInfo.setUpdateID(transactionLogIndex);
+      openKeyInfo = openKeyInfo.toBuilder()
+          .addMetadata(OzoneConsts.LEASE_RECOVERY, "true")
+          .setUpdateID(transactionLogIndex)
+          .build();
       openKeyInfo.setModificationTime(Time.now());
       // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

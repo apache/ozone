@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import java.util.Objects;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -40,10 +39,8 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
 
   @Override
   public final List<ContainerBlockInfo> chooseContainerForBlockDeletion(
-      int blockCount, Map<Long, ContainerData> candidateContainers)
-      throws StorageContainerException {
-    Preconditions.checkNotNull(candidateContainers,
-        "Internal assertion: candidate containers cannot be null");
+      int blockCount, Map<Long, ContainerData> candidateContainers) {
+    Objects.requireNonNull(candidateContainers, "candidateContainers == null");
 
     int originalBlockCount = blockCount;
     List<ContainerBlockInfo> result = new ArrayList<>();

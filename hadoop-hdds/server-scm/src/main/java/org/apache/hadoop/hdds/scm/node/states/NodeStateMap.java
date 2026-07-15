@@ -17,14 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -39,7 +41,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
  */
 public class NodeStateMap {
   /** Map: {@link DatanodeID} -> ({@link DatanodeInfo}, {@link ContainerID}s). */
-  private final Map<DatanodeID, DatanodeEntry> nodeMap = new HashMap<>();
+  private final Map<DatanodeID, DatanodeEntry> nodeMap = new TreeMap<>();
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -164,11 +166,7 @@ public class NodeStateMap {
     }
   }
 
-  /**
-   * Returns the list of all the nodes as DatanodeInfo objects.
-   *
-   * @return list of all the node ids
-   */
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
   public List<DatanodeInfo> getAllDatanodeInfos() {
     lock.readLock().lock();
     try {
@@ -180,15 +178,9 @@ public class NodeStateMap {
     }
   }
 
-  /**
-   * Returns a list of the nodes as DatanodeInfo objects matching the passed
-   * status.
-   *
-   * @param status - The status of the nodes to return
-   * @return List of DatanodeInfo for the matching nodes
-   */
-  public List<DatanodeInfo> getDatanodeInfos(NodeStatus status) {
-    return filterNodes(matching(status));
+  /** @return a list of datanodes for the matching nodes matching the given status. */
+  public List<DatanodeDetails> getDatanodeDetails(NodeStatus status) {
+    return filterNodes(matching(status), d -> d);
   }
 
   /**
@@ -370,11 +362,16 @@ public class NodeStateMap {
    * @return a list of all nodes matching the {@code filter}
    */
   private List<DatanodeInfo> filterNodes(Predicate<DatanodeInfo> filter) {
+    return filterNodes(filter, Function.identity());
+  }
+
+  private <T> List<T> filterNodes(Predicate<DatanodeInfo> filter, Function<DatanodeInfo, T> converter) {
     lock.readLock().lock();
     try {
       return nodeMap.values().stream()
           .map(DatanodeEntry::getInfo)
           .filter(filter)
+          .map(converter)
           .collect(Collectors.toList());
     } finally {
       lock.readLock().unlock();

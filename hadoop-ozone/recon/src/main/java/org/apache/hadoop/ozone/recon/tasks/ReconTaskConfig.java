@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.recon.task")
 public class ReconTaskConfig {
 
-  @Config(key = "pipelinesync.interval",
+  @Config(key = "ozone.recon.task.pipelinesync.interval",
       type = ConfigType.TIME,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
@@ -38,7 +38,7 @@ public class ReconTaskConfig {
   )
   private Duration pipelineSyncTaskInterval = Duration.ofMinutes(5);
 
-  @Config(key = "missingcontainer.interval",
+  @Config(key = "ozone.recon.task.missingcontainer.interval",
       type = ConfigType.TIME,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
@@ -48,7 +48,7 @@ public class ReconTaskConfig {
   )
   private Duration missingContainerTaskInterval = Duration.ofMinutes(5);
 
-  @Config(key = "safemode.wait.threshold",
+  @Config(key = "ozone.recon.task.safemode.wait.threshold",
       type = ConfigType.TIME,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
@@ -58,7 +58,7 @@ public class ReconTaskConfig {
   )
   private Duration safeModeWaitThreshold = Duration.ofMinutes(5);
 
-  @Config(key = "containercounttask.interval",
+  @Config(key = "ozone.recon.task.containercounttask.interval",
       type = ConfigType.TIME,
       defaultValue = "60s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },

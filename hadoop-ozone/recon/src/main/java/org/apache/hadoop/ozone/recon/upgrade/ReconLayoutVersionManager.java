@@ -90,8 +90,8 @@ public class ReconLayoutVersionManager {
       for (ReconLayoutFeature feature : featuresToFinalize) {
         LOG.debug("Processing feature version: {}", feature.getVersion());
         try {
-          // Fetch only the FINALIZE action for the feature
-          Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
+          // Fetch the action for the feature
+          Optional<ReconUpgradeAction> action = feature.getAction();
           if (action.isPresent()) {
             LOG.debug("Finalize action found for feature version: {}", feature.getVersion());
             // Update the schema version in the database

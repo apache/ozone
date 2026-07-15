@@ -65,7 +65,6 @@ import org.junit.jupiter.api.Test;
 public class TestDatanodeAdminMonitor {
 
   private SimpleMockNodeManager nodeManager;
-  private OzoneConfiguration conf;
   private DatanodeAdminMonitorImpl monitor;
   private DatanodeAdminMonitorTestUtil
           .DatanodeAdminHandler startAdminHandler;
@@ -74,7 +73,7 @@ public class TestDatanodeAdminMonitor {
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     eventQueue = new EventQueue();
     startAdminHandler = new DatanodeAdminMonitorTestUtil
@@ -248,7 +247,7 @@ public class TestDatanodeAdminMonitor {
     // the container's sequence id is greater than the healthy replicas'
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.THREE), containerID.getId(),
+            HddsProtos.ReplicationFactor.THREE), containerID.getIdForTesting(),
         HddsProtos.LifeCycleState.QUASI_CLOSED,
         replicas.iterator().next().getSequenceId() + 1);
     // UNHEALTHY replica is on a unique origin and has same sequence id as
@@ -312,7 +311,7 @@ public class TestDatanodeAdminMonitor {
     // create a container and 3 QUASI_CLOSED replicas with containerID 1 and same origin ID
     ContainerID containerID = ContainerID.valueOf(1);
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(
-        HddsProtos.ReplicationFactor.THREE), containerID.getId(), HddsProtos.LifeCycleState.QUASI_CLOSED);
+        HddsProtos.ReplicationFactor.THREE), containerID.getIdForTesting(), HddsProtos.LifeCycleState.QUASI_CLOSED);
     Set<ContainerReplica> replicas =
         ReplicationTestUtil.createReplicasWithSameOrigin(containerID, State.QUASI_CLOSED, 0, 0, 0);
 

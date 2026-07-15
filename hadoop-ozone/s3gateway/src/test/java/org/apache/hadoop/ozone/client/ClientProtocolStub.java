@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 
 /**
@@ -250,6 +251,45 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKeyIfNotExists(keyName, size, replicationConfig, metadata, tags);
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
+            metadata, tags);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createStreamKeyIfNotExists(keyName, size, replicationConfig,
+            metadata, tags);
+  }
+
+  @Override
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .rewriteStreamKeyIfMatch(keyName, size, expectedETag,
+            replicationConfig, metadata, tags);
+  }
+
+  @Override
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
@@ -271,6 +311,14 @@ public class ClientProtocolStub implements ClientProtocol {
   public void deleteKey(String volumeName, String bucketName, String keyName,
                         boolean recursive) throws IOException {
     getBucket(volumeName, bucketName).deleteKey(keyName);
+  }
+
+  @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName,
+                        boolean recursive, String expectedETag)
+      throws IOException {
+    ((OzoneBucketStub) getBucket(volumeName, bucketName))
+        .deleteKey(keyName, expectedETag);
   }
 
   @Override
@@ -367,6 +415,16 @@ public class ClientProtocolStub implements ClientProtocol {
       Map<Integer, String> partsMap) throws IOException {
     return getBucket(volumeName, bucketName)
         .completeMultipartUpload(keyName, uploadID, partsMap);
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String volumeName, String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .completeMultipartUpload(keyName, uploadID, partsMap,
+            expectedDataGeneration, expectedETag);
   }
 
   @Override
@@ -639,11 +697,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void setIsS3Request(boolean isS3Request) {
-
-  }
-
-  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
@@ -739,6 +792,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
                                            String fromSnapshot,
@@ -747,6 +801,28 @@ public class ClientProtocolStub implements ClientProtocol {
                                            int pageSize,
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       boolean forceFullDiff,
+                                                       boolean disableNativeDiff)
       throws IOException {
     return null;
   }
@@ -803,4 +879,19 @@ public class ClientProtocolStub implements ClientProtocol {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName) throws IOException {
+    return getBucket(volumeName, bucketName).getBucketTagging();
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putBucketTagging(tags);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
+    getBucket(volumeName, bucketName).deleteBucketTagging();
+  }
 }

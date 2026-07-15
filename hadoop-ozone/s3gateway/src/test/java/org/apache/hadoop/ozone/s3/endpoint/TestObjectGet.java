@@ -17,35 +17,44 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -74,52 +83,38 @@ public class TestObjectGet {
 
   private HttpHeaders headers;
   private ObjectEndpoint rest;
-  private OzoneClient client;
-  private ContainerRequestContext context;
+  private OzoneBucket bucket;
 
   @BeforeEach
   public void init() throws OS3Exception, IOException {
     //GIVEN
-    client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
+    bucket = client.getObjectStore().getS3Bucket(BUCKET_NAME);
 
     headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .build();
 
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    rest.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        1, null, null, null, body);
+    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_NAME, CONTENT));
+
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
-
-    context = mock(ContainerRequestContext.class);
-    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-    rest.setContext(context);
+    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
   }
 
   @Test
-  public void get() throws IOException, OS3Exception {
+  public void testGet() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
 
     //THEN
-    OzoneInputStream ozoneInputStream =
-        client.getObjectStore().getS3Bucket(BUCKET_NAME)
-            .readKey(KEY_NAME);
-    String keyContent =
-        IOUtils.toString(ozoneInputStream, UTF_8);
-
-    assertEquals(CONTENT, keyContent);
-    assertEquals(String.valueOf(keyContent.length()),
+    OzoneClientTestUtils.assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
@@ -129,19 +124,86 @@ public class TestObjectGet {
   }
 
   @Test
+  public void testGetIfMatch() throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testGetIfMatchFailure() throws IOException {
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"wrong-etag\"");
+
+    assertErrorResponse(PRECOND_FAILED, () -> get(rest, BUCKET_NAME, KEY_NAME));
+  }
+
+  @Test
+  public void testGetIfNoneMatchReturnsNotModified() throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus());
+  }
+
+  @Test
+  public void testGetIfModifiedSinceReturnsNotModified()
+      throws IOException, OS3Exception {
+    when(headers.getHeaderString(IF_MODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().plusSeconds(60)));
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus());
+  }
+
+  @Test
+  public void testGetIgnoresIfUnmodifiedSinceAfterMatchingIfMatch()
+      throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(IF_UNMODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().minusSeconds(60)));
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testGetIgnoresIfModifiedSinceWhenIfNoneMatchPresent()
+      throws IOException, OS3Exception {
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER))
+        .thenReturn("\"different-etag\"");
+    when(headers.getHeaderString(IF_MODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().plusSeconds(60)));
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
   public void getKeyWithTag() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get(BUCKET_NAME, KEY_WITH_TAG, 0, null, 0, null, null);
+    Response response = get(rest, BUCKET_NAME, KEY_WITH_TAG);
 
     //THEN
-    OzoneInputStream ozoneInputStream =
-        client.getObjectStore().getS3Bucket(BUCKET_NAME)
-            .readKey(KEY_NAME);
-    String keyContent =
-        IOUtils.toString(ozoneInputStream, UTF_8);
-
-    assertEquals(CONTENT, keyContent);
-    assertEquals(String.valueOf(keyContent.length()),
+    OzoneClientTestUtils.assertKeyContent(bucket, KEY_WITH_TAG, CONTENT);
+    assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
@@ -153,9 +215,10 @@ public class TestObjectGet {
   public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
 
-    assertEquals(CONTENT_TYPE1,
+    // Content-Type is not inherited from the request; key1 has none stored.
+    assertEquals("binary/octet-stream",
         response.getHeaderString("Content-Type"));
     assertEquals(CONTENT_LANGUAGE1,
         response.getHeaderString("Content-Language"));
@@ -173,8 +236,7 @@ public class TestObjectGet {
   public void overrideResponseHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    MultivaluedHashMap<String, String> queryParameter =
-        new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParameter = rest.getContext().getUriInfo().getQueryParameters();
     // overrider request header
     queryParameter.putSingle("response-content-type", CONTENT_TYPE2);
     queryParameter.putSingle("response-content-language", CONTENT_LANGUAGE2);
@@ -184,9 +246,7 @@ public class TestObjectGet {
         CONTENT_DISPOSITION2);
     queryParameter.putSingle("response-content-encoding", CONTENT_ENCODING2);
 
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(queryParameter);
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
 
     assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));
@@ -207,13 +267,13 @@ public class TestObjectGet {
     Response response;
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
 
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals("1", response.getHeaderString("Content-Length"));
     assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
     assertEquals(
@@ -226,7 +286,7 @@ public class TestObjectGet {
   @Test
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
@@ -234,10 +294,59 @@ public class TestObjectGet {
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getAndHeadReturnStoredContentType()
+      throws IOException, OS3Exception {
+    // Store a Content-Type, then read with no request Content-Type.
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(CONTENT_TYPE1);
+    assertSucceeds(() -> put(rest, BUCKET_NAME, "typed-key", CONTENT));
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(null);
+
+    // GET and HEAD return the stored Content-Type.
+    assertEquals(CONTENT_TYPE1,
+        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
+    assertEquals(CONTENT_TYPE1,
+        rest.head(BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
+
+    // An object stored without a Content-Type falls back to the default.
+    assertEquals("binary/octet-stream",
+        get(rest, BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
+    assertEquals("binary/octet-stream",
+        rest.head(BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
+  }
+
+  @Test
+  public void getIgnoresRequestContentTypeUsesStored()
+      throws IOException, OS3Exception {
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(CONTENT_TYPE1);
+    assertSucceeds(() -> put(rest, BUCKET_NAME, "typed-key", CONTENT));
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(null);
+
+    // A request Content-Type is ignored; the stored value is returned.
+    doReturn(CONTENT_TYPE2).when(headers).getHeaderString("Content-Type");
+    assertEquals(CONTENT_TYPE1,
+        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
+
+    // No stored Content-Type: request still ignored, default returned.
+    assertEquals("binary/octet-stream",
+        get(rest, BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
+
+    // response-content-type still overrides.
+    MultivaluedMap<String, String> queryParameter =
+        rest.getContext().getUriInfo().getQueryParameters();
+    queryParameter.putSingle("response-content-type", CONTENT_TYPE2);
+    assertEquals(CONTENT_TYPE2,
+        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
   }
 
   private void setDefaultHeader() {
@@ -258,20 +367,17 @@ public class TestObjectGet {
   @Test
   public void testGetWhenKeyIsDirectoryAndDoesNotEndWithASlash()
       throws IOException {
-    // GIVEN
     final String keyPath = "keyDir";
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
     rest.setOzoneConfiguration(config);
-    OzoneBucket bucket = client.getObjectStore().getS3Bucket(BUCKET_NAME);
     bucket.createDirectory(keyPath);
 
-    // WHEN
-    final OS3Exception ex = assertThrows(OS3Exception.class,
-            () -> rest.get(BUCKET_NAME, keyPath, 0, null, 0, null, null));
+    assertErrorResponse(NO_SUCH_KEY, () -> get(rest, BUCKET_NAME, keyPath));
+  }
 
-    // THEN
-    assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
-    bucket.deleteKey(keyPath);
+  private static String formatHttpDate(Instant instant) {
+    return RFC1123Util.FORMAT.format(
+        instant.atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE)));
   }
 }

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -173,8 +174,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
   }
 
   @Override
-  public void addContainerToPipeline(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException {
     getStateManager().addContainerToPipelineForce(pipelineID, containerID);
   }
 }

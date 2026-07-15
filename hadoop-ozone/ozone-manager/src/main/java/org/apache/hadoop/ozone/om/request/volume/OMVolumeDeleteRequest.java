@@ -20,11 +20,14 @@ package org.apache.hadoop.ozone.om.request.volume;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -58,12 +61,40 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
+    DeleteVolumeRequest deleteVolumeRequest =
+        getOmRequest().getDeleteVolumeRequest();
+    Objects.requireNonNull(deleteVolumeRequest);
+    String volume = deleteVolumeRequest.getVolumeName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
+            null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volume);
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.DELETE_VOLUME, auditMap, ex,
+                request.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return request;
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long transactionLogIndex = context.getIndex();
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
-    Preconditions.checkNotNull(deleteVolumeRequest);
+    Objects.requireNonNull(deleteVolumeRequest, "deleteVolumeRequest == null");
 
     String volume = deleteVolumeRequest.getVolumeName();
 
@@ -80,13 +111,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
-            null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -169,6 +193,4 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     }
     return omClientResponse;
   }
-
 }
-

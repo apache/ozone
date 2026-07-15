@@ -112,18 +112,19 @@ public final class NSSummaryCLIUtils {
   }
 
   public static void printEmptyPathRequest() {
-    System.err.println("The path parameter is empty.\n" +
-        "If you mean the root path, use / instead.");
+    System.err.println("The path parameter is empty.");
+    System.err.println("If you mean the root path, use / instead.");
   }
 
   public static void printPathNotFound() {
-    System.err.println("Path not found in the system.\n" +
-        "Did you remove any protocol prefix before the path?");
+    System.err.println("Path not found in the system.");
+    System.err.println("Did you remove any protocol prefix before the path?");
   }
 
   public static void printTypeNA(String requestType) {
     String markUp = "@|underline " + requestType + "|@";
-    System.err.println("Path found in the system.\nBut the entity type " +
+    System.err.println("Path found in the system.");
+    System.err.println("But the entity type " +
         "is not applicable to the " + Ansi.AUTO.string(markUp) + " request");
   }
 
@@ -144,7 +145,7 @@ public final class NSSummaryCLIUtils {
     if (!path.startsWith("ofs://")) {
       return path;
     }
-    int idx = path.indexOf("/", OFS_PREFIX.length());
+    int idx = path.indexOf('/', OFS_PREFIX.length());
     if (idx == -1) {
       return path.substring(OFS_PREFIX.length());
     }

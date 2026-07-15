@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 @ConfigGroup(prefix = "ozone.replication")
 public class ReplicationConfigValidator {
 
-  @Config(key = "allowed-configs",
+  @Config(key = "ozone.replication.allowed-configs",
       defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|"
           + "(EC/(3-2|6-3|10-4)-(512|1024|2048|4096)k)"
           + "$",

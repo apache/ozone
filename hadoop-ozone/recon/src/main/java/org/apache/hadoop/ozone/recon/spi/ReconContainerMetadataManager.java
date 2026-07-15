@@ -19,9 +19,10 @@ package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 
 /**
@@ -48,14 +50,19 @@ public interface ReconContainerMetadataManager {
       throws IOException;
 
   /**
-   * Store the container to Key prefix mapping into the Recon Container DB.
+   * Returns staged DB container metadata manager.
    *
-   * @param containerKeyPrefix the containerId, key-prefix tuple.
-   * @param count              Count of Keys with that prefix.
+   * @param stagedReconDbStore staged Recon DB store
+   * @return ReconContainerMetadataManager
    */
-  @Deprecated
-  void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                Integer count) throws IOException;
+  ReconContainerMetadataManager getStagedReconContainerMetadataManager(DBStore stagedReconDbStore);
+
+  /**
+   * reinitialize the ReconContainerMetadataManage.
+   *
+   * @param reconDBProvider recon DB provider to reinitialize with.
+   */
+  void reinitialize(ReconDBProvider reconDBProvider);
 
   /**
    * Store the container to Key prefix mapping into a batch.
@@ -67,16 +74,6 @@ public interface ReconContainerMetadataManager {
   void batchStoreContainerKeyMapping(BatchOperation batch,
                                      ContainerKeyPrefix containerKeyPrefix,
                                      Integer count) throws IOException;
-
-  /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException
-   */
-  @Deprecated
-  void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
    * Store the containerID -&gt; no. of keys count into a batch.
@@ -98,7 +95,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void storeContainerReplicaHistory(Long containerID,
-      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException;
+      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException;
 
   /**
    * Batch version of storeContainerReplicaHistory.
@@ -107,7 +104,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void batchStoreContainerReplicaHistory(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException;
 
   /**
@@ -142,7 +139,7 @@ public interface ReconContainerMetadataManager {
    * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException
    */
-  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+  Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException;
 
   /**

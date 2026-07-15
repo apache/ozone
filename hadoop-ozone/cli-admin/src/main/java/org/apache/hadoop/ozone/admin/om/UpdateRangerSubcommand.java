@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import java.util.concurrent.Callable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
@@ -39,24 +38,8 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class UpdateRangerSubcommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id", "--om-service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use -id instead. "
-          + "If insists on using -host with OM HA, this must point directly "
-          + "to the leader OM. "
-          + "This option is required when -id is not provided or "
-          + "when HA is not enabled."
-  )
-  private String omHost;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(names = {"--no-wait"},
       description = "Do not wait for task completion. Exit immediately "
@@ -65,15 +48,7 @@ public class UpdateRangerSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-
-    if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify -id or -host");
-      return null;
-    }
-
-    boolean forceHA = false;
-    try (OzoneManagerProtocol client = parent.createOmClient(
-        omServiceId, omHost, forceHA)) {
+    try (OzoneManagerProtocol client = omAddressOptions.newClient()) {
 
       boolean res = client.triggerRangerBGSync(noWait);
 

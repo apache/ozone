@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -25,16 +24,12 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
  * Lightweight OmKeyInfo class.
  */
-@JsonIgnoreProperties({
-    "metadata", "objectID", "updateID", "parentObjectID", "objectInfo"
-})
-public final class ReconBasicOmKeyInfo extends WithParentObjectId {
+public final class ReconBasicOmKeyInfo {
 
   private final String volumeName;
   private final String bucketName;
@@ -59,7 +54,7 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
   private final ReplicationConfig replicationConfig;
 
   private final boolean isFile;
-  private long parentId;
+  private final long parentId;
 
   public static Codec<ReconBasicOmKeyInfo> getCodec() {
     return DelegatedCodec.decodeOnly(
@@ -243,6 +238,38 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
             keyInfoProtoLight.getEcReplicationConfig()))
         .setIsFile(!keyName.endsWith("/"))
         .setParentId(keyInfoProtoLight.getParentID());
+
+    return builder.build();
+  }
+
+  /**
+   * Converts a KeyInfo protobuf object into a ReconBasicOmKeyInfo instance.
+   * This method extracts only the essential fields required for Recon event handling, avoiding the overhead of
+   * deserializing unused metadata such as KeyLocationList or ACLs.
+   *
+   * @param keyInfoProto required for deserialization.
+   * @return the deserialized lightweight ReconBasicOmKeyInfo object.
+   */
+  public static ReconBasicOmKeyInfo getFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfoProto) {
+    if (keyInfoProto == null) {
+      return null;
+    }
+
+    String keyName = keyInfoProto.getKeyName();
+
+    Builder builder = new Builder()
+        .setVolumeName(keyInfoProto.getVolumeName())
+        .setBucketName(keyInfoProto.getBucketName())
+        .setKeyName(keyName)
+        .setDataSize(keyInfoProto.getDataSize())
+        .setCreationTime(keyInfoProto.getCreationTime())
+        .setModificationTime(keyInfoProto.getModificationTime())
+        .setReplicationConfig(ReplicationConfig.fromProto(
+            keyInfoProto.getType(),
+            keyInfoProto.getFactor(),
+            keyInfoProto.getEcReplicationConfig()))
+        .setIsFile(!keyName.endsWith("/"))
+        .setParentId(keyInfoProto.getParentID());
 
     return builder.build();
   }

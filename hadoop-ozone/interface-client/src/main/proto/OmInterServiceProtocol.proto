@@ -38,6 +38,7 @@ message BootstrapOMRequest {
     required string nodeId = 1;
     required string hostAddress = 2;
     required uint32 ratisPort = 3;
+    optional bool isListener = 4;
 }
 
 message BootstrapOMResponse {

@@ -67,7 +67,6 @@ import org.mockito.Mockito;
 public class TestNodeDecommissionManager {
 
   private NodeDecommissionManager decom;
-  private StorageContainerManager scm;
   private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
@@ -77,8 +76,8 @@ public class TestNodeDecommissionManager {
   void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    scm = HddsTestUtils.getScm(conf);
-    nodeManager = (SCMNodeManager)scm.getScmNodeManager();
+    StorageContainerManager scm = HddsTestUtils.getScm(conf);
+    nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
@@ -105,7 +104,7 @@ public class TestNodeDecommissionManager {
   private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID conId) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setReplicationConfig(rep)
-        .setContainerID(conId.getId())
+        .setContainerID(conId.getIdForTesting())
         .setPipelineID(PipelineID.randomId())
         .setState(OPEN)
         .setOwner("admin");
@@ -115,8 +114,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testHostStringsParseCorrectly()
       throws InvalidHostStringException {
-    NodeDecommissionManager.HostDefinition def =
-        new NodeDecommissionManager.HostDefinition("foobar");
+    NodeDecommissionManager.HostDefinition def = new NodeDecommissionManager.HostDefinition("foobar");
     assertEquals("foobar", def.getHostname());
     assertEquals(-1, def.getPort());
 
@@ -128,8 +126,7 @@ public class TestNodeDecommissionManager {
     assertEquals("foobar", def.getHostname());
     assertEquals(1234, def.getPort());
 
-    def = new NodeDecommissionManager.HostDefinition(
-        "foobar.mycompany.com:1234");
+    def = new NodeDecommissionManager.HostDefinition("foobar.mycompany.com:1234");
     assertEquals("foobar.mycompany.com", def.getHostname());
     assertEquals(1234, def.getPort());
 

@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.common.base.Preconditions;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -30,6 +30,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -96,7 +97,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public void close() {
-    IOUtils.closeQuietly(transactionBuffer);
+    IOUtils.closeQuietly(transactionBuffer::close);
   }
 
   /**
@@ -141,7 +142,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
   }
 
   @Override
-  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+  public boolean removeSCM(RemoveSCMRequest request) {
     return false;
   }
 
@@ -168,7 +169,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   private class RatisServerStub implements SCMRatisServer {
 
-    private Map<RequestType, Object> handlers =
+    private Map<RequestType, ScmInvoker<?>> invokers =
         new EnumMap<>(RequestType.class);
 
     private RaftPeerId leaderId = RaftPeerId.valueOf(UUID.randomUUID().toString());
@@ -178,9 +179,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public void registerStateMachineHandler(final RequestType handlerType,
-        final Object handler) {
-      handlers.put(handlerType, handler);
+    public void registerStateMachineHandler(final ScmInvoker<?> handler) {
+      invokers.put(handler.getType(), handler);
     }
 
     @Override
@@ -218,26 +218,9 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     private Message process(final SCMRatisRequest request) throws Exception {
-      try {
-        final Object handler = handlers.get(request.getType());
-
-        if (handler == null) {
-          throw new IOException(
-              "No handler found for request type " + request.getType());
-        }
-
-        final Object result = handler.getClass()
-            .getMethod(request.getOperation(),
-                request.getParameterTypes())
-            .invoke(handler, request.getArguments());
-
-        return SCMRatisResponse.encode(result);
-      } catch (NoSuchMethodException | SecurityException ex) {
-        throw new InvalidProtocolBufferException(ex.getMessage());
-      } catch (InvocationTargetException e) {
-        final Throwable target = e.getTargetException();
-        throw target instanceof Exception ? (Exception) target : e;
-      }
+      final ScmInvoker<?> invoker = invokers.get(request.getType());
+      requireNonNull(invoker, "invoker == null");
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
     }
 
     @Override
@@ -273,12 +256,12 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public boolean addSCM(AddSCMRequest request) throws IOException {
+    public boolean addSCM(AddSCMRequest request) {
       return false;
     }
 
     @Override
-    public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+    public boolean removeSCM(RemoveSCMRequest request) {
       return false;
     }
 

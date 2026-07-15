@@ -17,15 +17,21 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -35,13 +41,17 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +61,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconContainerEndpoint {
 
-  private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore store;
@@ -59,9 +68,14 @@ public class TestReconContainerEndpoint {
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    // ContainerKeyMapper tasks share static maps/flags across the JVM; reset so a
+    // prior test method cannot break mapper state for this cluster instance.
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    // Configure multiple task threads for concurrent task execution
+    conf.setInt("ozone.recon.task.thread.count", 6);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -73,13 +87,9 @@ public class TestReconContainerEndpoint {
   }
 
   @AfterEach
-  public void shutdown() throws IOException {
-    if (client != null) {
-      client.close();
-    }
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  public void shutdown() {
+    IOUtils.closeQuietly(client, cluster);
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
   }
 
   @Test
@@ -107,14 +117,24 @@ public class TestReconContainerEndpoint {
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
+    CompletableFuture<Void> completableFuture =
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
+    completableFuture.join();
+    waitUntilReconIndexesKeysForPaths(volName, bucketName,
+        nestedDirKey, singleFileKey);
+
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucketInfo.getBucketLayout());
 
-    // Assuming a known container ID that these keys have been written into
-    long testContainerID = 1L;
+    long testContainerID = getContainerIdForKey(volName, bucketName, nestedDirKey);
 
     // Query the ContainerEndpoint for the keys in the specified container
     Response response = getContainerEndpointResponse(testContainerID);
@@ -134,7 +154,7 @@ public class TestReconContainerEndpoint {
     assertEquals("file1", keyMetadata.getKey());
     assertEquals("testvol/fsobucket/dir1/dir2/dir3/file1", keyMetadata.getCompletePath());
 
-    testContainerID = 2L;
+    testContainerID = getContainerIdForKey(volName, bucketName, singleFileKey);
     response = getContainerEndpointResponse(testContainerID);
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
@@ -168,13 +188,24 @@ public class TestReconContainerEndpoint {
             .getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
+    CompletableFuture<Void> completableFuture =
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
+    completableFuture.join();
+    waitUntilReconIndexesKeysForPaths(volumeName, obsBucketName, obsSingleFileKey);
+
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.OBJECT_STORE, bucketInfo.getBucketLayout());
 
-    // Initialize the ContainerEndpoint
-    long containerId = 1L;
+    long containerId = getContainerIdForKey(volumeName, obsBucketName,
+        obsSingleFileKey);
+
     Response response = getContainerEndpointResponse(containerId);
 
     assertNotNull(response, "Response should not be null.");
@@ -194,20 +225,51 @@ public class TestReconContainerEndpoint {
   private Response getContainerEndpointResponse(long containerId) {
     OzoneStorageContainerManager reconSCM =
         recon.getReconServer().getReconStorageContainerManager();
-    ReconContainerManager reconContainerManager =
-        (ReconContainerManager) reconSCM.getContainerManager();
-    ContainerHealthSchemaManager containerHealthSchemaManager =
-        reconContainerManager.getContainerSchemaManager();
     ReconOMMetadataManager omMetadataManagerInstance =
         (ReconOMMetadataManager)
             recon.getReconServer().getOzoneManagerServiceProvider()
                 .getOMMetadataManagerInstance();
     ContainerEndpoint containerEndpoint =
-        new ContainerEndpoint(reconSCM, containerHealthSchemaManager,
+        new ContainerEndpoint(reconSCM,
+            null, // ContainerHealthSchemaManager - not needed for this test
             recon.getReconServer().getReconNamespaceSummaryManager(),
             recon.getReconServer().getReconContainerMetadataManager(),
-            omMetadataManagerInstance);
+            omMetadataManagerInstance, null);
     return containerEndpoint.getKeysForContainer(containerId, 10, "");
+  }
+
+  /**
+   * Wait until Recon's container-key index reflects all written keys (by container id).
+   * The OM event queue can be empty while a batch is still being processed.
+   */
+  private void waitUntilReconIndexesKeysForPaths(String volumeName,
+      String bucketName, String... keyPaths)
+      throws Exception {
+    Map<Long, Integer> requiredCountByContainer = new HashMap<>();
+    for (String keyPath : keyPaths) {
+      long containerId =
+          getContainerIdForKey(volumeName, bucketName, keyPath);
+      requiredCountByContainer.merge(containerId, 1, Integer::sum);
+    }
+    ReconContainerMetadataManager mgr =
+        recon.getReconServer().getReconContainerMetadataManager();
+    waitUntilReconKeyCounts(mgr, requiredCountByContainer);
+  }
+
+  private long getContainerIdForKey(String volumeName, String bucketName,
+      String keyName) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    OmKeyLocationInfo location = cluster.getOzoneManager()
+        .lookupKey(keyArgs)
+        .getKeyLocationVersions()
+        .get(0)
+        .getBlocksLatestVersionOnly()
+        .get(0);
+    return location.getContainerID();
   }
 
   private void writeTestData(String volumeName, String bucketName,

@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
@@ -56,39 +59,38 @@ import org.slf4j.event.Level;
  * Tests failover with SCM HA setup.
  */
 public class TestFailoverWithSCMHA {
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_OMS = 1;
+  private static final int NUM_OF_SCMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private String scmServiceId;
-  private int numOfOMs = 1;
-  private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
+  private static final String[][] OZONE_ADMIN_SCM_COMMANDS = {
+      {"datanode", "list"},
+      {"pipeline", "list"},
+      {"scm", "roles"},
+      {"container", "list"},
+      {"safemode", "status"}
+  };
+
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
             SNAPSHOT_THRESHOLD);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
-        .setNumOfStorageContainerManagers(numOfSCMs).setNumOfActiveSCMs(3)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setSCMServiceId(SCM_SERVICE_ID).setNumOfOzoneManagers(NUM_OF_OMS)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS).setNumOfActiveSCMs(3)
         .build();
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {
@@ -112,7 +114,7 @@ public class TestFailoverWithSCMHA {
     failoverProxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
-            failoverProxyProvider);
+            failoverProxyProvider, conf);
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
@@ -220,6 +222,39 @@ public class TestFailoverWithSCMHA {
       ContainerBalancerConfigurationProto protobuf =
           ContainerBalancerConfigurationProto.parseFrom(byteString);
       assertFalse(protobuf.getShouldRun());
+    }
+  }
+
+  /**
+   * Verifies that when SCMs are unavailable, the CLI shows retry messages
+   * on stderr before eventually failing for all SCM-querying commands.
+   */
+  @Test
+  public void testRetryMessageShownWhenScmUnavailable() throws Exception {
+    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
+    scmClientConfig.setRetryCount(2);
+    scmClientConfig.setRetryInterval(50);
+    scmClientConfig.setMaxRetryTimeout(150);
+    conf.setFromObject(scmClientConfig);
+
+    Map<String, String> configOverrides = new HashMap<>();
+    cluster.getConf().forEach(entry ->
+        configOverrides.put(entry.getKey(), entry.getValue()));
+
+    cluster.shutdown();
+    cluster = null;
+
+    OzoneAdmin ozoneAdmin = new OzoneAdmin();
+    ozoneAdmin.setConfigurationOverrides(configOverrides);
+
+    for (String[] args : OZONE_ADMIN_SCM_COMMANDS) {
+      try (GenericTestUtils.PrintStreamCapturer err = GenericTestUtils.captureErr()) {
+        ozoneAdmin.execute(args);
+        String stderrOutput = err.get();
+
+        // Retry message format: "... Retrying in Xms after N failover attempt(s)."
+        assertThat(stderrOutput.toLowerCase()).contains("retrying in", "failover attempt(s)");
+      }
     }
   }
 

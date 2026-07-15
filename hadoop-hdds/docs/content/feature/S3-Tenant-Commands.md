@@ -246,6 +246,52 @@ bash-4.2$ ozone tenant user info --json testuser
 }
 ```
 
+### Get tenant user secret key
+
+Get secret key by tenant user access ID.
+
+Unlike `ozone s3 getsecret`, it doesn’t generate a key if the access ID doesn’t exist.
+
+```shell
+ozone tenant user get-secret <ACCESS_ID>
+```
+or
+```shell
+ozone tenant user getsecret <ACCESS_ID>
+```
+
+Example:
+
+```shell
+bash-4.2$ ozone tenant user get-secret 'tenantone$testuser'
+export AWS_ACCESS_KEY_ID='tenantone$testuser'
+export AWS_SECRET_ACCESS_KEY='<GENERATED_SECRET>'
+```
+
+### Set tenant user secret key
+
+Set secret key for a tenant user access ID.
+
+Secret key length should be at least 8 characters.
+
+```shell
+ozone tenant user set-secret <ACCESS_ID> --secret <SECRET_KEY>
+```
+
+or
+
+```shell
+ozone tenant user setsecret <ACCESS_ID> --secret <SECRET_KEY>
+```
+
+Example:
+
+```shell
+bash-4.2$ ozone tenant user set-secret 'tenantone$testuser' --secret 'NEW_SECRET'
+export AWS_ACCESS_KEY_ID='tenantone$testuser'
+export AWS_SECRET_ACCESS_KEY='NEW_SECRET'
+```
+
 ### Revoke a tenant admin
 
 ```shell

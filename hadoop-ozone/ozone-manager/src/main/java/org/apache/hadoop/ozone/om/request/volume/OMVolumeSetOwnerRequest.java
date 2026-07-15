@@ -19,10 +19,11 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -61,15 +62,38 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
 
     long modificationTime = Time.now();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        getOmRequest().getSetVolumePropertyRequest();
+    String volume = setVolumePropertyRequest.getVolumeName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volume);
+        auditMap.put(OzoneConsts.OWNER,
+            setVolumePropertyRequest.getOwnerName());
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.SET_OWNER, auditMap, ex,
+                request.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return request.toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 
@@ -78,7 +102,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     final long transactionLogIndex = context.getIndex();
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
-    Preconditions.checkNotNull(setVolumePropertyRequest);
+    Objects.requireNonNull(setVolumePropertyRequest, "setVolumePropertyRequest == null");
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -108,13 +132,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     String oldOwner = null;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
-      }
-
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
       OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList;
       OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList;
@@ -151,12 +168,11 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           maxUserVolumeCount, transactionLogIndex);
 
       // Set owner with new owner name.
-      omVolumeArgs.setOwnerName(newOwner);
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-
-      // Update modificationTime.
-      omVolumeArgs.setModificationTime(
-          setVolumePropertyRequest.getModificationTime());
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .setOwnerName(newOwner)
+          .setModificationTime(setVolumePropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(

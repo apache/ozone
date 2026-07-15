@@ -18,7 +18,6 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -152,14 +151,10 @@ public final class CompactionLogEntry implements
     public Builder(long dbSequenceNumber, long compactionTime,
                    List<CompactionFileInfo> inputFileInfoList,
                    List<CompactionFileInfo> outputFileInfoList) {
-      Preconditions.checkNotNull(inputFileInfoList,
-          "inputFileInfoList is required parameter.");
-      Preconditions.checkNotNull(outputFileInfoList,
-          "outputFileInfoList is required parameter.");
       this.dbSequenceNumber = dbSequenceNumber;
       this.compactionTime = compactionTime;
-      this.inputFileInfoList = inputFileInfoList;
-      this.outputFileInfoList = outputFileInfoList;
+      this.inputFileInfoList = Objects.requireNonNull(inputFileInfoList, "inputFileInfoList == null");
+      this.outputFileInfoList = Objects.requireNonNull(outputFileInfoList, "outputFileInfoList == null");
     }
 
     public Builder setCompactionReason(String compactionReason) {

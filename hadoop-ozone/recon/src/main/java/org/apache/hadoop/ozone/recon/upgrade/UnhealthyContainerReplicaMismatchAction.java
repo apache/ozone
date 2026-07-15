@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
-import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
@@ -38,16 +37,14 @@ import org.slf4j.LoggerFactory;
  * Upgrade action for handling the addition of a new unhealthy container state in Recon, which will be for containers,
  * that have replicas with different data checksums.
  */
-@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH, type = FINALIZE)
+@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH)
 public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
-  private DataSource dataSource;
   private DSLContext dslContext;
 
   @Override
   public void execute(DataSource source) throws Exception {
-    this.dataSource = source;
-    try (Connection conn = dataSource.getConnection()) {
+    try (Connection conn = source.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;
       }
@@ -89,10 +86,5 @@ public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeActi
 
     LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
         Arrays.toString(enumStates));
-  }
-
-  @Override
-  public UpgradeActionType getType() {
-    return FINALIZE;
   }
 }

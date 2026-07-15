@@ -46,16 +46,13 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHandler {
 
-  private OzoneConfiguration conf;
   private HddsDispatcher dispatcher;
-  private ContainerSet containerSet;
-  private VolumeSet volumeSet;
 
   @BeforeEach
   public void setup() throws Exception {
-    this.conf = new OzoneConfiguration();
-    this.containerSet = mock(ContainerSet.class);
-    this.volumeSet = mock(MutableVolumeSet.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerSet containerSet = mock(ContainerSet.class);
+    VolumeSet volumeSet = mock(MutableVolumeSet.class);
     VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(

@@ -99,7 +99,6 @@ import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -163,7 +162,6 @@ public class TestContainerCommandsEC {
   private static CertificateClient certClient;
 
   private static OzoneBucket classBucket;
-  private static OzoneVolume classVolume;
   private static ReplicationConfig repConfig;
 
   @BeforeAll
@@ -466,11 +464,11 @@ public class TestContainerCommandsEC {
         // To create the actual situation, container would have been in closed
         // state at SCM.
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.FINALIZE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE, 0L);
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.CLOSE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE, 0L);
 
         //Create the recovering container in DN.
         String encodedToken = cToken.encodeToUrlString();
@@ -556,11 +554,11 @@ public class TestContainerCommandsEC {
         // To create the actual situation, container would have been in closed
         // state at SCM.
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.FINALIZE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE, 0L);
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.CLOSE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE, 0L);
 
         //Create the recovering container in target DN.
         String encodedToken = cToken.encodeToUrlString();
@@ -935,14 +933,14 @@ public class TestContainerCommandsEC {
   }
 
   private void closeContainer(long conID)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     //Close the container first.
-    scm.getContainerManager().getContainerStateManager().updateContainerState(
+    scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
-        HddsProtos.LifeCycleEvent.FINALIZE);
-    scm.getContainerManager().getContainerStateManager().updateContainerState(
+        HddsProtos.LifeCycleEvent.FINALIZE, 0L);
+    scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
-        HddsProtos.LifeCycleEvent.CLOSE);
+        HddsProtos.LifeCycleEvent.CLOSE, 0L);
   }
 
   private void checkBlockDataWithRetry(
@@ -1016,7 +1014,7 @@ public class TestContainerCommandsEC {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    classVolume = store.getVolume(volumeName);
+    OzoneVolume classVolume = store.getVolume(volumeName);
     classVolume.createBucket(bucketName);
     classBucket = classVolume.getBucket(bucketName);
     repConfig =
@@ -1038,7 +1036,7 @@ public class TestContainerCommandsEC {
                     .map(ContainerInfo::containerID)
                     .collect(Collectors.toList());
     assertEquals(1, containerIDs.size());
-    containerID = containerIDs.get(0).getId();
+    containerID = containerIDs.get(0).getIdForTesting();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
     assertEquals(1, pipelines.size());
     pipeline = pipelines.get(0);

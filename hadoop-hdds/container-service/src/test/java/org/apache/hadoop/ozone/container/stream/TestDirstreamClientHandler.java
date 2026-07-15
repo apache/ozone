@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.container.stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.netty.buffer.ByteBuf;
@@ -27,8 +29,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test streaming client.
@@ -111,6 +117,32 @@ public class TestDirstreamClientHandler {
 
     assertEquals("xxxx", getContent("asd.txt"));
     assertEquals("yyy", getContent("bsd.txt"));
+  }
+
+  @ParameterizedTest(name = "Invalid format: {0}")
+  @MethodSource("provideInvalidFormatTestCases")
+  public void testInvalidFormat(String testCaseName, String invalidInput) {
+    final DirstreamClientHandler handler = new DirstreamClientHandler(
+        new DirectoryServerDestination(tmpDir));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+      handler.doRead(null, wrap(invalidInput));
+    });
+    assertThat(exception)
+        .hasMessageContaining("Invalid file name format");
+  }
+
+  private static Stream<Arguments> provideInvalidFormatTestCases() {
+    return Stream.of(
+        // Test case: Missing space between size and filename
+        Arguments.of("Missing space", "123File.txt\n"),
+        // Test case: Empty filename after space
+        Arguments.of("Empty filename", "123 \n"),
+        // Test case: Only size number, no filename
+        Arguments.of("Only size", "12345\n"),
+        // Test case: Size is not a number
+        Arguments.of("Invalid size (non-numeric)", "oops filename.txt\n")
+    );
   }
 
   @Nonnull

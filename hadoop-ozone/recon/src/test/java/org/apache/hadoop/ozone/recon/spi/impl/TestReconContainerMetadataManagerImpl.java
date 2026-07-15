@@ -50,7 +50,6 @@ public class TestReconContainerMetadataManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -58,7 +57,7 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -81,7 +80,7 @@ public class TestReconContainerMetadataManagerImpl {
   private void populateKeysInContainers(long containerId1, long containerId2)
       throws Exception {
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     ContainerKeyPrefix containerKeyPrefix1 = ContainerKeyPrefix.get(
         containerId1, keyPrefix1, 0);
     reconContainerMetadataManager
@@ -120,7 +119,7 @@ public class TestReconContainerMetadataManagerImpl {
         "V1/B2/K3", 0);
     prefixCounts.put(ckp3, 3);
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     for (Map.Entry<ContainerKeyPrefix, Integer> entry :
         prefixCounts.entrySet()) {
       reconContainerMetadataManager.batchStoreContainerKeyMapping(
@@ -165,7 +164,7 @@ public class TestReconContainerMetadataManagerImpl {
     prefixCounts.put(keyPrefix2, 2);
     prefixCounts.put(keyPrefix3, 3);
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     for (Map.Entry<String, Integer> entry : prefixCounts.entrySet()) {
       ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(
           containerId, entry.getKey(), 0);
@@ -193,7 +192,7 @@ public class TestReconContainerMetadataManagerImpl {
   public void testStoreContainerKeyCount() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     reconContainerMetadataManager
         .batchStoreContainerKeyCounts(rdbBatchOperation, containerId, 2L);
     reconContainerMetadataManager
@@ -205,7 +204,7 @@ public class TestReconContainerMetadataManagerImpl {
     assertEquals(3,
         reconContainerMetadataManager.getKeyCountForContainer(nextContainerId));
 
-    RDBBatchOperation rdbBatchOperation2 = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation2 = RDBBatchOperation.newAtomicOperation();
     reconContainerMetadataManager
         .batchStoreContainerKeyCounts(rdbBatchOperation2, containerId, 20L);
     reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation2);
@@ -217,7 +216,7 @@ public class TestReconContainerMetadataManagerImpl {
   public void testGetKeyCountForContainer() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     reconContainerMetadataManager
         .batchStoreContainerKeyCounts(rdbBatchOperation, containerId, 2L);
     reconContainerMetadataManager
@@ -237,7 +236,7 @@ public class TestReconContainerMetadataManagerImpl {
   public void testDoesContainerExists() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     reconContainerMetadataManager
         .batchStoreContainerKeyCounts(rdbBatchOperation, containerId, 2L);
     reconContainerMetadataManager
@@ -255,7 +254,7 @@ public class TestReconContainerMetadataManagerImpl {
   public void testGetCountForContainerKeyPrefix() throws Exception {
     long containerId = System.currentTimeMillis();
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     reconContainerMetadataManager.batchStoreContainerKeyMapping(
         rdbBatchOperation, ContainerKeyPrefix.get(containerId, keyPrefix1), 2);
     reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -414,7 +413,7 @@ public class TestReconContainerMetadataManagerImpl {
       }
     });
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     ContainerKeyPrefix prefixForDelete = ContainerKeyPrefix.get(
         containerId, keyPrefix2, 0);
     reconContainerMetadataManager

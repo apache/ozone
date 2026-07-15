@@ -55,8 +55,6 @@ public class TestEndpointBase {
             CUSTOM_METADATA_HEADER_PREFIX + OzoneConsts.GDPR_FLAG, "true");
 
     EndpointBase endpointBase = new EndpointBase() {
-      @Override
-      public void init() { }
     };
 
     Map<String, String> filteredCustomMetadata =
@@ -86,8 +84,6 @@ public class TestEndpointBase {
             new String(new byte[3000], StandardCharsets.UTF_8));
 
     EndpointBase endpointBase = new EndpointBase() {
-      @Override
-      public void init() { }
     };
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> endpointBase
@@ -105,8 +101,6 @@ public class TestEndpointBase {
     s3requestHeaders.add(CUSTOM_METADATA_HEADER_PREFIX.toUpperCase(Locale.ROOT) + key, value);
 
     EndpointBase endpointBase = new EndpointBase() {
-      @Override
-      public void init() { }
     };
 
     Map<String, String> customMetadata = endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);

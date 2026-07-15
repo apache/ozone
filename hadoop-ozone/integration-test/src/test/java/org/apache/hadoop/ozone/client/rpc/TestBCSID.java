@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -59,11 +58,6 @@ public class TestBCSID {
   private static String volumeName;
   private static String bucketName;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
 
@@ -79,7 +73,6 @@ public class TestBCSID {
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
             .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "bcsid";
@@ -88,9 +81,6 @@ public class TestBCSID {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

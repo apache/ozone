@@ -46,7 +46,7 @@ public class OzoneServiceConfig {
   public static final int DEFAULT_SHUTDOWN_HOOK_PRIORITY = 10;
 
   public static final String SERVICE_SHUTDOWN_TIMEOUT =
-      "shutdown.timeout";
+      "ozone.service.shutdown.timeout";
   /** Default shutdown hook timeout: {@value} seconds. */
   public static final String SERVICE_SHUTDOWN_TIMEOUT_DEFAULT = "60s";
 

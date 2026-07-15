@@ -33,7 +33,23 @@ github:
     - HDFS
     - RATIS
   enabled_merge_buttons:
-    squash:  true
+    squash: true
     squash_commit_message: PR_TITLE
-    merge:   false
-    rebase:  false
+    merge: false
+    rebase: false
+  copilot_code_review:
+    enabled: true
+    review_drafts: true
+    review_on_push: true
+  rulesets:
+    - name: "Default Branch Protection"
+      type: branch
+      branches:
+        includes:
+          - "~DEFAULT_BRANCH"
+          - "ozone-*"
+        excludes: []
+      bypass_teams:
+        - root
+      restrict_deletion: true
+      restrict_force_push: true

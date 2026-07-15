@@ -60,17 +60,16 @@ public class TestSnapshotUtils {
   }
 
   private OmKeyInfo createOmKeyInfo(boolean hsync, List<OmKeyLocationInfoGroup> group, long objectId) {
-    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName("vol")
         .setBucketName("bucket")
         .setKeyName("key")
         .setOmKeyLocationInfos(group)
-        .setObjectID(objectId)
-        .build();
+        .setObjectID(objectId);
     if (hsync) {
-      keyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+      builder.addMetadata(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
     }
-    return keyInfo;
+    return builder.build();
   }
 
   @Test

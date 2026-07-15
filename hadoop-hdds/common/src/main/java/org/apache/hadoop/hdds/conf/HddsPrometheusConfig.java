@@ -23,7 +23,7 @@ package org.apache.hadoop.hdds.conf;
 @ConfigGroup(prefix = "hdds.prometheus")
 public class HddsPrometheusConfig {
 
-  @Config(key = "endpoint.token",
+  @Config(key = "hdds.prometheus.endpoint.token",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.MANAGEMENT },

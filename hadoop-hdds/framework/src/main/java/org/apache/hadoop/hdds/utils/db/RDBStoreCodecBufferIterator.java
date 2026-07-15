@@ -32,7 +32,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix, Type type) {
+      CodecBuffer prefix, IteratorType type) {
     super(iterator, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;
@@ -95,66 +95,6 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
       Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
       keyBuffer.release();
       valueBuffer.release();
-    }
-  }
-
-  static class Buffer {
-    private final CodecBuffer.Capacity initialCapacity;
-    private final PutToByteBuffer<RuntimeException> source;
-    private CodecBuffer buffer;
-
-    Buffer(CodecBuffer.Capacity initialCapacity,
-           PutToByteBuffer<RuntimeException> source) {
-      this.initialCapacity = initialCapacity;
-      this.source = source;
-    }
-
-    void release() {
-      if (buffer != null) {
-        buffer.release();
-      }
-    }
-
-    private void prepare() {
-      if (buffer == null) {
-        allocate();
-      } else {
-        buffer.clear();
-      }
-    }
-
-    private void allocate() {
-      if (buffer != null) {
-        buffer.release();
-      }
-      buffer = CodecBuffer.allocateDirect(-initialCapacity.get());
-    }
-
-    CodecBuffer getFromDb() {
-      if (source == null) {
-        return null;
-      }
-
-      for (prepare(); ; allocate()) {
-        final Integer required = buffer.putFromSource(source);
-        if (required == null) {
-          return null; // the source is unavailable
-        } else if (required == buffer.readableBytes()) {
-          return buffer; // buffer size is big enough
-        }
-        // buffer size too small, try increasing the capacity.
-        if (buffer.setCapacity(required)) {
-          buffer.clear();
-          // retry with the new capacity
-          final int retried = buffer.putFromSource(source);
-          Preconditions.assertSame(required.intValue(), retried, "required");
-          return buffer;
-        }
-
-        // failed to increase the capacity
-        // increase initial capacity and reallocate it
-        initialCapacity.increase(required);
-      }
     }
   }
 }

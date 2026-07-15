@@ -26,7 +26,12 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,12 +40,13 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -48,6 +54,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -67,11 +74,14 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
+import org.apache.hadoop.ozone.recon.api.types.ExportJob;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
@@ -82,7 +92,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,7 +103,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class ContainerEndpoint {
 
   private ReconContainerMetadataManager reconContainerMetadataManager;
@@ -104,6 +113,7 @@ public class ContainerEndpoint {
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
+  private final ExportJobManager exportJobManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
@@ -145,7 +155,8 @@ public class ContainerEndpoint {
                            ContainerHealthSchemaManager containerHealthSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
-                           ReconOMMetadataManager omMetadataManager) {
+                           ReconOMMetadataManager omMetadataManager,
+                           ExportJobManager exportJobManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
@@ -154,6 +165,7 @@ public class ContainerEndpoint {
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.omMetadataManager = omMetadataManager;
+    this.exportJobManager = exportJobManager;
   }
 
   /**
@@ -285,7 +297,7 @@ public class ContainerEndpoint {
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
             keyMetadata.setKey(omKeyInfo.getKeyName());
             keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
-                reconNamespaceSummaryManager, omMetadataManager));
+                reconNamespaceSummaryManager));
             keyMetadata.setCreationTime(
                 Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
             keyMetadata.setModificationTime(
@@ -340,7 +352,8 @@ public class ContainerEndpoint {
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
     containerHealthSchemaManager.getUnhealthyContainers(
-            UnHealthyContainerStates.MISSING, 0L, Optional.empty(), limit)
+            ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+            0L, 0L, limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
           try {
@@ -392,46 +405,44 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
-    Optional<Long> maxContainerIdOpt = maxContainerId > 0 ? Optional.of(maxContainerId) : Optional.empty();
-    List<UnhealthyContainerMetadata> unhealthyMeta = new ArrayList<>();
-    List<UnhealthyContainersSummary> summary;
+    return getUnhealthyContainersFromSchema(state, limit, maxContainerId,
+        minContainerId);
+  }
+
+  /**
+   * New implementation - reads from UNHEALTHY_CONTAINERS table.
+   */
+  private Response getUnhealthyContainersFromSchema(
+      String state,
+      int limit,
+      long maxContainerId,
+      long minContainerId) {
+    List<UnhealthyContainerMetadata> unhealthyMeta;
+    List<UnhealthyContainersSummary> summary = new ArrayList<>();
+
     try {
-      UnHealthyContainerStates internalState = null;
+      ContainerSchemaDefinition.UnHealthyContainerStates containerState = null;
 
       if (state != null) {
-        // If an invalid state is passed in, this will throw
-        // illegalArgumentException and fail the request
-        internalState = UnHealthyContainerStates.valueOf(state);
+        containerState = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
       }
 
-      summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
-      List<UnhealthyContainers> containers = containerHealthSchemaManager
-          .getUnhealthyContainers(internalState, minContainerId, maxContainerIdOpt, limit);
+      // Get summary from UNHEALTHY_CONTAINERS table and convert to V1 format
+      List<ContainerHealthSchemaManager.UnhealthyContainersSummary> unhealthyContainersSummary =
+          containerHealthSchemaManager.getUnhealthyContainersSummary();
+      for (ContainerHealthSchemaManager.UnhealthyContainersSummary s : unhealthyContainersSummary) {
+        summary.add(new UnhealthyContainersSummary(s.getContainerState(), s.getCount()));
+      }
 
-      // Filtering out EMPTY_MISSING and NEGATIVE_SIZE containers from the response.
-      // These container states are not being inserted into the database as they represent
-      // edge cases that are not critical to track as unhealthy containers.
-      List<UnhealthyContainers> filteredContainers = containers.stream()
-          .filter(container -> !container.getContainerState()
-              .equals(UnHealthyContainerStates.EMPTY_MISSING.toString())
-              && !container.getContainerState()
-              .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString()))
+      // Get containers from UNHEALTHY_CONTAINERS table
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> unhealthyContainers =
+          containerHealthSchemaManager.getUnhealthyContainers(containerState, minContainerId, maxContainerId, limit);
+
+      unhealthyMeta = unhealthyContainers.stream()
+          .map(this::toUnhealthyMetadata)
           .collect(Collectors.toList());
-
-      for (UnhealthyContainers c : filteredContainers) {
-        long containerID = c.getContainerId();
-        ContainerInfo containerInfo =
-            containerManager.getContainer(ContainerID.valueOf(containerID));
-        long keyCount = containerInfo.getNumberOfKeys();
-        UUID pipelineID = containerInfo.getPipelineID().getId();
-        List<ContainerHistory> datanodes =
-            containerManager.getLatestContainerHistory(containerID,
-                containerInfo.getReplicationConfig().getRequiredNodes());
-        unhealthyMeta.add(new UnhealthyContainerMetadata(
-            c, datanodes, pipelineID, keyCount));
-      }
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
+    } catch (UncheckedIOException ex) {
+      throw new WebApplicationException(ex.getCause(),
           Response.Status.INTERNAL_SERVER_ERROR);
     } catch (IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
@@ -449,6 +460,32 @@ public class ContainerEndpoint {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
     return Response.ok(response).build();
+  }
+
+  private UnhealthyContainerMetadata toUnhealthyMetadata(
+      ContainerHealthSchemaManager.UnhealthyContainerRecord record) {
+    try {
+      long containerID = record.getContainerId();
+      ContainerInfo containerInfo =
+          containerManager.getContainer(ContainerID.valueOf(containerID));
+      long keyCount = containerInfo.getNumberOfKeys();
+      UUID pipelineID = containerInfo.getPipelineID().getId();
+      List<ContainerHistory> datanodes =
+          containerManager.getLatestContainerHistory(containerID,
+              containerInfo.getReplicationConfig().getRequiredNodes());
+      UnhealthyContainers unhealthyContainers = new UnhealthyContainers(
+          record.getContainerId(),
+          record.getContainerState(),
+          record.getInStateSince(),
+          record.getExpectedReplicaCount(),
+          record.getActualReplicaCount(),
+          record.getReplicaDelta(),
+          record.getReason());
+      return new UnhealthyContainerMetadata(unhealthyContainers, datanodes,
+          pipelineID, keyCount);
+    } catch (IOException ioEx) {
+      throw new UncheckedIOException(ioEx);
+    }
   }
 
   /**
@@ -473,7 +510,161 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
-    return getUnhealthyContainers(null, limit, maxContainerId, minContainerId);
+    return getUnhealthyContainersFromSchema(null, limit, maxContainerId,
+        minContainerId);
+  }
+
+  /**
+   * List all export jobs tracked by the server (any status).
+   *
+   * @return Response containing a list of ExportJob objects
+   */
+  @GET
+  @Path("/unhealthy/export")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response listExportJobs() {
+    List<ExportJob> jobs = exportJobManager.getAllJobs();
+    for (ExportJob job : jobs) {
+      if (job.getStatus() == ExportJob.JobStatus.QUEUED) {
+        job.setQueuePosition(exportJobManager.getQueuePosition(job.getJobId()));
+      }
+    }
+    return Response.ok(jobs).build();
+  }
+
+  /**
+   * Start an async CSV export job for unhealthy containers.
+   * Returns immediately with a job ID that the client can poll.
+   *
+   * @param state The container state (required: MISSING, UNDER_REPLICATED, etc.)
+   * @return Response containing ExportJob with jobId
+   */
+  @POST
+  @Path("/unhealthy/export")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response startExport(@QueryParam("state") String state) {
+
+    if (StringUtils.isEmpty(state)) {
+      throw new WebApplicationException("state query parameter is required",
+          Response.Status.BAD_REQUEST);
+    }
+
+    // Validate state parameter
+    try {
+      ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException("Invalid state: " + state, Response.Status.BAD_REQUEST);
+    }
+
+    try {
+      String jobId = exportJobManager.submitJob(state);
+      ExportJob job = exportJobManager.getJob(jobId);
+      return Response.ok(job).build();
+    } catch (IllegalStateException e) {
+      // Return JSON error response instead of HTML
+      Map<String, String> errorResponse = new HashMap<>();
+      errorResponse.put("error", "Too Many Requests");
+      errorResponse.put("message", e.getMessage());
+      return Response.status(Response.Status.TOO_MANY_REQUESTS)
+          .entity(errorResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+  }
+
+  /**
+   * Get the status of an export job.
+   *
+   * @param jobId The job ID returned by startExport
+   * @return Response containing the ExportJob with current status/progress
+   */
+  @GET
+  @Path("/unhealthy/export/{jobId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getExportStatus(@PathParam("jobId") String jobId) {
+    ExportJob job = exportJobManager.getJob(jobId);
+    if (job == null) {
+      throw new WebApplicationException("Job not found", Response.Status.NOT_FOUND);
+    }
+    
+    // Calculate and set queue position if QUEUED
+    if (job.getStatus() == ExportJob.JobStatus.QUEUED) {
+      int position = exportJobManager.getQueuePosition(jobId);
+      job.setQueuePosition(position);
+    }
+    
+    return Response.ok(job).build();
+  }
+
+  /**
+   * Download a completed export TAR file.
+   *
+   * @param jobId The job ID
+   * @return Response with TAR file stream
+   */
+  @GET
+  @Path("/unhealthy/export/{jobId}/download")
+  @Produces("application/x-tar")
+  public Response downloadExport(@PathParam("jobId") String jobId) {
+    ExportJob job = exportJobManager.getJob(jobId);
+    if (job == null) {
+      throw new WebApplicationException("Job not found", Response.Status.NOT_FOUND);
+    }
+    if (job.getStatus() != ExportJob.JobStatus.COMPLETED) {
+      throw new WebApplicationException("Job not completed yet", Response.Status.CONFLICT);
+    }
+
+    File file = new File(job.getFilePath());
+    if (!file.exists()) {
+      throw new WebApplicationException("Export file not found", Response.Status.NOT_FOUND);
+    }
+
+    if (!job.tryReserveDownload()) {
+      Map<String, String> errorResponse = new java.util.HashMap<>();
+      errorResponse.put("error", "Download limit reached");
+      errorResponse.put("message", "This export has reached its maximum download limit of "
+          + job.getMaxDownloads() + ".");
+      return Response.status(Response.Status.TOO_MANY_REQUESTS)
+          .entity(errorResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+
+    LOG.info("Download {} of {} for job {}", job.getDownloadCount(), job.getMaxDownloads(), jobId);
+
+    StreamingOutput stream = outputStream -> {
+      try (InputStream fis = Files.newInputStream(file.toPath());
+           BufferedOutputStream bos = new BufferedOutputStream(outputStream, 256 * 1024)) {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = fis.read(buffer)) != -1) {
+          bos.write(buffer, 0, bytesRead);
+        }
+        bos.flush();
+      }
+    };
+
+    return Response.ok(stream)
+        .header("Content-Disposition", "attachment; filename=\"" + job.getFileName() + "\"")
+        .header("Content-Type", "application/x-tar")
+        .build();
+  }
+
+  /**
+   * Cancel a running export job.
+   *
+   * @param jobId The job ID
+   * @return Response with 200 if successful
+   */
+  @DELETE
+  @Path("/unhealthy/export/{jobId}")
+  public Response cancelExport(@PathParam("jobId") String jobId) {
+    try {
+      exportJobManager.cancelJob(jobId);
+      return Response.ok().build();
+    } catch (IllegalStateException e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.NOT_FOUND);
+    }
   }
 
   /**
@@ -659,11 +850,11 @@ public class ContainerEndpoint {
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
+          List<Pipeline> pipelines = new ArrayList<>();
           PipelineID pipelineID = null;
           try {
             pipelineID = containerInfo.getPipelineID();
@@ -785,5 +976,65 @@ public class ContainerEndpoint {
     }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
     return Response.ok(response).build();
+  }
+
+  /**
+   * Return all containers in QUASI_CLOSED state.
+   *
+   * @param limit          max no. of containers to get.
+   * @param minContainerId cursor — return containers with ID &gt; minContainerId.
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/quasiClosed")
+  public Response getQuasiClosedContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
+
+    if (minContainerId < 0) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("minContainerId must be >= 0").build();
+    }
+    if (limit < 0) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("limit must be >= 0").build();
+    }
+
+    List<ContainerInfo> containers = containerManager.getContainers(
+        ContainerID.valueOf(minContainerId + 1), limit, HddsProtos.LifeCycleState.QUASI_CLOSED);
+
+    List<QuasiClosedContainerMetadata> metaList = containers.stream()
+        .map(this::toQuasiClosedMetadata)
+        .collect(Collectors.toList());
+
+    long firstKey = metaList.isEmpty() ? minContainerId : metaList.get(0).getContainerID();
+    long lastKey  = metaList.isEmpty() ? minContainerId : metaList.get(metaList.size() - 1).getContainerID();
+    int total     = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
+
+    return Response.ok(new QuasiClosedContainersResponse(total, firstKey, lastKey, metaList)).build();
+  }
+
+  private QuasiClosedContainerMetadata toQuasiClosedMetadata(ContainerInfo ci) {
+    try {
+      long containerID = ci.getContainerID();
+      int requiredNodes = ci.getReplicationConfig().getRequiredNodes();
+      List<ContainerHistory> replicas =
+          containerManager.getLatestContainerHistory(containerID, requiredNodes);
+      long stateEnterTime = ci.getStateEnterTime() != null
+          ? ci.getStateEnterTime().toEpochMilli() : 0L;
+      String pipelineID = ci.getPipelineID() != null
+          ? ci.getPipelineID().getId().toString() : null;
+      return new QuasiClosedContainerMetadata(
+          containerID,
+          pipelineID,
+          ci.getNumberOfKeys(),
+          stateEnterTime,
+          requiredNodes,
+          replicas.size(),
+          replicas);
+    } catch (Exception e) {
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }

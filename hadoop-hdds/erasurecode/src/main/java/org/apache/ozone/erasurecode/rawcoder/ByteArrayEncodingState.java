@@ -18,7 +18,6 @@
 package org.apache.ozone.erasurecode.rawcoder;
 
 import java.nio.ByteBuffer;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
@@ -91,12 +90,12 @@ class ByteArrayEncodingState extends EncodingState {
   void checkBuffers(byte[][] buffers) {
     for (byte[] buffer : buffers) {
       if (buffer == null) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Invalid buffer found, not allowing null");
       }
 
       if (buffer.length != encodeLength) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Invalid buffer not of length " + encodeLength);
       }
     }

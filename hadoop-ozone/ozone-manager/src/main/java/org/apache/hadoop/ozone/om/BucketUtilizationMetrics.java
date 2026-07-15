@@ -76,7 +76,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
       if (quotaInBytes == -1) {
         availableSpace = quotaInBytes;
       } else {
-        availableSpace = Math.max(bucketInfo.getQuotaInBytes() - bucketInfo.getUsedBytes(), 0);
+        availableSpace = Math.max(bucketInfo.getQuotaInBytes() - bucketInfo.getTotalBucketSpace(), 0);
       }
 
       collector.addRecord(SOURCE)
@@ -84,6 +84,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
           .tag(BucketMetricsInfo.VolumeName, bucketInfo.getVolumeName())
           .tag(BucketMetricsInfo.BucketName, bucketInfo.getBucketName())
           .addGauge(BucketMetricsInfo.BucketUsedBytes, bucketInfo.getUsedBytes())
+          .addGauge(BucketMetricsInfo.BucketSnapshotUsedBytes, bucketInfo.getSnapshotUsedBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaBytes, bucketInfo.getQuotaInBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaNamespace, bucketInfo.getQuotaInNamespace())
           .addGauge(BucketMetricsInfo.BucketAvailableBytes, availableSpace);
@@ -98,8 +99,9 @@ public class BucketUtilizationMetrics implements MetricsSource {
   enum BucketMetricsInfo implements MetricsInfo {
     VolumeName("Volume Metrics."),
     BucketName("Bucket Metrics."),
-    BucketUsedBytes("Bytes used by bucket."),
-    BucketQuotaBytes("Bucket quote in bytes."),
+    BucketUsedBytes("Bytes used by bucket in AOS."),
+    BucketQuotaBytes("Bucket quota in bytes"),
+    BucketSnapshotUsedBytes("Bucket quota bytes held in snapshots"),
     BucketQuotaNamespace("Bucket quota in namespace."),
     BucketAvailableBytes("Bucket available space.");
 

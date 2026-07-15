@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import java.io.IOException;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
@@ -38,14 +36,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   public void finalizeLayoutFeature(LayoutFeature layoutFeature,
       OzoneManager om) throws UpgradeException {
     super.finalizeLayoutFeature(layoutFeature,
-        layoutFeature.action(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+        layoutFeature.action(),
         om.getOmStorage());
-  }
-
-  @Override
-  public void runPrefinalizeStateActions(Storage storage, OzoneManager om)
-      throws IOException {
-    super.runPrefinalizeStateActions(
-        lf -> ((OMLayoutFeature) lf)::action, storage, om);
   }
 }

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 public class TestOmSnapshotDiffJobCodec {
   private final OldSnapshotDiffJobCodecForTesting oldCodec
       = new OldSnapshotDiffJobCodecForTesting();
-  private final Codec<SnapshotDiffJob> newCodec = SnapshotDiffJob.getCodec();
+  private final Codec<SnapshotDiffJob> newCodec = SnapshotDiffJob.codec();
 
   @Test
   public void testOldJsonSerializedDataCanBeReadByNewCodec() throws Exception {
@@ -47,8 +47,7 @@ public class TestOmSnapshotDiffJobCodec {
         false,
         100L,
         SubStatus.SST_FILE_DELTA_DAG_WALK,
-        0.0
-    );
+        0.0, "jobKey");
 
     // Step 2: Serialize using the old Jackson-based codec
     byte[] oldFormatData = oldCodec.toPersistedFormatImpl(original);
@@ -67,6 +66,7 @@ public class TestOmSnapshotDiffJobCodec {
     assertEquals(original.isNativeDiffDisabled(), parsed.isNativeDiffDisabled());
     assertEquals(original.getSubStatus(), parsed.getSubStatus());
     assertEquals(original.getTotalDiffEntries(), parsed.getTotalDiffEntries());
+    assertEquals(original.getLargestEntryKey(), parsed.getLargestEntryKey());
 
     assertEquals(0.0, parsed.getKeysProcessedPct());
   }

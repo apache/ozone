@@ -22,8 +22,8 @@ import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import org.apache.hadoop.ipc.ExternalCall;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ExternalCall;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterEach;

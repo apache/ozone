@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -64,7 +65,6 @@ public class TestContainerKeyMapperTask {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private OzoneConfiguration omConfiguration;
 
   private static final String FSO_KEY_NAME = "dir1/file7";
@@ -82,7 +82,7 @@ public class TestContainerKeyMapperTask {
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.resolve("JunitOmDBDir").toFile());
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.resolve("JunitOmMetadataDir").toFile());
     omConfiguration = new OzoneConfiguration();
@@ -96,6 +96,10 @@ public class TestContainerKeyMapperTask {
             .build();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
+    
+    // Clear shared container count map and reset flags for clean test state
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
+    ReconConstants.resetTableTruncatedFlags();
   }
 
   @Test

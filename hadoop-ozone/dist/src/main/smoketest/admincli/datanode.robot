@@ -99,20 +99,25 @@ Incomplete command
 
 List datanodes as JSON
     ${output} =         Execute          ozone admin datanode list --json | jq -r '.'
-                        Should contain   ${output}    datanodeDetails
+                        Should contain   ${output}    id
                         Should contain   ${output}    healthState
                         Should contain   ${output}    opState
+                        Should contain   ${output}    persistedOpState
 
 Get usage info as JSON
     ${output} =         Execute          ozone admin datanode usageinfo -m --json | jq -r '.'
-                        Should contain   ${output}  capacity
+                        Should contain   ${output}  ozoneCapacity
                         Should contain   ${output}  committed
                         Should contain   ${output}  containerCount
                         Should contain   ${output}  datanodeDetails
                         Should contain   ${output}  freeSpaceToSpare
                         Should contain   ${output}  ozoneUsed
                         Should contain   ${output}  ozoneUsedPercent
-                        Should contain   ${output}  remaining
-                        Should contain   ${output}  remainingPercent
-                        Should contain   ${output}  totalUsed
-                        Should contain   ${output}  totalUsedPercent
+                        Should contain   ${output}  ozoneAvailable
+                        Should contain   ${output}  ozoneAvailablePercent
+                        Should contain   ${output}  filesystemUsed
+                        Should contain   ${output}  filesystemUsedPercent
+                        Should contain   ${output}  filesystemAvailable
+                        Should contain   ${output}  filesystemAvailablePercent
+                        Should contain   ${output}  filesystemCapacity
+                        Should contain   ${output}  reserved

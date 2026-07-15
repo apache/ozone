@@ -22,9 +22,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -184,10 +186,11 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer writeChunkData = ChunkBuffer.wrap(getData());
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    closedKeyValueContainer();
     ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
+    keyValueHandler.markContainerForClose(kvContainer);
+    keyValueHandler.closeContainer(kvContainer);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
     ChunkBufferToByteString readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
         getBlockID(), getChunkInfo(), WRITE_STAGE);
@@ -226,14 +229,69 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     Assertions.assertEquals(containerData.getBytesUsed(), writeChunkData.remaining() + newWriteChunkData.remaining());
   }
 
+  /**
+   * Test that overwrite operations that extend the file correctly update usedSpace by the delta.
+   */
   @Test
-  public void testPutBlockForClosedContainer() throws IOException {
+  public void testOverwriteFileExtensionUpdatesByDelta() throws Exception {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    closedKeyValueContainer();
+    ChunkManager chunkManager = createTestSubject();
+
+    // Initial write: 4 bytes at offset 0
+    byte[] initialData = "test".getBytes(UTF_8);
+    ChunkInfo initialChunk = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0),
+        0,  // offset
+        initialData.length);
+    ChunkBuffer initialBuffer = ChunkBuffer.allocate(initialData.length).put(initialData);
+    initialBuffer.rewind();
+    setDataChecksum(initialChunk, initialBuffer);
+
+    long initialUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long initialBlockBytes = containerData.getBytesUsed();
+    chunkManager.writeChunk(kvContainer, getBlockID(), initialChunk, initialBuffer, WRITE_STAGE);
+    long afterFirstWriteUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long afterFirstWriteBlockBytes = containerData.getBytesUsed();
+
+    assertEquals(initialUsedSpace + initialData.length, afterFirstWriteUsedSpace);
+    assertEquals(initialBlockBytes + initialData.length, afterFirstWriteBlockBytes);
+
+    // Overwrite that extends file: write 6 bytes at offset 2 (extends file from 4 to 8 bytes)
+    // File before: [t][e][s][t]
+    // File after:  [t][e][e][x][t][e][n][d]
+    // File length delta: 8 - 4 = 4 bytes
+    byte[] overwriteData = "extend".getBytes(UTF_8);
+    ChunkInfo overwriteChunk = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0),
+        2,  // offset - starts at position 2
+        overwriteData.length);
+    ChunkBuffer overwriteBuffer = ChunkBuffer.allocate(overwriteData.length).put(overwriteData);
+    overwriteBuffer.rewind();
+    setDataChecksum(overwriteChunk, overwriteBuffer);
+
+    chunkManager.writeChunk(kvContainer, getBlockID(), overwriteChunk, overwriteBuffer, WRITE_STAGE);
+    long afterOverwriteUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long afterOverwriteBlockBytes = containerData.getBytesUsed();
+
+    long expectedDelta = (2 + overwriteData.length) - initialData.length; // 8 - 4 = 4
+    long expectedWriteBytes = initialData.length + overwriteData.length; // 4 + 6 = 10
+
+    assertEquals(afterFirstWriteUsedSpace + expectedDelta, afterOverwriteUsedSpace);
+    assertEquals(afterFirstWriteBlockBytes + expectedDelta, afterOverwriteBlockBytes);
+    assertEquals(expectedWriteBytes, containerData.getStatistics().getWriteBytes());
+  }
+
+  @Test
+  public void testPutBlockForClosedContainer() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    KeyValueContainer kvContainer = getKeyValueContainer();
+    KeyValueContainerData containerData = kvContainer.getContainerData();
     ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
+    keyValueHandler.markContainerForClose(kvContainer);
+    keyValueHandler.closeContainer(kvContainer);
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, containerData.getState());
+    assertEquals(0L, containerData.getDataChecksum());
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
     ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0), 0L, 20L);
 
@@ -244,11 +302,13 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
+    keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(20L, containerData.getBytesUsed());
+    verifyAllDataChecksumsMatch(containerData, conf);
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
@@ -264,11 +324,15 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    long previousDataChecksum = containerData.getDataChecksum();
+    keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(40L, containerData.getBytesUsed());
+    assertNotEquals(previousDataChecksum, containerData.getDataChecksum());
+    verifyAllDataChecksumsMatch(containerData, conf);
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
@@ -291,7 +355,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
     assertEquals(50L, containerData.getBytesUsed());
 
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
@@ -329,10 +393,6 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dnUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     return ContainerTestUtils.getKeyValueHandler(conf, dnUuid, containerSet, volumeSet);
-  }
-
-  public void closedKeyValueContainer() {
-    getKeyValueContainer().getContainerData().setState(ContainerProtos.ContainerDataProto.State.CLOSED);
   }
 
   @Override

@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +45,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,9 +77,12 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -292,6 +299,53 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testEmptyMerkleTreeImportExport(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+    closeContainer();
+
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+    // Create an empty checksum file that exists but has no valid merkle tree
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
+    ContainerProtos.ContainerChecksumInfo emptyContainerInfo = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      emptyContainerInfo.writeTo(tmpOutputStream);
+    }
+
+    // Check state of original container.
+    checkContainerFilesPresent(data, 0);
+
+    //destination path
+    File exportTar = Files.createFile(
+        folder.toPath().resolve("export.tar")).toFile();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+    //export the container
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    // import container.
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+    data = keyValueContainer.getContainerData();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerChecksumTreeManager.readChecksumInfo(data);
+    assertFalse(checksumInfo.hasContainerMerkleTree());
+    // The import should not fail and the checksum should be 0
+    assertEquals(0, data.getDataChecksum());
+    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    verifyAllDataChecksumsMatch(data, CONF);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testUnhealthyContainerImportExport(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -340,6 +394,18 @@ public class TestKeyValueContainer {
     closeContainer();
     populate(numberOfKeysToWrite);
 
+    // Create merkle tree and set data checksum to simulate actual key value container.
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(
+        keyValueContainer.getContainerData());
+    ContainerProtos.ContainerMerkleTree containerMerkleTreeWriterProto = buildTestTree(CONF).toProto();
+    keyValueContainerData.setDataChecksum(containerMerkleTreeWriterProto.getDataChecksum());
+    ContainerProtos.ContainerChecksumInfo containerInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerId)
+        .setContainerMerkleTree(containerMerkleTreeWriterProto).build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      containerInfo.writeTo(tmpOutputStream);
+    }
+
     //destination path
     File folderToExport = Files.createFile(
         folder.toPath().resolve("export.tar")).toFile();
@@ -387,6 +453,9 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertEquals(keyValueContainerData.getDataChecksum(), containerData.getDataChecksum());
+      verifyAllDataChecksumsMatch(containerData, CONF);
+
       assertNotNull(containerData.getContainerFileChecksum());
       assertNotEquals(containerData.ZERO_CHECKSUM, container.getContainerData().getContainerFileChecksum());
 
@@ -425,6 +494,68 @@ public class TestKeyValueContainer {
         }
       });
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFailedImportCleanupMovesContainerBeforeDelete(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+    KeyValueContainer container = new KeyValueContainer(
+        keyValueContainerData, CONF) {
+      @Override
+      void deleteDirectory(File directory) throws IOException {
+        File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+            getContainerData(), getContainerData().getVolume()).toFile();
+        if (directory.equals(deletedContainerDir)) {
+          throw new IOException("Injected tmp cleanup failure");
+        }
+        super.deleteDirectory(directory);
+      }
+    };
+    container.populatePathFields(scmId, containerVolume);
+
+    ContainerPacker<KeyValueContainerData> failingPacker =
+        new ContainerPacker<KeyValueContainerData>() {
+          @Override
+          public byte[] unpackContainerData(
+              Container<KeyValueContainerData> containerToUnpack,
+              InputStream inputStream, Path tmpDir, Path destContainerDir)
+              throws IOException {
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getChunksPath()).toPath());
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getMetadataPath()).toPath());
+            throw new IOException("Injected import failure");
+          }
+
+          @Override
+          public void pack(Container<KeyValueContainerData> containerToPack,
+              OutputStream destination) {
+          }
+
+          @Override
+          public byte[] unpackContainerDescriptor(InputStream inputStream) {
+            return null;
+          }
+        };
+
+    assertThrows(IOException.class, () -> container.importContainerData(
+        new ByteArrayInputStream(new byte[0]), failingPacker));
+
+    assertThat(new File(container.getContainerData().getContainerPath()))
+        .doesNotExist();
+    File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container.getContainerData(), container.getContainerData().getVolume())
+        .toFile();
+    assertThat(deletedContainerDir).exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS))
+        .exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH))
+        .exists();
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
@@ -627,6 +758,35 @@ public class TestKeyValueContainer {
     assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         keyValueContainerData.getState());
     assertNotNull(keyValueContainer.getContainerReport());
+  }
+
+  /**
+   * When a container's metadata directory is missing (MISSING_METADATA_DIR detected by the scanner),
+   * markContainerUnhealthy must succeed without throwing. Writing a partial .container file with only
+   * the state field would lose other metadata and is more harmful than writing nothing. The in-memory
+   * UNHEALTHY state is sufficient for SCM to receive it via ICR and schedule deletion.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkUnhealthyWithMissingMetadataDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // Simulate MISSING_METADATA_DIR using the same corruption helper used in scanner tests.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertTrue(metadataDir.exists(), "Metadata dir should exist before corruption");
+    MISSING_METADATA_DIR.applyTo(keyValueContainer);
+
+    // markContainerUnhealthy must not throw even though the metadata dir is absent.
+    keyValueContainer.markContainerUnhealthy();
+
+    // In-memory state must be UNHEALTHY.
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // Regression guards: if a future change adds mkdirs/persist logic, these catch it early.
+    assertFalse(metadataDir.exists(), "Metadata dir should not be recreated by markContainerUnhealthy");
+    assertFalse(keyValueContainer.getContainerFile().exists(),
+        "Container file should not be written when metadata dir is missing");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -1058,6 +1218,8 @@ public class TestKeyValueContainer {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
       metadataTable.put(data.getPendingDeleteBlockCountKey(),
           pendingDeleteBlockCount);
+      metadataTable.put(data.getPendingDeleteBlockBytesKey(),
+          pendingDeleteBlockCount * 256);
     }
     container.close();
 
@@ -1100,6 +1262,8 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+    assertEquals(pendingDeleteBlockCount * 256,
+        importedContainer.getContainerData().getBlockPendingDeletionBytes());
   }
 
   @ContainerTestVersionInfo.ContainerTest

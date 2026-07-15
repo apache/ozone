@@ -21,11 +21,11 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -107,7 +107,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
     final ChunkBufferToByteString data = selectHandler(container)
         .readChunk(container, blockID, info, dispatcherContext);
 
-    Preconditions.checkState(data != null);
+    Objects.requireNonNull(data, "data == null");
     container.getContainerData().getStatistics().updateRead(info.getLen());
 
     return data;
@@ -117,7 +117,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
   public void deleteChunk(Container container, BlockID blockID, ChunkInfo info)
       throws StorageContainerException {
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
 
     // Delete the chunk from disk.
     // Do not decrement the ContainerData counters (usedBytes) here as it
@@ -131,7 +131,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
   public void deleteChunks(Container container, BlockData blockData)
       throws StorageContainerException {
 
-    Preconditions.checkNotNull(blockData, "Block data cannot be null.");
+    Objects.requireNonNull(blockData, "blockData == null");
 
     // Delete the chunks belonging to blockData.
     // Do not decrement the ContainerData counters (usedBytes) here as it

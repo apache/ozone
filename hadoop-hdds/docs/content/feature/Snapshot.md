@@ -48,6 +48,24 @@ When keys are changed or deleted in the live bucket, their data blocks are retai
 
 **Snapshot Data Storage:** Snapshot metadata resides in OM's RocksDB. Diff job data is stored in `ozone.om.snapshot.diff.db.dir` (defaults to OM metadata directory).
 
+### Snapshot Space & Size Tracking
+
+When a snapshot is created, it references the state of the bucket at that point in time. Over time, as keys are deleted or overwritten in the active namespace, the data blocks are kept alive by the snapshots. Ozone tracks space usage for snapshots using the following metrics:
+
+#### Referenced Size
+* **`referencedSize`**: The total logical data size (in bytes, unreplicated) of all active keys/files in the bucket at the moment the snapshot was created.
+* **`referencedReplicatedSize`**: The total replicated data size (in bytes, replicated) referenced by the snapshot at its creation point.
+
+#### Exclusive Size
+As mutations occur in the active bucket or other snapshots, some blocks become exclusively held by a single snapshot. Ozone tracks this exclusive size using two separate asynchronous background services:
+
+1. **`KeyDeletingService` (Key Deep Cleaning)**: Processes deleted keys to find blocks exclusively held by the snapshot. It sets `exclusiveSize` (unreplicated) and `exclusiveReplicatedSize` (replicated).
+2. **`SnapshotDirectoryCleaningService` (Directory Deep Cleaning)**: Recursively processes deleted directories. To avoid write conflicts and overwriting between these two independent services, it stores its results separately in `exclusiveSizeDeltaFromDirDeepCleaning` (unreplicated) and `exclusiveReplicatedSizeDeltaFromDirDeepCleaning` (replicated).
+
+The actual total exclusive size of a snapshot is the sum of these fields:
+* **Total Exclusive Size**: `exclusiveSize` + `exclusiveSizeDeltaFromDirDeepCleaning`
+* **Total Exclusive Replicated Size**: `exclusiveReplicatedSize` + `exclusiveReplicatedSizeDeltaFromDirDeepCleaning`
+
 For more details, see Prashant Pogde’s [Introducing Apache Ozone Snapshots](https://medium.com/@prashantpogde/introducing-apache-ozone-snapshots-af82e976142f).
 
 ## User Tutorial
@@ -93,18 +111,49 @@ Manage snapshots using `ozone sh` or `ozone fs` (Hadoop-compatible) commands:
     ```
     Requires read privileges on the bucket.
 
-*   **Snapshot Diff:** Shows changes between two snapshots or a snapshot and the live bucket.
+*   **Submit Snapshot Diff:** Submit job to find diff between two snapshots or a snapshot and the live bucket.
     ```shell
     ozone sh snapshot diff /vol1/bucket1 <snap1> <snap2_or_live_bucket>
     ```
+  
+*   **Get Snapshot Diff Report:** Shows changes between two snapshots or a snapshot and the live bucket.
+    ```shell
+    ozone sh snapshot diff --get-report /vol1/bucket1 <snap1> <snap2_or_live_bucket>
+    ```
     Output prefixes: `+` (add), `-` (delete), `M` (modify), `R` (rename). Use `-p`, `-t` for pagination.
     Manage diff jobs: `ozone sh snapshot listDiff /vol1/bucket1`, `ozone sh snapshot cancelDiff <jobId>`.
+
+*   **List Snapshot Diff Jobs:** Lists snapshot diff jobs for a bucket.
+    ```shell
+    ozone sh snapshot listDiff /vol1/bucket1
+    ```
+    By default, lists jobs with `in_progress` status. Use `--job-status` to filter by specific status:
+    ```shell
+    # List jobs with specific status (queued, in_progress, done, failed, rejected)
+    ozone sh snapshot listDiff /vol1/bucket1 --job-status done
+    ```
+    Use `--all-status` to list all jobs regardless of status:
+    ```shell
+    # List all snapshot diff jobs regardless of status
+    ozone sh snapshot listDiff /vol1/bucket1 --all-status
+    ```
+    **Note:** The difference between `--all-status` and `-all` (or `-a`):
+    * `--all-status`: Controls which jobs to show based on status (lists all jobs regardless of status)
+    * `-all` (or `-a`): Controls the number of results returned (pagination option, removes pagination limit, **not related to snapshot diff job status**)
+    
+    For example:
+    ```shell
+    # List all jobs regardless of status, with pagination limit removed
+    ozone sh snapshot listDiff /vol1/bucket1 --all-status -all
+    # Or limit results to 10 items
+    ozone sh snapshot listDiff /vol1/bucket1 --all-status -l 10
+    ```
 
 *   **Rename Snapshot:**
     ```shell
     ozone sh snapshot rename /vol1/bucket1 <oldName> <newName>
     ```
-    Requires bucket owner or admin.
+    Requires `ozone.om.snapshot.rename.allowed=true` on the OM side and bucket owner or admin privileges.
 
 *   **Snapshot Info:**
     ```shell
@@ -154,16 +203,15 @@ Handle exceptions for privilege or non-existent snapshot issues.
 
 ## System Administration How-To
 
-This section covers key configurations and monitoring for Ozone snapshots. Tune these in **ozone-site.xml**.
+This section covers key configurations and monitoring for Ozone snapshots.
 
-**Snapshot-Related Configuration Parameters:**
+### Configuration Properties
 
-*   **`ozone.om.fs.snapshot.max.limit`**: Max snapshots per bucket (Default: 10000). Safety limit.
-*   **`ozone.om.snapshot.compaction.dag.max.time.allowed`**: Window for efficient SnapshotDiff (Default: 30 days). Older diffs may be slower.
-*   **`ozone.om.snapshot.diff.db.dir`**: Directory for SnapshotDiff job data. Defaults to OM metadata dir. Use a spacious location for large diffs.
-*   **`ozone.om.snapshot.rocksdb.metrics.enabled`**: Enable detailed RocksDB metrics for snapshots (Default: false). Use for debugging/monitoring.
-*   **`ozone.om.snapshot.load.native.lib`**: Use native RocksDB library for snapshot operations (Default: true). Set to false as a workaround for native library issues.
-*   **`ozone.om.snapshot.diff.concurrent.max`**: Max concurrent SnapshotDiff jobs per OM (Default: 10). Increase if OM resources allow.
+See [Snapshot Configuration Properties]({{< ref "Snapshot-Configuration-Properties.md" >}}).
+
+Note: Snapshot configuration may change over time. Check `ozone-default.xml` for the most up-to-date settings.
+
+### Monitoring
 
 Monitor OM heap usage with many snapshots or large diffs. Enable Ozone Native ACLs or Ranger for access control.
 

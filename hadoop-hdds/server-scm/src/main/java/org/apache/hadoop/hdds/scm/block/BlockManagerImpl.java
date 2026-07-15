@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,13 +93,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
-    metrics = ScmBlockDeletingServiceMetrics.create();
+    metrics = ScmBlockDeletingServiceMetrics.create(this);
 
     // SCM block deleting transaction log and deleting service.
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getDBTransactionBuffer(),
+        scm.getScmHAManager().asSCMHADBTransactionBuffer(),
         metrics);
 
 
@@ -184,7 +185,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      long localID = sequenceIdGen.getNextId(LOCAL_ID);
+      long localID = sequenceIdGen.getNextId(SequenceIdType.localId);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
@@ -219,21 +220,20 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       throw new SCMException("SafeModePrecheck failed for deleteBlocks",
           SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    Map<Long, List<Long>> containerBlocks = new HashMap<>();
-    // TODO: track the block size info so that we can reclaim the container
-    // TODO: used space when the block is deleted.
+    Map<Long, List<DeletedBlock>> containerBlocks = new HashMap<>();
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", bg.getDeletedBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
+      for (DeletedBlock deletedBlock : bg.getDeletedBlocks()) {
+        BlockID block = deletedBlock.getBlockID();
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
+          containerBlocks.get(containerID).add(deletedBlock);
         } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
+          List<DeletedBlock> item = new ArrayList<>();
+          item.add(deletedBlock);
           containerBlocks.put(containerID, item);
         }
       }

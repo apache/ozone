@@ -29,8 +29,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -83,6 +83,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
@@ -115,6 +117,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -133,6 +137,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -183,7 +189,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse, ProtocolMessageEnum>
+      ScmContainerLocationResponse, StorageContainerLocationProtocolProtos.Type>
       dispatcher;
 
   /**
@@ -196,7 +202,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
       StorageContainerManager scm,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {
     this.impl = impl;
     this.scm = scm;
@@ -208,9 +214,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
-    // not leader or not belong to admin command.
+    // Trigger not leader exception unless:
+    // This is the leader node, or this is an admin command, 
+    // or this is a follower-readable command.
     if (!scm.checkLeader()
-        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
+        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())
+        && !FOLLOWER_READABLE_COMMAND_TYPES.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
           scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
@@ -712,6 +721,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
               .build();
+      case GetDeletedBlocksTransactionSummary:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetDeletedBlocksTxnSummaryResponse(
+                getDeletedBlocksTxnSummary(
+                    request.getGetDeletedBlocksTxnSummaryRequest()))
+            .build();
       case TransferLeadership:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -738,6 +755,18 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
+            .build();
+      case ListContainerIDs:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmListContainerIDsResponse(listContainerIDs(request.getScmListContainerIDsRequest()))
+            .build();
+      case SuppressContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setSuppressContainerResponse(suppressContainer(request.getSuppressContainerRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -868,6 +897,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
+    // Filter by suppressed: true (suppressed only), false (unsuppressed only) or null (display all).
+    Boolean suppressed = request.hasSuppressed() ? request.getSuppressed() : null;
+
     ContainerListResult containerListAndTotalCount;
     if (factor != null) {
       // Call from a legacy client
@@ -875,7 +907,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           impl.listContainer(startContainerID, count, state, factor);
     } else {
       containerListAndTotalCount =
-          impl.listContainer(startContainerID, count, state, replicationType, repConfig);
+          impl.listContainer(startContainerID, count, state, replicationType, repConfig, suppressed);
     }
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
@@ -1132,6 +1164,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Boolean> networkTopologyEnable = Optional.empty();
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();
+    Optional<String> excludeContainers = Optional.empty();
+    Optional<String> includeContainers = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1192,12 +1226,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       excludeNodes = Optional.of(request.getExcludeNodes());
     }
 
+    if (request.hasExcludeContainers()) {
+      excludeContainers = Optional.of(request.getExcludeContainers());
+    }
+
+    if (request.hasIncludeContainers()) {
+      includeContainers = Optional.of(request.getIncludeContainers());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -1308,9 +1350,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainerCountResponseProto getContainerCount(
       StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
       request) throws IOException {
+    long containerCount = request.hasState()
+        ? impl.getContainerCount(request.getState())
+        : impl.getContainerCount();
 
     return GetContainerCountResponseProto.newBuilder()
-      .setContainerCount(impl.getContainerCount())
+      .setContainerCount(containerCount)
       .build();
   }
 
@@ -1324,6 +1369,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
       GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
     long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
@@ -1333,6 +1379,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public ResetDeletedBlockRetryCountResponseProto
       getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {
@@ -1340,6 +1387,18 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
+  }
+
+  public GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummary(
+      GetDeletedBlocksTxnSummaryRequestProto request) throws IOException {
+    HddsProtos.DeletedBlocksTransactionSummary summary = impl.getDeletedBlockSummary();
+    if (summary == null) {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder().build();
+    } else {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder()
+          .setSummary(summary)
+          .build();
+    }
   }
 
   public TransferLeadershipResponseProto transferScmLeadership(
@@ -1352,7 +1411,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionScmResponseProto decommissionScm(
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
-        request.getScmId());
+            request.getScmId());
   }
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
@@ -1362,5 +1421,38 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
+  }
+
+  public SCMListContainerIDsResponseProto listContainerIDs(
+      SCMListContainerIDsRequestProto request) throws IOException {
+    ContainerID startContainerID = ContainerID.valueOf(0);
+
+    if (request.hasStartContainerID()) {
+      startContainerID = ContainerID.valueOf(request.getStartContainerID().getId());
+    }
+
+    HddsProtos.LifeCycleState state = null;
+    if (request.hasState()) {
+      state = request.getState();
+    }
+
+    SCMListContainerIDsResponseProto.Builder builder =
+        SCMListContainerIDsResponseProto.newBuilder();
+
+    List<ContainerID> containerIDs = impl.getListOfContainerIDs(
+        startContainerID, request.getCount(), state);
+
+    containerIDs.stream()
+        .map(ContainerID::getProtobuf)
+        .forEach(builder::addContainerIDs);
+
+    return builder.build();
+  }
+
+  public SuppressContainerResponseProto suppressContainer(SuppressContainerRequestProto request) throws IOException {
+    List<Long> failedContainerIDs = impl.suppressContainers(request.getContainerIDsList(), request.getSuppress());
+    return SuppressContainerResponseProto.newBuilder()
+        .addAllFailedContainerIDs(failedContainerIDs)
+        .build();
   }
 }

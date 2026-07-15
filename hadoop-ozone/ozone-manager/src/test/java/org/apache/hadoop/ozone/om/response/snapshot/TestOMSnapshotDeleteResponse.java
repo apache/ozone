@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -32,7 +34,9 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -62,7 +66,13 @@ public class TestOMSnapshotDeleteResponse {
     String fsPath = folder.toAbsolutePath().toString();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotLocalDataManager omSnapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(omSnapshotLocalDataManager);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -107,7 +117,7 @@ public class TestOMSnapshotDeleteResponse {
 
     // Confirm snapshot directory was created
     String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
-        snapshotInfo);
+        snapshotInfo, 0);
     assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry

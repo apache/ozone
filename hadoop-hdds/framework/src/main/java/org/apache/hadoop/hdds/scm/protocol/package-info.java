@@ -15,5 +15,5 @@
  * limitations under the License.
  */
 
-/** SCM block location protocol interfaces. */
+/** SCM protocol related interfaces. */
 package org.apache.hadoop.hdds.scm.protocol;

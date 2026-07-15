@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.block;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -45,6 +46,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   public static final String SOURCE_NAME =
       SCMBlockDeletingService.class.getSimpleName();
   private final MetricsRegistry registry;
+  private final BlockManager blockManager;
 
   /**
    * Given all commands are finished and no new coming deletes from OM.
@@ -100,15 +102,32 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   private final Map<DatanodeID, DatanodeCommandDetails> numCommandsDatanode = new ConcurrentHashMap<>();
 
-  private ScmBlockDeletingServiceMetrics() {
+  private static final MetricsInfo NUM_BLOCK_DELETION_TRANSACTIONS = Interns.info(
+      "numBlockDeletionTransactions",
+      "The number of transactions in DB.");
+
+  private static final MetricsInfo NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "numBlockOfAllDeletionTransactions",
+      "The number of blocks in all transactions in DB.");
+
+  private static final MetricsInfo BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "blockSizeOfAllDeletionTransactions",
+      "The size of all blocks in all transactions in DB.");
+
+  private static final MetricsInfo REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "replicatedBlockSizeOfAllDeletionTransactions",
+      "The replicated size of all blocks in all transactions in DB.");
+
+  private ScmBlockDeletingServiceMetrics(BlockManager blockManager) {
     this.registry = new MetricsRegistry(SOURCE_NAME);
+    this.blockManager = blockManager;
   }
 
-  public static synchronized ScmBlockDeletingServiceMetrics create() {
+  public static synchronized ScmBlockDeletingServiceMetrics create(BlockManager blockManager) {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "SCMBlockDeletingService",
-          new ScmBlockDeletingServiceMetrics());
+          new ScmBlockDeletingServiceMetrics(blockManager));
     }
 
     return instance;
@@ -255,6 +274,19 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
     numBlockAddedForDeletionToDN.snapshot(builder, all);
+
+    // add metrics for deleted block transaction summary
+    HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
+    if (summary != null) {
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_DELETION_TRANSACTIONS, summary.getTotalTransactionCount());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockCount());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockSize());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockReplicatedSize());
+    }
 
     MetricsRecordBuilder recordBuilder = builder;
     for (Map.Entry<DatanodeID, DatanodeCommandDetails> e : numCommandsDatanode.entrySet()) {

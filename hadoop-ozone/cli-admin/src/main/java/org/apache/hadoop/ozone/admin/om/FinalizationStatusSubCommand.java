@@ -35,29 +35,17 @@ import picocli.CommandLine;
 )
 public class FinalizationStatusSubCommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host"
-  )
-  private String omHost;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client =
-        parent.createOmClient(omServiceId, omHost, false);
-    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
-    UpgradeFinalization.StatusAndMessages progress =
-        client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
-    System.out.println(progress.status());
+    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID();
+    try (OzoneManagerProtocol client = omAddressOptions.newClient()) {
+      UpgradeFinalization.StatusAndMessages progress =
+          client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
+      System.out.println(progress.status());
+    }
     return null;
   }
 }

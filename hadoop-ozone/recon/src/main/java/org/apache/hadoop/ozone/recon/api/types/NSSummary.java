@@ -26,41 +26,60 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
+ * 
+ * IMPORTANT: As of the materialized optimization, sizeOfFiles and numOfFiles 
+ * now represent TOTAL values (including this directory and ALL subdirectories)
+ * rather than just direct files in this directory, for O(1) disk usage queries.
  */
 
 public class NSSummary {
+  // IMPORTANT: These fields now contain TOTAL values (this directory + all subdirectories)
+  // for performance optimization, not just direct files in this directory
   private int numOfFiles;
   private long sizeOfFiles;
+  private long replicatedSizeOfFiles;
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
   private long parentId = 0;
 
   public NSSummary() {
-    this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
+    this(0, 0L, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
         new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
+                   long replicatedSizeOfFiles,
                    int[] bucket,
                    Set<Long> childDir,
                    String dirName,
                    long parentId) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
     this.dirName = dirName;
     this.parentId = parentId;
   }
 
+  /**
+   * @return Total number of files in this directory and ALL subdirectories
+   */
   public int getNumOfFiles() {
     return numOfFiles;
   }
 
+  /**
+   * @return Total size of files in this directory and ALL subdirectories
+   */
   public long getSizeOfFiles() {
     return sizeOfFiles;
+  }
+
+  public long getReplicatedSizeOfFiles() {
+    return replicatedSizeOfFiles;
   }
 
   public int[] getFileSizeBucket() {
@@ -75,12 +94,22 @@ public class NSSummary {
     return dirName;
   }
 
+  /**
+   * @param numOfFiles Total number of files in this directory and ALL subdirectories
+   */
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
 
+  /**
+   * @param sizeOfFiles Total size of files in this directory and ALL subdirectories
+   */
   public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
+  }
+
+  public void setReplicatedSizeOfFiles(long replicatedSizeOfFiles) {
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
@@ -124,6 +153,7 @@ public class NSSummary {
         ", childDir=" + childDir +
         ", numOfFiles=" + numOfFiles +
         ", sizeOfFiles=" + sizeOfFiles +
+        ", replicatedSizeOfFiles=" + replicatedSizeOfFiles +
         ", fileSizeBucket=" + Arrays.toString(fileSizeBucket) +
         '}';
   }

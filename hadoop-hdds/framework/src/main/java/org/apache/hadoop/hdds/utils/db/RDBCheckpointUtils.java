@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public final class RDBCheckpointUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointUtils.class);
-  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
+  public static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
   private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(20);
 
   private RDBCheckpointUtils() { }

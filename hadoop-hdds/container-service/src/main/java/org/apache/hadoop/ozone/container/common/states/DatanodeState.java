@@ -38,8 +38,9 @@ public interface DatanodeState<T> {
 
   /**
    * Executes one or more tasks that is needed by this state.
+   * Note that it is unsafe to call this method concurrently.
    *
-   * @param executor -  ExecutorService
+   * @param executor -  ExecutorService that can be used by the DatanodeState to submit tasks to.
    */
   void execute(ExecutorService executor);
 

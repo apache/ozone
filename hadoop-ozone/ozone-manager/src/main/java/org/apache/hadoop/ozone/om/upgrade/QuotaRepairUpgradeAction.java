@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.QUOTA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -31,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Quota repair for usages action to be triggered after upgrade.
  */
-@UpgradeActionOm(type = ON_FINALIZE, feature = QUOTA)
+@UpgradeActionOm(feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(QuotaRepairUpgradeAction.class);
 

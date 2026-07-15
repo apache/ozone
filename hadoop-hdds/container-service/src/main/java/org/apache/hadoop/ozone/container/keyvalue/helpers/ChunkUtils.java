@@ -233,11 +233,8 @@ public final class ChunkUtils {
     }
 
     // Increment volumeIO stats here.
-    long endTime = Time.monotonicNow();
     if (volume != null) {
-      volume.getVolumeIOStats().incReadTime(endTime - startTime);
-      volume.getVolumeIOStats().incReadOpCount();
-      volume.getVolumeIOStats().incReadBytes(bytesRead);
+      volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
     }
 
     LOG.debug("Read {} bytes starting at offset {} from {}",
@@ -492,7 +489,7 @@ public final class ChunkUtils {
     }
   }
 
-  public static void limitReadSize(long len)
+  public static int limitReadSize(long len)
       throws StorageContainerException {
     if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
       String err = String.format(
@@ -501,6 +498,7 @@ public final class ChunkUtils {
       LOG.error(err);
       throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
     }
+    return (int) len;
   }
 
   public static StorageContainerException wrapInStorageContainerException(

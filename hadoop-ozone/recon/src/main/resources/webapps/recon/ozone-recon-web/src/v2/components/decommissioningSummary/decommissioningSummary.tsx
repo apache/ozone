@@ -16,22 +16,17 @@
  * limitations under the License.
  */
 
-import React, { useEffect } from 'react';
-import { AxiosError } from 'axios';
+import React from 'react';
 import { Descriptions, Popover, Result } from 'antd';
 import { SummaryData } from '@/v2/types/datanode.types';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import Spin from 'antd/es/spin';
 
 type DecommisioningSummaryProps = {
   uuid: string;
 }
 
-type DecommisioningSummaryState = {
-  loading: boolean;
-  summaryData: SummaryData | Record<string, unknown>;
-};
 
 function getDescriptions(summaryData: SummaryData): React.ReactElement {
   const {
@@ -67,59 +62,34 @@ function getDescriptions(summaryData: SummaryData): React.ReactElement {
 const DecommissionSummary: React.FC<DecommisioningSummaryProps> = ({
   uuid = ''
 }) => {
-  const [state, setState] = React.useState<DecommisioningSummaryState>({
-    summaryData: {},
-    loading: false
-  });
-  const cancelSignal = React.useRef<AbortController>();
+  const { 
+    data: decommissionResponse, 
+    loading, 
+    error 
+  } = useApiData<{DatanodesDecommissionInfo: SummaryData[]}>(
+    `/api/v1/datanodes/decommission/info/datanode?uuid=${uuid}`,
+    { DatanodesDecommissionInfo: [] },
+    {
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  const summaryData = decommissionResponse.DatanodesDecommissionInfo[0] || {};
+
   let content = (
     <Spin
       size='large'
       style={{ margin: '15px 15px 10px 15px' }} />
   );
 
-  async function fetchDecommissionSummary(selectedUuid: string) {
-    setState({
-      ...state,
-      loading: true
-    });
-    try {
-      const { request, controller } = AxiosGetHelper(
-        `/api/v1/datanodes/decommission/info/datanode?uuid=${selectedUuid}`,
-        cancelSignal.current
-      );
-      cancelSignal.current = controller;
-      const datanodesInfoResponse = await request;
-      setState({
-        ...state,
-        loading: false,
-        summaryData: datanodesInfoResponse?.data?.DatanodesDecommissionInfo[0] ?? {}
-      });
-    } catch (error) {
-      setState({
-        ...state,
-        loading: false,
-        summaryData: {}
-      });
-      showDataFetchError((error as AxiosError).toString());
-      content = (
-        <Result
-          status='error'
-          title='Unable to fetch Decommission Summary data'
-          className='decommission-summary-result' />
-      )
-    }
-  }
-
-  useEffect(() => {
-    fetchDecommissionSummary(uuid);
-    return (() => {
-      cancelRequests([cancelSignal.current!]);
-    })
-  }, []);
-
-  const { summaryData } = state;
-  if (summaryData?.datanodeDetails
+  if (error) {
+    content = (
+      <Result
+        status='error'
+        title='Unable to fetch Decommission Summary data'
+        className='decommission-summary-result' />
+    );
+  } else if (summaryData?.datanodeDetails
       && summaryData?.metrics
       && summaryData?.containers
   ) {

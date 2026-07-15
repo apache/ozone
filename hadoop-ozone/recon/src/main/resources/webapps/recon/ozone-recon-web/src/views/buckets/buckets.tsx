@@ -496,7 +496,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
         loading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

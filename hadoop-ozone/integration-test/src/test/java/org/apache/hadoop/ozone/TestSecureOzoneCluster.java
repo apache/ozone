@@ -39,6 +39,7 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -62,7 +63,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -80,8 +80,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
@@ -106,9 +105,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -131,8 +127,8 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Client;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -445,18 +441,10 @@ final class TestSecureOzoneCluster {
     Files.createDirectories(scmPath);
     conf.set(OZONE_METADATA_DIRS, scmPath.toString());
 
+    // Use scmInit to properly initialize SCM with all required directories
+    StorageContainerManager.scmInit(conf, clusterId);
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    HASecurityUtils.initializeSecurity(scmStore, conf,
-        InetAddress.getLocalHost().getHostName(), true);
-    scmStore.setPrimaryScmNodeId(scmId);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                .getLocalNodeDetails(), conf);
+    scmId = scmStore.getScmId();
 
     /*
      * As all these processes run inside the same JVM, there are issues around
@@ -552,9 +540,9 @@ final class TestSecureOzoneCluster {
       conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
       IllegalArgumentException exception = assertThrows(
           IllegalArgumentException.class, () -> setupOm(conf));
-      assertTrue(exception.getMessage().contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
+      assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
           "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
-          "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration"));
+          "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
     } finally {
       if (scm != null) {
         scm.stop();
@@ -661,9 +649,9 @@ final class TestSecureOzoneCluster {
       // Start SCM
       scm.start();
 
-      // Setup secure OM for start.
-      int tokenMaxLifetime = 1000;
-      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
+      // Setup secure OM for start.  Generous token lifetime so the renewer and
+      // tampered-token cases below do not race token expiry.
+      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
       setupOm(conf);
       OzoneManager.setTestSecureOmFlag(true);
       om.setCertClient(new CertificateClientTestImpl(conf));
@@ -694,10 +682,15 @@ final class TestSecureOzoneCluster {
       omLogs.clearOutput();
 
       // Test failure of delegation renewal
-      // 1. When token maxExpiryTime exceeds
-      Thread.sleep(tokenMaxLifetime);
+      // 1. When token maxExpiryTime exceeds (maxDate in the past)
+      OzoneTokenIdentifier expiredId = OzoneTokenIdentifier.readProtoBuf(
+          token.getIdentifier());
+      expiredId.setMaxDate(System.currentTimeMillis() - 1000);
+      Token<OzoneTokenIdentifier> expiredToken = new Token<>(
+          expiredId.getBytes(), token.getPassword(), token.getKind(),
+          token.getService());
       OMException ex = assertThrows(OMException.class,
-          () -> omClient.renewDelegationToken(token));
+          () -> omClient.renewDelegationToken(expiredToken));
       assertEquals(TOKEN_EXPIRED, ex.getResult());
       omLogs.clearOutput();
 
@@ -969,7 +962,7 @@ final class TestSecureOzoneCluster {
     // first renewed cert
     X509Certificate newCert =
         generateSelfSignedX509Cert(securityConfig, null,
-            LocalDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
+            ZonedDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
             Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     SCMGetCertResponseProto responseProto =
@@ -1052,7 +1045,7 @@ final class TestSecureOzoneCluster {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509Certificate newCertHolder = generateSelfSignedX509Cert(
         securityConfig, null,
-        LocalDateTime.now().plus(gracePeriod),
+        ZonedDateTime.now().plus(gracePeriod),
         Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
     // provide an invalid SCMGetCertResponseProto. Without
@@ -1358,22 +1351,16 @@ final class TestSecureOzoneCluster {
     if (m.matches()) {
       cn = m.group(1);
     }
-    String hostName = InetAddress.getLocalHost().getHostName();
-
     // Subject name should be om login user in real world but in this test
     // UGI has scm user context.
-    assertThat(cn).contains(SCM_SUB_CA);
-    assertThat(cn).contains(hostName);
+    assertThat(cn).isEqualTo(SCM_SUB_CA + "@localhost");
 
-    LocalDate today = LocalDateTime.now().toLocalDate();
-    Date invalidDate;
+    LocalDate today = ZonedDateTime.now().toLocalDate();
 
     // Make sure the end date is honored.
-    invalidDate = java.sql.Date.valueOf(today.plus(1, ChronoUnit.DAYS));
-    assertTrue(cert.getNotAfter().after(invalidDate));
-
-    invalidDate = java.sql.Date.valueOf(today.plus(400, ChronoUnit.DAYS));
-    assertTrue(cert.getNotAfter().before(invalidDate));
+    assertThat(cert.getNotAfter())
+        .isAfter(java.sql.Date.valueOf(today.plus(1, ChronoUnit.DAYS)))
+        .isBefore(java.sql.Date.valueOf(today.plus(400, ChronoUnit.DAYS)));
 
     assertThat(cert.getSubjectDN().toString()).contains(scmId);
     assertThat(cert.getSubjectDN().toString()).contains(clusterId);
@@ -1399,13 +1386,13 @@ final class TestSecureOzoneCluster {
   }
 
   private static X509Certificate generateSelfSignedX509Cert(
-      SecurityConfig conf, KeyPair keyPair, LocalDateTime startDate,
+      SecurityConfig conf, KeyPair keyPair, ZonedDateTime startDate,
       Duration certLifetime) throws Exception {
     if (keyPair == null) {
       keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     }
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return SelfSignedCertificate.newBuilder()
         .setBeginDate(start)
         .setEndDate(end)
@@ -1436,13 +1423,12 @@ final class TestSecureOzoneCluster {
         .setDigitalEncryption(true);
 
     addIpAndDnsDataToBuilder(csrBuilder);
-    LocalDateTime start = LocalDateTime.now();
+    ZonedDateTime start = ZonedDateTime.now();
     Duration certDuration = conf.getDefaultCertDuration();
     //TODO: generateCSR!
     return approver.sign(conf, rootKeyPair.getPrivate(), rootCert,
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(certDuration)
-                .atZone(ZoneId.systemDefault()).toInstant()),
+            Date.from(start.toInstant()),
+            Date.from(start.plus(certDuration).toInstant()),
             csrBuilder.build().generateCSR(), "test", clusterId,
             String.valueOf(System.nanoTime()));
   }
@@ -1451,8 +1437,7 @@ final class TestSecureOzoneCluster {
       CertificateSignRequest.Builder csrBuilder) throws IOException {
     DomainValidator validator = DomainValidator.getInstance();
     // Add all valid ips.
-    List<InetAddress> inetAddresses =
-        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
     csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }

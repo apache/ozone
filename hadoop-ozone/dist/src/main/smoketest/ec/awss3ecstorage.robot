@@ -18,6 +18,7 @@ Documentation       S3 gateway test with aws cli with STANDARD_IA storage class
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
+Resource            lib.resource
 Resource            ../s3/commonawslib.robot
 Resource            ../s3/mpu_lib.robot
 Resource            ../ozone-lib/shell.robot
@@ -41,12 +42,16 @@ ${BUCKET}             generated
 *** Test Cases ***
 
 Put Object with STANDARD_IA storage class
+    Wait Until Keyword Succeeds      2min       10sec      Has Enough Datanodes    5
+
     ${file_checksum} =  Execute                    md5sum /tmp/1mb | awk '{print $1}'
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey32 --body /tmp/1mb --storage-class STANDARD_IA
     ${eTag} =           Execute                    echo '${result}' | jq -r '.ETag'
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
                         Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecKey32    RS    3    2    1048576
+
+    Wait Until Keyword Succeeds      2min       10sec      Has Enough Datanodes    9
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/ecKey63 --body /tmp/1mb --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
     ${eTag} =           Execute                    echo '${result}' | jq -r '.ETag'
@@ -64,7 +69,7 @@ Test multipart upload with STANDARD_IA storage
                         Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecmultipartKey32    RS    3    2    1048576
 
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63     0     --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
-    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/part1
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/1mb
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey63 --upload-id ${uploadID}
     ${part1} =          Execute               echo '${result}' | jq -r '.Parts[0].ETag'
                         Should Be equal       ${part1}    ${eTag1}

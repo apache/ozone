@@ -64,6 +64,8 @@ public interface Table<KEY, VALUE> {
    * Check if a given key exists in Metadata store.
    * (Optimization to save on data deserialization)
    * A lock on the key / bucket needs to be acquired before invoking this API.
+   * Implementations may use fast existence checks internally, but the returned
+   * result must be definitive for the current table state.
    * @param key metadata key
    * @return true if the metadata store contains a key.
    */
@@ -107,12 +109,9 @@ public interface Table<KEY, VALUE> {
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
-   * This method first checks using keyMayExist, if it returns false, we are
-   * 100% sure that key does not exist in DB, so it returns null with out
-   * calling db.get. If keyMayExist return true, then we use db.get and then
-   * return the value. This method will be useful in the cases where the
-   * caller is more sure that this key does not exist in DB and keyMayExist
-   * will help here.
+   * Implementations may use keyMayExist or similar fast-path checks
+   * internally, but the returned result must remain equivalent to a regular
+   * point lookup on the current table state.
    *
    * @param key metadata key
    * @return value in byte array or null if the key is not found.
@@ -144,12 +143,12 @@ public interface Table<KEY, VALUE> {
 
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {
-    return iterator(null, KeyValueIterator.Type.KEY_AND_VALUE);
+    return iterator(null, IteratorType.KEY_AND_VALUE);
   }
 
   /** The same as iterator(prefix, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
+    return iterator(prefix, IteratorType.KEY_AND_VALUE);
   }
 
   /**
@@ -166,7 +165,7 @@ public interface Table<KEY, VALUE> {
    * @param type Specify whether key and/or value are required.
    * @return an iterator.
    */
-  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
+  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException;
 
   /**
@@ -174,7 +173,7 @@ public interface Table<KEY, VALUE> {
    * @return a key-only iterator
    */
   default TableIterator<KEY, KEY> keyIterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.KEY_ONLY);
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, IteratorType.KEY_ONLY);
     return TableIterator.convert(i, KeyValue::getKey);
   }
 
@@ -188,7 +187,7 @@ public interface Table<KEY, VALUE> {
    * @return a value-only iterator.
    */
   default TableIterator<KEY, VALUE> valueIterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.VALUE_ONLY);
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, IteratorType.VALUE_ONLY);
     return TableIterator.convert(i, KeyValue::getValue);
   }
 
@@ -260,7 +259,7 @@ public interface Table<KEY, VALUE> {
   /**
    * Create the metrics datasource that emits table cache metrics.
    */
-  default TableCacheMetrics createCacheMetrics() throws RocksDatabaseException {
+  default TableCacheMetrics createCacheMetrics() {
     throw new NotImplementedException("getCacheValue is not implemented");
   }
 
@@ -391,24 +390,5 @@ public interface Table<KEY, VALUE> {
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
 
-    /** The iterator type. */
-    enum Type {
-      /** Neither read key nor value. */
-      NEITHER,
-      /** Read key only. */
-      KEY_ONLY,
-      /** Read value only. */
-      VALUE_ONLY,
-      /** Read both key and value. */
-      KEY_AND_VALUE;
-
-      boolean readKey() {
-        return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
-      }
-
-      boolean readValue() {
-        return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
-      }
-    }
   }
 }

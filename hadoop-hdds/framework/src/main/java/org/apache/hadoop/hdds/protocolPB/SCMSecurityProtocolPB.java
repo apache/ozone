@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.protocolPB;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityProtocolService;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**

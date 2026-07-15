@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -108,7 +109,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
     try {
       KeyValueContainer kvContainer = (KeyValueContainer) container;
@@ -303,7 +304,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
     KeyValueContainer kvContainer = (KeyValueContainer) container;
 
     // In version1, we have only chunk file.

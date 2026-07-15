@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.protocolPB;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService;
-import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**

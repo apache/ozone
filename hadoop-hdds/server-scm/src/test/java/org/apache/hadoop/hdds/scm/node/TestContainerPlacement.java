@@ -24,7 +24,11 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -33,6 +37,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -46,6 +51,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -65,6 +71,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -74,6 +81,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,7 +99,6 @@ public class TestContainerPlacement {
   private SequenceIdGenerator sequenceIdGen;
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
-  private NodeManager nodeManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -101,7 +108,7 @@ public class TestContainerPlacement {
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
@@ -155,11 +162,15 @@ public class TestContainerPlacement {
 
   ContainerManager createContainerManager()
       throws IOException {
+    pipelineManager = spy(pipelineManager);
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
+
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())));
+            Clock.system(ZoneId.systemDefault()), null));
   }
 
   /**
@@ -167,10 +178,11 @@ public class TestContainerPlacement {
    *
    * @throws IOException
    * @throws InterruptedException
+   * @throws TimeoutException
    */
   @Test
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException {
+      InterruptedException, TimeoutException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;
@@ -207,9 +219,8 @@ public class TestContainerPlacement {
         scmNodeManager.processHeartbeat(datanodeDetails);
       }
 
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(nodeCount, scmNodeManager.getNodeCount(null, HEALTHY));
+      GenericTestUtils.waitFor(
+          () -> scmNodeManager.getNodeCount(null, HEALTHY) == nodeCount, 100, 5000);
       assertEquals(capacity * nodeCount,
           (long) scmNodeManager.getStats().getCapacity().get());
       assertEquals(used * nodeCount,
@@ -225,6 +236,8 @@ public class TestContainerPlacement {
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
               OzoneConsts.OZONE);
+      assertNotNull(container, "allocateContainer returned null (unexpected in this placement test)");
+
       int replicaCount = 0;
       for (DatanodeDetails datanodeDetails : datanodes) {
         if (replicaCount ==

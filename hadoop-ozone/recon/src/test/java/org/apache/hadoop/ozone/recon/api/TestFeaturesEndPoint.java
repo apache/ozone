@@ -52,12 +52,11 @@ public class TestFeaturesEndPoint {
   private Path temporaryFolder;
   private FeaturesEndpoint featuresEndPoint;
   private boolean isSetupDone = false;
-  private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
 
   private void initializeInjector() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());

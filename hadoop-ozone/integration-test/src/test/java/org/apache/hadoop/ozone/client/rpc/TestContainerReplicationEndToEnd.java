@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -72,7 +71,6 @@ import org.slf4j.LoggerFactory;
 public class TestContainerReplicationEndToEnd {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
   private static ObjectStore objectStore;
   private static String volumeName;
@@ -80,14 +78,9 @@ public class TestContainerReplicationEndToEnd {
   private static XceiverClientManager xceiverClientManager;
   private static long containerReportInterval;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     containerReportInterval = 2000;
 
@@ -118,7 +111,6 @@ public class TestContainerReplicationEndToEnd {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -128,9 +120,6 @@ public class TestContainerReplicationEndToEnd {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -213,7 +202,7 @@ public class TestContainerReplicationEndToEnd {
 
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       Predicate<DatanodeDetails> p =
-          i -> i.getUuid().equals(dn.getDatanodeDetails().getUuid());
+          i -> i.getID().equals(dn.getDatanodeDetails().getID());
       if (!pipeline.getNodes().stream().anyMatch(p)) {
         dnService = dn;
       }

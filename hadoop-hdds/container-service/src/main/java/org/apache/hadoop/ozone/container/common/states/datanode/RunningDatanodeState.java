@@ -52,6 +52,10 @@ public class RunningDatanodeState implements DatanodeState {
   private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
+  // Since we connectionManager endpoints can be changed by reconfiguration
+  // we should not rely on ConnectionManager#getValues being unchanged between
+  // execute and await
+  private int executingEndpointCount = 0;
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -85,6 +89,7 @@ public class RunningDatanodeState implements DatanodeState {
   @Override
   public void execute(ExecutorService executor) {
     ecs = new ExecutorCompletionService<>(executor);
+    executingEndpointCount = 0;
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       Callable<EndPointStates> endpointTask = buildEndPointTask(endpoint);
       if (endpointTask != null) {
@@ -109,6 +114,7 @@ public class RunningDatanodeState implements DatanodeState {
             throw timeoutEx;
           }
         });
+        executingEndpointCount++;
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task
@@ -125,30 +131,37 @@ public class RunningDatanodeState implements DatanodeState {
     this.ecs = e;
   }
 
-  @SuppressWarnings("checkstyle:Indentation")
+  @VisibleForTesting
+  public void setExecutingEndpointCount(int executingEndpointCount) {
+    this.executingEndpointCount = executingEndpointCount;
+  }
+
   private Callable<EndPointStates> buildEndPointTask(
       EndpointStateMachine endpoint) {
     switch (endpoint.getState()) {
-      case GETVERSION:
-        return new VersionEndpointTask(endpoint, conf,
-            context.getParent().getContainer());
-      case REGISTER:
-        return RegisterEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setContext(context)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setOzoneContainer(context.getParent().getContainer())
-            .build();
-      case HEARTBEAT:
-        return HeartbeatEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setContext(context)
-            .build();
-      default:
-        return null;
+    case GETVERSION:
+      // set the next heartbeat time to current to avoid wait for next heartbeat as REGISTER can be triggered
+      // immediately after GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
+      return new VersionEndpointTask(endpoint, conf,
+          context.getParent().getContainer());
+    case REGISTER:
+      return RegisterEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setContext(context)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setOzoneContainer(context.getParent().getContainer())
+          .build();
+    case HEARTBEAT:
+      return HeartbeatEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setContext(context)
+          .build();
+    default:
+      return null;
     }
   }
 
@@ -197,14 +210,13 @@ public class RunningDatanodeState implements DatanodeState {
   public DatanodeStateMachine.DatanodeStates
       await(long duration, TimeUnit timeUnit)
       throws InterruptedException {
-    int count = connectionManager.getValues().size();
     int returned = 0;
     long durationMS = timeUnit.toMillis(duration);
     long timeLeft = durationMS;
     long startTime = Time.monotonicNow();
     List<Future<EndPointStates>> results = new LinkedList<>();
 
-    while (returned < count && timeLeft > 0) {
+    while (returned < executingEndpointCount && timeLeft > 0) {
       Future<EndPointStates> result =
           ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
       if (result != null) {

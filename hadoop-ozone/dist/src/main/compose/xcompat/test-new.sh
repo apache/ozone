@@ -26,4 +26,5 @@ export COMPOSE_DIR
 source "${COMPOSE_DIR}/lib.sh"
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
+export COMPOSE_FILE=new-cluster.yaml:clients.yaml
+cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}

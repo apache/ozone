@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.ozone.test.MetricsAsserts.assertGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -160,7 +160,11 @@ public class TestSCMNodeMetrics {
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        registeredDatanode.getID(), "/tmp", 100, 10, 90, null);
+        registeredDatanode.getID(), "/tmp", 100, 10, 90, null)
+        .toBuilder()
+        .setFsCapacity(200)
+        .setFsAvailable(150)
+        .build();
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -226,12 +230,22 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("AllNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("TotalCapacity", 100L,
+    // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
+    assertGauge("NonWritableNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("TotalUsed", 10L,
+    assertGauge("TotalOzoneCapacity", 100L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalOzoneUsed", 10L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemCapacity", 200L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemUsed", 50L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemAvailable", 150L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     nodeManager.processHeartbeat(registeredDatanode);
-    sleep(4000);
+    GenericTestUtils.waitFor(
+        () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
     assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
     assertGauge("InServiceHealthyNodes", 1, metricsSource);

@@ -17,20 +17,17 @@
 
 package org.apache.ozone.rocksdiff;
 
+import java.util.Objects;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 
 /**
  * Node in the compaction DAG that represents an SST file.
  */
-public class CompactionNode {
-  // Name of the SST file
-  private final String fileName;
+public class CompactionNode extends SstFileInfo {
   private final long snapshotGeneration;
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
-  private final String startKey;
-  private final String endKey;
-  private final String columnFamily;
 
   /**
    * CompactionNode constructor.
@@ -38,13 +35,10 @@ public class CompactionNode {
    * @param seqNum Snapshot generation (sequence number)
    */
   public CompactionNode(String file, long seqNum, String startKey, String endKey, String columnFamily) {
-    fileName = file;
+    super(file, startKey, endKey, columnFamily);
     totalNumberOfKeys = 0L;
     snapshotGeneration = seqNum;
     cumulativeKeysReverseTraversal = 0L;
-    this.startKey = startKey;
-    this.endKey = endKey;
-    this.columnFamily = columnFamily;
   }
 
   public CompactionNode(CompactionFileInfo compactionFileInfo) {
@@ -54,11 +48,7 @@ public class CompactionNode {
 
   @Override
   public String toString() {
-    return String.format("Node{%s}", fileName);
-  }
-
-  public String getFileName() {
-    return fileName;
+    return String.format("Node{%s}", getFileName());
   }
 
   public long getSnapshotGeneration() {
@@ -73,18 +63,6 @@ public class CompactionNode {
     return cumulativeKeysReverseTraversal;
   }
 
-  public String getStartKey() {
-    return startKey;
-  }
-
-  public String getEndKey() {
-    return endKey;
-  }
-
-  public String getColumnFamily() {
-    return columnFamily;
-  }
-
   public void setCumulativeKeysReverseTraversal(
       long cumulativeKeysReverseTraversal) {
     this.cumulativeKeysReverseTraversal = cumulativeKeysReverseTraversal;
@@ -92,5 +70,17 @@ public class CompactionNode {
 
   public void addCumulativeKeysReverseTraversal(long diff) {
     this.cumulativeKeysReverseTraversal += diff;
+  }
+
+  // Not changing previous behaviour.
+  @Override
+  public final boolean equals(Object o) {
+    return this == o;
+  }
+
+  // Having hashcode only on the basis of the filename.
+  @Override
+  public int hashCode() {
+    return Objects.hash(getFileName());
   }
 }

@@ -52,13 +52,11 @@ public class TestKeyValueContainerMarkUnhealthy {
   @TempDir
   private Path folder;
 
-  private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
-  private UUID datanodeId;
 
   private ContainerLayoutVersion layout;
 
@@ -68,8 +66,8 @@ public class TestKeyValueContainerMarkUnhealthy {
   }
 
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    datanodeId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    UUID datanodeId = UUID.randomUUID();
     String dataDir = Files.createDirectory(
         folder.resolve("data")).toAbsolutePath().toString();
     HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)

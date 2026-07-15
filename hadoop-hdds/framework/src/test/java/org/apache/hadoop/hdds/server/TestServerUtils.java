@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.hdds.server;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
@@ -73,6 +78,27 @@ public class TestServerUtils {
     assertEquals("700",
         ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf));
 
+  }
+
+  @Test
+  public void testGetPermissionsWithDefaults() {
+    // Create an OzoneConfiguration without explicitly setting permissions
+    // Should fall back to default values from ozone-default.xml (700)
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Test getPermissions for different config names and verify they use defaults
+    assertEquals("700",
+        ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, conf),
+        "Should use default 700 for Recon DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(ScmConfigKeys.OZONE_SCM_DB_DIRS, conf),
+        "Should use default 700 for SCM DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_METADATA_DIRS, conf),
+        "Should use default 700 for metadata dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf),
+        "Should use default 700 for OM DB dirs");
   }
 
   @Test
@@ -263,4 +289,278 @@ public class TestServerUtils {
         () -> ServerUtils.getOzoneMetaDirPath(conf));
   }
 
+  /**
+   * Test that SCM, OM, and Datanode colocated on the same host with only
+   * ozone.metadata.dirs configured don't conflict with Ratis directories.
+   */
+  @Test
+  public void testColocatedComponentsWithSharedMetadataDir() {
+    final File metaDir = new File(folder.toFile(), "sharedMetaDir");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Only configure ozone.metadata.dirs (the fallback config)
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      assertFalse(metaDir.exists());
+
+      // Test Ratis directories - each component should get its own with flat naming
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, SCM);
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, DATANODE);
+
+      // Verify Ratis directories use flat naming pattern (component.ratis)
+      assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
+      assertEquals(new File(metaDir, "om.ratis").getPath(), omRatisDir);
+      assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
+
+      // Verify all Ratis directories are different
+      assertNotEquals(scmRatisDir, omRatisDir);
+      assertNotEquals(scmRatisDir, dnRatisDir);
+      assertNotEquals(omRatisDir, dnRatisDir);
+
+      // Verify the base metadata dir exists
+      assertTrue(metaDir.exists());
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  @Test
+  public void testEmptyOldSharedRatisIgnored() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create old Ratis directory (empty)
+      assertTrue(oldSharedRatisDir.mkdirs());
+
+      // SCM should use new SCM path
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, SCM);
+      assertEquals(Paths.get(metaDir.getPath(), "scm.ratis").toString(), scmRatisDir);
+
+      // OM should use new OM path
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, OM);
+      assertEquals(Paths.get(metaDir.getPath(), "om.ratis").toString(), omRatisDir);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  /**
+   * Test backward compatibility: old shared /ratis directory should be used
+   * when it exists and is non-empty (simulating upgrade from version 2.0.0).
+   */
+  @Test
+  public void testBackwardCompatibilityWithOldSharedRatisDir() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create old shared ratis directory with some files (simulating existing data)
+      assertTrue(oldSharedRatisDir.mkdirs());
+      File testFile = new File(oldSharedRatisDir, "test-file");
+      assertTrue(testFile.createNewFile());
+
+      // Test that all components use the old shared location
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, SCM);
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, DATANODE);
+
+      // All should use the old shared location
+      assertEquals(oldSharedRatisDir.getPath(), scmRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), omRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), dnRatisDir);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  /**
+   * Test backward compatibility: SCM-specific /scm-ha directory should be preferred
+   * over shared /ratis directory when both exist and are non-empty.
+   * OM and DATANODE should continue using /ratis even when /scm-ha exists.
+   */
+  @Test
+  public void testBackwardCompatibilityWithScmHaDirectory() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldScmHaDir = new File(metaDir, "scm-ha");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create both scm-ha and ratis directories with files
+      assertTrue(oldScmHaDir.mkdirs());
+      File scmHaTestFile = new File(oldScmHaDir, "scm-ha-file");
+      assertTrue(scmHaTestFile.createNewFile());
+
+      assertTrue(oldSharedRatisDir.mkdirs());
+      File ratisTestFile = new File(oldSharedRatisDir, "ratis-file");
+      assertTrue(ratisTestFile.createNewFile());
+
+      // SCM should prefer scm-ha over ratis
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, SCM);
+      assertEquals(oldScmHaDir.getPath(), scmRatisDir);
+      assertNotEquals(oldSharedRatisDir.getPath(), scmRatisDir);
+
+      // OM and DATANODE should still use ratis even when scm-ha exists
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, DATANODE);
+      assertEquals(oldSharedRatisDir.getPath(), omRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), dnRatisDir);
+
+      // Test that empty scm-ha directory is ignored (SCM should fall back to ratis)
+      FileUtils.deleteQuietly(scmHaTestFile);
+      String scmRatisDirWithEmptyScmHa = ServerUtils.getDefaultRatisDirectory(conf, SCM);
+      assertEquals(oldSharedRatisDir.getPath(), scmRatisDirWithEmptyScmHa);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  /**
+   * Test that SCM and OM colocated on the same host with only
+   * ozone.metadata.dirs configured get separate Ratis snapshot directories.
+   */
+  @Test
+  public void testColocatedComponentsWithSharedMetadataDirForSnapshots() {
+    final File metaDir = new File(folder.toFile(), "sharedMetaDir");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Only configure ozone.metadata.dirs (the fallback config)
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      assertFalse(metaDir.exists());
+
+      // Test Ratis snapshot directories - OM and SCM should get their own
+      String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, SCM);
+      String omSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, OM);
+
+      // Verify snapshot directories use: <ozone.metadata.dirs>/<component>.ratis.snapshot
+      assertEquals(new File(metaDir, "scm.ratis.snapshot").getPath(), scmSnapshotDir);
+      assertEquals(new File(metaDir, "om.ratis.snapshot").getPath(), omSnapshotDir);
+
+      // Verify snapshot directories are different
+      assertNotEquals(scmSnapshotDir, omSnapshotDir);
+
+      // Verify the base metadata dir exists
+      assertTrue(metaDir.exists());
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithOctal() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithSymbolic() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir2");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "rwx------");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithDefaultValue() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir3");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Don't explicitly set the permission config key - should use default value (700)
+
+    // Should use default value from ozone-default.xml (700)
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Permissions should be set to default value (700 = rwx------)
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithNonExistentDir() {
+    File nonExistentDir = new File(folder.toFile(), "nonExistent");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Should not throw exception for non-existent directory
+    ServerUtils.setDataDirectoryPermissions(nonExistentDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsSkipsReadOnlyDir() throws IOException {
+    // Create a directory and set it to read-only
+    File readOnlyDir = new File(folder.toFile(), "readOnlyDir");
+    assertTrue(readOnlyDir.mkdirs());
+
+    // Set initial permissions and make it read-only
+    Path dirPath = readOnlyDir.toPath();
+    Set<PosixFilePermission> readOnlyPermissions =
+        PosixFilePermissions.fromString("r-xr-xr-x");
+    Files.setPosixFilePermissions(dirPath, readOnlyPermissions);
+
+    // Verify directory is read-only
+    assertFalse(readOnlyDir.canWrite());
+
+    // Configure system to use 700 permissions
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Call setDataDirectoryPermissions on read-only directory
+    // Should skip permission setting and not throw exception
+    ServerUtils.setDataDirectoryPermissions(readOnlyDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Verify permissions were NOT changed (still read-only)
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(readOnlyPermissions, actualPermissions);
+    assertFalse(readOnlyDir.canWrite());
+  }
 }

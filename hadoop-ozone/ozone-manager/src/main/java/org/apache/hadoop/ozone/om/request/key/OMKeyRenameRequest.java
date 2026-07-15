@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -74,7 +74,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
-    Preconditions.checkNotNull(renameKeyRequest);
+    Objects.requireNonNull(renameKeyRequest, "renameKeyRequest == null");
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
 
@@ -176,7 +176,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
       }
 
-      fromKeyValue.setUpdateID(trxnLogIndex);
+      fromKeyValue = fromKeyValue.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       fromKeyValue.setKeyName(toKeyName);
 

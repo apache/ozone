@@ -23,11 +23,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_BYTES;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
@@ -43,12 +45,14 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -56,6 +60,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.yaml.snakeyaml.nodes.Tag;
 
 /**
@@ -235,8 +240,8 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks increment number
    */
-  public void incrPendingDeletionBlocks(long numBlocks) {
-    getStatistics().addBlockPendingDeletion(numBlocks);
+  public void incrPendingDeletionBlocks(long numBlocks, long bytes) {
+    getStatistics().addBlockPendingDeletion(numBlocks, bytes);
   }
 
   /**
@@ -244,6 +249,13 @@ public class KeyValueContainerData extends ContainerData {
    */
   public long getNumPendingDeletionBlocks() {
     return getStatistics().getBlockPendingDeletion();
+  }
+
+  /**
+   * Get the total bytes used by pending deletion blocks.
+   */
+  public long getBlockPendingDeletionBytes() {
+    return getStatistics().getBlockPendingDeletionBytes();
   }
 
   /**
@@ -315,7 +327,7 @@ public class KeyValueContainerData extends ContainerData {
     if (!finalizedBlockSet.isEmpty()) {
       // delete from db and clear memory
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Objects.requireNonNull(db, "db == null");
       try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
         db.getStore().getFinalizeBlocksTable().deleteBatchWithPrefix(batch, containerPrefix());
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -376,6 +388,10 @@ public class KeyValueContainerData extends ContainerData {
     metadataTable.putWithBatch(batchOperation, getBlockCountKey(), b.getCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
         b.getPendingDeletion() - deletedBlockCount);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
+          b.getPendingDeletionBytes() - releasedBytes);
+    }
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
@@ -386,6 +402,9 @@ public class KeyValueContainerData extends ContainerData {
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
+    }
   }
 
   // NOTE: Below are some helper functions to format keys according
@@ -422,6 +441,14 @@ public class KeyValueContainerData extends ContainerData {
 
   public String getPendingDeleteBlockCountKey() {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
+  }
+
+  public String getContainerDataChecksumKey() {
+    return formatKey(CONTAINER_DATA_CHECKSUM);
+  }
+  
+  public String getPendingDeleteBlockBytesKey() {
+    return formatKey(PENDING_DELETE_BLOCK_BYTES);
   }
 
   public String getDeletingBlockKeyPrefix() {

@@ -1,0 +1,674 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.container.diskbalancer;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+/**
+ * This is a test class for DiskBalancerService.
+ */
+@Timeout(30)
+public class TestDiskBalancerService {
+  @TempDir
+  private Path tmpDir;
+
+  private File testRoot;
+  private String scmId;
+  private String datanodeUuid;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
+  private MutableVolumeSet volumeSet;
+
+  @BeforeEach
+  public void init() throws IOException {
+    testRoot = tmpDir.toFile();
+    if (testRoot.exists()) {
+      FileUtils.cleanDirectory(testRoot);
+    }
+    scmId = UUID.randomUUID().toString();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        generateVolumeLocation(testRoot.getAbsolutePath(), 2));
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
+    conf.set("hdds.datanode.du.factory.classname",
+        "org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory$HalfTera");
+    conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);
+    datanodeUuid = UUID.randomUUID().toString();
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+  }
+
+  @AfterEach
+  public void cleanup() throws IOException {
+    BlockUtils.shutdownCache(conf);
+    FileUtils.deleteDirectory(testRoot);
+    volumeSet.shutdown();
+  }
+
+  /**
+   * Creates stale diskBalancer directories to simulate leftover directories
+   * from previous failed container moves.
+   *
+   * @param volSet the volume set containing volumes to create stale dirs for
+   * @param clusterId the cluster ID to use when constructing paths for uninitialized volumes
+   * @throws IOException if directory creation fails
+   */
+  private void createStaleDiskBalancerDirs(VolumeSet volSet, String clusterId)
+      throws IOException {
+    List<StorageVolume> volumes = volSet.getVolumesList();
+    for (StorageVolume volume : volumes) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        File staleDiskBalancerDir;
+        
+        File volumeTmpDir = hddsVolume.getTmpDir();
+        if (volumeTmpDir != null) {
+          // If tmpDir is initialized, use it directly
+          staleDiskBalancerDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
+        } else {
+          // If tmpDir is not initialized, construct the path manually
+          File clusterIdDir = new File(hddsVolume.getHddsRootDir(), clusterId);
+          File tmpDirPath = new File(clusterIdDir, TMP_DIR_NAME);
+          staleDiskBalancerDir = new File(tmpDirPath, DiskBalancerService.DISK_BALANCER_DIR);
+        }
+        
+        // Create stale directory with some content
+        assertTrue(staleDiskBalancerDir.mkdirs(),
+            "Failed to create stale diskBalancer directory: " + staleDiskBalancerDir.getAbsolutePath());
+        File staleContainerDir = new File(staleDiskBalancerDir, "12345");
+        assertTrue(staleContainerDir.mkdirs());
+        // Verify stale directory exists before cleanup
+        assertTrue(staleDiskBalancerDir.exists(),
+            "Stale diskBalancer directory should exist before cleanup");
+      }
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testUpdateService(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    // Increase volume's usedBytes
+    for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+      volume.incrementUsedSpace(volume.getCurrentUsage().getCapacity() / 2);
+    }
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    // Set a low bandwidth to delay job
+    DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 1L, 5,
+        true, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
+    svc.refresh(initialInfo);
+
+    svc.start();
+
+    assertTrue(svc.getDiskBalancerInfo().isShouldRun());
+    assertEquals(10, svc.getDiskBalancerInfo().getThreshold(), 0.0);
+    assertEquals(1, svc.getDiskBalancerInfo().getBandwidthInMB());
+    assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
+    assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
+
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.STOPPED, 20.0d, 5L, 10, false);
+    svc.refresh(newInfo);
+
+    assertFalse(svc.getDiskBalancerInfo().isShouldRun());
+    assertEquals(20, svc.getDiskBalancerInfo().getThreshold(), 0.0);
+    assertEquals(5, svc.getDiskBalancerInfo().getBandwidthInMB());
+    assertEquals(10, svc.getDiskBalancerInfo().getParallelThread());
+    assertFalse(svc.getDiskBalancerInfo().isStopAfterDiskEven());
+
+    svc.shutdown();
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidDiskBalancerInfo")
+  public void testRefreshRejectsInvalidDiskBalancerInfo(
+      ContainerTestVersionInfo versionInfo, DiskBalancerInfo diskBalancerInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> svc.refresh(diskBalancerInfo));
+
+    svc.shutdown();
+  }
+
+  public static Stream<Arguments> invalidDiskBalancerInfo() {
+    return ContainerTestVersionInfo.getLayoutList().stream()
+        .flatMap(versionInfo -> Stream.of(
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true))));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPolicyClassInitialization(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    assertTrue(svc.getVolumeContainerChoosingPolicy()
+        instanceof DefaultContainerChoosingPolicy);
+  }
+
+  private String generateVolumeLocation(String base, int volumeCount) {
+    if (volumeCount == 0) {
+      return "";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < volumeCount; i++) {
+      sb.append(base).append("/vol").append(i)
+          .append(',');
+    }
+    return sb.substring(0, sb.length() - 1);
+  }
+
+  private DiskBalancerServiceTestImpl getDiskBalancerService(
+      ContainerSet containerSet, ConfigurationSource config,
+      KeyValueHandler keyValueHandler, ContainerController controller,
+      int threadCount) throws IOException {
+    OzoneContainer ozoneContainer =
+        mockDependencies(containerSet, keyValueHandler, controller);
+    return new DiskBalancerServiceTestImpl(ozoneContainer, 1000, config,
+        threadCount);
+  }
+
+  private DiskBalancerServiceTestImpl getDiskBalancerService(
+      OzoneConfiguration config) throws IOException {
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(config);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(config, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(config));
+    return getDiskBalancerService(containerSet, config, keyValueHandler, null, 1);
+  }
+
+  private OzoneConfiguration confWithDiskBalancerInfoDir(File infoDir) {
+    OzoneConfiguration testConf = new OzoneConfiguration(conf);
+    testConf.set("hdds.datanode.disk.balancer.info.dir",
+        infoDir.getAbsolutePath());
+    return testConf;
+  }
+
+  private File getDiskBalancerInfoFile(File infoDir) {
+    return new File(infoDir,
+        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+  }
+
+  public static Stream<Arguments> values() {
+    return Stream.of(
+        Arguments.arguments(0, 0, 0),
+        Arguments.arguments(1, 0, 0),
+        Arguments.arguments(1, 50, 0),
+        Arguments.arguments(2, 0, 0),
+        Arguments.arguments(2, 10, 0),
+        Arguments.arguments(2, 50, 40), // one disk is 50% above average, the other disk is 50% below average
+        Arguments.arguments(3, 0, 0),
+        Arguments.arguments(3, 10, 0),
+        Arguments.arguments(4, 0, 0),
+        Arguments.arguments(4, 50, 40) // two disks are 50% above average, the other two disks are 50% below average
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testCalculateBytesToMove(int volumeCount, int deltaUsagePercent,
+      long expectedBytesToMovePercent) throws IOException {
+    int updatedVolumeCount = volumeCount == 0 ? 1 : volumeCount;
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        generateVolumeLocation(testRoot.getAbsolutePath(), updatedVolumeCount));
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+    if (volumeCount == 0) {
+      volumeSet.failVolume(((HddsVolume) volumeSet.getVolumesList().get(0)).getHddsRootDir().getAbsolutePath());
+    }
+
+    double avgUtilization = 0.5;
+    int totalOverUtilisedVolumes = 0;
+
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    for (int i = 0; i < volumes.size(); i++) {
+      StorageVolume vol = volumes.get(i);
+      long totalCapacityPerVolume = vol.getCurrentUsage().getCapacity();
+      if (i % 2 == 0) {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization + deltaUsagePercent / 100.0)));
+        totalOverUtilisedVolumes++;
+      } else {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization - deltaUsagePercent / 100.0)));
+      }
+    }
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    long totalCapacity = volumes.isEmpty() ? 0 : volumes.get(0).getCurrentUsage().getCapacity();
+    long expectedBytesToMove = (long) Math.ceil(
+        (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
+
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, null);
+    // data precision loss due to double data involved in calculation
+    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeUsages)) <= 1);
+  }
+
+  @Test
+  public void testConcurrentTasksNotExceedThreadLimit() throws Exception {
+    LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
+    int parallelThread = 3;
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, parallelThread);
+
+    // Set operational state to RUNNING
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, parallelThread,
+        false, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
+    svc.refresh(info);
+
+    ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
+    svc.setVolumeContainerChoosingPolicy(containerPolicy);
+
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    HddsVolume source = (HddsVolume) volumes.get(0);
+    HddsVolume dest = (HddsVolume) volumes.get(1);
+    ContainerData containerData = mock(ContainerData.class);
+
+    // Mock unique container IDs to correctly populate the Set
+    when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
+    when(containerData.getBytesUsed()).thenReturn(100L);
+
+    when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble(), any()))
+        .thenReturn(new ContainerCandidate(containerData, source, dest));
+
+    // Test when no tasks are in progress, it should schedule up to the limit
+    BackgroundTaskQueue queue = svc.getTasks();
+    assertEquals(parallelThread, queue.size());
+    assertEquals(parallelThread, svc.getInProgressContainers().size());
+
+    // Test when in-progress tasks are at the limit, no new tasks are scheduled
+    svc.getTasks();
+    GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains("No available thread " +
+            "for disk balancer service. Current thread count is 3."),
+        100, 5000);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteCreatesParentDirectory(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("nested").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    svc.refresh(info);
+
+    assertEquals(info,
+        DiskBalancerYaml.readDiskBalancerInfoFile(
+            getDiskBalancerInfoFile(infoDir)));
+    svc.shutdown();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-parent").toFile();
+    assertTrue(infoDir.createNewFile());
+
+    IOException exception = assertThrows(IOException.class,
+        () -> getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir)));
+
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsFileWriteFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-info-dir").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    File infoFile = getDiskBalancerInfoFile(infoDir);
+    assertTrue(infoFile.delete());
+    assertTrue(infoFile.mkdirs());
+    assertTrue(new File(infoFile, "existing").createNewFile());
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    IOException exception = assertThrows(IOException.class,
+        () -> svc.refresh(info));
+
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to write DiskBalancerInfo file: ");
+    svc.shutdown();
+  }
+
+  private OzoneContainer mockDependencies(ContainerSet containerSet,
+      KeyValueHandler keyValueHandler, ContainerController controller) {
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getWriteChannel()).thenReturn(null);
+    ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
+    when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.getHandler(any())).thenReturn(keyValueHandler);
+    when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
+    when(ozoneContainer.getController()).thenReturn(controller);
+    return ozoneContainer;
+  }
+
+  private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
+    String schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  public static Stream<Arguments> thresholdValidationTestCases() {
+    return Stream.of(
+        // Invalid values that should throw IllegalArgumentException
+        Arguments.arguments(0.0, true, null),
+        Arguments.arguments(100.0, true, null),
+        Arguments.arguments(-1.0, true, null),
+        Arguments.arguments(-0.001, true, null),
+        Arguments.arguments(100.001, true, null),
+        // Valid boundary values that should be accepted
+        Arguments.arguments(0.001, false, 0.001),
+        Arguments.arguments(99.999, false, 99.999),
+        // Valid middle values that should be accepted
+        Arguments.arguments(50.5, false, 50.5),
+        Arguments.arguments(99.0, false, 99.0)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("thresholdValidationTestCases")
+  public void testDiskBalancerConfigurationThresholdValidation(double threshold,
+      boolean shouldThrowException, Double expectedThreshold) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+
+    if (shouldThrowException) {
+      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+          () -> config.setThreshold(threshold));
+      assertEquals("Threshold must be a percentage(double) in the range 0 to 100 both exclusive.",
+          exception.getMessage());
+    } else {
+      // Valid threshold should be accepted
+      config.setThreshold(threshold);
+      assertEquals(expectedThreshold, config.getThreshold(), 0.0001);
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerCleansUpStaleTmpDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    // Start volumes to initialize tmp directories
+    volumeSet.startAllVolume();
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+
+    // Create stale diskBalancer directories to simulate leftover from previous run
+    createStaleDiskBalancerDirs(volumeSet, scmId);
+
+    // Use actual DiskBalancerService (not TestImpl) to test the real start() method
+    OzoneContainer ozoneContainer = mockDependencies(containerSet, keyValueHandler, null);
+    DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
+        TimeUnit.MILLISECONDS, 1, conf);
+
+    // Start the service, which should clean up stale tmp directories via cleanupTmpDir()
+    svc.start();
+
+    // Verify stale diskBalancer tmp directories are cleaned up
+    for (StorageVolume volume : volumeSet.getVolumesList()) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        File volumeTmpDir = hddsVolume.getTmpDir();
+        File diskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
+
+        // Verify stale directory is cleaned up (should not exist)
+        assertFalse(diskBalancerTmpDir.exists(),
+            "Stale diskBalancer tmp directory should be cleaned up on startup");
+      }
+    }
+
+    svc.shutdown();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerCleanupWhenTmpDirNotInitialized(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    // Create a fresh volume set WITHOUT calling createDbInstancesForTestIfNeeded
+    // This simulates volumes that are formatted but tmpDir is not initialized
+    MutableVolumeSet testVolumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    // Format volumes and ensure clusterID directory exists, but DON'T create tmp dirs
+    // This simulates the scenario where tmpDir is null
+    for (StorageVolume volume : testVolumeSet.getVolumesList()) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        // Format volume to set clusterID
+        hddsVolume.format(scmId);
+        // Manually create the clusterID directory (needed for tmpDir creation)
+        // but don't call createWorkingDir() or createTmpDirs()
+        File clusterIdDir = new File(hddsVolume.getHddsRootDir(), scmId);
+        if (!clusterIdDir.exists()) {
+          assertTrue(clusterIdDir.mkdirs(),
+              "Failed to create clusterID directory: " + clusterIdDir.getAbsolutePath());
+        }
+        // Verify tmpDir is null (not initialized)
+        assertNull(hddsVolume.getTmpDir());
+      }
+    }
+
+    // Create stale diskBalancer directories manually to simulate leftover from failed move
+    // This tests the scenario where stale dirs exist even though tmpDir is not initialized
+    createStaleDiskBalancerDirs(testVolumeSet, scmId);
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, testVolumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+
+    // Use actual DiskBalancerService (not TestImpl) to test the real start() method
+    OzoneContainer ozoneContainer = mockDependencies(containerSet, keyValueHandler, null);
+    // Override getVolumeSet to return our test volume set
+    when(ozoneContainer.getVolumeSet()).thenReturn(testVolumeSet);
+
+    DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
+        TimeUnit.MILLISECONDS, 1, conf);
+
+    // Start the service - cleanup should handle volumes with uninitialized tmpDir
+    // and clean up stale directories even when tmpDir is null
+    svc.start();
+
+    // Verify stale directories are cleaned up even though tmpDir is not initialized
+    List<StorageVolume> volumes = testVolumeSet.getVolumesList();
+    for (StorageVolume volume : volumes) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        // tmpDir should still be null - cleanup doesn't initialize it
+        assertNull(hddsVolume.getTmpDir(),
+            "tmpDir should not be initialized by cleanup, it will be created lazily");
+
+        // Verify stale diskBalancer directory is cleaned up
+        File hddsRootDir = hddsVolume.getHddsRootDir();
+        File expectedDiskBalancerTmpDir = new File(new File(hddsRootDir, scmId),
+            TMP_DIR_NAME + File.separator + DiskBalancerService.DISK_BALANCER_DIR);
+        assertFalse(expectedDiskBalancerTmpDir.exists(),
+            "Stale diskBalancer directory should be cleaned up even when tmpDir is not initialized");
+      }
+    }
+
+    svc.shutdown();
+    testVolumeSet.shutdown();
+  }
+
+  private static Stream<Arguments> movableContainerStatesCases() {
+    return Stream.of(
+        Arguments.of("CLOSED,QUASI_CLOSED", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of(" CLOSED , QUASI_CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED  ", true,
+            new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
+        Arguments.of("CLOSING,CLOSED", false, new HashSet<>(Arrays.
+                asList(State.CLOSING, State.CLOSED)), "State CLOSING is not movable"),
+        Arguments.of("  QUASI_CLOSED,CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED , CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of(null, false, null, "must not be empty"),
+        Arguments.of("", false, null, "must not be empty"),
+        Arguments.of("   ", false, null, "must not be empty"),
+        Arguments.of(",,,", false, null, "at least one valid"),
+        Arguments.of("closed", false, null, "uppercase"),
+        Arguments.of("NOT_A_STATE", false, null, "Invalid container state"),
+        Arguments.of("OPEN", false, null, "State OPEN is not movable"),
+        Arguments.of("RECOVERING", false, null, "State RECOVERING is not movable"),
+        Arguments.of("DELETED", false, null, "State DELETED is not movable")
+    );
+  }
+
+  /**
+   * {@link DiskBalancerConfiguration#setContainerStates(String)} accepts only exact enum names;
+   * blank input, empty token lists, wrong casing, and unknown names fail with an error.
+   */
+  @ParameterizedTest(name = "containerStates={0}")
+  @MethodSource("movableContainerStatesCases")
+  public void testMovableContainerStates(String containerStates, boolean expectSuccess,
+      Set<State> expectedStates, String messageMustContain) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+    if (expectSuccess) {
+      config.setContainerStates(containerStates);
+      assertEquals(expectedStates, config.getMovableContainerStates());
+    } else {
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> config.setContainerStates(containerStates));
+      if (messageMustContain != null) {
+        assertTrue(ex.getMessage().contains(messageMustContain),
+            () -> "Expected message to contain '" + messageMustContain + "': " + ex.getMessage());
+      }
+    }
+  }
+
+}

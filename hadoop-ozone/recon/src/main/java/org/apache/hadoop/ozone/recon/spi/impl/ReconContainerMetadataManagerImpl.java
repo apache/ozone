@@ -34,10 +34,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -83,17 +83,34 @@ public class ReconContainerMetadataManagerImpl
 
   private DBStore containerDbStore;
 
-  @Inject
   private Configuration sqlConfiguration;
 
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
-                                           Configuration sqlConfiguration) {
-    containerDbStore = reconDBProvider.getDbStore();
+  public ReconContainerMetadataManagerImpl(
+      ReconDBProvider reconDBProvider, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    this(reconDBProvider.getDbStore(), sqlConfiguration, omMetadataManager);
+  }
+
+  private ReconContainerMetadataManagerImpl(
+      DBStore reconDBStore, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    containerDbStore = reconDBStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
+    this.sqlConfiguration = sqlConfiguration;
+    this.omMetadataManager = omMetadataManager;
+    initializeTables();
+  }
+
+  @Override
+  public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
+      DBStore stagedReconDbStore) {
+    return new ReconContainerMetadataManagerImpl(stagedReconDbStore, sqlConfiguration, omMetadataManager);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) {
+    containerDbStore = reconDBProvider.getDbStore();
     initializeTables();
   }
 
@@ -154,24 +171,6 @@ public class ReconContainerMetadataManagerImpl
 
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
-   * count into the container DB store.
-   *
-   * @param containerKeyPrefix the containerID, key-prefix tuple.
-   * @param count Count of the keys matching that prefix.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                       Integer count)
-      throws IOException {
-    containerKeyTable.put(containerKeyPrefix, count);
-    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
-      keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), count);
-    }
-  }
-
-  /**
-   * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into a batch.
    *
    * @param batch the batch we store into
@@ -189,19 +188,6 @@ public class ReconContainerMetadataManagerImpl
       keyContainerTable.putWithBatch(batch,
           containerKeyPrefix.toKeyPrefixContainer(), count);
     }
-  }
-
-  /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyCount(Long containerID, Long count)
-      throws IOException {
-    containerKeyCountTable.put(containerID, count);
   }
 
   /**
@@ -229,9 +215,9 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void storeContainerReplicaHistory(Long containerID,
-      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
+      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException {
     List<ContainerReplicaHistory> tsList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+    for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
 
@@ -247,17 +233,17 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void batchStoreContainerReplicaHistory(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException {
     try (BatchOperation batchOperation =
              containerDbStore.initBatchOperation()) {
-      for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
+      for (Map.Entry<Long, Map<DatanodeID, ContainerReplicaHistory>> entry :
           replicaHistoryMap.entrySet()) {
         final long containerId = entry.getKey();
-        final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
+        final Map<DatanodeID, ContainerReplicaHistory> tsMap = entry.getValue();
 
         List<ContainerReplicaHistory> tsList = new ArrayList<>();
-        for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+        for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
           tsList.add(e.getValue());
         }
 
@@ -290,7 +276,7 @@ public class ReconContainerMetadataManagerImpl
    * @throws IOException
    */
   @Override
-  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+  public Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException {
 
     final ContainerReplicaHistoryList tsList =
@@ -300,12 +286,12 @@ public class ReconContainerMetadataManagerImpl
       return new HashMap<>();
     }
 
-    Map<UUID, ContainerReplicaHistory> res = new HashMap<>();
+    Map<DatanodeID, ContainerReplicaHistory> res = new HashMap<>();
     // Populate result map with entries from the DB.
     // The list should be fairly short (< 10 entries).
     for (ContainerReplicaHistory ts : tsList.getList()) {
-      final UUID uuid = ts.getUuid();
-      res.put(uuid, ts);
+      final DatanodeID id = ts.getId();
+      res.put(id, ts);
     }
     return res;
   }

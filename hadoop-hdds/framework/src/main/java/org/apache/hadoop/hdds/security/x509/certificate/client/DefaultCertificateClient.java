@@ -272,17 +272,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   private synchronized void updateCachedRootCAId(String s) {
-    BigInteger candidateNewId = new BigInteger(s);
     if (rootCaCertId == null
-        || new BigInteger(rootCaCertId).compareTo(candidateNewId) < 0) {
+        || new BigInteger(rootCaCertId).compareTo(new BigInteger(s)) < 0) {
       rootCaCertId = s;
     }
   }
 
   private synchronized void updateCachedSubCAId(String s) {
-    BigInteger candidateNewId = new BigInteger(s);
     if (caCertId == null
-        || new BigInteger(caCertId).compareTo(candidateNewId) < 0) {
+        || new BigInteger(caCertId).compareTo(new BigInteger(s)) < 0) {
       caCertId = s;
     }
   }
@@ -1354,7 +1352,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   public synchronized void startCertificateRenewerService() {
-    Preconditions.checkNotNull(getCertificate(),
+    Objects.requireNonNull(getCertificate(),
         "Component certificate should not be empty");
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -31,9 +32,11 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -43,6 +46,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -54,11 +61,21 @@ import org.junit.jupiter.api.Test;
 public class TestSCMSafeModeWithPipelineRules {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
 
   public void setup(int numDatanodes) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    configureTestCluster(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(numDatanodes)
+        .build();
+    cluster.waitForClusterToBeReady();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    pipelineManager = scm.getPipelineManager();
+  }
+
+  private static void configureTestCluster(OzoneConfiguration conf) {
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "10s");
@@ -70,13 +87,6 @@ public class TestSCMSafeModeWithPipelineRules {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS, true);
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    StorageContainerManager scm = cluster.getStorageContainerManager();
-    pipelineManager = scm.getPipelineManager();
   }
 
   @Test
@@ -155,6 +165,49 @@ public class TestSCMSafeModeWithPipelineRules {
         cluster.getStorageContainerManager().getReplicationManager();
 
     GenericTestUtils.waitFor(replicationManager::isRunning, 1000, 60000);
+  }
+
+  @Test
+  void testSafeModeExitAfterScmRestartWithMixedEcAndRatisThreeKeys()
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    configureTestCluster(conf);
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        HddsProtos.ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        true);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
+        .build();
+    cluster.waitForClusterToBeReady();
+    pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
+    waitForRatis3NodePipelines(1);
+
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      TestDataUtil.createKey(bucket, "ec-key",
+          new ECReplicationConfig("rs-3-2-1024k"),
+          "ec-data".getBytes(UTF_8));
+      TestDataUtil.createKey(bucket, "ratis3-key",
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          "ratis-data".getBytes(UTF_8));
+    }
+
+    cluster.restartStorageContainerManager(false);
+    SCMSafeModeManager scmSafeModeManager =
+        cluster.getStorageContainerManager().getScmSafeModeManager();
+    final ECMinDataNodeSafeModeRule ecRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECMinDataNodeSafeModeRule.class);
+
+    assertTrue(ecRule.isEnabled());
+    ecRule.setValidateBasedOnReportProcessing(false);
+    GenericTestUtils.waitFor(ecRule::validate, 1000, 60000);
+    GenericTestUtils.waitFor(() -> {
+      scmSafeModeManager.refreshAndValidate();
+      return !scmSafeModeManager.getInSafeMode();
+    }, 1000, 60000);
   }
 
   @AfterEach

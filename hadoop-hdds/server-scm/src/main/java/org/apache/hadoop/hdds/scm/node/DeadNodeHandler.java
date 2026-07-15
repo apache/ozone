@@ -77,6 +77,14 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
                         final EventPublisher publisher) {
 
     try {
+      NodeStatus currentStatus =
+          nodeManager.getNodeStatus(datanodeDetails);
+
+      if (currentStatus.getHealth() != HddsProtos.NodeState.DEAD) {
+        LOG.info("Skip event for dead node {} since the current " +
+            "state is {}", datanodeDetails, currentStatus.getHealth());
+        return;
+      }
 
       /*
        * We should have already destroyed all the pipelines on this datanode
@@ -92,7 +100,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 
-      boolean isNodeInMaintenance = nodeManager.getNodeStatus(datanodeDetails).isInMaintenance();
+      boolean isNodeInMaintenance = currentStatus.isInMaintenance();
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
@@ -119,15 +127,26 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         deletedBlockLog.onDatanodeDead(datanodeDetails.getID());
       }
 
-      //move dead datanode out of ClusterNetworkTopology
-      NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
-      if (nt.contains(datanodeDetails)) {
-        nt.remove(datanodeDetails);
-        //make sure after DN is removed from topology,
-        //DatanodeDetails instance returned from nodeStateManager has no parent.
-        Preconditions.checkState(
-            nodeManager.getNode(datanodeDetails.getID())
-                .getParent() == null);
+      // Only remove from topology if the node is still DEAD. Between the time
+      // the DEAD_NODE event was fired and now, the node may have been
+      // resurrected (DEAD -> HEALTHY_READONLY) via a heartbeat. Removing a
+      // resurrected node from the topology would leave it reachable but
+      // invisible to the placement policy.
+      currentStatus = nodeManager.getNodeStatus(datanodeDetails);
+      if (currentStatus.getHealth() == HddsProtos.NodeState.DEAD) {
+        NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+        if (nt.contains(datanodeDetails)) {
+          nt.remove(datanodeDetails);
+          DatanodeDetails node = nodeManager.getNode(datanodeDetails.getID());
+          //make sure after DN is removed from topology,
+          //DatanodeDetails instance returned from nodeStateManager has no parent.
+          if (node != null) {
+            Preconditions.checkState(node.getParent() == null);
+          }
+        }
+      } else {
+        LOG.info("Skipping topology removal for dead node {} whose current " +
+            "state is {}", datanodeDetails, currentStatus.getHealth());
       }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an

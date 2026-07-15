@@ -23,7 +23,7 @@ import picocli.CommandLine.Command;
 /**
  * Shell for multi-tenant related operations.
  */
-@Command(name = "ozone tenant",
+@Command(name = "ozone tenant", aliases = "tenant",
     description = "Shell for multi-tenant specific operations",
     subcommands = {
         TenantCreateHandler.class,

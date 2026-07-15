@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
+import static org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes.newBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,10 +32,12 @@ import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
@@ -49,6 +52,7 @@ public final class TestCodec {
 
   static {
     CodecBuffer.enableLeakDetection();
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
 
   @Test
@@ -139,6 +143,20 @@ public final class TestCodec {
   }
 
   @Test
+  public void testStringCodecMalformedUtf8String() throws Exception {
+    final byte[] malformed = new byte[] {(byte) 0xC3, (byte) '/', 0, 0, 0, 1};
+
+    // StringCodec.getCodecNoFallback() should throw CodecException
+    assertThrows(CodecException.class,
+        () -> StringCodec.getCodecNoFallback().fromPersistedFormat(malformed));
+
+    // StringCodec.get() will replace malformed characters.
+    final String decoded = StringCodec.get().fromPersistedFormat(malformed);
+    final byte[] encoded = StringCodec.get().toPersistedFormat(decoded);
+    assertFalse(Arrays.equals(malformed, encoded));
+  }
+
+  @Test
   public void testStringCodec() throws Exception {
     assertFalse(StringCodec.get().isFixedLength());
     runTestStringCodec("");
@@ -180,6 +198,7 @@ public final class TestCodec {
   static int runTestStringCodec(String original) throws Exception {
     final int serializedSize = UTF_8.encode(original).remaining();
     runTest(StringCodec.get(), original, serializedSize);
+    runTest(StringCodec.getCodecNoFallback(), original, serializedSize);
     return serializedSize;
   }
 
@@ -201,7 +220,7 @@ public final class TestCodec {
 
 
     final String multiByteChars = "Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。";
-    assertThrows(IOException.class,
+    assertThrows(CodecException.class,
         tryCatch(() -> runTestFixedLengthStringCodec(multiByteChars)));
     assertThrows(IllegalStateException.class,
         tryCatch(() -> FixedLengthStringCodec.string2Bytes(multiByteChars)));
@@ -289,17 +308,15 @@ public final class TestCodec {
   public static <T> void runTest(Codec<T> codec, T original,
       Integer serializedSize) throws Exception {
     CodecTestUtil.runTest(codec, original, serializedSize, null);
-    runTestBytes(original, codec);
+    runTestBytes(original, codec, CodecBuffer.Allocator.HEAP);
+    runTestBytes(original, codec, CodecBuffer.Allocator.DIRECT);
   }
 
-  static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
+  static <T> void runTestBytes(T object, Codec<T> codec, CodecBuffer.Allocator allocator) throws IOException {
     final byte[] array = codec.toPersistedFormat(object);
     final Bytes fromArray = new Bytes(array);
-
-    try (CodecBuffer buffer = codec.toCodecBuffer(object,
-        CodecBuffer.Allocator.HEAP)) {
-      final Bytes fromBuffer = new Bytes(buffer);
-
+    try (CodecBuffer buffer = codec.toCodecBuffer(object, allocator)) {
+      final Bytes fromBuffer = newBytes(buffer);
       assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
       assertEquals(fromArray, fromBuffer);
       assertEquals(fromBuffer, fromArray);

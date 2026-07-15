@@ -165,7 +165,7 @@ public class TestReconcileContainerCommandHandler {
     when(mockSupervisor.getReplicationRequestAvgTime(subject.getMetricsName())).thenReturn(3L);
     when(mockSupervisor.getReplicationQueuedCount(subject.getMetricsName())).thenReturn(1L);
 
-    assertEquals(subject.getMetricsName(), "ContainerReconciliations");
+    assertEquals(subject.getMetricsName(), ReconcileContainerTask.METRIC_NAME);
     assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
     assertEquals(subject.getQueuedCount(), 1);
     assertEquals(subject.getTotalRunTime(), 10);
@@ -177,7 +177,7 @@ public class TestReconcileContainerCommandHandler {
 
     for (Map.Entry<ContainerID, ContainerReplicaProto> entry: reportsSent.entrySet()) {
       ContainerID id = entry.getKey();
-      assertNotNull(containerSet.getContainer(id.getId()));
+      assertNotNull(containerSet.getContainer(id.getIdForTesting()));
 
       long sentDataChecksum = entry.getValue().getDataChecksum();
       // Current implementation is incomplete, and uses a mocked checksum.

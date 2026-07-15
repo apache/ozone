@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -66,9 +68,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
 
   private Map<SCMCommandProto.Type, MetricsInfo> stateContextCommandQueueMap;
   private Map<SCMCommandProto.Type, MetricsInfo> commandDispatcherQueueMap;
-  private Map<InetSocketAddress, MetricsInfo> incrementalReportsQueueMap;
-  private Map<InetSocketAddress, MetricsInfo> containerActionQueueMap;
-  private Map<InetSocketAddress, MetricsInfo> pipelineActionQueueMap;
+  private Map<HostAndPort, MetricsInfo> incrementalReportsQueueMap;
+  private Map<HostAndPort, MetricsInfo> containerActionQueueMap;
+  private Map<HostAndPort, MetricsInfo> pipelineActionQueueMap;
 
   public DatanodeQueueMetrics(DatanodeStateMachine datanodeStateMachine) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -114,35 +116,35 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean b) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
 
-    Map<SCMCommandProto.Type, Integer> tmpMap =
+    EnumCounters<SCMCommandProto.Type> tmpEnum =
         datanodeStateMachine.getContext().getCommandQueueSummary();
     for (Map.Entry<SCMCommandProto.Type, MetricsInfo> entry:
         stateContextCommandQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
-          (long) tmpMap.getOrDefault(entry.getKey(), 0));
+          tmpEnum.get(entry.getKey()));
     }
 
-    tmpMap = datanodeStateMachine.getCommandDispatcher()
+    tmpEnum = datanodeStateMachine.getCommandDispatcher()
         .getQueuedCommandCount();
     for (Map.Entry<SCMCommandProto.Type, MetricsInfo> entry:
         commandDispatcherQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
-          (long) tmpMap.getOrDefault(entry.getKey(), 0));
+          tmpEnum.get(entry.getKey()));
     }
 
-    for (Map.Entry<InetSocketAddress, MetricsInfo> entry:
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
         incrementalReportsQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
           datanodeStateMachine.getContext()
               .getIncrementalReportQueueSize().getOrDefault(entry.getKey(), 0));
     }
-    for (Map.Entry<InetSocketAddress, MetricsInfo> entry:
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
         containerActionQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
           datanodeStateMachine.getContext()
               .getContainerActionQueueSize().getOrDefault(entry.getKey(), 0));
     }
-    for (Map.Entry<InetSocketAddress, MetricsInfo> entry:
+    for (Map.Entry<HostAndPort, MetricsInfo> entry:
         pipelineActionQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
           datanodeStateMachine.getContext().getPipelineActionQueueSize()
@@ -155,7 +157,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
-  public void addEndpoint(InetSocketAddress endpoint) {
+  public void addEndpoint(HostAndPort endpoint) {
     incrementalReportsQueueMap.computeIfAbsent(endpoint,
         k -> getMetricsInfo(INCREMENTAL_REPORT_QUEUE_PREFIX,
             CaseFormat.UPPER_UNDERSCORE
@@ -168,6 +170,27 @@ public final class DatanodeQueueMetrics implements MetricsSource {
         k -> getMetricsInfo(PIPELINE_ACTION_QUEUE_PREFIX,
             CaseFormat.UPPER_UNDERSCORE
                 .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+  }
+
+  public void removeEndpoint(HostAndPort endpoint) {
+    incrementalReportsQueueMap.remove(endpoint);
+    containerActionQueueMap.remove(endpoint);
+    pipelineActionQueueMap.remove(endpoint);
+  }
+
+  @VisibleForTesting
+  public int getIncrementalReportsQueueMapSize() {
+    return incrementalReportsQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getContainerActionQueueMapSize() {
+    return containerActionQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getPipelineActionQueueMapSize() {
+    return pipelineActionQueueMap.size();
   }
 
   private MetricsInfo getMetricsInfo(String prefix, String metricName) {

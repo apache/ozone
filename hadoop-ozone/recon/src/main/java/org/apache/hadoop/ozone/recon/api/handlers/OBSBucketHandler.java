@@ -169,40 +169,8 @@ public class OBSBucketHandler extends BucketHandler {
    */
   @Override
   public long calculateDUUnderObject(long parentId) throws IOException {
-    // Initialize the total disk usage variable.
-    long totalDU = 0L;
-
-    // Access the key table for the bucket.
-    Table<String, OmKeyInfo> keyTable = getKeyTable();
-
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
-      // Construct the seek prefix to filter keys under this bucket.
-      String seekPrefix =
-          OM_KEY_PREFIX + vol + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX;
-      iterator.seek(seekPrefix);
-
-      // Iterate over keys in the bucket.
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String keyName = kv.getKey();
-
-        // Break the loop if the current key does not start with the seekPrefix.
-        if (!keyName.startsWith(seekPrefix)) {
-          break;
-        }
-
-        // Sum the size of each key to the total disk usage.
-        OmKeyInfo keyInfo = kv.getValue();
-        if (keyInfo != null) {
-          totalDU += keyInfo.getDataSize();
-        }
-      }
-    }
-
-    // Return the total disk usage of all keys in the bucket.
-    return totalDU;
+    NSSummary nsSummary = getReconNamespaceSummaryManager().getNSSummary(parentId);
+    return nsSummary != null ? nsSummary.getReplicatedSizeOfFiles() : 0L;
   }
 
   /**

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -52,7 +53,7 @@ public class TestNodeStateMap {
   }
 
   void addNode(DatanodeDetails datanode, NodeStatus status) throws NodeAlreadyExistsException {
-    map.addNode(new DatanodeInfo(datanode, status, null));
+    map.addNode(new DatanodeInfo(datanode, status, null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
   }
 
   @BeforeEach
@@ -129,7 +130,7 @@ public class TestNodeStateMap {
     }
     final NodeStatus requestedState = NodeStatus.valueOf(
         NodeOperationalState.IN_SERVICE, NodeState.STALE, opExpiryEpochSeconds);
-    List<DatanodeInfo> nodes = map.getDatanodeInfos(requestedState);
+    final List<DatanodeDetails> nodes = map.getDatanodeDetails(requestedState);
     assertEquals(1, nodes.size());
     assertEquals(1, map.getNodeCount(requestedState));
 

@@ -17,18 +17,47 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksIterator;
 
 /**
  * Managed RocksIterator.
+ *
+ * <p>When constructed with a {@code dbRef} (an acquired reference to the
+ * underlying RocksDatabase counter), the iterator holds that reference for its
+ * entire lifetime and releases it in {@link #close()}. This guarantees the DB
+ * cannot be physically destroyed (via waitAndClose) while the iterator is open,
+ * eliminating any TOCTOU race between iterator creation and use.
  */
 public class ManagedRocksIterator extends ManagedObject<RocksIterator> {
 
-  public ManagedRocksIterator(RocksIterator original) {
+  private final UncheckedAutoCloseable dbRef;
+
+  public ManagedRocksIterator(RocksIterator original, UncheckedAutoCloseable dbRef) {
     super(original);
+    this.dbRef = dbRef;
+  }
+
+  public ManagedRocksIterator(RocksIterator original) {
+    this(original, null);
+  }
+
+  @Override
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      if (dbRef != null) {
+        dbRef.close();
+      }
+    }
   }
 
   public static ManagedRocksIterator managed(RocksIterator iterator) {
     return new ManagedRocksIterator(iterator);
+  }
+
+  public static ManagedRocksIterator managed(RocksIterator iterator, UncheckedAutoCloseable dbRef) {
+    return new ManagedRocksIterator(iterator, dbRef);
   }
 }

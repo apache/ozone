@@ -54,6 +54,7 @@ public class TestHddsServerUtils {
   public void testGetDatanodeAddressWithPort() {
     final String scmHost = "host123:100";
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         NetUtils.createSocketAddr(
@@ -69,6 +70,7 @@ public class TestHddsServerUtils {
   public void testGetDatanodeAddressWithoutPort() {
     final String scmHost = "host123";
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         NetUtils.createSocketAddr(

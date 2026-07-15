@@ -40,12 +40,10 @@ Kinit as ozone admin
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
 
 Sync OM Data
-  Log To Console          Sending CURL request to ${TRIGGER_SYNC_ENDPOINT}
   ${result} =             Execute       curl --negotiate -u : -LSs ${TRIGGER_SYNC_ENDPOINT}
   [return]  ${result}
 
 Fetch Task Status
-  Log To Console          Sending CURL request to ${TASK_STATUS_ENDPOINT}
   ${result} =             Execute     curl -H "Accepts: application/json" --negotiate -u : -LSs ${TASK_STATUS_ENDPOINT}
   ${parsed_response} =    Evaluate    json.loads('''${result}''')
   ${tasks} =              Evaluate    [task for task in ${parsed_response}]
@@ -105,9 +103,7 @@ Validate All Tasks Updated After Sync
     END
 
 Validate Sequence number is updated after sync
-    Log To Console          Triggering OM DB sync for updates
-    Log To Console          Wait for few seconds to let previous OM DB Sync thread to finish
-    Sleep  2s               # Waits for 2 seconds
+    Sleep  2s               # Waits for 2 seconds for any previous om sync to complete
     Sync OM Data
     ${tasks} =              Fetch Task Status
     Should Not Be Empty     ${tasks}

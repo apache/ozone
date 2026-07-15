@@ -131,7 +131,7 @@ public class TestRefreshVolumeUsageHandler {
 
       // force refresh and verify used space in optimized flow
       cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList().get(0)
-          .getVolumeUsage().get().refreshNow();
+          .getVolumeUsage().refreshNow();
       GenericTestUtils.waitFor(() -> logCapture.getOutput().contains("container data usages 4"), 500, 10 * 1000);
     }
   }

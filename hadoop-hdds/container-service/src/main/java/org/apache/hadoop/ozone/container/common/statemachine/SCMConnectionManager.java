@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMill
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -36,12 +35,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.io_.retry.RetryPolicies;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -61,7 +61,7 @@ public class SCMConnectionManager
       LoggerFactory.getLogger(SCMConnectionManager.class);
 
   private final ReadWriteLock mapLock;
-  private final Map<InetSocketAddress, EndpointStateMachine> scmMachines;
+  private final Map<HostAndPort, EndpointStateMachine> scmMachines;
 
   private final int rpcTimeout;
   private final ConfigurationSource conf;
@@ -130,7 +130,7 @@ public class SCMConnectionManager
    * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void addSCMServer(InetSocketAddress address,
+  public void addSCMServer(HostAndPort address,
       String threadNamePrefix) throws IOException {
     writeLock();
     try {
@@ -156,7 +156,7 @@ public class SCMConnectionManager
 
       StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           StorageContainerDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
+          address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
           NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
           retryPolicy).getProxy();
 
@@ -179,7 +179,7 @@ public class SCMConnectionManager
    * @param address Recon address.
    * @throws IOException
    */
-  public void addReconServer(InetSocketAddress address,
+  public void addReconServer(HostAndPort address,
       String threadNamePrefix) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
     writeLock();
@@ -202,7 +202,7 @@ public class SCMConnectionManager
               TimeUnit.MILLISECONDS);
       ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           ReconDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
+          address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
           NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
           retryPolicy).getProxy();
 
@@ -224,18 +224,19 @@ public class SCMConnectionManager
    * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void removeSCMServer(InetSocketAddress address) throws IOException {
+  public void removeSCMServer(HostAndPort address) throws IOException {
     writeLock();
     try {
-      if (!scmMachines.containsKey(address)) {
+      EndpointStateMachine endPoint = scmMachines.remove(address);
+      if (endPoint == null) {
         LOG.warn("Trying to remove a non-existent SCM machine. " +
             "Ignoring the request.");
         return;
       }
-
-      EndpointStateMachine endPoint = scmMachines.get(address);
+      // This is a normal reconfiguration removal. Do not set the endpoint to
+      // SHUTDOWN, as an in-flight task may report that state as a DN fatal
+      // shutdown.
       endPoint.close();
-      scmMachines.remove(address);
     } finally {
       writeUnlock();
     }
@@ -270,6 +271,18 @@ public class SCMConnectionManager
     readLock();
     try {
       return unmodifiableList(new ArrayList<>(scmMachines.values()));
+    } finally {
+      readUnlock();
+    }
+  }
+
+  /**
+   * @return the number of connections (both SCM and Recon)
+   */
+  public int getNumOfConnections() {
+    readLock();
+    try {
+      return scmMachines.size();
     } finally {
       readUnlock();
     }

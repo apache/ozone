@@ -23,13 +23,13 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -84,7 +84,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
         .getCreateFileRequest();
-    Preconditions.checkNotNull(createFileRequest);
+    Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
@@ -101,14 +101,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
       return getOmRequest().toBuilder().setUserInfo(userInfo).build();
     }
 
-    long scmBlockSize = ozoneManager.getScmBlockSize();
-
     // NOTE size of a key is not a hard limit on anything, it is a value that
     // client should expect, in terms of current size of key. If client sets
     // a value, then this value is used, otherwise, we allocate a single
     // block which is the current size, if read by the client.
     final long requestedSize = keyArgs.getDataSize() > 0 ?
-        keyArgs.getDataSize() : scmBlockSize;
+        keyArgs.getDataSize() : ozoneManager.getScmBlockSize();
 
     HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
     HddsProtos.ReplicationType type = keyArgs.getType();
@@ -123,17 +121,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
-
-    List< OmKeyLocationInfo > omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
-              new ExcludeList(), requestedSize, scmBlockSize,
-              ozoneManager.getPreallocateBlocksMax(),
-              ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMServiceId(),
-              ozoneManager.getMetrics(),
-              keyArgs.getSortDatanodes(),
-              userInfo);
+    // We also allocate block even if requestedSize is 0 because unlike
+    // CreateKey which is used for S3 use case where the requested dataSize is known in advance
+    // and KeyArgs.dataSize is not going to be set for empty key
+    // File system client does not know the final file size in advance but use 0 as
+    // the placeholder for the data size. Therefore, we should at least allocate a
+    // single block and we cannot simply skip the allocate block call
+    final List< OmKeyLocationInfo > omKeyLocationInfoList = allocateBlock(
+        repConfig, new ExcludeList(), requestedSize, keyArgs.getSortDatanodes(), userInfo, ozoneManager);
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)

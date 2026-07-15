@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.reconfig;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -39,6 +41,7 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -61,12 +64,16 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
-        .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
         .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
         .add(OZONE_THREAD_NUMBER_DIR_DELETION)
         .add(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL)
         .addAll(new OmConfig().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
+        .add(OZONE_BLACKLIST_USERS)
+        .add(OZONE_BLACKLIST_GROUPS)
+        .add(OZONE_READ_BLACKLIST_USERS)
+        .add(OZONE_READ_BLACKLIST_GROUPS)
         .build();
 
     assertProperties(getSubject(), expected);
@@ -76,7 +83,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
   void adminUsernames() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
+    getSubject().reconfigureProperty(OZONE_ADMINISTRATORS, newValue);
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
@@ -87,7 +94,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
   void readOnlyAdmins() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
+    getSubject().reconfigureProperty(OZONE_READONLY_ADMINISTRATORS,
         newValue);
 
     assertEquals(
@@ -96,10 +103,74 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
+  void blacklistUsers() throws ReconfigurationException {
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
+
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_USERS, newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        cluster().getOzoneManager().getOmBlacklistUsernames());
+  }
+
+  @Test
+  void blacklistGroups() throws ReconfigurationException {
+    String groupA = "groupA";
+    String groupB = "groupB";
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_GROUPS, groupA);
+    assertTrue(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupA),
+        groupA + " should be a blacklist group");
+
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_GROUPS, groupB);
+    assertFalse(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupA),
+        groupA + " should NOT be a blacklist group");
+    assertTrue(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupB),
+        groupB + " should be a blacklist group");
+  }
+
+  @Test
+  void readBlacklistUsers() throws ReconfigurationException {
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
+
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_USERS,
+        newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        cluster().getOzoneManager().getOmReadOnlyBlacklistUsernames());
+  }
+
+  @Test
+  void readBlacklistGroups() throws ReconfigurationException {
+    String groupA = "readonlyBlacklistGroupA";
+    String groupB = "readonlyBlacklistGroupB";
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_GROUPS,
+        groupA);
+    assertTrue(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupA),
+        groupA + " should be a readOnly blacklist group");
+
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_GROUPS,
+        groupB);
+    assertFalse(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupA),
+        groupA + " should NOT be a readOnly blacklist group");
+    assertTrue(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupB),
+        groupB + " should be a readOnly blacklist group");
+  }
+
+  @Test
   public void maxListSize() throws ReconfigurationException {
     final long initialValue = cluster().getOzoneManager().getConfig().getMaxListSize();
 
-    getSubject().reconfigurePropertyImpl(OmConfig.Keys.SERVER_LIST_MAX_SIZE,
+    getSubject().reconfigureProperty(OmConfig.Keys.SERVER_LIST_MAX_SIZE,
         String.valueOf(initialValue + 1));
 
     assertEquals(initialValue + 1,
@@ -111,7 +182,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     int originLimit = cluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask();
 
-    getSubject().reconfigurePropertyImpl(OZONE_KEY_DELETING_LIMIT_PER_TASK,
+    getSubject().reconfigureProperty(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         String.valueOf(originLimit + 1));
 
     assertEquals(originLimit + 1, cluster().getOzoneManager()
@@ -120,20 +191,21 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void allowListAllVolumes() throws ReconfigurationException {
-    final boolean newValue = !cluster().getOzoneManager().getAllowListAllVolumes();
+    final boolean newValue = !cluster().getOzoneManager().getConfig().isListAllVolumesAllowed();
 
-    getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED,
+    getSubject().reconfigureProperty(OmConfig.Keys.LIST_ALL_VOLUMES_ALLOWED,
         String.valueOf(newValue));
 
-    assertEquals(newValue, cluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(newValue, cluster().getOzoneManager().getConfig().isListAllVolumesAllowed());
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "invalid"})
   void unsetAllowListAllVolumes(String newValue) throws ReconfigurationException {
-    getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
+    getSubject().reconfigureProperty(OmConfig.Keys.LIST_ALL_VOLUMES_ALLOWED, newValue);
 
-    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(Boolean.parseBoolean(newValue),
+        cluster().getOzoneManager().getConfig().isListAllVolumesAllowed());
   }
 
   @Test
@@ -153,7 +225,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     // 1. Test reconfiguring to a different valid interval (30 seconds)
     // This should restart the SstFilteringService
     final String newIntervalValue = "30s";
-    getSubject().reconfigurePropertyImpl(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newIntervalValue);
+    getSubject().reconfigureProperty(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newIntervalValue);
     assertEquals(newIntervalValue, om.getConfiguration()
         .get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify the service is still enabled with the new interval
@@ -169,7 +241,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
     // 2. Service should stop when interval is reconfigured to -1
     final String disableValue = String.valueOf(-1);
-    getSubject().reconfigurePropertyImpl(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, disableValue);
+    getSubject().reconfigureProperty(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, disableValue);
     assertEquals(disableValue, om.getConfiguration().get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify that the SstFilteringService is stopped
     assertFalse(keyManagerImpl.isSstFilteringSvcEnabled(),
@@ -179,7 +251,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
     // Set the interval back to the original value
     // Service should be started again when reconfigured to a valid value
-    getSubject().reconfigurePropertyImpl(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, originalValue);
+    getSubject().reconfigureProperty(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, originalValue);
     assertEquals(originalValue, om.getConfiguration().get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
     // Verify that the SstFilteringService is running again
     assertTrue(keyManagerImpl.isSstFilteringSvcEnabled(),

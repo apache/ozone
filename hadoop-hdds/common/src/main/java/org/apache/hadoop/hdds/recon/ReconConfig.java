@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.recon")
 public class ReconConfig {
 
-  @Config(key = "kerberos.principal",
+  @Config(key = "ozone.recon.kerberos.principal",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
@@ -36,7 +36,7 @@ public class ReconConfig {
   )
   private String principal;
 
-  @Config(key = "kerberos.keytab.file",
+  @Config(key = "ozone.recon.kerberos.keytab.file",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
@@ -45,7 +45,7 @@ public class ReconConfig {
   )
   private String keytab;
 
-  @Config(key = "security.client.datanode.container.protocol.acl",
+  @Config(key = "ozone.recon.security.client.datanode.container.protocol.acl",
       type = ConfigType.STRING,
       defaultValue = "*",
       tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },

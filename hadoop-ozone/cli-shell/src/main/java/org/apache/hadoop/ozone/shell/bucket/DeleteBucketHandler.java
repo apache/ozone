@@ -70,9 +70,9 @@ public class DeleteBucketHandler extends BucketHandler {
       if (!yes) {
         // Ask for user confirmation
         out().print("This command will delete bucket recursively." +
-            "\nThere is no recovery option after using this command, " +
+            "%nThere is no recovery option after using this command, " +
             "and deleted keys won't move to trash." +
-            "\nEnter 'yes' to proceed': ");
+            "%nEnter 'yes' to proceed': ");
         out().flush();
         Scanner scanner = new Scanner(new InputStreamReader(
             System.in, StandardCharsets.UTF_8));

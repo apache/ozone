@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.NEITHER;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.NEITHER;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.VALUE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

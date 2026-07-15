@@ -16,28 +16,34 @@
  * limitations under the License.
  */
 
-import React, {useRef} from 'react';
+import React from 'react';
 import filesize from 'filesize';
 
-import { AxiosError } from 'axios';
-import { Popover, Table } from 'antd';
+import { Button, Popover, Select, Space, Table } from 'antd';
 import {
   ColumnsType,
   TablePaginationConfig
 } from 'antd/es/table';
-import { CheckCircleOutlined, NodeIndexOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  LeftOutlined,
+  NodeIndexOutlined,
+  RightOutlined
+} from '@ant-design/icons';
 
 import {getFormattedTime} from '@/v2/utils/momentUtils';
 import {showDataFetchError} from '@/utils/common';
-import {AxiosGetHelper} from '@/utils/axiosRequestHelper';
+import {fetchData} from '@/v2/hooks/useAPIData.hook';
 import {
   Container,
   ContainerKeysResponse,
   ContainerReplica,
   ContainerTableProps,
   ExpandedRowState,
-  KeyResponse
+  KeyResponse,
 } from '@/v2/types/container.types';
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const size = filesize.partial({ standard: 'iec' });
 
@@ -66,7 +72,7 @@ export const COLUMNS: ColumnsType<Container> = [
     sorter: (a: Container, b: Container) => a.containerID - b.containerID
   },
   {
-    title: 'No. of Keys',
+    title: 'No. of Blocks',
     dataIndex: 'keys',
     key: 'keys',
     sorter: (a: Container, b: Container) => a.keys - b.keys
@@ -179,27 +185,38 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   expandedRow,
   expandedRowSetter,
   searchColumn = 'containerID',
-  searchTerm = ''
+  searchTerm = '',
+  onNextPage,
+  onPrevPage,
+  hasNextPage,
+  hasPrevPage,
+  pageSize,
+  onPageSizeChange,
+  sinceColumnTitle = 'Unhealthy Since',
 }) => {
 
-  const cancelSignal = useRef<AbortController>();
 
   function filterSelectedColumns() {
     const columnKeys = selectedColumns.map((column) => column.value);
-    return COLUMNS.filter(
+    const filteredColumns = COLUMNS.filter(
       (column) => columnKeys.indexOf(column.key as string) >= 0
     );
+    
+    // Override the title for the unhealthySince column if needed
+    return filteredColumns.map(col => {
+      if (col.key === 'unhealthySince') {
+        return { ...col, title: sinceColumnTitle };
+      }
+      return col;
+    });
   }
 
-  function loadRowData(containerID: number) {
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/containers/${containerID}/keys`,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const containerKeysResponse: ContainerKeysResponse = response.data;
+  async function loadRowData(containerID: number) {
+    try {
+      const containerKeysResponse = await fetchData<ContainerKeysResponse>(
+        `/api/v1/containers/${containerID}/keys`
+      );
+      
       expandedRowSetter({
         ...expandedRow,
         [containerID]: {
@@ -209,7 +226,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           totalCount: containerKeysResponse.totalCount
         }
       });
-    }).catch(error => {
+    } catch (error) {
       expandedRowSetter({
         ...expandedRow,
         [containerID]: {
@@ -217,8 +234,8 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           loading: false
         }
       });
-      showDataFetchError((error as AxiosError).toString());
-    });
+      showDataFetchError(error);
+    }
   }
 
   function getFilteredData(data: Container[]) {
@@ -236,35 +253,26 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
     if (expanded) {
       loadRowData(record.containerID);
     }
-    else {
-      cancelSignal.current && cancelSignal.current.abort();
-    }
   }
 
   function expandedRowRender(record: Container) {
     const containerId = record.containerID
     const containerKeys: ExpandedRowState = expandedRow[containerId];
     const dataSource = containerKeys?.dataSource ?? [];
-    const paginationConfig: TablePaginationConfig = {
-      showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} Keys`
-    }
+    const keysPaginationConfig: TablePaginationConfig = {
+      showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} Keys`,
+      showSizeChanger: false,
+    };
 
     return (
       <Table
         loading={containerKeys?.loading ?? true}
         dataSource={dataSource}
         columns={KEY_TABLE_COLUMNS}
-        pagination={paginationConfig}
+        pagination={keysPaginationConfig}
         rowKey={(record: KeyResponse) => record.CompletePath}
         locale={{ filterTitle: '' }} />
     )
-  };
-
-  const paginationConfig: TablePaginationConfig = {
-    showTotal: (total: number, range) => (
-      `${range[0]}-${range[1]} of ${total} Containers`
-    ),
-    showSizeChanger: true
   };
 
   return (
@@ -274,7 +282,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         dataSource={getFilteredData(data)}
         columns={filterSelectedColumns()}
         loading={loading}
-        pagination={paginationConfig}
+        pagination={false}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}
         expandable={{
@@ -282,6 +290,38 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           expandedRowRender: expandedRowRender,
           onExpand: onRowExpandClick
         }} />
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: '16px'
+      }}>
+        <Space>
+          <span style={{ color: 'rgba(0,0,0,0.45)', fontSize: '14px' }}>
+            Rows per page:
+          </span>
+          <Select
+            value={pageSize}
+            onChange={onPageSizeChange}
+            disabled={loading}
+            options={PAGE_SIZE_OPTIONS.map(n => ({ label: `${n}`, value: n }))}
+            style={{ width: 80 }}
+          />
+        </Space>
+        <Space>
+          <Button
+            icon={<LeftOutlined />}
+            disabled={!hasPrevPage || loading}
+            onClick={onPrevPage}>
+            Previous
+          </Button>
+          <Button
+            disabled={!hasNextPage || loading}
+            onClick={onNextPage}>
+            Next <RightOutlined />
+          </Button>
+        </Space>
+      </div>
     </div>
   );
 }
