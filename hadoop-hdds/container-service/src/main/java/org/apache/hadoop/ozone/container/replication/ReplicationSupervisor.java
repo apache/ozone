@@ -282,9 +282,9 @@ public final class ReplicationSupervisor {
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
     } else {
-      // Duplicate: this command was not executed, so report it as failed while the identical
-      // in-flight task continues independently.
-      updateCommandStatus(task, CommandStatus::markAsFailed);
+      // An equivalent task is already in flight. Drain this command's status without
+      // asking SCM to clear the pending op that represents the running work.
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
     }
   }
 
@@ -458,11 +458,6 @@ public final class ReplicationSupervisor {
         inFlight.remove(task);
         decrementTaskCounter(task);
       }
-    }
-
-    private void updateCommandStatus(AbstractReplicationTask t,
-        Consumer<CommandStatus> updater) {
-      ReplicationSupervisor.this.updateCommandStatus(t, updater);
     }
 
     @Override

@@ -59,10 +59,6 @@ public class TestCommandStatusReportHandler implements EventPublisher {
     replicationStatus = null;
   }
 
-  private ReplicationStatus getReplicationStatus() {
-    return replicationStatus;
-  }
-
   @Test
   public void testCommandStatusReport() {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(LOG);
@@ -93,12 +89,18 @@ public class TestCommandStatusReportHandler implements EventPublisher {
 
   @Test
   public void replicationFailureFiresReplicationStatusEvent() {
-    // getCommandStatusList() already includes a FAILED replicateContainerCommand
-    cmdStatusReportHandler.onMessage(getStatusReport(getCommandStatusList()), this);
-    assertNotNull(getReplicationStatus());
-    assertEquals(1, getReplicationStatus().getCmdStatus().size());
+    CommandStatus failedReplication = CommandStatus.newBuilder()
+        .setCmdId(HddsIdFactory.getLongId())
+        .setStatus(CommandStatus.Status.FAILED)
+        .setType(Type.replicateContainerCommand)
+        .build();
+
+    cmdStatusReportHandler.onMessage(
+        getStatusReport(Collections.singletonList(failedReplication)), this);
+    assertNotNull(replicationStatus);
+    assertEquals(1, replicationStatus.getCmdStatus().size());
     assertEquals(CommandStatus.Status.FAILED,
-        getReplicationStatus().getCmdStatus().get(0).getStatus());
+        replicationStatus.getCmdStatus().get(0).getStatus());
   }
 
   @Override

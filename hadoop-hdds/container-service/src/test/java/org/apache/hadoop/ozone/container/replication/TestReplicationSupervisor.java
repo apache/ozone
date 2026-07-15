@@ -1089,9 +1089,9 @@ public class TestReplicationSupervisor {
   }
 
   @Test
-  public void reportsFailedStatusWhenDuplicate() {
+  public void reportsExecutedStatusWhenDuplicate() {
     // A duplicate task (same container already in-flight) should drain its own PENDING
-    // status entry to FAILED, because this command was not executed.
+    // status entry without asking SCM to clear the pending op for the in-flight task.
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
         .stateContext(context)
         .executor(new DiscardingExecutorService())
@@ -1108,8 +1108,8 @@ public class TestReplicationSupervisor {
     context.addCmdStatus(dupCmd);
     supervisor.addTask(new ReplicationTask(dupCmd, noopReplicator));
 
-    // The duplicate command's status should be FAILED (entry drained).
-    assertEquals(FAILED, context.getCommandStatusMap().get(dupCmd.getId()).getStatus());
+    // The duplicate command's status should be EXECUTED (entry drained).
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(dupCmd.getId()).getStatus());
   }
 
   @ContainerLayoutTestInfo.ContainerTest

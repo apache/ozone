@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -756,6 +757,7 @@ public class TestStateContext {
     assertTrue(termOfLeaderSCM.isPresent());
     assertEquals(originalTerm, termOfLeaderSCM.getAsLong());
     assertNull(subject.getNextCommand());
+    assertEquals(FAILED, subject.getCommandStatusMap().get(commandWithNewTerm.getId()).getStatus());
   }
 
   @Test

@@ -768,6 +768,10 @@ public class StateContext {
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
             command, command.getTerm(), currentTerm);
+        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
+            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
       }
     } finally {
       lock.unlock();
@@ -785,6 +789,11 @@ public class StateContext {
       if (commandQueue.size() >= maxCommandQueueLimit) {
         LOG.warn("Ignore command as command queue crosses max limit {}.",
             maxCommandQueueLimit);
+        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
+            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+          addCmdStatus(command);
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
         return;
       }
       updateTermOfLeaderSCM(command);

@@ -49,6 +49,8 @@ public class ReplicationStatusHandler implements EventHandler<ReplicationStatus>
       LOG.info("Skip processing replication status since current SCM is not leader.");
       return;
     }
+    LOG.debug("Processing {} failed replication command statuses from datanode {}.",
+        status.getCmdStatus().size(), status.getDatanodeDetails());
     status.getCmdStatus().forEach(cmdStatus ->
         containerReplicaPendingOps.onReplicationCommandFailed(cmdStatus.getCmdId()));
   }
