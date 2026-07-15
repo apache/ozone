@@ -282,9 +282,9 @@ public final class ReplicationSupervisor {
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
     } else {
-      // Duplicate: an identical task is already in-flight; the in-flight copy will report the real
-      // outcome, so drain this command's PENDING entry now to avoid a status-map leak.
-      updateCommandStatus(task, CommandStatus::markAsExecuted);
+      // Duplicate: this command was not executed, so report it as failed while the identical
+      // in-flight task continues independently.
+      updateCommandStatus(task, CommandStatus::markAsFailed);
     }
   }
 
