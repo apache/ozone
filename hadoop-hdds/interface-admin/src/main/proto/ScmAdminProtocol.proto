@@ -476,6 +476,7 @@ message GetPipelineResponseProto {
 }
 
 message GetContainerCountRequestProto {
+  optional LifeCycleState state = 1;
 }
 
 message GetContainerCountResponseProto {

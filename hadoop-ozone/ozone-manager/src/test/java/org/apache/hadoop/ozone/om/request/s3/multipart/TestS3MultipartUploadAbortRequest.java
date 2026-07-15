@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test Multipart upload abort request.
  */
-public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
+public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
 
   @Test
   public void testPreExecute() throws IOException {

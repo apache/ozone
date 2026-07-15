@@ -130,6 +130,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class tests container commands for reconciliation.
  */
+@Flaky("HDDS-13401")
 public class TestContainerCommandReconciliation {
 
   private static MiniOzoneHAClusterImpl cluster;
@@ -373,7 +374,6 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
-  @Flaky("HDDS-13401")
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -485,7 +485,6 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
-  @Flaky("HDDS-13401")
   public void testDataChecksumReportedAtSCM() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.

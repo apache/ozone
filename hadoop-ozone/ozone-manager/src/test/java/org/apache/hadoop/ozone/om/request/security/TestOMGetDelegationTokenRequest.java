@@ -53,7 +53,7 @@ import org.junit.jupiter.api.Test;
  * The class tests OMGetDelegationTokenRequest.
  */
 public class TestOMGetDelegationTokenRequest extends
-    TestOMDelegationTokenRequest {
+    OMDelegationTokenRequestTests {
 
   private OzoneDelegationTokenSecretManager secretManager;
   private OzoneTokenIdentifier identifier;

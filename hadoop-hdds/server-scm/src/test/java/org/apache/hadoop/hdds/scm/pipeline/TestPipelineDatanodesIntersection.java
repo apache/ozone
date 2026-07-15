@@ -122,12 +122,12 @@ public class TestPipelineDatanodesIntersection {
             LOG.info("This pipeline: " + pipeline.getId().toString() +
                 " overlaps with previous pipeline: " + overlapPipeline.getId() +
                 ". They share same set of datanodes as: " +
-                pipeline.getNodesInOrder().get(0).getUuid() + "/" +
-                pipeline.getNodesInOrder().get(1).getUuid() + "/" +
-                pipeline.getNodesInOrder().get(2).getUuid() + " and " +
-                overlapPipeline.getNodesInOrder().get(0).getUuid() + "/" +
-                overlapPipeline.getNodesInOrder().get(1).getUuid() + "/" +
-                overlapPipeline.getNodesInOrder().get(2).getUuid() +
+                pipeline.getNodesInOrder().get(0).getID() + "/" +
+                pipeline.getNodesInOrder().get(1).getID() + "/" +
+                pipeline.getNodesInOrder().get(2).getID() + " and " +
+                overlapPipeline.getNodesInOrder().get(0).getID() + "/" +
+                overlapPipeline.getNodesInOrder().get(1).getID() + "/" +
+                overlapPipeline.getNodesInOrder().get(2).getID() +
                 " is the same.");
           }
         }

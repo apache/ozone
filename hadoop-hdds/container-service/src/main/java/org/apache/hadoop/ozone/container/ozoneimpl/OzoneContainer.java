@@ -50,6 +50,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -239,7 +240,6 @@ public class OzoneContainer {
         context);
 
     replicationServer = new ReplicationServer(
-        controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
         certClient,
@@ -279,7 +279,8 @@ public class OzoneContainer {
               config);
     } else {
       diskBalancerService = null;
-      LOG.info("Disk Balancer is disabled.");
+      LOG.info("Disk Balancer is not enabled. Please enable the " +
+          HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " configuration key.");
     }
 
     Duration recoveringContainerScrubbingSvcInterval =

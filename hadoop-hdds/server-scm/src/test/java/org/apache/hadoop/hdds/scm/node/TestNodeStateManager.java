@@ -88,7 +88,7 @@ public class TestNodeStateManager {
     // Create a datanode, then add and retrieve it
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
-    assertEquals(dn.getUuid(), nsm.getNode(dn).getUuid());
+    assertEquals(dn.getID(), nsm.getNode(dn).getID());
     // Now get the status of the newly added node and it should be
     // IN_SERVICE and HEALTHY
     NodeStatus expectedState = NodeStatus.inServiceHealthy();

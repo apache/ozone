@@ -55,7 +55,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.crypto.Cipher;
@@ -221,9 +220,9 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
+  private final ContainerClientMetrics.Handle clientMetricsHandle;
   private final ContainerClientMetrics clientMetrics;
   private final MemoizedSupplier<ExecutorService> writeExecutor;
-  private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
   private volatile OzoneFsServerDefaults serverDefaults;
   private volatile long serverDefaultsLastUpdate;
   private final long serverDefaultsValidityPeriod;
@@ -330,7 +329,8 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new BoundedElasticByteBufferPool(maxPoolSize);
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, ecReconstructExecutor);
-    this.clientMetrics = ContainerClientMetrics.acquire();
+    this.clientMetricsHandle = ContainerClientMetrics.acquireHandle();
+    this.clientMetrics = clientMetricsHandle.metrics();
 
     this.serverDefaultsValidityPeriod = conf.getTimeDuration(
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS,
@@ -1438,7 +1438,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedDataGeneration(
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
     return openOutputStream(builder.build(), size);
   }
 
@@ -1472,13 +1472,6 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream openOutputStream(OmKeyArgs keyArgs, long size)
       throws IOException {
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
-    // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
-    // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
-    // which will cause S3G's atomic write length check to fail,
-    // so reset size to 0 here.
-    if (isS3GRequest.get() && size == 0) {
-      openKey.getKeyInfo().setDataSize(0);
-    }
     return createOutputStream(openKey);
   }
 
@@ -1549,7 +1542,7 @@ public class RpcClient implements ClientProtocol {
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
     builder.setExpectedDataGeneration(
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
     return openDataStreamOutput(builder.build());
   }
 
@@ -1712,16 +1705,25 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive)
       throws IOException {
+    deleteKey(volumeName, bucketName, keyName, recursive, null);
+  }
+
+  @Override
+  public void deleteKey(
+      String volumeName, String bucketName, String keyName, boolean recursive,
+      String expectedETag) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+    OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive)
-        .build();
-    ozoneManagerClient.deleteKey(keyArgs);
+        .setRecursive(recursive);
+    if (expectedETag != null) {
+      keyArgs.setExpectedETag(expectedETag);
+    }
+    ozoneManagerClient.deleteKey(keyArgs.build());
   }
 
   @Override
@@ -1956,16 +1958,23 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
-    if (ecReconstructExecutor.isInitialized()) {
-      ecReconstructExecutor.get().shutdownNow();
+    IOUtils.cleanupWithLogger(LOG,
+        () -> shutdownExecutor(ecReconstructExecutor),
+        () -> shutdownExecutor(writeExecutor),
+        ozoneManagerClient,
+        xceiverClientManager,
+        () -> {
+          keyProviderCache.invalidateAll();
+          keyProviderCache.cleanUp();
+        },
+        clientMetricsHandle);
+  }
+
+  private static void shutdownExecutor(
+      MemoizedSupplier<ExecutorService> executor) {
+    if (executor.isInitialized()) {
+      executor.get().shutdownNow();
     }
-    if (writeExecutor.isInitialized()) {
-      writeExecutor.get().shutdownNow();
-    }
-    IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
-    keyProviderCache.invalidateAll();
-    keyProviderCache.cleanUp();
-    ContainerClientMetrics.release();
   }
 
   @Deprecated
@@ -2151,6 +2160,39 @@ public class RpcClient implements ClientProtocol {
 
     return omMultipartUploadCompleteInfo;
 
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String volumeName, String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    String ownerName = getRealUserInfo().getShortUserName();
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setMultipartUploadID(uploadID)
+        .setOwnerName(ownerName);
+
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
+
+    OmKeyArgs keyArgs = builder.build();
+
+    OmMultipartUploadCompleteList omMultipartUploadCompleteList =
+        new OmMultipartUploadCompleteList(partsMap);
+
+    return ozoneManagerClient.completeMultipartUpload(keyArgs,
+        omMultipartUploadCompleteList);
   }
 
   @Override
@@ -2554,15 +2596,12 @@ public class RpcClient implements ClientProtocol {
   }
 
   private KeyDataStreamOutput.Builder newKeyOutputStreamBuilder() {
-    // Amazon S3 never adds partial objects, So for S3 requests we need to
-    // set atomicKeyCreation to true
     // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
     return new KeyDataStreamOutput.Builder()
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig)
-        .setAtomicKeyCreation(isS3GRequest.get());
+        .setConfig(clientConfig);
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey)
@@ -2636,7 +2675,6 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(clientConfig)
-        .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
         .setExecutorServiceSupplier(writeExecutor)
         .setStreamBufferArgs(streamBufferArgs)
@@ -2738,11 +2776,6 @@ public class RpcClient implements ClientProtocol {
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
     this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
-  }
-
-  @Override
-  public void setIsS3Request(boolean s3Request) {
-    this.isS3GRequest.set(s3Request);
   }
 
   @Override
@@ -2858,6 +2891,55 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    return ozoneManagerClient.getBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName,
+      Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addAllTags(tags)
+        .build();
+    ozoneManagerClient.putBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    ozoneManagerClient.deleteBucketTagging(bucketArgs);
   }
 
   private static ExecutorService createThreadPoolExecutor(

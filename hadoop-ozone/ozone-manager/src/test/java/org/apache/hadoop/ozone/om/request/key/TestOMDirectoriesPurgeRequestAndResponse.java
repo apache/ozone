@@ -84,7 +84,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.
  */
-public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
+public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests {
 
   private int numKeys = 10;
 

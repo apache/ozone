@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Collections;
@@ -90,11 +91,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
-    ExcludeList excludeList = new ExcludeList();
-    if (allocateBlockRequest.hasExcludeList()) {
-      excludeList =
-          ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
-    }
+    final ExcludeList excludeList = !allocateBlockRequest.hasExcludeList() ? new ExcludeList()
+        : ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
 
     // TODO: Here we are allocating block with out any check for key exist in
     //  open table or not and also with out any authorization checks.
@@ -104,20 +102,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-    UserInfo userInfo = getUserIfNotExists(ozoneManager);
+    UserInfo userInfo = getOmRequest().getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
-    List<OmKeyLocationInfo> omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-            ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
-            ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
-            ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(),
-            ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
-            keyArgs.getSortDatanodes(), userInfo);
+    final List<OmKeyLocationInfo> omKeyLocationInfoList = allocateBlock(repConfig, excludeList,
+        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -141,13 +133,13 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder().setUserInfo(userInfo)
+    return getOmRequest().toBuilder()
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+  public final OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
@@ -190,12 +182,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           bucketName);
 
       // Here we don't acquire bucket/volume lock because for a single client
-      // allocateBlock is called in serial fashion.
+      // allocateBlock is called in serial fashion. With this approach, it
+      // won't make 'fail-fast' during race condition case on delete/rename op,
+      // assuming that later it will fail at the key commit operation.
 
-      openKeyName = omMetadataManager
-          .getOpenKey(volumeName, bucketName, keyName, clientID);
+      openKeyName =
+          getOpenKeyName(volumeName, bucketName, keyName, clientID, omMetadataManager);
       openKeyInfo =
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
+          getOpenKeyInfo(omMetadataManager, openKeyName, keyName);
+
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);
@@ -241,22 +236,20 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           .build();
 
       // Add to cache.
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(openKeyName),
-          CacheValue.get(trxnLogIndex, openKeyInfo));
+      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager,
+          openKeyName, keyName, openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
-      omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, getBucketLayout());
+      omClientResponse = getOmClientResponse(clientID, omResponse, openKeyInfo,
+          omBucketInfo, omMetadataManager);
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
     } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
-      omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception), getBucketLayout());
+      omClientResponse = getOmClientErrorResponse(omResponse, exception);
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
           "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
@@ -274,6 +267,41 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
+  }
+
+  protected OmKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager,
+      String openKeyName, String keyName) throws IOException {
+    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
+  }
+
+  protected String getOpenKeyName(String volumeName, String bucketName,
+      String keyName, long clientID, OMMetadataManager omMetadataManager)
+          throws IOException {
+    return omMetadataManager.getOpenKey(volumeName, bucketName, keyName, clientID);
+  }
+
+  protected void addOpenTableCacheEntry(long trxnLogIndex,
+      OMMetadataManager omMetadataManager, String openKeyName, String keyName,
+      OmKeyInfo openKeyInfo) {
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+        new CacheKey<>(openKeyName),
+        CacheValue.get(trxnLogIndex, openKeyInfo));
+  }
+
+  @Nonnull
+  protected OMClientResponse getOmClientResponse(long clientID,
+      OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
+      OmBucketInfo omBucketInfo, OMMetadataManager omMetadataManager)
+          throws IOException {
+    return new OMAllocateBlockResponse(omResponse.build(),
+        openKeyInfo, clientID, getBucketLayout());
+  }
+
+  @Nonnull
+  protected OMClientResponse getOmClientErrorResponse(
+      OMResponse.Builder omResponse, Exception exception) {
+    return new OMAllocateBlockResponse(createErrorOMResponse(
+        omResponse, exception), getBucketLayout());
   }
 
   @RequestFeatureValidator(

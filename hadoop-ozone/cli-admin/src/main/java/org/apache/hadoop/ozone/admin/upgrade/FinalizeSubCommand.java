@@ -17,27 +17,45 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
-import java.io.IOException;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
 /**
- * Sub command to finalize a cluster upgrade.
+ * Handler for the ozone admin upgrade finalize command.
  */
 @CommandLine.Command(
     name = "finalize",
-    description = "Finalize a cluster upgrade",
+    description = "Initiates the the process to finalize a cluster upgrade.",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class FinalizeSubCommand extends ScmSubcommand {
+    versionProvider = HddsVersionProvider.class
+)
+public class FinalizeSubCommand extends AbstractSubcommand implements Callable<Integer> {
+
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @Override
-  public void execute(ScmClient client) throws IOException {
-    client.finalizeUpgrade();
+  public Integer call() throws Exception {
+    try (OzoneManagerProtocol client = getClient()) {
+      OzoneManagerVersion omVersion = RpcClient.getOmVersion(client.getServiceInfo());
+      if (!OzoneManagerVersion.ZDU.isSupportedBy(omVersion)) {
+        err().println("OM does not support zero downtime upgrade. The cluster should be finalized with " +
+            "`ozone admin om finalizeupgrade`");
+        return 1;
+      }
+      client.finalizeUpgrade();
+      out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
+    }
+    return 0;
+  }
 
-    out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
+  protected OzoneManagerProtocol getClient() throws Exception {
+    return omAddressOptions.newClient();
   }
 }
-

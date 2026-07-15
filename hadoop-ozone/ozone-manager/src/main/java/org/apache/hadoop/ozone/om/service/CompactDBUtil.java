@@ -38,13 +38,13 @@ public final class CompactDBUtil {
   private CompactDBUtil() {
   }
 
-  public static void compactTable(OMMetadataManager omMetadataManager,
-                                  String tableName) throws IOException {
+  public static void compactTable(OMMetadataManager omMetadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) throws IOException {
     long startTime = Time.monotonicNow();
-    LOG.info("Compacting column family: {}", tableName);
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(
-          ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setBottommostLevelCompaction(compactionType);
+      LOG.info("Compacting column family: {} with {} bottommost level compaction",
+          tableName, options.bottommostLevelCompaction());
       options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
@@ -62,14 +62,34 @@ public final class CompactDBUtil {
     }
   }
 
-  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
+  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) {
     return CompletableFuture.runAsync(() -> {
       try {
-        compactTable(metadataManager, tableName);
+        compactTable(metadataManager, tableName, compactionType);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
+  }
+
+  /**
+   * Converts the given RocksDB id to a
+   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum value.
+   * Defaults to {@code kSkip} if the id is invalid.
+   *
+   * @param bottommostLevelCompaction RocksDB id
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized).
+   */
+  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
+      int bottommostLevelCompaction) {
+    ManagedCompactRangeOptions.BottommostLevelCompaction level =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(bottommostLevelCompaction);
+    if (level == null) {
+      LOG.warn("Invalid bottommost level compaction id: {}. Using default: kSkip.", bottommostLevelCompaction);
+      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
+    }
+    return level;
   }
 }

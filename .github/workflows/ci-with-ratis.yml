@@ -54,5 +54,5 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
     with:
-      ratis_args: "-Dratis.version=${{ needs.ratis.outputs.ratis-version }} -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }} -Dratis-thirdparty.grpc.version=${{ needs.ratis.outputs.grpc-version }} -Dratis-thirdparty.netty.version=${{ needs.ratis.outputs.netty-version }} -Dratis-thirdparty.protobuf.version=${{ needs.ratis.outputs.protobuf-version }}"
+      ratis_args: ${{ needs.ratis.outputs.build-args }}
       ref: ${{ github.event.inputs.ref }}

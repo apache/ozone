@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -56,10 +57,11 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
@@ -67,12 +69,10 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +113,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // transaction (recursive directory creations) is 2^8 - 1 as only 8
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
+  private static final Set<AccessModeProto> READ_WRITE = EnumSet.of(READ, WRITE);
 
   protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
@@ -179,22 +181,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  /**
-   * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
-   * in one rpc call.
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
+  /** Allocate multiple blocks using one rpc to SCM. */
+  protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
-      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      long requestedSize, boolean shouldSortDatanodes,
+      UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    final long scmBlockSize = ozoneManager.getScmBlockSize();
+
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = (int) Math.min(preallocateBlocksMax,
+    final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
     String clientMachine = "";
@@ -204,15 +201,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    final List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+      allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, clientMachine);
     } catch (SCMException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+      ozoneManager.getMetrics().incNumBlockAllocateCallFails();
+      if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
@@ -225,9 +220,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setLength(scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
-      if (grpcBlockTokenEnabled) {
-        builder.setToken(secretManager.generateToken(remoteUser, blockID,
-            EnumSet.of(READ, WRITE), scmBlockSize));
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
+            remoteUser, blockID, READ_WRITE, scmBlockSize);
+        builder.setToken(token);
       }
       locationInfos.add(builder.build());
     }
@@ -993,9 +989,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
-      if (keyArgs.hasExpectedETag()) {
-        builder.setExpectedETag(keyArgs.getExpectedETag());
-      }
 
       return builder.build();
     }
@@ -1308,5 +1301,98 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("Attempting to create unencrypted file " +
           keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
     }
+  }
+
+  /**
+   * Validates atomic rewrite conditions for conditional writes.
+   * <p>
+   * For If-None-Match: * (expectedDataGeneration = EXPECTED_GEN_CREATE_IF_NOT_EXISTS),
+   * the key must NOT exist.
+   * <p>
+   * For If-Match with a specific generation, the key must exist with matching updateID.
+   *
+   * @param dbKeyInfo the existing key info from the database (null if key doesn't exist)
+   * @param keyArgs the key arguments containing expected generation
+   * @throws OMException if validation fails
+   */
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasExpectedDataGeneration()) {
+      long expectedGen = keyArgs.getExpectedDataGeneration();
+      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+        if (dbKeyInfo != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+        if (dbKeyInfo == null) {
+          throw new OMException("Key not found during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+        if (dbKeyInfo.getUpdateID() != expectedGen) {
+          throw new OMException("Generation mismatch during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
+    if (!keyArgs.hasExpectedETag()) {
+      return;
+    }
+
+    String expectedETag = keyArgs.getExpectedETag();
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for If-Match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!dbKeyInfo.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          OMException.ResultCodes.ETAG_MISMATCH);
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * If it matches, the ETag condition is converted to a generation-based condition
+   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @throws OMException if validation fails
+   */
+  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+
+    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+      return keyArgs;
+    }
+
+    return keyArgs.toBuilder()
+        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .clearExpectedETag()
+        .build();
   }
 }

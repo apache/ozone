@@ -51,8 +51,8 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Assertions;
@@ -63,7 +63,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Test class to test OMSnapshotMoveTableKeysResponse.
  */
-public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndResponseTests {
 
   private String snapshotName1;
   private String snapshotName2;

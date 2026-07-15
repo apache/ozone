@@ -34,7 +34,7 @@ import org.apache.http.HttpStatus;
  *
  * This handler processes bucket-level requests that do not target
  * specific subresources (such as {@code ?acl}, {@code ?uploads},
- * or {@code ?delete}), which are handled by dedicated handlers.
+ * {@code ?delete} or {@code ?tagging}), which are handled by dedicated handlers.
  *
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
@@ -47,7 +47,8 @@ public class BucketCrudHandler extends BucketOperationHandler {
   private boolean shouldHandle() {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
-        && queryParams().get(QueryParams.DELETE) == null;
+        && queryParams().get(QueryParams.DELETE) == null
+        && queryParams().get(QueryParams.TAGGING) == null;
   }
 
   /**

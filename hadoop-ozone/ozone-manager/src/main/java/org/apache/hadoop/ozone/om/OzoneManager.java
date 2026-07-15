@@ -224,6 +224,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -251,6 +252,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -260,6 +262,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -309,6 +312,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QueryUpgradeStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
@@ -517,6 +521,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
 
+  private final OMServiceManager serviceManager;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -720,6 +726,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     readBlacklist = OzoneBlacklist.getReadonlyBlacklist(conf);
 
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
+
+    serviceManager = new OMServiceManager();
+
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -2436,6 +2445,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisSnapshotProvider != null) {
         omRatisSnapshotProvider.close();
       }
+      serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
@@ -3230,7 +3240,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
-    String leaderReadiness = omRatisServer.getLeaderStatus().name();
+
+    String localLeaderStatus = omRatisServer.getLeaderStatus().name();
+    String localNodeId = omNodeDetails.getNodeId();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error(NO_LEADER_ERROR_MESSAGE);
@@ -3244,7 +3256,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to getServiceList", e);
       return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
     }
-    return OmUtils.format(serviceList, port, leaderId.toString(), leaderReadiness);
+    return OmUtils.format(serviceList, port, leaderId.toString(),
+        localNodeId, localLeaderStatus);
   }
 
   /**
@@ -3276,6 +3289,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public String getHostname() {
     return omHostName;
+  }
+
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
   }
 
   @VisibleForTesting
@@ -3642,6 +3660,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequest
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
+    HddsProtos.UpgradeStatus scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+
+    return QueryUpgradeStatusResponse.newBuilder()
+        .setOmFinalized(!versionManager.needsFinalization())
+        .setHddsStatus(scmStatus)
+        .build();
+  }
+
+  @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String unusedUpgradeClientId, boolean unusedTakeover, boolean unusedReadonly)
       throws IOException {
@@ -3926,24 +3961,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
-    auditMap.put(OzoneConsts.KEY, keyName);
-    auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
-    auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
-        Integer.toString(partNumberMarker));
-    auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
-
-    metrics.incNumListMultipartUploadParts();
+    final Map<String, String> auditMap = bucket.audit();
     try {
-      OmMultipartUploadListParts omMultipartUploadListParts =
-          keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
-              keyName, uploadID, partNumberMarker, maxParts);
+      auditMap.put(OzoneConsts.KEY, keyName);
+      auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
+      auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
+          Integer.toString(partNumberMarker));
+      auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.KEY, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, keyName);
+      }
+
+      metrics.incNumListMultipartUploadParts();
+      final OmMultipartUploadListParts omMultipartUploadListParts = keyManager.listParts(
+          realVolumeName, realBucketName, keyName, uploadID, partNumberMarker, maxParts);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumListMultipartUploadPartFails();
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap, ex));
@@ -3957,15 +4000,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
+    final Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
 
-    metrics.incNumListMultipartUploads();
     try {
-      OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(bucket.realVolume(),
-          bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, realVolumeName, realBucketName, null);
+      }
+
+      metrics.incNumListMultipartUploads();
+      final OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(
+          realVolumeName, realBucketName, prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
@@ -5156,6 +5208,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(final OmBucketArgs args)
+      throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return rcReader.get().getBucketTagging(args);
+    }
+  }
+
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
@@ -5581,6 +5642,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return reconfigurationHandler;
   }
 
+  public OMServiceManager getOMServiceManager() {
+    return serviceManager;
+  }
+
   /**
    * Wait until both buffers are flushed.  This is used in cases like
    * "follower bootstrap tarball creation" where the rocksDb for the active
@@ -5597,10 +5662,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily,
+      ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",

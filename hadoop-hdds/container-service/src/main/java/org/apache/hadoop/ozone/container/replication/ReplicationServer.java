@@ -37,13 +37,13 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,20 +61,16 @@ public class ReplicationServer {
 
   private CertificateClient caClient;
 
-  private ContainerController controller;
-
   private int port;
   private final ContainerImporter importer;
 
   private ThreadPoolExecutor executor;
 
-  public ReplicationServer(ContainerController controller,
-      ReplicationConfig replicationConfig, SecurityConfig secConf,
-      CertificateClient caClient, ContainerImporter importer,
-      String threadNamePrefix) {
+  public ReplicationServer(ReplicationConfig replicationConfig,
+      SecurityConfig secConf, CertificateClient caClient,
+      ContainerImporter importer, String threadNamePrefix) {
     this.secConf = secConf;
     this.caClient = caClient;
-    this.controller = controller;
     this.importer = importer;
     this.port = replicationConfig.getPort();
 
@@ -102,8 +98,7 @@ public class ReplicationServer {
   }
 
   public void init() {
-    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
-        new OnDemandContainerReplicationSource(controller), importer);
+    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(importer);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(
@@ -121,7 +116,9 @@ public class ReplicationServer {
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
         sslContextBuilder.trustManager(caClient.getTrustManager());
         sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
-        sslContextBuilder.ciphers(secConf.getGrpcTlsCiphers());
+        sslContextBuilder.ciphers(
+            secConf.getGrpcTlsCiphers(),
+            SupportedCipherSuiteFilter.INSTANCE);
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {
@@ -179,10 +176,10 @@ public class ReplicationServer {
     public static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
     private static final String OUTOFSERVICE_FACTOR_KEY =
         "outofservice.limit.factor";
-    private static final double OUTOFSERVICE_FACTOR_MIN = 1;
+    static final double OUTOFSERVICE_FACTOR_MIN = 1;
     static final double OUTOFSERVICE_FACTOR_DEFAULT = 2;
     private static final String OUTOFSERVICE_FACTOR_DEFAULT_VALUE = "2.0";
-    private static final double OUTOFSERVICE_FACTOR_MAX = 10;
+    static final double OUTOFSERVICE_FACTOR_MAX = 10;
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
@@ -271,14 +268,16 @@ public class ReplicationServer {
 
       if (outOfServiceFactor < OUTOFSERVICE_FACTOR_MIN ||
           outOfServiceFactor > OUTOFSERVICE_FACTOR_MAX) {
+        double clamped = Math.min(OUTOFSERVICE_FACTOR_MAX,
+            Math.max(OUTOFSERVICE_FACTOR_MIN, outOfServiceFactor));
         LOG.warn(
-            "{} must be between {} and {} but was set to {}. Defaulting to {}",
+            "{} must be between {} and {} but was set to {}. Clamping to {}",
             REPLICATION_OUTOFSERVICE_FACTOR_KEY,
             OUTOFSERVICE_FACTOR_MIN,
             OUTOFSERVICE_FACTOR_MAX,
             outOfServiceFactor,
-            OUTOFSERVICE_FACTOR_DEFAULT);
-        outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
+            clamped);
+        outOfServiceFactor = clamped;
       }
     }
 

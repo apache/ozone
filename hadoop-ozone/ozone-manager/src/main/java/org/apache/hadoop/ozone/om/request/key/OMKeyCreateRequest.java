@@ -97,7 +97,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -127,16 +127,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = null;
     UserInfo userInfo = getUserInfo();
     if (!keyArgs.getIsMultipartKey()) {
-
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-
-      // NOTE size of a key is not a hard limit on anything, it is a value that
-      // client should expect, in terms of current size of key. If client sets
-      // a value, then this value is used, otherwise, we allocate a single
-      // block which is the current size, if read by the client.
-      final long requestedSize = keyArgs.getDataSize() > 0 ?
-          keyArgs.getDataSize() : scmBlockSize;
-
       HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
       HddsProtos.ReplicationType type = keyArgs.getType();
 
@@ -153,7 +143,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
 
-      List<OmKeyLocationInfo> omKeyLocationInfoList;
+      final List<OmKeyLocationInfo> omKeyLocationInfoList;
       final long effectiveDataSize;
       // Skip block allocation if dataSize <= 0. We also consider unspecified dataSize as
       // empty key since the client will not set dataSize if the key is empty (i.e. dataSize <= 0),
@@ -161,17 +151,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         omKeyLocationInfoList = Collections.emptyList();
         effectiveDataSize = 0;
       } else {
+        effectiveDataSize = keyArgs.getDataSize();
         omKeyLocationInfoList = captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
-            () -> allocateBlock(ozoneManager.getScmClient(),
-                ozoneManager.getBlockTokenSecretManager(), repConfig,
-                new ExcludeList(), requestedSize, scmBlockSize,
-                ozoneManager.getPreallocateBlocksMax(),
-                ozoneManager.isGrpcBlockTokenEnabled(),
-                ozoneManager.getOMServiceId(),
-                ozoneManager.getMetrics(),
-                keyArgs.getSortDatanodes(),
-                userInfo));
-        effectiveDataSize = requestedSize;
+            () -> allocateBlock(repConfig, new ExcludeList(), effectiveDataSize,
+                keyArgs.getSortDatanodes(), userInfo, ozoneManager));
       }
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
@@ -474,58 +457,5 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
-  }
-
-  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
-      throws OMException {
-    if (keyArgs.hasExpectedDataGeneration()) {
-      long expectedGen = keyArgs.getExpectedDataGeneration();
-      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
-        if (dbKeyInfo != null) {
-          throw new OMException("Key already exists",
-              OMException.ResultCodes.KEY_ALREADY_EXISTS);
-        }
-      } else {
-        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
-        if (dbKeyInfo == null) {
-          throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-        if (dbKeyInfo.getUpdateID() != expectedGen) {
-          throw new OMException("Generation mismatch during expected rewrite",
-              OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-      }
-    }
-
-  }
-
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
-      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
-    if (!keyArgs.hasExpectedETag()) {
-      return keyArgs;
-    }
-
-    String expectedETag = keyArgs.getExpectedETag();
-    if (dbKeyInfo == null) {
-      throw new OMException("Key not found for If-Match",
-          OMException.ResultCodes.KEY_NOT_FOUND);
-    }
-    if (!dbKeyInfo.hasEtag()) {
-      throw new OMException("Key does not have an ETag",
-          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
-    }
-    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
-      throw new OMException("ETag mismatch",
-          OMException.ResultCodes.ETAG_MISMATCH);
-    }
-    if (keyArgs.hasExpectedDataGeneration()) {
-      return keyArgs;
-    }
-
-    return keyArgs.toBuilder()
-        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
-        .clearExpectedETag()
-        .build();
   }
 }

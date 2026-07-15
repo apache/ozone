@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -63,6 +64,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final int minHealthyPipelines;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
   private final NodeManager nodeManager;
+  private final RatisReplicationConfig targetReplicationConfig =
+      RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+  private final int targetRequiredNodes =
+      HddsProtos.ReplicationFactor.THREE_VALUE;
+  private final String targetReplicationLabel =
+      targetReplicationConfig.configFormat();
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
@@ -76,7 +83,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
-    // We only care about THREE replica pipeline
     minHealthyPipelines = getMinHealthyPipelines(configuration);
 
     Preconditions.checkArgument(
@@ -93,7 +99,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
 
-    // We only care about THREE replica pipeline
     return minDatanodes / HddsProtos.ReplicationFactor.THREE_VALUE;
 
   }
@@ -129,14 +134,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     // datanode can send pipeline report again, or SCMPipelineManager will
     // create new pipelines.
 
-    // Only handle RATIS + 3-replica pipelines.
-    if (pipeline.getType() != HddsProtos.ReplicationType.RATIS ||
-        ((RatisReplicationConfig) pipeline.getReplicationConfig()).getReplicationFactor() !=
-            HddsProtos.ReplicationFactor.THREE) {
+    if (!targetReplicationConfig.equals(pipeline.getReplicationConfig())) {
       Logger safeModeManagerLog = SCMSafeModeManager.getLogger();
       if (safeModeManagerLog.isDebugEnabled()) {
-        safeModeManagerLog.debug("Skipping pipeline safemode report processing as Replication type isn't RATIS " +
-            "or replication factor isn't 3.");
+        safeModeManagerLog.debug("Skipping pipeline safemode report processing"
+            + " as replication config {} does not match target {}.",
+            pipeline.getReplicationConfig(), targetReplicationConfig);
       }
       return;
     }
@@ -149,9 +152,10 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     }
 
     List<DatanodeDetails> pipelineDns = pipeline.getNodes();
-    if (pipelineDns.size() != 3) {
-      LOG.warn("Only {} DNs reported this pipeline: {}, all 3 DNs should report the pipeline", pipelineDns.size(),
-          pipeline.getId());
+    if (pipelineDns.size() != targetRequiredNodes) {
+      LOG.warn("Only {} DNs reported this pipeline: {}, all {} DNs should "
+              + "report the pipeline",
+          pipelineDns.size(), pipeline.getId(), targetRequiredNodes);
       return;
     }
 
@@ -206,8 +210,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private synchronized void initializeRule(boolean refresh) {
     unProcessedPipelineSet.addAll(pipelineManager.getPipelines(
-            RatisReplicationConfig.getInstance(
-                HddsProtos.ReplicationFactor.THREE),
+            targetReplicationConfig,
             Pipeline.PipelineState.OPEN).stream().map(Pipeline::getId)
         .collect(Collectors.toSet()));
 
@@ -233,10 +236,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private boolean validateHealthyPipelineSafeModeRuleUsingPipelineManager() {
     // Query PipelineManager directly for healthy pipeline count
     List<Pipeline> openPipelines = pipelineManager.getPipelines(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        targetReplicationConfig,
         Pipeline.PipelineState.OPEN);
-    
-    LOG.debug("Found {} open RATIS/THREE pipelines", openPipelines.size());
+
+    LOG.debug("Found {} open {} pipelines", openPipelines.size(),
+        targetReplicationLabel);
 
     int pipelineCount = openPipelines.size();
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
@@ -259,11 +263,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   boolean isPipelineHealthy(Pipeline pipeline) {
-    // Verify pipeline has all 3 nodes
+    // Verify pipeline has all required nodes for target replication.
     List<DatanodeDetails> nodes = pipeline.getNodes();
-    if (nodes.size() != 3) {
-      LOG.debug("Pipeline {} is not healthy: has {} nodes instead of 3",
-          pipeline.getId(), nodes.size());
+    if (nodes.size() != targetRequiredNodes) {
+      LOG.debug("Pipeline {} is not healthy: has {} nodes instead of {}",
+          pipeline.getId(), nodes.size(), targetRequiredNodes);
       return false;
     }
 
@@ -304,8 +308,9 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   @Override
   public String getStatusText() {
     String status = String.format(
-        "healthy Ratis/THREE pipelines (=%d) >= healthyPipelineThresholdCount" +
-            " (=%d)", getCurrentHealthyPipelineCount(),
+        "healthy %s pipelines (=%d) >= healthyPipelineThresholdCount" +
+            " (=%d)", targetReplicationLabel,
+        getCurrentHealthyPipelineCount(),
         getHealthyPipelineThresholdCount());
     status = updateStatusTextWithSamplePipelines(status);
     return status;
@@ -315,7 +320,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       String status) {
     if (validateBasedOnReportProcessing()) {
       List<Pipeline> openPipelines = pipelineManager.getPipelines(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+          targetReplicationConfig,
           Pipeline.PipelineState.OPEN);
 
       Set<PipelineID> unhealthyPipelines = openPipelines.stream()

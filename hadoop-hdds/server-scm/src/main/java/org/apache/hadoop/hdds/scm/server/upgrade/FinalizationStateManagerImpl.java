@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.FinalizationStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -103,7 +104,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
       Objects.requireNonNull(versionManager, "versionManager == null");
 
-      return ratisServer.getProxyHandler(FinalizationStateManager.class, new FinalizationStateManagerImpl(this));
+      final FinalizationStateManager impl = new FinalizationStateManagerImpl(this);
+      return ratisServer.getProxyHandler(new FinalizationStateManagerInvoker(impl, ratisServer));
     }
   }
 }

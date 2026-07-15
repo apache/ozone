@@ -44,7 +44,7 @@ public class ScmVersionManager extends RatisBasedVersionManager {
     this(storage, upgradeActionArg, new ScmUpgradeActionProvider());
   }
 
-  @VisibleForTesting
+  // Used by Recon's node manager to track Datanode versions without running SCM specific upgrade actions.
   public ScmVersionManager(SCMStorageConfig storage,
       OzoneStorageContainerManager upgradeActionArg,
       ComponentUpgradeActionProvider<ScmUpgradeAction> upgradeActionProvider)

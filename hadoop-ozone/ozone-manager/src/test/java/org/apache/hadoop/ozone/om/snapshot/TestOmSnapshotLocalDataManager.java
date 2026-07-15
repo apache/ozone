@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -46,6 +47,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -460,16 +462,26 @@ public class TestOmSnapshotLocalDataManager {
         createMockLiveFileMetaData("file6.sst", FILE_TABLE, "key1", "key2"),
         createMockLiveFileMetaData("file7.sst", KEY_TABLE, "key1", "key2"),
         createMockLiveFileMetaData("file1.sst", "col1", "key1", "key2"));
+    long beforeAdd = System.currentTimeMillis();
+    long committedLastDefragTime;
     try (WritableOmSnapshotLocalDataProvider snap =
              localDataManager.getWritableOmSnapshotLocalData(snapId)) {
+      assertEquals(0L, snap.getSnapshotLocalData().getLastDefragTime());
       mockSnapshotStore(snapId, newVersionSstFiles);
       snap.addSnapshotVersion(snapshotStore);
+      assertEquals(0L, snap.getSnapshotLocalData().getLastDefragTime());
       snap.commit();
+      committedLastDefragTime = snap.getSnapshotLocalData().getLastDefragTime();
+      assertTrue(committedLastDefragTime >= beforeAdd);
     }
+    long afterAdd = System.currentTimeMillis();
     validateVersions(localDataManager, snapId, 1, Sets.newHashSet(0, 1));
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapId)) {
       OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
       OmSnapshotLocalData.VersionMeta versionMeta = snapshotLocalData.getVersionSstFileInfos().get(1);
+      assertEquals(committedLastDefragTime, snapshotLocalData.getLastDefragTime());
+      assertTrue(snapshotLocalData.getLastDefragTime() >= beforeAdd);
+      assertTrue(snapshotLocalData.getLastDefragTime() <= afterAdd);
       assertEquals(6, versionMeta.getPreviousSnapshotVersion());
       List<SstFileInfo> expectedLiveFileMetaData =
           newVersionSstFiles.subList(0, 3).stream().map(SstFileInfo::new).collect(Collectors.toList());
@@ -975,6 +987,42 @@ public class TestOmSnapshotLocalDataManager {
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
   }
 
+  @Test
+  public void testInitSkipsYamlFilesThatCannotBeLoaded() throws IOException {
+    UUID snapshotId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID validSnapshotId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    UUID previousSnapshotId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+    createSnapshotLocalDataFile(snapshotId, previousSnapshotId);
+    createSnapshotLocalDataFile(validSnapshotId, null);
+    Path invalidYamlPath = Paths.get(snapshotsDir.getAbsolutePath(),
+        "db" + OM_SNAPSHOT_SEPARATOR + previousSnapshotId + YAML_FILE_EXTENSION);
+    Files.write(invalidYamlPath, "not: [valid".getBytes(StandardCharsets.UTF_8));
+
+    localDataManager = getNewOmSnapshotLocalDataManager();
+
+    assertThat(localDataManager.getVersionNodeMapUnmodifiable()).containsOnlyKeys(validSnapshotId);
+  }
+
+  @Test
+  public void testInitSkipsPreviousSnapshotWithMismatchedSnapshotId() throws IOException {
+    UUID snapshotId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID validSnapshotId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    UUID previousSnapshotId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    UUID mismatchedSnapshotId = UUID.fromString("00000000-0000-0000-0000-000000000003");
+
+    createSnapshotLocalDataFile(snapshotId, previousSnapshotId);
+    createSnapshotLocalDataFile(validSnapshotId, null);
+    // Write a loadable YAML at the previous snapshot's path, but whose stored snapshotId does not match the path.
+    Path mismatchedYamlPath = Paths.get(snapshotsDir.getAbsolutePath(),
+        "db" + OM_SNAPSHOT_SEPARATOR + previousSnapshotId + YAML_FILE_EXTENSION);
+    writeLocalDataToFile(createMockLocalData(mismatchedSnapshotId, null), mismatchedYamlPath);
+
+    localDataManager = getNewOmSnapshotLocalDataManager();
+
+    assertThat(localDataManager.getVersionNodeMapUnmodifiable()).containsOnlyKeys(validSnapshotId);
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testInitWithMissingYamlFiles(boolean needsUpgrade) throws IOException {
@@ -1070,16 +1118,17 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @Test
-  public void testInitWithInvalidPathThrowsException() throws IOException {
+  public void testInitSkipsYamlFileWhosePathDoesNotMatchStoredSnapshotId() throws IOException {
     UUID snapshotId = UUID.randomUUID();
-    
+
     // Create a file with wrong location
     OmSnapshotLocalData localData = createMockLocalData(snapshotId, null);
     Path wrongPath = Paths.get(snapshotsDir.getAbsolutePath(), "db-wrong-name.yaml");
     writeLocalDataToFile(localData, wrongPath);
-    
-    // Should throw IOException during init
-    assertThrows(IOException.class, this::getNewOmSnapshotLocalDataManager);
+
+    localDataManager = getNewOmSnapshotLocalDataManager();
+
+    assertThat(localDataManager.getVersionNodeMapUnmodifiable()).isEmpty();
   }
 
   @Test

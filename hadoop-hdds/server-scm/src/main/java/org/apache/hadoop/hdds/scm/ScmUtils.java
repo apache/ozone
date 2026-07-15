@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.BlockingQueue;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
@@ -216,6 +218,27 @@ public final class ScmUtils {
             "Please try the operation later again.",
             SCMException.ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
       }
+    }
+  }
+
+  /**
+   * Returns default replication config, or null when configured values are
+   * invalid. Callers can decide whether to fallback or skip their operation.
+   */
+  public static ReplicationConfig getDefaultReplicationConfig(
+      ConfigurationSource conf, Logger logger, String componentName) {
+    try {
+      return ReplicationConfig.getDefault(conf);
+    } catch (IllegalArgumentException e) {
+      logger.warn("Ignoring invalid default replication config in {}: "
+              + "type={}, replication={}.",
+          componentName,
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT),
+          e);
+      return null;
     }
   }
 }

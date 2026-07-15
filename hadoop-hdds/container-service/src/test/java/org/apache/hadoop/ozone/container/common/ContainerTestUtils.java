@@ -46,11 +46,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -150,7 +151,7 @@ public final class ContainerTestUtils {
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
-    return new EndpointStateMachine(address, rpcClient,
+    return new EndpointStateMachine(new HostAndPort(address.getHostName(), address.getPort()), rpcClient,
         new LegacyHadoopConfigurationSource(conf), "");
   }
 

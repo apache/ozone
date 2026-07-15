@@ -314,6 +314,14 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName,
+                        boolean recursive, String expectedETag)
+      throws IOException {
+    ((OzoneBucketStub) getBucket(volumeName, bucketName))
+        .deleteKey(keyName, expectedETag);
+  }
+
+  @Override
   public void deleteKeys(String volumeName, String bucketName,
                          List<String> keyNameList) throws IOException {
 
@@ -407,6 +415,16 @@ public class ClientProtocolStub implements ClientProtocol {
       Map<Integer, String> partsMap) throws IOException {
     return getBucket(volumeName, bucketName)
         .completeMultipartUpload(keyName, uploadID, partsMap);
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String volumeName, String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .completeMultipartUpload(keyName, uploadID, partsMap,
+            expectedDataGeneration, expectedETag);
   }
 
   @Override
@@ -679,11 +697,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void setIsS3Request(boolean isS3Request) {
-
-  }
-
-  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
@@ -866,4 +879,19 @@ public class ClientProtocolStub implements ClientProtocol {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName) throws IOException {
+    return getBucket(volumeName, bucketName).getBucketTagging();
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putBucketTagging(tags);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
+    getBucket(volumeName, bucketName).deleteBucketTagging();
+  }
 }

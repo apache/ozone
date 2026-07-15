@@ -32,7 +32,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -44,12 +43,12 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -260,6 +259,13 @@ public class SCMClientProtocolServer implements
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, owner);
+      if (container == null) {
+        throw new SCMException(
+            "Could not allocate container for replication " + replicationConfig
+                + ", owner=" + owner
+                + ": no suitable open pipeline with enough space",
+            ResultCodes.FAILED_TO_ALLOCATE_CONTAINER);
+      }
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
@@ -421,8 +427,13 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        //not found , just go ahead
-        LOG.error("Container with common pipeline not found: {}", ex);
+        // ContainerWithPipeline.pipeline is required in the protobuf response,
+        // so this RPC cannot return container metadata with a null pipeline.
+        // Keep the "exist" semantics by excluding only this container from the
+        // batch result instead of failing the entire request.
+        LOG.warn("Container {} exists but its pipeline could not be resolved; "
+            + "excluding it from getExistContainerWithPipelinesInBatch result. "
+            + "Cause: {}", containerID, ex.getMessage());
       }
     }
     return cpList;
@@ -517,7 +528,7 @@ public class SCMClientProtocolServer implements
       
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
-              .sorted().collect(Collectors.toList());
+              .sorted(Comparator.comparing(ContainerInfo::containerID)).collect(Collectors.toList());
       List<ContainerInfo> limitedContainers =
           containerInfos.stream().limit(count).collect(Collectors.toList());
       long totalCount = (long) containerInfos.size();
@@ -683,9 +694,9 @@ public class SCMClientProtocolServer implements
     }
     try {
       List<HddsProtos.Node> result = new ArrayList<>();
-      for (DatanodeDetails node : queryNode(opState, state)) {
+      for (DatanodeDetails node : scm.getScmNodeManager().getNodes(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
         HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
@@ -709,34 +720,22 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public HddsProtos.Node queryNode(UUID uuid)
-      throws IOException {
+  public HddsProtos.Node queryNode(UUID uuid) {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("uuid", String.valueOf(uuid));
     HddsProtos.Node result = null;
-    try {
-      DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
-      if (node != null) {
-        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
-        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
-            .setNodeID(node.getProtoBufMessage())
-            .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState());
+    DatanodeInfo datanodeInfo = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
+    if (datanodeInfo != null) {
+      NodeStatus ns = datanodeInfo.getNodeStatus();
+      HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
+          .setNodeID(datanodeInfo.getProtoBufMessage())
+          .addNodeStates(ns.getHealth())
+          .addNodeOperationalStates(ns.getOperationalState());
 
-        if (datanodeInfo != null) {
-          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
-          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
-          addFailedVolumes(nodeBuilder, datanodeInfo);
-        }
-        result = nodeBuilder.build();
-      }
-    } catch (NodeNotFoundException e) {
-      IOException ex = new IOException(
-          "An unexpected error occurred querying the NodeStatus", e);
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.QUERY_NODE, auditMap, ex));
-      throw ex;
+      nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+      nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+      addFailedVolumes(nodeBuilder, datanodeInfo);
+      result = nodeBuilder.build();
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
@@ -1150,15 +1149,19 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().getContainerReport();
   }
 
+  /*
+   * This command is deprecated and is retained for backward compatibility. It no longer finalizes SCM
+   * as the process is driven from OM which will trigger the SCM finalize process.
+   */
   @Override
   @Deprecated
-  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
-      IOException {
-    if (!scm.getVersionManager().needsFinalization()) {
-      return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
-    }
-    finalizeUpgrade();
-    return new StatusAndMessages(STARTING_FINALIZATION, Collections.emptyList());
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) {
+    // This command is kept only for legacy upgrade scripts which would have first finalized SCM and then
+    // made a call to OM to finalize it. The new flow, is that a single call to OM triggers the finalization process.
+    // The legacy OM command now calls the new one and correctly starts the flow, so this command has become a
+    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow any scripts to move
+    // on and call OM to start the process.
+    return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
   }
 
   @Override
@@ -1569,7 +1572,7 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     try {
-      long count = scm.getContainerManager().getContainers().size();
+      long count = scm.getContainerManager().getTotalContainerCount();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, null));
       return count;
@@ -1620,26 +1623,6 @@ public class SCMClientProtocolServer implements
     }
   }
 
-  /**
-   * Queries a list of Node that match a set of statuses.
-   *
-   * <p>For example, if the nodeStatuses is HEALTHY and RAFT_MEMBER, then
-   * this call will return all
-   * healthy nodes which members in Raft pipeline.
-   *
-   * <p>Right now we don't support operations, so we assume it is an AND
-   * operation between the
-   * operators.
-   *
-   * @param opState - NodeOperational State
-   * @param state - NodeState.
-   * @return List of Datanodes.
-   */
-  public List<DatanodeDetails> queryNode(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
-    return new ArrayList<>(queryNodeState(opState, state));
-  }
-
   @VisibleForTesting
   public StorageContainerManager getScm() {
     return scm;
@@ -1650,24 +1633,6 @@ public class SCMClientProtocolServer implements
    */
   public boolean getSafeModeStatus() {
     return scm.getScmContext().isInSafeMode();
-  }
-
-  /**
-   * Query the System for Nodes.
-   *
-   * @params opState - The node operational state
-   * @param nodeState - NodeState that we are interested in matching.
-   * @return Set of Datanodes that match the NodeState.
-   */
-  private Set<DatanodeDetails> queryNodeState(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
-    Set<DatanodeDetails> returnSet = new TreeSet<>();
-    List<DatanodeDetails> tmp = scm.getScmNodeManager()
-        .getNodes(opState, nodeState);
-    if ((tmp != null) && (!tmp.isEmpty())) {
-      returnSet.addAll(tmp);
-    }
-    return returnSet;
   }
 
   @Override

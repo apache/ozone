@@ -318,6 +318,38 @@ public class TestOzoneManagerRequestHandler {
   }
 
   @Test
+  public void testQueryUpgradeStatusDispatch() throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalized(true)
+        .setShouldFinalize(false)
+        .setNumDatanodesFinalized(3)
+        .setNumDatanodesTotal(3)
+        .build();
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse expected =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalized(true)
+            .setHddsStatus(hddsStatus)
+            .build();
+    Mockito.when(ozoneManager.queryUpgradeStatus()).thenReturn(expected);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.QueryUpgradeStatus)
+            .setClientId("test-client")
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse response = handler.handleReadRequest(request);
+
+    Assertions.assertTrue(response.getSuccess());
+    Assertions.assertTrue(response.hasQueryUpgradeStatusResponse());
+    Assertions.assertEquals(expected, response.getQueryUpgradeStatusResponse());
+    Mockito.verify(ozoneManager).queryUpgradeStatus();
+  }
+
+  @Test
   public void testSnapshotDiffRoutingUsesCorrectServerMethodBasedOnOptionalFlags()
       throws IOException {
     OzoneManagerRequestHandler handler = getRequestHandler(10);

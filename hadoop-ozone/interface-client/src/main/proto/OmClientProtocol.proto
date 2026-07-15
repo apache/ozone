@@ -73,7 +73,7 @@ enum Type {
 
   ServiceList = 51;
   DBUpdates = 53;
-  FinalizeUpgrade = 54;
+  FinalizeUpgrade = 54; // [deprecated = true]
   FinalizeUpgradeProgress = 55;
   Prepare = 56;
   PrepareStatus = 57;
@@ -157,6 +157,12 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   SubmitSnapshotDiff = 143;
+  // TODO(HDDS-15497): S3 bucket tagging RPCs; handled by OM in a follow-up PR (S3G maps to PUT/GET/DELETE ?tagging).
+  PutBucketTagging = 144;
+  GetBucketTagging = 145;
+  DeleteBucketTagging = 146;
+  StartFinalizeUpgrade = 147;
+  QueryUpgradeStatus = 148;
 }
 
 enum SafeMode {
@@ -215,8 +221,8 @@ message OMRequest {
 
   optional ServiceListRequest               serviceListRequest             = 51;
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
-  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
-  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54 [deprecated = true];
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55 [deprecated = true];
   optional PrepareRequest                   prepareRequest                 = 56;
   optional PrepareStatusRequest             prepareStatusRequest           = 57;
   optional CancelPrepareRequest             cancelPrepareRequest           = 58;
@@ -309,6 +315,14 @@ message OMRequest {
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 
   optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
+  // TODO: PutBucketTagging — tags in bucketArgs.tags; OM persists to BucketInfo.tags.
+  optional PutBucketTaggingRequest          putBucketTaggingRequest         = 145;
+  // TODO: GetBucketTagging — volume/bucket in bucketArgs; response returns tag list.
+  optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
+  // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
+  optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
+  optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 148;
+  optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 149;
 }
 
 message OMResponse {
@@ -358,8 +372,8 @@ message OMResponse {
 
   optional ServiceListResponse               ServiceListResponse           = 51;
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
-  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
-  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
+  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54 [deprecated = true];
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55 [deprecated = true];
   optional PrepareResponse                 prepareResponse                 = 56;
   optional PrepareStatusResponse           prepareStatusResponse           = 57;
   optional CancelPrepareResponse           cancelPrepareResponse           = 58;
@@ -444,6 +458,14 @@ message OMResponse {
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
 
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
+  // TODO: Empty ack after OM applies tag set to OmBucketInfo.
+  optional PutBucketTaggingResponse          putBucketTaggingResponse      = 144;
+  // TODO: Tag list for S3G GetBucketTagging XML; empty if no tags.
+  optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
+  // TODO: Empty ack after OM clears BucketInfo.tags.
+  optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
+  optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 147;
+  optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 148;
 }
 
 enum Status {
@@ -787,6 +809,8 @@ message BucketInfo {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
+    // TODO: S3 bucket tags persisted in OM DB; set by PutBucketTagging, read by GetBucketTagging.
+    repeated hadoop.hdds.KeyValue tags = 23;
 }
 
 enum BucketLayoutProto {
@@ -860,6 +884,8 @@ message BucketArgs {
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
+    // TODO: Tag payload for PutBucketTagging only.
+    repeated hadoop.hdds.KeyValue tags = 13;
 }
 
 message PrefixInfo {
@@ -1192,11 +1218,6 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
-
-    // expectedETag, when set, indicates that the existing key must have
-    // the given ETag for the operation to succeed. This is used for
-    // S3 conditional writes with the If-Match header.
-    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1631,6 +1652,21 @@ message FinalizeUpgradeResponse {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+message StartFinalizeUpgradeRequest {
+}
+
+message StartFinalizeUpgradeResponse {
+}
+
+message QueryUpgradeStatusRequest {
+}
+
+message QueryUpgradeStatusResponse {
+    optional bool omFinalized = 1;
+    optional hadoop.hdds.UpgradeStatus hddsStatus = 2;
+}
+
+// deprecated, use QueryUpgradeStatusRequest/Response instead. Retained for wire compatibility.
 message FinalizeUpgradeProgressRequest {
     // Ignored by OM; retained for wire compatibility.
     required string upgradeClientId = 1;
@@ -2365,6 +2401,8 @@ message BucketQuotaCount {
     required int64 diffUsedBytes = 3;
     required int64 diffUsedNamespace = 4;
     required bool supportOldQuota = 5 [default=false];
+    optional int64 diffSnapshotUsedBytes = 6;
+    optional int64 diffSnapshotUsedNamespace = 7;
 }
 
 message QuotaRepairResponse {
@@ -2482,4 +2520,34 @@ service OzoneManagerService {
     // A client-to-OM RPC to send client requests to OM Ratis server
     rpc submitRequest(OMRequest)
           returns(OMResponse);
+}
+
+// TODO: S3 PutBucketTagging — bucketArgs identifies bucket; tags in bucketArgs.tags replace existing set.
+message PutBucketTaggingRequest {
+  required BucketArgs bucketArgs = 1;
+  optional uint64 modificationTime = 2;
+}
+
+// TODO: Success response; no body (tags stored on OmBucketInfo).
+message PutBucketTaggingResponse {
+}
+
+// TODO: S3 GetBucketTagging — bucketArgs.volumeName/bucketName; link resolved in OM reader.
+message GetBucketTaggingRequest {
+  required BucketArgs bucketArgs = 1;
+}
+
+// TODO: Returns current bucket tags for S3G Tagging XML response.
+message GetBucketTaggingResponse {
+  repeated hadoop.hdds.KeyValue tags = 1;
+}
+
+// TODO: S3 DeleteBucketTagging — clears all tags on bucket (link → source bucket in OM).
+message DeleteBucketTaggingRequest {
+  required BucketArgs bucketArgs = 1;
+  optional uint64 modificationTime = 2;
+}
+
+// TODO: Success response; bucket has no tags after commit.
+message DeleteBucketTaggingResponse {
 }

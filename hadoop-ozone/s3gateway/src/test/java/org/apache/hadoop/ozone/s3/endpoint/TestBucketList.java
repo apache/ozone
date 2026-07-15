@@ -28,7 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.stream.IntStream;
+import javax.xml.bind.JAXB;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -57,6 +59,9 @@ public class TestBucketList {
     endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
     endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
     ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertNotNull(getBucketResponse.getPrefix());
+    assertEquals("", getBucketResponse.getPrefix().getName());
 
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/",
@@ -131,6 +136,20 @@ public class TestBucketList {
         getBucketResponse.getContents().get(0).getOwner().getDisplayName());
     assertEquals(user2.getShortUserName(),
         getBucketResponse.getContents().get(1).getOwner().getDisplayName());
+  }
+
+  @Test
+  public void listWithDelimiterAndPrefixMatchingNoKeys() throws OS3Exception, IOException {
+    OzoneClient ozoneClient =
+        createClientWithKeys("b/a/r", "b/a/c", "b/a/g", "g");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "d");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "/");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertEquals(0, response.getContents().size());
+    assertEquals(0, response.getCommonPrefixes().size());
   }
 
   @Test
@@ -458,6 +477,19 @@ public class TestBucketList {
   }
 
   @Test
+  public void testListObjectsWithNonIntegerMaxKeys() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("bucket");
+    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.MAX_KEYS, "blah");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucket"));
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
+  }
+
+  @Test
   public void testListObjectsWithNegativeMaxKeys() throws Exception {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
@@ -540,6 +572,98 @@ public class TestBucketList {
       String exceptName, String exceptEncodingType, EncodingTypeObject object) {
     assertEquals(exceptName, object.getName());
     assertEquals(exceptEncodingType, object.getEncodingType());
+  }
+
+  /**
+   * An empty continuation token must be treated as no token: list from the
+   * start, not truncated, and echo the empty token back (AWS S3 semantics).
+   */
+  @Test
+  public void listWithEmptyContinuationToken() throws OS3Exception, IOException {
+    OzoneClient ozoneClient = createClientWithKeys("bar", "baz", "foo", "quxx");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, "");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertFalse(response.isTruncated());
+    assertEquals(4, response.getContents().size());
+    // Echoed back verbatim (empty), so botocore populates ContinuationToken=''.
+    assertEquals("", response.getContinueToken());
+  }
+
+  /**
+   * A supplied continuation token must be echoed back in the response so that
+   * clients can read response['ContinuationToken'].
+   */
+  @Test
+  public void listEchoesContinuationToken() throws OS3Exception, IOException {
+    OzoneClient ozoneClient = createClientWithKeys("bar", "baz", "foo", "quxx");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 1);
+    ListObjectResponse first = (ListObjectResponse) endpoint.get("b1").getEntity();
+    assertTrue(first.isTruncated());
+    String token = first.getNextToken();
+    assertNotNull(token);
+
+    endpoint.queryParamsForTest().unset(QueryParams.MAX_KEYS);
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, token);
+    ListObjectResponse second = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertFalse(second.isTruncated());
+    // The request continuation token is echoed back verbatim.
+    assertEquals(token, second.getContinueToken());
+    assertEquals(3, second.getContents().size());
+  }
+
+  /**
+   * With both StartAfter and a continuation token, the token drives the
+   * listing position while both StartAfter and ContinuationToken are echoed.
+   */
+  @Test
+  public void listContinuationTokenWithStartAfter()
+      throws OS3Exception, IOException {
+    OzoneClient ozoneClient = createClientWithKeys("bar", "baz", "foo", "quxx");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    endpoint.queryParamsForTest().set(QueryParams.START_AFTER, "bar");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 1);
+    ListObjectResponse first = (ListObjectResponse) endpoint.get("b1").getEntity();
+    assertTrue(first.isTruncated());
+    String token = first.getNextToken();
+    assertNotNull(token);
+
+    endpoint.queryParamsForTest().unset(QueryParams.MAX_KEYS);
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, token);
+    ListObjectResponse second = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertFalse(second.isTruncated());
+    assertEquals(token, second.getContinueToken());
+    assertEquals("bar", second.getStartAfter().getName());
+    assertEquals(2, second.getContents().size());
+  }
+
+  /**
+   * The echoed request continuation token must be serialized as the AWS S3
+   * element name {@code ContinuationToken} (not {@code continueToken}).
+   */
+  @Test
+  public void continuationTokenXmlElementName() throws Exception {
+    ListObjectResponse response = new ListObjectResponse();
+    response.setContinueToken("token-value");
+
+    StringWriter writer = new StringWriter();
+    JAXB.marshal(response, writer);
+    String xml = writer.toString();
+
+    assertTrue(xml.contains("<ContinuationToken>token-value</ContinuationToken>"),
+        "expected <ContinuationToken> element, got: " + xml);
+    assertFalse(xml.contains("continueToken"),
+        "response must not use the non-AWS <continueToken> element");
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {

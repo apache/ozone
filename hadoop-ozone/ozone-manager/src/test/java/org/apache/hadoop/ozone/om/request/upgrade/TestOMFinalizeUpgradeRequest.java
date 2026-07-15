@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for the OMFinalizeUpgradeRequest class.
  */
-public class TestOMFinalizeUpgradeRequest extends TestOMKeyRequest {
+public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   @Test
   public void testFinalizationInProgressKeyRemoved() throws IOException {

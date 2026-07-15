@@ -17,15 +17,10 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import static java.util.Collections.emptyList;
-
-import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
@@ -34,54 +29,37 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 
 /**
- * SCM command to request replication of a container.
+ * SCM command to request push-replication of a container to a target datanode.
  */
 public final class ReplicateContainerCommand
     extends SCMCommand<ReplicateContainerCommandProto> {
 
   private final long containerID;
-  private final List<DatanodeDetails> sourceDatanodes;
   private final DatanodeDetails targetDatanode;
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
   private ComponentVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
 
-  public static ReplicateContainerCommand fromSources(long containerID,
-      List<DatanodeDetails> sourceDatanodes) {
-    return new ReplicateContainerCommand(containerID, sourceDatanodes, null);
-  }
-
   public static ReplicateContainerCommand toTarget(long containerID,
       DatanodeDetails target, ComponentVersion apparentVersion) {
     ReplicateContainerCommand cmd =
-        new ReplicateContainerCommand(containerID, emptyList(), target);
+        new ReplicateContainerCommand(containerID, target);
     cmd.apparentVersion = apparentVersion;
     return cmd;
   }
 
-  public static ReplicateContainerCommand forTest(long containerID) {
-    ReplicateContainerCommand cmd =
-        new ReplicateContainerCommand(containerID, emptyList(), null);
-    cmd.apparentVersion = HDDSVersion.SOFTWARE_VERSION;
-    return cmd;
-  }
-
-  private ReplicateContainerCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes, DatanodeDetails target) {
+  private ReplicateContainerCommand(long containerID, DatanodeDetails target) {
     this.containerID = containerID;
-    this.sourceDatanodes = sourceDatanodes;
-    this.targetDatanode = target;
+    this.targetDatanode = Objects.requireNonNull(target, "target == null");
   }
 
   // Should be called only for protobuf conversion
-  private ReplicateContainerCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes, long id,
+  private ReplicateContainerCommand(long containerID, long id,
       DatanodeDetails targetDatanode) {
     super(id);
     this.containerID = containerID;
-    this.sourceDatanodes = sourceDatanodes;
-    this.targetDatanode = targetDatanode;
+    this.targetDatanode = Objects.requireNonNull(targetDatanode, "target == null");
   }
 
   public void setReplicaIndex(int index) {
@@ -115,16 +93,11 @@ public final class ReplicateContainerCommand
   public ReplicateContainerCommandProto getProto() {
     Builder builder = ReplicateContainerCommandProto.newBuilder()
         .setCmdId(getId())
-        .setContainerID(containerID);
-    for (DatanodeDetails dd : sourceDatanodes) {
-      builder.addSources(dd.getProtoBufMessage());
-    }
-    builder.setReplicaIndex(replicaIndex);
-    if (targetDatanode != null) {
-      builder.setTarget(targetDatanode.getProtoBufMessage());
-    }
-    builder.setPriority(priority);
-    builder.setApparentVersion(apparentVersion.serialize());
+        .setContainerID(containerID)
+        .setReplicaIndex(replicaIndex)
+        .setTarget(targetDatanode.getProtoBufMessage())
+        .setPriority(priority)
+        .setApparentVersion(apparentVersion.serialize());
     return builder.build();
   }
 
@@ -132,19 +105,12 @@ public final class ReplicateContainerCommand
       ReplicateContainerCommandProto protoMessage) {
     Objects.requireNonNull(protoMessage, "protoMessage == null");
 
-    List<DatanodeDetailsProto> sources = protoMessage.getSourcesList();
-    List<DatanodeDetails> sourceNodes = !sources.isEmpty()
-        ? sources.stream()
-            .map(DatanodeDetails::getFromProtoBuf)
-            .collect(Collectors.toList())
-        : emptyList();
-    DatanodeDetails targetNode = protoMessage.hasTarget()
-        ? DatanodeDetails.getFromProtoBuf(protoMessage.getTarget())
-        : null;
+    DatanodeDetails targetNode =
+        DatanodeDetails.getFromProtoBuf(protoMessage.getTarget());
 
     ReplicateContainerCommand cmd =
         new ReplicateContainerCommand(protoMessage.getContainerID(),
-            sourceNodes, protoMessage.getCmdId(), targetNode);
+            protoMessage.getCmdId(), targetNode);
     if (protoMessage.hasReplicaIndex()) {
       cmd.setReplicaIndex(protoMessage.getReplicaIndex());
     }
@@ -162,10 +128,6 @@ public final class ReplicateContainerCommand
     return containerID;
   }
 
-  public List<DatanodeDetails> getSourceDatanodes() {
-    return sourceDatanodes;
-  }
-
   public DatanodeDetails getTargetDatanode() {
     return targetDatanode;
   }
@@ -180,21 +142,15 @@ public final class ReplicateContainerCommand
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append(getType())
-        .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
-        .append(", term: ").append(getTerm())
-        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
-        .append(", containerId=").append(getContainerID())
-        .append(", replicaIndex=").append(getReplicaIndex());
-    if (targetDatanode != null) {
-      sb.append(", targetNode=").append(targetDatanode);
-    } else {
-      sb.append(", sourceNodes=").append(sourceDatanodes);
-    }
-    sb.append(", priority=").append(priority)
-        .append(", apparentVersion=").append(apparentVersion);
-    return sb.toString();
+    return getType()
+        + ": cmdID: " + getId()
+        + ", encodedToken: \"" + getEncodedToken() + '"'
+        + ", term: " + getTerm()
+        + ", deadlineMsSinceEpoch: " + getDeadline()
+        + ", containerId=" + getContainerID()
+        + ", replicaIndex=" + getReplicaIndex()
+        + ", targetNode=" + targetDatanode
+        + ", priority=" + priority
+        + ", apparentVersion=" + apparentVersion;
   }
 }

@@ -22,6 +22,7 @@ import static org.jooq.impl.DSL.count;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -114,5 +115,102 @@ public final class SqlDbUtils {
     }
     LOG.debug("Found {} user-defined tables in the database: {}", tableNames.size(), tableNames);
     return tableNames;
+  }
+
+  /**
+   * Checks whether a column exists in a Derby table via {@code SYS.SYSCOLUMNS}.
+   *
+   * @param conn the database connection
+   * @param tableName the table name (case-insensitive)
+   * @param columnName the column name (case-insensitive)
+   * @return true if the column exists
+   */
+  public static boolean columnExists(Connection conn, String tableName, String columnName)
+      throws SQLException {
+    DatabaseMetaData metaData = conn.getMetaData();
+    try (ResultSet rs = metaData.getColumns(null, null, tableName, columnName)) {
+      if (rs.next()) {
+        return true;
+      }
+    }
+    try (ResultSet rs = metaData.getColumns(null, null, tableName.toUpperCase(), columnName.toUpperCase())) {
+      return rs.next();
+    }
+  }
+
+  /**
+   * Checks whether a Derby column allows NULL values.
+   *
+   * @param conn the database connection
+   * @param tableName the table name (case-insensitive)
+   * @param columnName the column name (case-insensitive)
+   * @return true if the column is nullable, false if NOT NULL or column does not exist
+   */
+  public static boolean isColumnNullable(Connection conn, String tableName, String columnName)
+      throws SQLException {
+    DatabaseMetaData metaData = conn.getMetaData();
+    try (ResultSet rs = metaData.getColumns(null, null, tableName, columnName)) {
+      if (rs.next()) {
+        return rs.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls;
+      }
+    }
+    try (ResultSet rs = metaData.getColumns(null, null, tableName.toUpperCase(), columnName.toUpperCase())) {
+      if (rs.next()) {
+        return rs.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks whether a named constraint exists on a Derby table.
+   *
+   * @param conn the database connection
+   * @param tableName the table name (case-insensitive)
+   * @param constraintName the constraint name (case-insensitive)
+   * @return true if the constraint exists on the table
+   */
+  public static boolean constraintExists(Connection conn, String tableName, String constraintName)
+      throws SQLException {
+    String sql = "SELECT 1 FROM SYS.SYSCONSTRAINTS c "
+        + "INNER JOIN SYS.SYSTABLES t ON c.TABLEID = t.TABLEID "
+        + "WHERE t.TABLENAME = ? AND c.CONSTRAINTNAME = ?";
+    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, tableName.toUpperCase());
+      ps.setString(2, constraintName);
+      try (ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+          return true;
+        }
+      }
+    }
+    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+      ps.setString(1, tableName.toUpperCase());
+      ps.setString(2, constraintName.toUpperCase());
+      try (ResultSet rs = ps.executeQuery()) {
+        return rs.next();
+      }
+    }
+  }
+
+  /**
+   * Checks whether a named index exists on a table.
+   *
+   * @param conn the database connection
+   * @param tableName the table name
+   * @param indexName the index name (case-insensitive)
+   * @return true if the index exists
+   */
+  public static boolean indexExists(Connection conn, String tableName, String indexName) throws SQLException {
+    DatabaseMetaData metaData = conn.getMetaData();
+    try (ResultSet rs = metaData.getIndexInfo(null, null, tableName, false, false)) {
+      while (rs.next()) {
+        String existing = rs.getString("INDEX_NAME");
+        if (existing != null && existing.equalsIgnoreCase(indexName)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

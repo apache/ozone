@@ -61,7 +61,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   ATOMIC_CREATE_IF_NOT_EXISTS(12,
       "OzoneManager version that supports explicit create-if-not-exists key semantics"),
-
+  S3_BUCKET_TAGGING_API(13,
+      "OzoneManager version that supports S3 bucket tagging APIs, such as "
+          + "PutBucketTagging, GetBucketTagging, and DeleteBucketTagging"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +

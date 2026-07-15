@@ -117,7 +117,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param health - The health of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
-  List<DatanodeDetails> getNodes(
+  List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health);
 
   /**
@@ -138,10 +138,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int getNodeCount(
       NodeOperationalState opState, NodeState health);
 
-  /**
-   * @return all datanodes known to SCM.
-   */
-  List<? extends DatanodeDetails> getAllNodes();
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
+  List<DatanodeInfo> getAllNodes();
 
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
@@ -155,7 +153,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     int finalizedNodes = 0;
     int totalHealthyNodes = 0;
 
-    for (DatanodeDetails dn : getAllNodes()) {
+    for (DatanodeInfo dn : getAllNodes()) {
       try {
         // Only count HEALTHY nodes. STALE/DEAD nodes are intentionally excluded
         // for the following reasons:
@@ -171,14 +169,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
           continue;
         }
         totalHealthyNodes++;
-        DatanodeInfo datanodeInfo = getDatanodeInfo(dn);
-        if (datanodeInfo == null) {
-          LOG.warn("Could not get DatanodeInfo for {}, skip counting for finalization.", dn.getHostName());
-          continue;
-        }
 
-        ComponentVersion dnApparentVersion = datanodeInfo.getLastKnownApparentVersion();
-        ComponentVersion dnSoftwareVersion = datanodeInfo.getLastKnownSoftwareVersion();
+        ComponentVersion dnApparentVersion = dn.getLastKnownApparentVersion();
+        ComponentVersion dnSoftwareVersion = dn.getLastKnownSoftwareVersion();
 
         if (!dnApparentVersion.equals(dnSoftwareVersion)) {
           // Datanode has not yet finalized
@@ -251,26 +244,40 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
-   * Get the datanode info of a specified datanode.
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
    *
-   * @param dn the usage of which we want to get
-   * @return DatanodeInfo of the specified datanode
-   */
-  @Nullable
-  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
-
-  /**
-   * True if the node can accept another container of the given size.
-   */
-  boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID);
-
-  /**
-   * Records a pending container allocation for a single DataNode identified by its ID.
-   *
-   * @param datanodeID  the ID of the DataNode receiving the allocation
+   * @param datanodeInfo node info of the receiving the allocation
    * @param containerID the container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
    */
-  void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
+  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
+   * Records a container allocation on the given datanode.
+   * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
+   * available space — it is called after the placement policy has already
+   * validated space and a replication command has been committed.
+   */
+  void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
+   * Returns true if the datanode has at least one available container slot considering
+   * in-flight allocations tracked by PendingContainerTracker.
+   *
+   * @param datanodeInfo the datanode to check
+   * @return true if at least one slot is free
+   */
+  boolean hasAvailableSpace(DatanodeInfo datanodeInfo);
+
+  /**
+   * Removes a pending container allocation from a datanode.
+   *
+   * @param datanodeInfo info about the datanode
+   * @param containerID the container to remove from pending
+   */
+  void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
    * Return the node stat of the specified datanode.
@@ -456,7 +463,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<SCMCommand<?>> getCommandQueue(DatanodeID dnID);
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
-  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
+  @Nullable DatanodeInfo getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
@@ -504,6 +511,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  PendingContainerTracker getPendingContainerTracker();
 
   /**
    * Class to store the number finalized and healthy datanodes.

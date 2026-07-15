@@ -59,8 +59,7 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  private static final Codec<OmKeyInfo> CODEC = newCodec();
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
    * The flag is set when a committed key is deleted from AOS but still held in
@@ -110,7 +109,6 @@ public final class OmKeyInfo extends WithParentObjectId
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
-  private String expectedETag;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -130,20 +128,18 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.expectedETag = b.expectedETag;
   }
 
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+  private static Codec<OmKeyInfo> newCodec() {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT.serialize()),
+        k -> k.getProtobuf(true, ClientVersion.CURRENT.serialize()),
         OmKeyInfo.class);
   }
 
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  public static Codec<OmKeyInfo> getCodec() {
+    return CODEC;
   }
 
   public String getVolumeName() {
@@ -189,14 +185,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
-  }
-
-  public void setExpectedETag(String eTag) {
-    this.expectedETag = eTag;
-  }
-
-  public String getExpectedETag() {
-    return expectedETag;
   }
 
   public String getOwnerName() {
@@ -502,7 +490,6 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
-    private String expectedETag;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -525,7 +512,6 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.expectedETag = obj.expectedETag;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -697,11 +683,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setExpectedETag(String eTag) {
-      this.expectedETag = eTag;
-      return this;
-    }
-
     @Override
     protected void validate() {
       super.validate();
@@ -821,9 +802,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
     }
-    if (expectedETag != null) {
-      kb.setExpectedETag(expectedETag);
-    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -876,9 +854,6 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
-    }
-    if (keyInfo.hasExpectedETag()) {
-      builder.setExpectedETag(keyInfo.getExpectedETag());
     }
 
     if (keyInfo.hasOwnerName()) {

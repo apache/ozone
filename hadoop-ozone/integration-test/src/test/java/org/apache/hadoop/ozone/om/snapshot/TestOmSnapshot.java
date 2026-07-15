@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
@@ -222,6 +223,19 @@ public abstract class TestOmSnapshot {
     }
   }
 
+  /**
+   * Pins a config-independent heavyweight test to exactly one subclass so it runs
+   * once instead of across the whole 8-class matrix (HDDS-10308); fast-skips in the
+   * other 7. The canonical config is FSO + non-linked. requiresNativeDiff picks
+   * between TestOmSnapshotFsoWithNativeLib (native on) and
+   * TestOmSnapshotFsoWithoutNativeLib (native off).
+   */
+  private void assumeCanonicalConfig(boolean requiresNativeDiff) {
+    assumeTrue(bucketLayout.isFileSystemOptimized()
+        && (requiresNativeDiff != disableNativeDiff)
+        && !createLinkedBucket);
+  }
+
   private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
@@ -325,11 +339,7 @@ public abstract class TestOmSnapshot {
   private void finalizeOMUpgrade() throws Exception {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
-    cluster.getOzoneManager().getMetadataManager().getMetaTable()
-        .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
-    cluster.getOzoneManager().getMetadataManager().getMetaTable()
-        .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
+    omClient.finalizeUpgrade();
     OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 
@@ -1435,7 +1445,7 @@ public abstract class TestOmSnapshot {
             snap7, "400000000000000000003", 0, forceFullSnapshotDiff, disableNativeDiff));
     assertThat(ioException.getMessage()).contains("Index (given: 3) " +
         "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
-        "(given: 1000) should be a positive number > 0.");
+        "(given: " + OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT + ") should be a positive number > 0.");
 
   }
 
@@ -2040,6 +2050,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    assumeCanonicalConfig(false);
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (UncheckedAutoCloseableSupplier<IOmMetadataReader> snapshotSupplier =
              cluster.getOzoneManager().getOmSnapshotManager()
@@ -2162,6 +2173,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
+    assumeCanonicalConfig(false);
     String snapshotName = createSnapshot(volumeName, bucketName);
 
     RDBStore activeDbStore = getRdbStore();
@@ -2389,6 +2401,7 @@ public abstract class TestOmSnapshot {
   // column families are used in SST diff calculation.
   @Test
   public void testSnapshotCompactionDag() throws Exception {
+    assumeCanonicalConfig(true);
     String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
@@ -2533,6 +2546,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotReuseSnapName() throws Exception {
+    assumeCanonicalConfig(false);
     // start KeyManager for this test
     startKeyManager();
     String volume = "vol-" + counter.incrementAndGet();

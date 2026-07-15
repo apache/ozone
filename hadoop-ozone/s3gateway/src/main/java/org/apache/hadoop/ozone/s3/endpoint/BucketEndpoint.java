@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.util.Time;
@@ -113,7 +114,11 @@ public class BucketEndpoint extends BucketOperationHandler {
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
-    ContinueToken decodedToken = ContinueToken.decodeFromString(continueToken);
+    // AWS S3 treats an empty continuation-token as no token: list from the
+    // start and echo the empty token back (see setContinueToken below).
+    ContinueToken decodedToken =
+        (continueToken == null || continueToken.isEmpty())
+            ? null : ContinueToken.decodeFromString(continueToken);
     OzoneBucket bucket = null;
 
     try {
@@ -126,7 +131,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
       // If continuation token and start after both are provided, then we
       // ignore start After
-      String prevKey = continueToken != null ? decodedToken.getLastKey()
+      String prevKey = decodedToken != null ? decodedToken.getLastKey()
           : startAfter;
 
       // If shallow is true, only list immediate children
@@ -174,17 +179,13 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    String prevDir = continueToken != null ? decodedToken.getLastDir() : null;
+    String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
       while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
         OzoneKey next = ozoneKeyIterator.next();
-        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
-            StringUtils.isNotEmpty(prefix) &&
-            !next.getName().startsWith(prefix)) {
-          // prefix has delimiter but key don't have
-          // example prefix: dir1/ key: dir123
+        if (StringUtils.isNotEmpty(prefix) && !next.getName().startsWith(prefix)) {
           continue;
         }
         if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
@@ -341,6 +342,11 @@ public class BucketEndpoint extends BucketOperationHandler {
   ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
+    if (request.getObjects() != null
+        && request.getObjects().size() > S3Consts.S3_DELETE_OBJECTS_MAX_KEYS) {
+      throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
+    }
+
     OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
@@ -419,8 +425,10 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     // initialize handlers
     BucketOperationHandler chain = BucketOperationHandlerChain.newBuilder(this)
+        .add(new BucketGetLocationHandler())
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
+        .add(new BucketTaggingHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();

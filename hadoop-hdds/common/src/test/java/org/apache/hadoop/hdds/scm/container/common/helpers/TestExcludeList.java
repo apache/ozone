@@ -23,14 +23,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests the exclude nodes list behavior at client.
  */
 public class TestExcludeList {
-  private TestClock clock = new TestClock(Instant.now(), ZoneOffset.UTC);
+  private MockClock clock = new MockClock(Instant.now(), ZoneOffset.UTC);
 
   @Test
   public void excludeNodesShouldBeCleanedBasedOnGivenTime() {

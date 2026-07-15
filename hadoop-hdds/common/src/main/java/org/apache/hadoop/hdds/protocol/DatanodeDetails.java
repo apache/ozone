@@ -143,17 +143,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
-   * Returns the DataNode UUID.
-   *
-   * @return UUID of DataNode
-   */
-  // TODO: Remove this in follow-up Jira (HDDS-12015)
-  @Deprecated
-  public UUID getUuid() {
-    return id.getUuid();
-  }
-
-  /**
    * Returns the string representation of DataNode UUID.
    *
    * @return UUID of DataNode
@@ -753,7 +742,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       this.id = details.id;
       this.ipAddress = details.getIpAddressAsByteString();
       this.hostName = details.getHostNameAsByteString();
-      this.networkName = details.getHostNameAsByteString();
+      this.networkName = details.getNetworkNameAsByteString();
       this.networkLocation = details.getNetworkLocationAsByteString();
       this.level = details.getLevel();
       this.ports = details.getPorts();

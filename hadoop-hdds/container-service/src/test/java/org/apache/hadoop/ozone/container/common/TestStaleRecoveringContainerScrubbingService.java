@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -77,8 +77,8 @@ public class TestStaleRecoveringContainerScrubbingService {
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private final TestClock testClock =
-      new TestClock(Instant.now(), ZoneOffset.UTC);
+  private final MockClock testClock =
+      new MockClock(Instant.now(), ZoneOffset.UTC);
 
   private void initVersionInfo(ContainerTestVersionInfo versionInfo)
       throws IOException {

@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroup;
@@ -106,6 +107,11 @@ abstract class TestContainerStateMachine {
     when(ratisServer.getServerDivision(any())).thenReturn(division);
     stateMachine = new ContainerStateMachine(null,
         RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
+    try {
+      stateMachine.initialize(raftServer, stateMachine.getGroupId(), null);
+    } catch (Exception e) {
+      // Ingore exception, as need init server to be closed
+    }
   }
 
   @AfterEach
@@ -148,13 +154,14 @@ abstract class TestContainerStateMachine {
     stateMachine.write(entryNext, trx).exceptionally(catcher.asSetter()).get();
     verify(dispatcher, times(0)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
-    assertInstanceOf(StorageContainerException.class, catcher.getReceived());
-    StorageContainerException sce = (StorageContainerException) catcher.getReceived();
+    assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
+    StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
     assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY, sce.getResult());
   }
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  @Flaky("HDDS-14962")
   public void testApplyTransactionFailure(boolean failWithException) throws ExecutionException,
       InterruptedException, IOException {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
@@ -231,12 +238,12 @@ abstract class TestContainerStateMachine {
     CompletableFuture<Message> secondWrite = stateMachine.write(entryNext, trx);
     firstWrite.exceptionally(catcher.asSetter()).get();
     assertNotNull(catcher.getCaught());
-    assertInstanceOf(InterruptedException.class, catcher.getReceived());
+    assertInstanceOf(InterruptedException.class, catcher.getReceived().getCause());
 
     secondWrite.exceptionally(catcher.asSetter()).get();
-    assertNotNull(catcher.getReceived());
-    assertInstanceOf(StorageContainerException.class, catcher.getReceived());
-    StorageContainerException sce = (StorageContainerException) catcher.getReceived();
+    assertNotNull(catcher.getReceived().getCause());
+    assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
+    StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
     assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
   }
 
@@ -267,8 +274,12 @@ abstract class TestContainerStateMachine {
     if (failWithException) {
       assertInstanceOf(RuntimeException.class, throwable.get());
     } else {
-      assertInstanceOf(StorageContainerException.class, throwable.get());
-      StorageContainerException sce = (StorageContainerException) throwable.get();
+      Throwable th = throwable.get();
+      if (null != th.getCause()) {
+        th = th.getCause();
+      }
+      assertInstanceOf(StorageContainerException.class, th);
+      StorageContainerException sce = (StorageContainerException) th;
       assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
     }
   }
