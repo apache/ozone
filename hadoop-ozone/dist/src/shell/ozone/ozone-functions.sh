@@ -1360,8 +1360,8 @@ function ozone_os_tricks
         echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
       else
         LINK_FILE="libhadoop.dylib"
-        if [ ! -f "$LINK_FILE" ]; then
-          ln -s "$TARGET_FILE" "$LINK_FILE"
+        if [ ! -L "$LINK_FILE" ] && [ ! -f "$LINK_FILE" ]; then
+          ln -s "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
         fi
         export DYLD_LIBRARY_PATH=$OZONE_HOME/lib/native:$DYLD_LIBRARY_PATH
       fi
@@ -1407,8 +1407,8 @@ function ozone_os_tricks
       else
         LINK_FILE="libhadoop.so"
         # If the symbolic file is already exist, skip create it again
-        if [ ! -f "$LINK_FILE" ]; then
-          ln -s "$TARGET_FILE" "$LINK_FILE"
+        if [ ! -L "$LINK_FILE" ] && [ ! -f "$LINK_FILE" ]; then
+          ln -s "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
         fi
         export LD_LIBRARY_PATH=$OZONE_HOME/lib/native:$LD_LIBRARY_PATH
       fi
