@@ -673,12 +673,19 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * thread locals: the session policy from {@link STSTokenIdentifier} (set on STS requests) and the
    * S3 action from {@link S3Authentication} (set on S3 requests). Either or both may be absent, in
    * which case the corresponding field is left untouched on the builder.
+   * <p>
+   * The S3 action is only propagated when the S3 STS feature flag is enabled, since it is only used
+   * for fine-grained STS authorization.
    * @param contextBuilder the builder to enrich in-place
    */
-  public static void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
+  private void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
     final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
     if (stsTokenIdentifier != null) {
       contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
+    }
+
+    if (!ozoneManager.isS3STSEnabled()) {
+      return;
     }
 
     final S3Authentication s3Authentication = OzoneManager.getS3Auth();

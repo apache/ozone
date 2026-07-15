@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.when;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,7 +67,7 @@ public class TestS3ActionOverrideForOwnerVerification {
   @Test
   public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
     final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup);
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
 
     // Trigger UploadPartCopy (MPU part upload with copy header).
     final String uploadId = "upload-id";
@@ -77,7 +79,7 @@ public class TestS3ActionOverrideForOwnerVerification {
   @Test
   public void testCopyObjectUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
     final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
-    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup);
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, true);
 
     // Trigger CopyObject (PUT with copy header, no upload ID).
     assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
@@ -85,7 +87,31 @@ public class TestS3ActionOverrideForOwnerVerification {
     assertEquals("GetObject", actionAtSourceBucketOwnerLookup.get());
   }
 
-  private static ObjectEndpoint newEndpoint(AtomicReference<String> actionAtSourceBucketOwnerLookup) throws Exception {
+  @Test
+  public void testUploadPartCopyDoesNotSetActionWhenStsDisabled() throws Exception {
+    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
+
+    // Trigger UploadPartCopy (MPU part upload with copy header).
+    final String uploadId = "upload-id";
+    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, 1, uploadId, ""));
+
+    assertNull(actionAtSourceBucketOwnerLookup.get());
+  }
+
+  @Test
+  public void testCopyObjectDoesNotSetActionWhenStsDisabled() throws Exception {
+    final AtomicReference<String> actionAtSourceBucketOwnerLookup = new AtomicReference<>();
+    final ObjectEndpoint endpoint = newEndpoint(actionAtSourceBucketOwnerLookup, false);
+
+    // Trigger CopyObject (PUT with copy header, no upload ID).
+    assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
+
+    assertNull(actionAtSourceBucketOwnerLookup.get());
+  }
+
+  private static ObjectEndpoint newEndpoint(AtomicReference<String> actionAtSourceBucketOwnerLookup,
+      boolean isStsEnabled) throws Exception {
     final HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
@@ -138,6 +164,7 @@ public class TestS3ActionOverrideForOwnerVerification {
         .thenThrow(new OMException("stop-after-owner-check", ResultCodes.KEY_NOT_FOUND));
 
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, isStsEnabled);
     return EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(conf)

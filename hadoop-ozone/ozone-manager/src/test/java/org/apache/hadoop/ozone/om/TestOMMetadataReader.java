@@ -163,6 +163,24 @@ public class TestOMMetadataReader {
   }
 
   @Test
+  public void testCheckAclsDoesNotAttachS3ActionWhenStsFeatureDisabled() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObject")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class), false);
+
+    final RequestContext.Builder contextWithoutS3ActionBuilder = createTestRequestContextBuilder();
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
+  }
+
+  @Test
   public void testCheckAclsLeavesS3ActionUnsetWhenS3AuthThreadLocalNull() throws Exception {
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
     final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
@@ -417,11 +435,17 @@ public class TestOMMetadataReader {
 
   private OmMetadataReader createMetadataReader(IAccessAuthorizer accessAuthorizer, KeyManager keyManager)
       throws IOException {
+    return createMetadataReader(accessAuthorizer, keyManager, true);
+  }
+
+  private OmMetadataReader createMetadataReader(IAccessAuthorizer accessAuthorizer, KeyManager keyManager,
+      boolean isS3StsEnabled) throws IOException {
     final OzoneManager ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
     when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
     when(ozoneManager.getConfiguration()).thenReturn(new OzoneConfiguration());
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    when(ozoneManager.isS3STSEnabled()).thenReturn(isS3StsEnabled);
     final OMPerformanceMetrics perfMetrics = mock(OMPerformanceMetrics.class);
     // OmMetadataReader uses these MutableRate metrics via MetricUtil.captureLatencyNs(...).
     when(perfMetrics.getListKeysResolveBucketLatencyNs()).thenReturn(mock(MutableRate.class));
