@@ -63,6 +63,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -142,11 +143,6 @@ import org.rocksdb.LiveFileMetaData;
  */
 public class TestSnapshotDefragService {
 
-  private enum LiveSstType {
-    DB_GENERATED,
-    PREVIOUSLY_INGESTED
-  }
-
   @Mock
   private OzoneManager ozoneManager;
 
@@ -180,6 +176,11 @@ public class TestSnapshotDefragService {
   private AutoCloseable mocks;
   private Map<String, CodecBuffer> dummyTableValues;
   private Set<CodecBuffer> closeSet = new HashSet<>();
+
+  private enum LiveSstType {
+    DB_GENERATED,
+    PREVIOUSLY_INGESTED
+  }
 
   @BeforeEach
   public void setup() throws IOException {
@@ -766,7 +767,7 @@ public class TestSnapshotDefragService {
       when(deltaFileComputer.getDeltaFiles(eq(previousSnapshotInfo),
           eq(snapshotInfo), eq(ImmutableSet.of(tableName))))
           .thenReturn(ImmutableList.of(Pair.of(deltaFile,
-              new SstFileInfo(deltaFile.getFileName().toString(), key, key,
+              new SstFileInfo(deltaFile.toFile().getName(), key, key,
                   tableName))));
 
       try (MockedConstruction<SstFileSetReader> ignored = mockConstruction(
@@ -786,6 +787,9 @@ public class TestSnapshotDefragService {
 
                 @Override
                 public String next() {
+                  if (!hasNext) {
+                    throw new NoSuchElementException();
+                  }
                   hasNext = false;
                   return key;
                 }
