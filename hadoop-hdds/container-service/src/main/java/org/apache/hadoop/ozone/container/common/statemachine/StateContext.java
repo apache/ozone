@@ -798,10 +798,10 @@ public class StateContext {
       }
       updateTermOfLeaderSCM(command);
       commandQueue.add(command);
+      addCmdStatus(command);
     } finally {
       lock.unlock();
     }
-    this.addCmdStatus(command);
   }
 
   public EnumCounters<SCMCommandProto.Type> getCommandQueueSummary() {

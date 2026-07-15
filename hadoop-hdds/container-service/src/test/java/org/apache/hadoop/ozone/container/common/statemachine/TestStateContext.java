@@ -772,8 +772,28 @@ public class TestStateContext {
     assertEquals(PENDING, status.getStatus());
   }
 
-  private static StateContext createSubject() throws IOException {
+  @Test
+  public void commandQueueFullReportsReplicationFailure() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = new DatanodeConfiguration();
+    dnConf.setCommandQueueLimit(1);
+    conf.setFromObject(dnConf);
+    StateContext ctx = createSubject(conf);
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
+    ctx.addCommand(cmd);
+
+    assertEquals(0, ctx.getCommandQueueSummary().get(SCMCommandProto.Type.replicateContainerCommand));
+    assertEquals(FAILED, ctx.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  private static StateContext createSubject() throws IOException {
+    return createSubject(new OzoneConfiguration());
+  }
+
+  private static StateContext createSubject(OzoneConfiguration conf) throws IOException {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     OzoneContainer o = mock(OzoneContainer.class);
