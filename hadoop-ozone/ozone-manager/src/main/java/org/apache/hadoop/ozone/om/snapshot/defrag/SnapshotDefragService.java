@@ -656,6 +656,7 @@ public class SnapshotDefragService extends BackgroundService
     OmMetadataManagerImpl checkpointMetadataManager = createCheckpoint(checkpointSnapshotInfo,
         COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
     Path checkpointLocation = checkpointMetadataManager.getStore().getDbLocation().toPath();
+    boolean defragSuccessful = false;
     try {
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
       if (LOG.isTraceEnabled()) {
@@ -704,7 +705,13 @@ public class SnapshotDefragService extends BackgroundService
         checkpointMetadataManager = null;
         // Switch the snapshot DB location to the new version.
         previousVersion  = atomicSwitchSnapshotDB(snapshotId, checkpointLocation);
-        omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
+        try {
+          omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
+        } catch (IOException deleteException) {
+          LOG.error("Failed to delete old checkpoint directories for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), deleteException);
+        }
+        defragSuccessful = true;
       } finally {
         snapshotContentLocks.releaseLock();
       }
@@ -718,7 +725,24 @@ public class SnapshotDefragService extends BackgroundService
       }
     } finally {
       if (checkpointMetadataManager != null) {
-        checkpointMetadataManager.close();
+        try {
+          checkpointMetadataManager.close();
+        } catch (IOException closeException) {
+          LOG.error("Failed to close checkpoint metadata manager for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), closeException);
+        }
+      }
+      if (defragSuccessful && checkpointLocation.toFile().exists()) {
+        try {
+          deleteDirectory(checkpointLocation);
+          LOG.info("Cleaned up failed checkpoint directory for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
+        } catch (IOException cleanupException) {
+          LOG.error("Failed to delete checkpoint directory {} for snapshot: {} (ID: {}). " +
+              "Disk space may not be freed. Manual cleanup may be required.",
+              checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), cleanupException);
+          snapshotMetrics.incNumSnapshotDefragFails();
+        }
       }
     }
     return true;
