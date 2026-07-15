@@ -50,15 +50,15 @@ import org.slf4j.LoggerFactory;
  * Utility class, used by integration tests,
  * for getting responses from Recon Endpoints.
  */
-public final class TestReconEndpointUtil {
+public final class ReconEndpointTestUtil {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestReconEndpointUtil.class);
+      LoggerFactory.getLogger(ReconEndpointTestUtil.class);
 
   private static final String CONTAINER_ENDPOINT = "/api/v1/containers";
   private static final String OM_DB_SYNC_ENDPOINT = "/api/v1/triggerdbsync/om";
 
-  private TestReconEndpointUtil() {
+  private ReconEndpointTestUtil() {
   }
 
   public static void triggerReconDbSyncWithOm(

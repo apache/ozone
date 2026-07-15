@@ -56,15 +56,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Helper methods for testing HDDS upgrade finalization in integration tests.
  */
-public final class TestHddsUpgradeUtils {
+public final class HddsUpgradeTestUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestHddsUpgradeUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HddsUpgradeTestUtils.class);
 
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
 
-  private TestHddsUpgradeUtils() { }
+  private HddsUpgradeTestUtils() { }
 
   public static void waitForFinalizationFromClient(
       StorageContainerLocationProtocol scmClient, String clientID)

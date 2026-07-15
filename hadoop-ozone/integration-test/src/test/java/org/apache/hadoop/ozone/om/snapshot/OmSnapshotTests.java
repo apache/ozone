@@ -173,7 +173,7 @@ import org.rocksdb.LiveFileMetaData;
  * Abstract class to test OmSnapshot.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOmSnapshot {
+public abstract class OmSnapshotTests {
   static {
     Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);
   }
@@ -207,7 +207,7 @@ public abstract class TestOmSnapshot {
   private final boolean createLinkedBucket;
   private final Map<String, String> linkedBuckets = new HashMap<>();
 
-  public TestOmSnapshot(BucketLayout newBucketLayout,
+  public OmSnapshotTests(BucketLayout newBucketLayout,
                         boolean newEnableFileSystemPaths,
                         boolean forceFullSnapDiff,
                         boolean disableNativeDiff,

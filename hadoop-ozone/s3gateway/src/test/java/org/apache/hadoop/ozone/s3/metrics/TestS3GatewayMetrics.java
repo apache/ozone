@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.s3.metrics;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.listParts;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putBucketTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -59,6 +60,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
@@ -411,8 +413,9 @@ public class TestS3GatewayMetrics {
   public void testCompleteMultiPartUploadSuccess() throws Exception {
     long oriMetric = metrics.getCompleteMultiPartUploadSuccess();
     String uploadID = initiateMultipartUpload(bucketName, keyName);
+    Part part = uploadPart(keyEndpoint, bucketName, keyName, 1, uploadID, CONTENT);
 
-    completeMultipartUpload(keyEndpoint, bucketName, keyName, uploadID, emptyList());
+    completeMultipartUpload(keyEndpoint, bucketName, keyName, uploadID, singletonList(part));
 
     long curMetric = metrics.getCompleteMultiPartUploadSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -422,8 +425,11 @@ public class TestS3GatewayMetrics {
   public void testCompleteMultiPartUploadFailure() {
     long oriMetric = metrics.getCompleteMultiPartUploadFailure();
 
+    Part part = new Part();
+    part.setPartNumber(1);
+    part.setETag("etag");
     assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
-        () -> completeMultipartUpload(keyEndpoint, bucketName, "key2", "random", emptyList()));
+        () -> completeMultipartUpload(keyEndpoint, bucketName, "key2", "random", singletonList(part)));
 
     long curMetric = metrics.getCompleteMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);

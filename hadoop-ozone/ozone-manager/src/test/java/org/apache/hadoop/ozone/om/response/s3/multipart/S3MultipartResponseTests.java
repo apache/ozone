@@ -291,7 +291,7 @@ public class S3MultipartResponseTests {
     }
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
-        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        multipartKey, openKey, multipartKeyInfo, null, null, keyToDeleteMap,
         openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
@@ -350,7 +350,7 @@ public class S3MultipartResponseTests {
     }
 
     return new S3MultipartUploadCommitPartResponse(omResponse,
-        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        multipartKey, openKey, multipartKeyInfo, null, null, keyToDeleteMap,
         openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
@@ -382,7 +382,7 @@ public class S3MultipartResponseTests {
 
     return new S3MultipartUploadCompleteResponse(omResponse, multipartKey,
         multipartOpenKey, omKeyInfo, allKeyInfoToRemove, getBucketLayout(),
-        omBucketInfo, bucketId);
+        omBucketInfo, bucketId, Collections.emptyList());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -417,7 +417,7 @@ public class S3MultipartResponseTests {
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo,  allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, volumeId, bucketId, null,
-        multipartKeyInfo);
+        multipartKeyInfo, Collections.emptyList());
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
@@ -433,7 +433,7 @@ public class S3MultipartResponseTests {
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
         multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
-        getBucketLayout());
+        getBucketLayout(), Collections.emptyList(), Collections.emptyList());
   }
 
   /**

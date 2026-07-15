@@ -22,9 +22,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Test base for raw Reed-solomon coders.
  */
-public abstract class TestRSRawCoderBase extends TestRawCoderBase {
+public abstract class RSRawCoderTests extends RawCoderTests {
 
-  public TestRSRawCoderBase(
+  public RSRawCoderTests(
       Class<? extends RawErasureCoderFactory> encoderFactoryClass,
       Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
     super(encoderFactoryClass, decoderFactoryClass);

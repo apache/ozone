@@ -126,6 +126,19 @@ wait_for_safemode_exit(){
   execute_commands_in_container ${SCM} "$cmd"
 }
 
+## @description wait until RATIS/THREE pipeline exists (or 180 seconds)
+wait_for_pipeline() {
+  RETRY_ATTEMPTS=60 retry assert_pipeline_exists
+}
+
+## @description check if RATIS/THREE pipeline exists; note: does not kinit
+assert_pipeline_exists() {
+  local cmd="ozone admin pipeline list --state OPEN --filter-by-factor THREE --json | jq -r 'length'"
+  local -i count
+  count=$(execute_commands_in_container ${SCM} "${cmd}")
+  [[ $count -gt 0 ]]
+}
+
 ## @description wait until OM leader is elected (or 120 seconds)
 wait_for_om_leader() {
   if [[ -z "${OM_SERVICE_ID:-}" ]]; then

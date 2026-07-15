@@ -15,29 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
-
-import org.junit.jupiter.api.BeforeAll;
+package org.apache.hadoop.ozone.s3.signature;
 
 /**
- * Base class for Ozone Manager HA tests.
+ * Signals a signature validation failure that AWS reports as 403 AccessDenied
+ * rather than 400 (e.g. an expired or out-of-range pre-signed URL).
  */
-public abstract class TestOzoneManagerHA extends AbstractOzoneManagerHATest {
-
-  @BeforeAll
-  public static void init() throws Exception {
-    initCluster(false);
-  }
-
-  /**
-   * Stop the current leader OM.
-   */
-  protected void stopLeaderOM() {
-    // The omFailoverProxyProvider will point to the current leader OM node.
-    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(getObjectStore());
-
-    // Stop one of the ozone manager, to see when the OM leader changes
-    // multipart upload is happening successfully or not.
-    getCluster().stopOzoneManager(leaderOMNodeId);
+public class AccessDeniedResourceException extends MalformedResourceException {
+  public AccessDeniedResourceException(String resource) {
+    super(resource);
   }
 }

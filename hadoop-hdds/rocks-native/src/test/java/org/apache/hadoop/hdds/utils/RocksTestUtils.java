@@ -31,9 +31,9 @@ import java.util.stream.Collectors;
 /**
  * Class containing test utils.
  */
-public final class TestUtils {
+public final class RocksTestUtils {
 
-  private TestUtils() {
+  private RocksTestUtils() {
   }
 
   public static List<Optional<String>> getTestingBounds(

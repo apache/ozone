@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -326,6 +327,48 @@ public class TestContainerBalancer {
 
     stopBalancer();
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  @Test
+  public void testGetBalancerStatusInfoAfterUserStop() throws Exception {
+    balancerConfiguration.setIterations(10);
+    balancerConfiguration.setTriggerDuEnable(true);
+    conf.setFromObject(balancerConfiguration);
+
+    startBalancer(balancerConfiguration);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
+
+    stopBalancer();
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(statusInfo);
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.name(),
+        statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.getMessage(),
+        statusInfo.getStopMessage());
+    assertNotNull(statusInfo.getStoppedAt());
+    assertFalse(statusInfo.getConfiguration().getShouldRun());
+    assertFalse(containerBalancer.isBalancerRunning());
+  }
+
+  @Test
+  public void testGetBalancerStatusInfoAfterScmStop() throws Exception {
+    balancerConfiguration.setIterations(10);
+    balancerConfiguration.setTriggerDuEnable(true);
+    conf.setFromObject(balancerConfiguration);
+
+    startBalancer(balancerConfiguration);
+    containerBalancer.stop();
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(statusInfo);
+    assertEquals(ContainerBalancerStopReason.SCM_STATE_CHANGE.name(),
+        statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.SCM_STATE_CHANGE.getMessage(),
+        statusInfo.getStopMessage());
+    assertNotNull(statusInfo.getStoppedAt());
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)

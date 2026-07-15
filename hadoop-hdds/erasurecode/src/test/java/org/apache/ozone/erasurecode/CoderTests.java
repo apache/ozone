@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  * coders.
  */
 @SuppressWarnings({"checkstyle:VisibilityModifier", "checkstyle:HiddenField"})
-public abstract class TestCoderBase {
+public abstract class CoderTests {
   private static int fixedDataGenerator = 0;
   protected boolean allowDump = true;
   protected int numDataUnits;

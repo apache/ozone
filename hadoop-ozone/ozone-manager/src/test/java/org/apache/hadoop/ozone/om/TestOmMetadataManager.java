@@ -1319,4 +1319,37 @@ public class TestOmMetadataManager {
 
     assertEquals(keyNames, listedKeys);
   }
+
+  @Test
+  public void testListKeysWithWhitespaceAndNewlinePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    String spaceOnly = " ";
+    String spacePrefixed = " x";
+    String doubleSpacePrefixed = "  y";
+    String newlinePrefixed = "\nbar";
+    String normalKey = "normal";
+
+    List<String> allKeys = Arrays.asList(
+        spaceOnly, spacePrefixed, doubleSpacePrefixed, newlinePrefixed, normalKey);
+    for (int i = 0; i < allKeys.size(); i++) {
+      addKeysToOM(volumeName, bucketName, allKeys.get(i), i);
+    }
+
+    List<String> spacePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, spaceOnly, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList(spaceOnly, doubleSpacePrefixed, spacePrefixed),
+        spacePrefixMatches);
+
+    List<String> newlinePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, "\n", 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Collections.singletonList(newlinePrefixed), newlinePrefixMatches);
+  }
 }
