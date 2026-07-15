@@ -1813,7 +1813,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
-    String bucketNameLocal = uniqueObjectName("bucket");
+    String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     fs.mkdirs(volume);
     assertThrows(OMException.class,
