@@ -187,8 +187,8 @@ public class TestAssumeRoleResponseInfo {
 
     final String toString = response.toString();
     final String expectedString = "AssumeRoleResponseInfo{" + "accessKeyId='" + ACCESS_KEY_ID  +
-        "', secretAccessKey='" + SECRET_ACCESS_KEY + "', sessionToken='" + SESSION_TOKEN +
-        "', expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS + ", assumedRoleId='" + ASSUMED_ROLE_ID + "'}";
+        "', sessionToken='" + SESSION_TOKEN + "', expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS +
+        ", assumedRoleId='" + ASSUMED_ROLE_ID + "'}";
 
     assertNotNull(toString);
     assertEquals(expectedString, toString);

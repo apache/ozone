@@ -80,8 +80,9 @@ public class AssumeRoleResponseInfo {
 
   @Override
   public String toString() {
-    return "AssumeRoleResponseInfo{" + "accessKeyId='" + accessKeyId + "', secretAccessKey='" + secretAccessKey +
-        "', sessionToken='" + sessionToken + "', expirationEpochSeconds=" + expirationEpochSeconds +
+    // Intentionally left off secretAccessKey
+    return "AssumeRoleResponseInfo{" + "accessKeyId='" + accessKeyId + "'" +
+        ", sessionToken='" + sessionToken + "', expirationEpochSeconds=" + expirationEpochSeconds +
         ", assumedRoleId='" + assumedRoleId + "'}";
   }
 
