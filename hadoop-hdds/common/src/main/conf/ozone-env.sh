@@ -173,7 +173,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 
 # Extra Java runtime options for all Ozone server daemons (OM, SCM, DataNode,
-# S3 Gateway, Recon, HttpFS, CSI).  These get appended to OZONE_OPTS for such
+# S3 Gateway, Recon, HttpFS).  These get appended to OZONE_OPTS for such
 # daemons and are a convenient way to apply common options to all of them.
 # export OZONE_SERVER_OPTS=""
 
@@ -325,15 +325,6 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # and therefore may override any similar flags set in OZONE_OPTS
 #
 # export OZONE_HTTPFS_OPTS=""
-
-###
-# CSI server specific parameters
-###
-# Specify the JVM options to be used when starting the CSI server.
-# These options will be appended to the options specified as OZONE_OPTS
-# and therefore may override any similar flags set in OZONE_OPTS
-#
-# export OZONE_CSI_OPTS=""
 
 ###
 # Client and tool command specific parameters

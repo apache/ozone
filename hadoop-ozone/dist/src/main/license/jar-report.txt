@@ -205,7 +205,6 @@ share/ozone/lib/netty-tcnative-boringssl-static.Final-windows-x86_64.jar
 share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
 share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
-share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/netty-transport.Final.jar
@@ -238,7 +237,6 @@ share/ozone/lib/ozone-cli-repair.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-common.jar
-share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
