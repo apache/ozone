@@ -193,6 +193,7 @@ asynchronously. Requires admin privileges. OM should be running for this tool.
       --cf, --column-family=<columnFamilyName>
                            Column family name
       --node-id=<nodeId>   NodeID of the OM for which db needs to be compacted.
+                           Required when OM HA is configured.
       --service-id, --om-service-id=<omServiceId>
                            Ozone Manager Service ID
 ```

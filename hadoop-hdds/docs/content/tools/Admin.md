@@ -195,7 +195,7 @@ works only on OzoneManager HA cluster.
                              complete. The command will return immediately
                              after triggering the task.
       --node-id=<nodeId>   NodeID of the OM to trigger snapshot defragmentation
-                             on.
+                             on. Required when OM HA is configured.
       --service-id, --om-service-id=<serviceID>
                            Ozone Manager Service ID.
   -V, --version            Print version information and exit.
