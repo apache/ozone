@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,7 +121,7 @@ public class IncrementalContainerReportHandler
           } else {
             getLogger().info("Failed to process {}", detailsForLogging, ex);
           }
-        } catch (IOException | InvalidStateTransitionException e) {
+        } catch (IOException e) {
           getLogger().info("Failed to process {}", detailsForLogging, e);
         }
       }

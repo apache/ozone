@@ -94,7 +94,7 @@ import org.junit.jupiter.api.Test;
  * Ozone Manager HA tests where all OMs are running throughout all tests.
  * @see TestOzoneManagerHAWithStoppedNodes
  */
-class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
+class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
   @Test
   void testFileOperationsWithRecursive() throws Exception {

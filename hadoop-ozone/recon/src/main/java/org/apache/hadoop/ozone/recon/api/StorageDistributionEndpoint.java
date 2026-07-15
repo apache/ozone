@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalNamespaceReport;
@@ -76,7 +76,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/storageDistribution")
 @Produces("application/json")
-@AdminOnly
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final NSSummaryEndpoint nsSummaryEndpoint;
@@ -169,18 +168,26 @@ public class StorageDistributionEndpoint {
   @Path("/download")
   public Response downloadDataNodeStorageDistribution() {
 
-    DataNodeMetricsServiceResponse metricsResponse =
-        dataNodeMetricsService.getCollectedMetrics(null);
+    Object metricsResponse = dataNodeMetricsService.getCollectedMetrics(null);
 
-    if (metricsResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+    if (!(metricsResponse instanceof DataNodeMetricsCompleteResponse)) {
       return Response.status(Response.Status.ACCEPTED)
           .entity(metricsResponse)
           .type(MediaType.APPLICATION_JSON)
           .build();
     }
 
+    DataNodeMetricsCompleteResponse completeResponse =
+        (DataNodeMetricsCompleteResponse) metricsResponse;
+
+    if (completeResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+      return Response.status(Response.Status.ACCEPTED)
+          .entity(completeResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
     List<DatanodePendingDeletionMetrics> pendingDeletionMetrics =
-        metricsResponse.getPendingDeletionPerDataNode();
+        completeResponse.getPendingDeletionPerDataNode();
 
     if (pendingDeletionMetrics == null) {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)

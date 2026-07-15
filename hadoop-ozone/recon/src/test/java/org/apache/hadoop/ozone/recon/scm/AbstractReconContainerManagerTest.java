@@ -145,7 +145,7 @@ public class AbstractReconContainerManagerTest {
     ContainerID containerID = ContainerID.valueOf(100L);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -189,7 +189,7 @@ public class AbstractReconContainerManagerTest {
       ContainerID cID = ContainerID.valueOf(i);
       ContainerInfo cInfo =
           new ContainerInfo.Builder()
-              .setContainerID(cID.getId())
+              .setContainerID(cID.getIdForTesting())
               .setNumberOfKeys(10)
               .setPipelineID(pipeline.getId())
               .setReplicationConfig(
@@ -228,7 +228,7 @@ public class AbstractReconContainerManagerTest {
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -246,7 +246,7 @@ public class AbstractReconContainerManagerTest {
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))

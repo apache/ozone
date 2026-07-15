@@ -43,7 +43,7 @@ import org.slf4j.event.Level;
 /**
  * Tests {@link StreamBlockInputStream}.
  */
-public class TestStreamBlockInputStream extends TestInputStreamBase {
+public class TestStreamBlockInputStream extends InputStreamTests {
   private static final Logger LOG = LoggerFactory.getLogger(TestStreamBlockInputStream.class);
 
   {

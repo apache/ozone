@@ -58,7 +58,7 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;

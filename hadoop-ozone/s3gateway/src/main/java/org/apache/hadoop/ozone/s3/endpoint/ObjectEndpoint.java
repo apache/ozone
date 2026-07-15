@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIREC
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
@@ -119,6 +120,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   private static final String BUCKET = "bucket";
   private static final String PATH = "path";
+  // Default Content-Type for objects stored without one, matching S3.
+  private static final String DEFAULT_CONTENT_TYPE = "binary/octet-stream";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpoint.class);
@@ -131,7 +134,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
-        .put(HttpHeaders.CONTENT_TYPE, "response-content-type")
         .put(HttpHeaders.CONTENT_LANGUAGE, "response-content-language")
         .put(HttpHeaders.EXPIRES, "response-expires")
         .put(HttpHeaders.CACHE_CONTROL, "response-cache-control")
@@ -267,6 +269,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
+      putContentType(customMetadata);
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
@@ -461,6 +464,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
 
+      // Content-Type comes from the stored object, not the request header;
+      // response-content-type still overrides it.
+      String contentType = queryParams.getFirst("response-content-type");
+      if (contentType == null) {
+        contentType = contentTypeOf(keyDetails);
+      }
+      responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
+
       for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
         String headerValue = getHeaders().getHeaderString(entry.getKey());
         String queryValue = queryParams.getFirst(entry.getValue());
@@ -495,6 +506,24 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     responseBuilder
         .header(HttpHeaders.LAST_MODIFIED,
             RFC1123Util.FORMAT.format(lastModificationTime));
+  }
+
+  /**
+   * Store the request's Content-Type (preserved by {@link HeaderPreprocessor}
+   * as {@code X-Ozone-Original-Content-Type}) in the key metadata.
+   */
+  private void putContentType(Map<String, String> metadata) {
+    String contentType =
+        getHeaders().getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE);
+    if (contentType != null) {
+      metadata.put(HttpHeaders.CONTENT_TYPE, contentType);
+    }
+  }
+
+  /** Returns the object's stored Content-Type, or the default if absent. */
+  private static String contentTypeOf(OzoneKey key) {
+    String contentType = key.getMetadata().get(HttpHeaders.CONTENT_TYPE);
+    return contentType != null ? contentType : DEFAULT_CONTENT_TYPE;
   }
 
   static void addTagCountIfAny(
@@ -572,7 +601,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
         .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
-        .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
+        .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
     addEntityTagHeader(response, key);
 
@@ -626,20 +655,32 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final long startNanos = context.getStartNanos();
+    S3ConditionalRequest.DeleteCondition deleteCondition = null;
 
     try {
       OzoneVolume volume = context.getVolume();
+      deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
+      if (!deleteCondition.hasIfMatch()) {
+        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
+      } else {
+        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false,
+            deleteCondition.getExpectedETag());
+      }
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
     } catch (OMException ex) {
       getMetrics().updateDeleteKeyFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        if (deleteCondition != null && deleteCondition.hasIfMatch()) {
+          throw newError(PRECOND_FAILED, keyPath, ex);
+        }
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
         return Response.status(Status.NO_CONTENT).build();
+      } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
         // With PREFIX metadata layout, a dir deletion without recursive flag
         // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
@@ -675,6 +716,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
+      putContentType(customMetadata);
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
@@ -718,17 +760,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     final String uploadID = queryParams().get(QueryParams.UPLOAD_ID, "");
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    OzoneVolume volume = getVolume();
-    // Using LinkedHashMap to preserve ordering of parts list.
-    Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
+    // Using LinkedHashMap to preserve ordering of parts list.
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
 
     S3ConditionalRequest.WriteConditions writeConditions =
         S3ConditionalRequest.parseWriteConditions(getHeaders(), key);
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      // Reject an empty part list before contacting OM.
+      if (partList == null || partList.isEmpty()) {
+        throw newError(MALFORMED_XML, key);
+      }
+
+      OzoneVolume volume = getVolume();
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
@@ -766,12 +813,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
-        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
-            "when calling the CompleteMultipartUpload operation: You must " +
-            "specify at least one part");
-        throw os3Exception;
       } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
@@ -1089,6 +1130,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
+        // REPLACE: Content-Type comes from the request, not the source.
+        putContentType(customMetadata);
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +

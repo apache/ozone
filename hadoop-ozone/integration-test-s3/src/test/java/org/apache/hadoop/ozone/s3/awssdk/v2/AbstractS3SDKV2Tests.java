@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -116,10 +117,13 @@ import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketTaggingResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
@@ -127,6 +131,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
@@ -139,6 +144,7 @@ import software.amazon.awssdk.services.s3.model.ListPartsRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest;
@@ -210,20 +216,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     if (s3AsyncClient != null) {
       s3AsyncClient.close();
     }
-  }
-
-  @Test
-  public void listBuckets() throws Exception {
-    final String bucketName = getBucketName();
-    final String expectedOwner = UserGroupInformation.getCurrentUser().getUserName();
-
-    s3Client.createBucket(b -> b.bucket(bucketName));
-
-    ListBucketsResponse syncResponse = s3Client.listBuckets();
-    assertEquals(1, syncResponse.buckets().size());
-    assertEquals(bucketName, syncResponse.buckets().get(0).name());
-    assertEquals(expectedOwner, syncResponse.owner().displayName());
-    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
   }
 
   @Test
@@ -303,6 +295,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("val", tagSet.get(0).value());
     assertEquals("key2", tagSet.get(1).key());
     assertEquals("val2", tagSet.get(1).value());
+  }
+
+  @Test
+  public void testBucketTaggingPutGetDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception noTags = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, noTags.statusCode());
+    assertEquals("NoSuchTagSet", noTags.awsErrorDetails().errorCode());
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("tag-key1").value("tag-value1").build(),
+        Tag.builder().key("tag-key2").value("tag-value2").build());
+    s3Client.putBucketTagging(PutBucketTaggingRequest.builder()
+        .bucket(bucketName)
+        .tagging(Tagging.builder().tagSet(tags).build())
+        .build());
+
+    GetBucketTaggingResponse taggingResult = s3Client.getBucketTagging(
+        GetBucketTaggingRequest.builder().bucket(bucketName).build());
+    Map<String, String> actualTags = taggingResult.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals(2, actualTags.size());
+    assertEquals("tag-value1", actualTags.get("tag-key1"));
+    assertEquals("tag-value2", actualTags.get("tag-key2"));
+
+    s3Client.deleteBucketTagging(DeleteBucketTaggingRequest.builder().bucket(bucketName).build());
+
+    S3Exception afterDelete = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
+    assertEquals(404, afterDelete.statusCode());
+    assertEquals("NoSuchTagSet", afterDelete.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -399,6 +425,73 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .key(keyName)
             .ifMatch("some-etag"),
         RequestBody.fromString("bar2")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("wrong-etag")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+    assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchWildcard() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("*"));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchWildcardMissingKeyFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatch("*")));
 
     assertEquals(412, exception.statusCode());
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
@@ -666,6 +759,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(part1Content, objectBytes.asUtf8String());
   }
 
+  @Test
+  public void testCompleteMultipartUploadWithNoParts() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.completeMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .multipartUpload(CompletedMultipartUpload.builder().build())));
+
+    assertThat(exception.statusCode()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(exception.awsErrorDetails().errorCode()).isEqualTo("MalformedXML");
+  }
+
   @ParameterizedTest
   @MethodSource("wrongContentMD5Provider")
   public void testMultipartUploadPartWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
@@ -924,6 +1039,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   @Test
   public void testListObjectsManyV2() throws Exception {
     testListObjectsMany(true);
+  }
+
+  @Test
+  public void testListObjectsSpecialKeyNamesV2() throws Exception {
+    final String bucketName = getBucketName("special-keys");
+    final String content = "x";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    for (String keyName : S3SDKTestUtils.S3_SPECIAL_KEY_NAMES) {
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+          RequestBody.fromString(content));
+      ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+          b -> b.bucket(bucketName).key(keyName));
+      assertEquals(content, objectBytes.asUtf8String());
+    }
+
+    ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).build());
+    List<String> listedKeys = listObjectsResponse.contents().stream()
+        .map(S3Object::key)
+        .collect(Collectors.toList());
+    assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {
@@ -2704,6 +2841,161 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
+    }
+  }
+
+  /**
+   * Integration tests for ListBuckets (GET / ListAllMyBuckets).
+   */
+  @Nested
+  class ListBucketsTests {
+
+    @Test
+    public void testListBuckets() throws Exception {
+      List<String> bucketNames = new ArrayList<>();
+      for (int i = 0; i <= 5; i++) {
+        String bucketName = getBucketName(String.valueOf(i));
+        s3Client.createBucket(b -> b.bucket(bucketName));
+        bucketNames.add(bucketName);
+      }
+
+      ListBucketsResponse syncResponse = s3Client.listBuckets();
+      List<String> listBucketNames = syncResponse.buckets().stream()
+          .map(Bucket::name)
+          .collect(Collectors.toList());
+
+      assertThat(listBucketNames).containsAll(bucketNames);
+
+      String expectedOwner = UserGroupInformation.getCurrentUser().getShortUserName();
+      assertEquals(expectedOwner, syncResponse.owner().displayName());
+      assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
+    }
+
+    /**
+     * Verifies {@code maxBuckets=1} returns one bucket per page and a continuation token
+     * when more buckets exist.
+     */
+    @Test
+    public void testListBucketsPaginatedMaxBucketsOne() throws Exception {
+      final String bucketA = uniqueObjectName("bucket-a");
+      final String bucketB = uniqueObjectName("bucket-b");
+      s3Client.createBucket(b -> b.bucket(bucketA));
+      s3Client.createBucket(b -> b.bucket(bucketB));
+      try {
+        List<String> found = S3SDKTestUtils.collectBucketsOnePerPage((token, max) -> {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder()
+              .maxBuckets(max);
+          if (token != null) {
+            reqBuilder.continuationToken(token);
+          }
+          ListBucketsResponse page = s3Client.listBuckets(reqBuilder.build());
+          return new S3SDKTestUtils.BucketListPage(
+              page.buckets().stream().map(Bucket::name).collect(Collectors.toList()),
+              page.continuationToken());
+        });
+        List<String> foundTestBuckets = S3SDKTestUtils.filterToExpectedBuckets(
+            found, bucketA, bucketB);
+        assertThat(foundTestBuckets).containsExactlyInAnyOrder(bucketA, bucketB);
+      } finally {
+        s3Client.deleteBucket(b -> b.bucket(bucketA));
+        s3Client.deleteBucket(b -> b.bucket(bucketB));
+      }
+    }
+
+    /**
+     * Verifies pagination: listing buckets page-by-page using {@code maxBuckets}
+     * and the returned continuation token, until all buckets are retrieved.
+     */
+    @Test
+    public void testListBucketsPaginationReturnsAllBuckets() throws Exception {
+      final int totalBuckets = 5;
+      final int pageSize = 2;
+      List<String> created = new ArrayList<>();
+
+      for (int i = 0; i < totalBuckets; i++) {
+        String name = uniqueObjectName("paginated-" + i);
+        s3Client.createBucket(b -> b.bucket(name));
+        created.add(name);
+      }
+
+      try {
+        List<String> retrieved = new ArrayList<>();
+        String continuationToken = null;
+
+        do {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder()
+              .maxBuckets(pageSize);
+          if (continuationToken != null) {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListBucketsResponse response = s3Client.listBuckets(reqBuilder.build());
+
+          response.buckets().stream()
+              .map(Bucket::name)
+              .filter(created::contains)
+              .forEach(retrieved::add);
+
+          continuationToken = response.continuationToken();
+        } while (continuationToken != null);
+
+        assertThat(retrieved).containsExactlyInAnyOrderElementsOf(created);
+      } finally {
+        for (String name : created) {
+          s3Client.deleteBucket(b -> b.bucket(name));
+        }
+      }
+    }
+
+    /**
+     * Verifies that page 2 can use only {@code continuationToken} without {@code maxBuckets}.
+     * The first page uses {@code maxBuckets=1}; subsequent pages send only the token.
+     */
+    @Test
+    public void testListBucketsContinuationTokenWithoutMaxBuckets() throws Exception {
+      List<String> created = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        String name = uniqueObjectName("token-only-" + i);
+        s3Client.createBucket(b -> b.bucket(name));
+        created.add(name);
+      }
+
+      try {
+        List<String> retrieved = new ArrayList<>();
+        String continuationToken = null;
+        boolean firstPage = true;
+
+        do {
+          ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.builder();
+          if (firstPage) {
+            reqBuilder.maxBuckets(1);
+            firstPage = false;
+          } else {
+            reqBuilder.continuationToken(continuationToken);
+          }
+
+          ListBucketsResponse response = s3Client.listBuckets(reqBuilder.build());
+          if (continuationToken == null) {
+            assertEquals(1, response.buckets().size());
+            assertNotNull(response.continuationToken());
+          } else {
+            assertFalse(response.buckets().isEmpty());
+          }
+
+          response.buckets().stream()
+              .map(Bucket::name)
+              .filter(created::contains)
+              .forEach(retrieved::add);
+
+          continuationToken = response.continuationToken();
+        } while (continuationToken != null);
+
+        assertThat(retrieved).containsExactlyInAnyOrderElementsOf(created);
+      } finally {
+        for (String name : created) {
+          s3Client.deleteBucket(b -> b.bucket(name));
+        }
+      }
     }
   }
 

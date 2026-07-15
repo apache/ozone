@@ -1187,6 +1187,8 @@ message FileChecksumProto {
 }
 
 message KeyInfo {
+    // When adding a new field, update SnapshotDiffValueParser.computeKeyInfoCompareSignature()
+    // if it is required for snapshot diff comparisons.
     required string volumeName = 1;
     required string bucketName = 2;
     required string keyName = 3;
@@ -1251,6 +1253,8 @@ message BasicKeyInfo {
 }
 
 message DirectoryInfo {
+    // When adding a new field, update SnapshotDiffValueParser.computeDirectoryInfoCompareSignature()
+    // if it is required for snapshot diff comparisons.
     required string name = 1;
     required uint64 creationTime = 2;
     required uint64 modificationTime = 3;
@@ -2381,6 +2385,8 @@ message BucketQuotaCount {
     required int64 diffUsedBytes = 3;
     required int64 diffUsedNamespace = 4;
     required bool supportOldQuota = 5 [default=false];
+    optional int64 diffSnapshotUsedBytes = 6;
+    optional int64 diffSnapshotUsedNamespace = 7;
 }
 
 message QuotaRepairResponse {

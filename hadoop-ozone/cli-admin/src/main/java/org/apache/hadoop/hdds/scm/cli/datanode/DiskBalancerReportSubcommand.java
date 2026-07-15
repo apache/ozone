@@ -86,7 +86,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display consolidated report for successful nodes
     if (!successNodes.isEmpty() && !reports.isEmpty()) {
-      List<DatanodeDiskBalancerInfoProto> reportList = new ArrayList<>(reports.values());
+      List<DatanodeDiskBalancerInfoProto> reportList = successNodes.stream()
+          .map(reports::get)
+          .collect(toList());
       System.out.println(generateReport(reportList));
     }
   }
@@ -167,7 +169,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         .append(" IdealUsage +/- Threshold are considered balanced.%n")
         .append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n")
         .append("  - Utilization: how much a particular volume is utilized ")
-        .append("effectiveUsedSpace / ozoneCapacity) in %%.%n")
+        .append("(effectiveUsedSpace / ozoneCapacity) in %%.%n")
         .append("  - OzoneCapacity: Ozone data volume capacity.%n")
         .append("  - OzoneAvailable: Ozone data volume available space.%n")
         .append("  - OzoneUsed: Ozone data volume used space.%n")
