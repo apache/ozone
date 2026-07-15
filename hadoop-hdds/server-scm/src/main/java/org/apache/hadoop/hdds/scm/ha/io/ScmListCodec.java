@@ -69,6 +69,12 @@ class ScmListCodec implements ScmCodec<Object> {
           "Missing ListArgument.type: " + argument);
     }
 
+    // Empty list was serialized with type=Object.class.getName() as a sentinel.
+    // Skip element-type resolution — there are no elements to decode.
+    if (argument.getValueCount() == 0) {
+      return new ArrayList<>();
+    }
+
     final Class<?> elementClass = resolver.get(argument.getType());
 
     final ScmCodec<?> elementCodec = ScmCodecFactory.getInstance().getCodec(elementClass);

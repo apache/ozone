@@ -59,18 +59,19 @@ class TestLocalOzoneCluster {
   private Path tempDir;
 
   @Test
-  void startPreparesConfiguration() throws Exception {
+  void prepareConfigurationExposesPreparedPorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     LocalOzoneClusterConfig config =
         LocalOzoneClusterConfig.builder(dataDir).build();
 
     try (LocalOzoneCluster cluster = newCluster(config)) {
-      cluster.start();
+      LocalOzoneCluster.PreparedConfiguration prepared =
+          cluster.prepareConfiguration();
 
       assertTrue(Files.isDirectory(metadataDir(dataDir)));
       assertTrue(Files.isRegularFile(portStateFile(dataDir)));
-      assertTrue(cluster.getScmPort() > 0);
-      assertTrue(cluster.getOmPort() > 0);
+      assertTrue(prepared.getScmPort() > 0);
+      assertTrue(prepared.getOmPort() > 0);
       assertEquals(-1, cluster.getS3gPort());
       assertEquals("", cluster.getS3Endpoint());
     }

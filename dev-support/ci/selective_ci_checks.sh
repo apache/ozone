@@ -266,7 +266,6 @@ function get_count_integration_files() {
         "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/mini-cluster"
-        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
         "src/test/resources"
     )

@@ -62,7 +62,7 @@
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
-    <cyclonedx.version>2.9.1</cyclonedx.version>
+    <cyclonedx.version>2.9.2</cyclonedx.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
     <derby.version>10.14.2.0</derby.version>
@@ -92,7 +92,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <iceberg.version>1.10.1</iceberg.version>
+    <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
     <jackson2-bom.version>2.21.4</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
@@ -112,21 +112,20 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.13</jline.version>
-    <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.22</jnr-posix.version>
+    <jline.version>3.30.15</jline.version>
+    <jnr-constants.version>0.11.0</jnr-constants.version>
+    <jnr-posix.version>3.2.1</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
-    <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.14.4</junit5.version>
-    <kerby.version>1.0.1</kerby.version>
+    <kerby.version>2.1.2</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
-    <log4j2.version>2.26.0</log4j2.version>
+    <log4j2.version>2.26.1</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>3.8.0</maven-assembly-plugin.version>
@@ -159,7 +158,7 @@
     <native.lib.tmp.dir />
     <netty.version>4.1.135.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
-    <nodejs.version>20.18.2</nodejs.version>
+    <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <opentelemetry.version>1.63.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
@@ -194,7 +193,7 @@
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>10.10.1.1</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.18</slf4j.version>
@@ -455,11 +454,6 @@
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.googlecode.json-simple</groupId>
-        <artifactId>json-simple</artifactId>
-        <version>${json-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jcraft</groupId>

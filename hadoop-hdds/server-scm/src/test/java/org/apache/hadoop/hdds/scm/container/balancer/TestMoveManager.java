@@ -80,7 +80,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -90,7 +90,7 @@ import org.mockito.ArgumentCaptor;
  */
 public class TestMoveManager {
 
-  private TestClock clock;
+  private MockClock clock;
   private ReplicationManager replicationManager;
   private ContainerManager containerManager;
   private MoveManager moveManager;
@@ -104,7 +104,7 @@ public class TestMoveManager {
   @BeforeEach
   public void setup() throws ContainerNotFoundException,
       NodeNotFoundException {
-    clock = TestClock.newInstance();
+    clock = MockClock.newInstance();
     containerInfo = ReplicationTestUtil.createContainerInfo(
         RatisReplicationConfig.getInstance(THREE), 1,
         HddsProtos.LifeCycleState.CLOSED);

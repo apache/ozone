@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import static org.apache.hadoop.hdds.scm.container.balancer.TestableCluster.RANDOM;
+import static org.apache.hadoop.hdds.scm.container.balancer.MockCluster.RANDOM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -206,7 +206,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void testCalculationOfUtilization(@Nonnull MockedSCM mockedSCM) {
-    TestableCluster cluster = mockedSCM.getCluster();
+    MockCluster cluster = mockedSCM.getCluster();
     DatanodeUsageInfo[] nodesInCluster = cluster.getNodesInCluster();
     double[] nodeUtilizations = cluster.getNodeUtilizationList();
     assertEquals(nodesInCluster.length, nodeUtilizations.length);
@@ -605,7 +605,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
   }
 
   public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
-    return new MockedSCM(new TestableCluster(datanodeCount, STORAGE_UNIT));
+    return new MockedSCM(new MockCluster(datanodeCount, STORAGE_UNIT));
   }
 
   private static CompletableFuture<MoveManager.MoveResult> genCompletableFuture(int sleepMilSec) {

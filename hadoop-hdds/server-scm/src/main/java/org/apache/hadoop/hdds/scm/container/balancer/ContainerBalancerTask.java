@@ -89,8 +89,6 @@ public class ContainerBalancerTask implements Runnable {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeScheduledForMoveInLatestIteration;
-  // count actual size moved in bytes
-  private long sizeActuallyMovedInLatestIteration;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
   private Set<String> excludeNodes;
@@ -120,6 +118,10 @@ public class ContainerBalancerTask implements Runnable {
   private Queue<ContainerBalancerTaskIterationStatusInfo> iterationsStatistic;
   private OffsetDateTime currentIterationStarted;
   private AtomicBoolean isCurrentIterationInProgress = new AtomicBoolean(false);
+  private volatile String stopReason;
+  private volatile String stopMessage;
+  private volatile OffsetDateTime stoppedAt;
+  private volatile String lastInitializationFailureDetail;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -190,8 +192,17 @@ public class ContainerBalancerTask implements Runnable {
       balance();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
+      recordStopReason(ContainerBalancerStopReason.ERROR,
+          ContainerBalancerStopReason.exceptionDetails(e));
     } finally {
       synchronized (this) {
+        finalizeInProgressIteration();
+        if (stoppedAt == null) {
+          stoppedAt = now();
+        }
+        if (stopReason == null) {
+          recordStopReason(ContainerBalancerStopReason.UNKNOWN);
+        }
         taskStatus = Status.STOPPED;
       }
     }
@@ -264,8 +275,9 @@ public class ContainerBalancerTask implements Runnable {
           return;
         }
         // otherwise, try to stop balancer
-        tryStopWithSaveConfiguration("Could not initialize " +
-            "ContainerBalancer's iteration number " + i);
+        isCurrentIterationInProgress.compareAndSet(true, false);
+        tryStopWithSaveConfiguration(ContainerBalancerStopReason.INITIALIZATION_FAILED,
+            " iteration number " + (i + 1) + ", " + lastInitializationFailureDetail);
         return;
       }
 
@@ -286,7 +298,7 @@ public class ContainerBalancerTask implements Runnable {
       // if no new move option is generated, it means the cluster cannot be
       // balanced anymore; so just stop balancer
       if (currentIterationResult == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        tryStopWithSaveConfiguration(currentIterationResult.toString());
+        tryStopWithSaveConfiguration(ContainerBalancerStopReason.CAN_NOT_BALANCE_ANY_MORE);
         return;
       }
 
@@ -319,7 +331,7 @@ public class ContainerBalancerTask implements Runnable {
       }
     }
     
-    tryStopWithSaveConfiguration("Completed all iterations.");
+    tryStopWithSaveConfiguration(ContainerBalancerStopReason.COMPLETED_ALL_ITERATIONS);
   }
 
   private ContainerBalancerTaskIterationStatusInfo getIterationStatistic(Integer iterationNumber,
@@ -338,29 +350,18 @@ public class ContainerBalancerTask implements Runnable {
     ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
 
     DataMoveInfo dataMoveInfo =
-        getDataMoveInfo(currentIterationResultName, sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
+        getDataMoveInfo(sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
     return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
   }
 
-  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<DatanodeID, Long> sizeEnteringDataToNodes,
+  private DataMoveInfo getDataMoveInfo(Map<DatanodeID, Long> sizeEnteringDataToNodes,
                                        Map<DatanodeID, Long> sizeLeavingDataFromNodes) {
-    if (currentIterationResultName == null) {
-      // For unfinished iteration
-      return new DataMoveInfo(
-          getSizeScheduledForMoveInLatestIteration(),
-          sizeActuallyMovedInLatestIteration,
-          sizeEnteringDataToNodes,
-          sizeLeavingDataFromNodes
-      );
-    } else {
-      // For finished iteration
-      return new DataMoveInfo(
-          getSizeScheduledForMoveInLatestIteration(),
-          metrics.getDataSizeMovedInLatestIteration(),
-          sizeEnteringDataToNodes,
-          sizeLeavingDataFromNodes
-      );
-    }
+    return new DataMoveInfo(
+        getSizeScheduledForMoveInLatestIteration(),
+        metrics.getDataSizeMovedInLatestIteration(),
+        sizeEnteringDataToNodes,
+        sizeLeavingDataFromNodes
+    );
   }
 
   private Map<DatanodeID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
@@ -417,19 +418,86 @@ public class ContainerBalancerTask implements Runnable {
   /**
    * Logs the reason for stop and save configuration and stop the task.
    * 
-   * @param stopReason a string specifying the reason for stop
+   * @param reason stop reason
    */
-  private void tryStopWithSaveConfiguration(String stopReason) {
+  private void tryStopWithSaveConfiguration(ContainerBalancerStopReason reason) {
+    tryStopWithSaveConfiguration(reason, null);
+  }
+
+  /**
+   * Logs the reason for stop and save configuration and stop the task.
+   *
+   * @param reason stable stop reason code
+   * @param details optional details appended to the human-readable message
+   */
+  private void tryStopWithSaveConfiguration(ContainerBalancerStopReason reason, String details) {
     synchronized (this) {
       try {
-        LOG.info("Save Configuration for stopping. Reason: {}", stopReason);
         saveConfiguration(config, false, 0);
+        recordStopReason(reason, details);
+        LOG.info("Save Configuration for stopping. Reason: {}, Message: {}",
+            reason.name(), stopMessage);
         stop();
       } catch (IOException | TimeoutException e) {
+        recordStopReason(reason, details);
         LOG.warn("Save configuration failed. Reason for " +
-            "stopping: {}", stopReason, e);
+                "stopping: {}, Message: {}", reason.name(), stopMessage, e);
       }
     }
+  }
+
+  /**
+   * Records the reason why the balancer task is stopping.
+   *
+   * @param reason stop reason
+   */
+  public void recordStopReason(ContainerBalancerStopReason reason) {
+    recordStopReason(reason, null);
+  }
+
+  /**
+   * Records the reason why the balancer task is stopping.
+   *
+   * @param reason stop reason
+   * @param details optional details appended to the message
+   */
+  public void recordStopReason(ContainerBalancerStopReason reason, String details) {
+    synchronized (this) {
+      if (stopReason == null) {
+        stopReason = reason.name();
+        stopMessage = reason.formatMessage(details);
+      }
+    }
+  }
+
+  private void finalizeInProgressIteration() {
+    if (!isCurrentIterationInProgress.get()) {
+      return;
+    }
+    List<ContainerBalancerTaskIterationStatusInfo> resultList = new ArrayList<>(iterationsStatistic);
+    int lastIterationNumber = resultList.stream()
+        .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+        .max()
+        .orElse(0);
+    long iterationDuration = getCurrentIterationDuration();
+    iterationsStatistic.offer(
+        getIterationStatistic(
+            lastIterationNumber + 1,
+            IterationResult.ITERATION_INTERRUPTED,
+            iterationDuration));
+    isCurrentIterationInProgress.set(false);
+  }
+
+  public String getStopReason() {
+    return stopReason;
+  }
+
+  public String getStopMessage() {
+    return stopMessage;
+  }
+
+  public OffsetDateTime getStoppedAt() {
+    return stoppedAt;
   }
 
   private void saveConfiguration(ContainerBalancerConfiguration configuration,
@@ -454,7 +522,9 @@ public class ContainerBalancerTask implements Runnable {
    * @return true if successfully initialized, otherwise false.
    */
   private boolean initializeIteration() {
+    lastInitializationFailureDetail = null;
     if (!isValidSCMState()) {
+      lastInitializationFailureDetail = ContainerBalancerStopReason.INIT_SCM_NOT_READY;
       return false;
     }
     // sorted list in order from most to least used
@@ -463,6 +533,7 @@ public class ContainerBalancerTask implements Runnable {
     if (datanodeUsageInfos.isEmpty()) {
       LOG.warn("Received an empty list of datanodes from Node Manager when " +
           "trying to identify which nodes to balance");
+      lastInitializationFailureDetail = ContainerBalancerStopReason.INIT_EMPTY_DATANODE_LIST;
       return false;
     }
 
@@ -540,6 +611,7 @@ public class ContainerBalancerTask implements Runnable {
 
     if (overUtilizedNodes.isEmpty() && underUtilizedNodes.isEmpty()) {
       LOG.info("Did not find any unbalanced Datanodes.");
+      lastInitializationFailureDetail = ContainerBalancerStopReason.INIT_NO_UNBALANCED_DATANODES;
       return false;
     }
 
@@ -743,9 +815,8 @@ public class ContainerBalancerTask implements Runnable {
 
     metrics.incrementNumContainerMovesTimeout(metrics.getNumContainerMovesTimeoutInLatestIteration());
 
-    metrics.incrementDataSizeMovedGBInLatestIteration(sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
-
-    metrics.incrementDataSizeMovedInLatestIteration(sizeActuallyMovedInLatestIteration);
+    long bytesMovedInLatestIteration = metrics.getDataSizeMovedInLatestIteration();
+    metrics.incrementDataSizeMovedGBInLatestIteration(bytesMovedInLatestIteration / OzoneConsts.GB);
 
     metrics.incrementDataSizeMovedGB(metrics.getDataSizeMovedGBInLatestIteration());
 
@@ -754,8 +825,8 @@ public class ContainerBalancerTask implements Runnable {
     LOG.info("Iteration Summary. Number of Datanodes involved: {}. Size " +
             "moved: {} ({} Bytes). Number of Container moves completed: {}.",
         countDatanodesInvolvedPerIteration,
-        byteDesc(sizeActuallyMovedInLatestIteration),
-        sizeActuallyMovedInLatestIteration,
+        byteDesc(bytesMovedInLatestIteration),
+        bytesMovedInLatestIteration,
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
@@ -943,8 +1014,7 @@ public class ContainerBalancerTask implements Runnable {
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
-            sizeActuallyMovedInLatestIteration +=
-                containerInfo.getUsedBytes();
+            metrics.incrementDataSizeMovedInLatestIteration(containerInfo.getUsedBytes());
             LOG.debug("Container move completed for container {} from " +
                     "source {} to target {}", containerID, source,
                 moveSelection.getTargetNode());
@@ -1156,7 +1226,6 @@ public class ContainerBalancerTask implements Runnable {
     this.selectedTargets.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeScheduledForMoveInLatestIteration = 0;
-    this.sizeActuallyMovedInLatestIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetDataSizeMovedInLatestIteration();
     metrics.resetNumContainerMovesScheduledInLatestIteration();

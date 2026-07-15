@@ -30,14 +30,30 @@ public class ContainerBalancerStatusInfo {
   private final OffsetDateTime startedAt;
   private final HddsProtos.ContainerBalancerConfigurationProto  configuration;
   private final List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo;
+  private final OffsetDateTime stoppedAt;
+  private final String stopReason;
+  private final String stopMessage;
 
   public ContainerBalancerStatusInfo(
           OffsetDateTime startedAt,
           HddsProtos.ContainerBalancerConfigurationProto configuration,
           List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo) {
+    this(startedAt, configuration, iterationsStatusInfo, null, null, null);
+  }
+
+  public ContainerBalancerStatusInfo(
+          OffsetDateTime startedAt,
+          HddsProtos.ContainerBalancerConfigurationProto configuration,
+          List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo,
+          OffsetDateTime stoppedAt,
+          String stopReason,
+          String stopMessage) {
     this.startedAt = startedAt;
     this.configuration = configuration;
     this.iterationsStatusInfo = iterationsStatusInfo;
+    this.stoppedAt = stoppedAt;
+    this.stopReason = stopReason;
+    this.stopMessage = stopMessage;
   }
 
   public OffsetDateTime getStartedAt() {
@@ -52,12 +68,25 @@ public class ContainerBalancerStatusInfo {
     return iterationsStatusInfo;
   }
 
+  public OffsetDateTime getStoppedAt() {
+    return stoppedAt;
+  }
+
+  public String getStopReason() {
+    return stopReason;
+  }
+
+  public String getStopMessage() {
+    return stopMessage;
+  }
+
   /**
    * Converts an instance into a protobuf-compatible object.
    * @return proto representation
    */
   public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto toProto() {
-    return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto
+    StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto.Builder builder =
+        StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto
         .newBuilder()
         .setStartedAt(getStartedAt().toEpochSecond())
         .setConfiguration(getConfiguration())
@@ -66,6 +95,16 @@ public class ContainerBalancerStatusInfo {
                 .stream()
                 .map(ContainerBalancerTaskIterationStatusInfo::toProto)
                 .collect(Collectors.toList())
-        ).build();
+        );
+    if (stoppedAt != null) {
+      builder.setStoppedAt(stoppedAt.toEpochSecond());
+    }
+    if (stopReason != null) {
+      builder.setStopReason(stopReason);
+    }
+    if (stopMessage != null) {
+      builder.setStopMessage(stopMessage);
+    }
+    return builder.build();
   }
 }
