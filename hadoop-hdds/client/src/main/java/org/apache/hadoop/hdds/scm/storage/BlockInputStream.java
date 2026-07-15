@@ -110,7 +110,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private BlockData blockData;
 
-  private Pipeline currentPipeline;
+  private Pipeline failedPipeline;
 
   private ReentrantLock lock = new ReentrantLock();
 
@@ -226,11 +226,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private void refreshBlockInfoForPositionRead(IOException cause, Pipeline pipeline) throws IOException {
     lock.lock();
     try {
-      if (currentPipeline == pipeline) {
+      if (failedPipeline != pipeline) {
         refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
-        if (pipelineRef.get() != currentPipeline) {
-          currentPipeline = pipelineRef.get();
-        }
+        failedPipeline = pipeline;
       }
 
     } finally {
@@ -662,7 +660,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
           is.releaseClient();
         }
       }
-      refreshBlockInfoForPositionRead(cause);
+      refreshBlockInfoForPositionRead(cause, pipeline);
     } finally {
       lock.unlock();
     }
