@@ -32,7 +32,6 @@ class TestOzoneContractFSO extends AbstractOzoneContractTest {
   @Override
   protected OzoneConfiguration createOzoneConfig() {
     OzoneConfiguration conf = super.createOzoneConfig();
-    conf.setBoolean("ozone.client.stream.readblock.enable", true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, FILE_SYSTEM_OPTIMIZED.name());
     return conf;
   }
