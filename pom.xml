@@ -43,6 +43,7 @@
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
+    <byte-buddy.version>1.18.11</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -641,6 +642,16 @@
             <artifactId>log4j</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>${byte-buddy.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-agent</artifactId>
+        <version>${byte-buddy.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
