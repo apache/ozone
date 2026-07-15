@@ -92,7 +92,7 @@ import org.slf4j.LoggerFactory;
  * @see TestOzoneManagerHAWithAllRunning
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
+public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
 

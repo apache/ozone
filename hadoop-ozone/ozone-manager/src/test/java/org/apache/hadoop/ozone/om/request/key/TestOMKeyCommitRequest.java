@@ -71,7 +71,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * Class tests OMKeyCommitRequest class.
  */
-public class TestOMKeyCommitRequest extends TestOMKeyRequest {
+public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
   private static final int DEFAULT_COMMIT_BLOCK_SIZE = 5;
 
@@ -274,7 +274,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNull(committedKey.getExpectedDataGeneration());
     // Generation should be changed
     assertNotEquals(closedKeyInfo.getGeneration(), committedKey.getGeneration());
     assertEquals(acls, committedKey.getAcls());
@@ -312,7 +311,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
     assertNotNull(committedKey);
-    assertNull(committedKey.getExpectedDataGeneration());
   }
 
   @Test

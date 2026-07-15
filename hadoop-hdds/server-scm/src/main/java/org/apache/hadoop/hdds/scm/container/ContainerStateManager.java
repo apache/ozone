@@ -104,13 +104,14 @@ public interface ContainerStateManager extends SCMHandler {
   boolean contains(ContainerID containerID);
 
   /**
-   * Get {@link ContainerID}s for the given state.
+   * Get {@link ContainerID}s for the given optional lifeCycleState and healthState.
    *
    * @param start the start {@link ContainerID} (inclusive)
    * @param count the size limit
    * @return a list of {@link ContainerID};
    */
-  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count);
+  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState, 
+       ContainerID start, int count);
 
   /**
    * Get {@link ContainerInfo}s.

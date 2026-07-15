@@ -24,7 +24,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.recon.TestReconEndpointUtil.getReconWebAddress;
+import static org.apache.hadoop.ozone.recon.ReconEndpointTestUtil.getReconWebAddress;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -215,7 +215,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(STORAGE_DIST_ENDPOINT);
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       StorageCapacityDistributionResponse storageResponse =
           MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
 
@@ -279,7 +279,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=om");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       Map<String, Number> pendingDeletionMap = MAPPER.readValue(response, Map.class);
       assertEquals(300L, pendingDeletionMap.get("totalSize").longValue());
       assertEquals(300L, pendingDeletionMap.get("pendingDirectorySize").longValue() +
@@ -295,7 +295,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     try {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=scm");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       ScmPendingDeletion pendingDeletion = MAPPER.readValue(response, ScmPendingDeletion.class);
       assertEquals(300, pendingDeletion.getTotalReplicatedBlockSize());
       assertEquals(100, pendingDeletion.getTotalBlocksize());
@@ -312,7 +312,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       DataNodeMetricsCompleteResponse pendingDeletion =
           MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
@@ -335,7 +335,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       DataNodeMetricsCompleteResponse pendingDeletion =
           MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
@@ -357,7 +357,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     try {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       DataNodeMetricsCompleteResponse pendingDeletion =
           MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
