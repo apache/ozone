@@ -281,7 +281,7 @@ public class ContainerReplicaPendingOps {
               }
               decrementCounter(op.getOpType(), op.getReplicaIndex());
               if (op.getCommand() != null) {
-                commandIdToContainer.remove(op.getCommand().getId());
+                removeCommandIndexIfUnused(op.getCommand().getId(), ops);
               }
             }
             expiredOps.add(op);
@@ -449,7 +449,7 @@ public class ContainerReplicaPendingOps {
             completedOps.add(op);
             iterator.remove();
             if (op.getCommand() != null) {
-              commandIdToContainer.remove(op.getCommand().getId());
+              removeCommandIndexIfUnused(op.getCommand().getId(), ops);
             }
             if (opType == ADD) {
               containerSizeScheduled.computeIfPresent(target.getID(), (k, v) -> {
@@ -475,6 +475,16 @@ public class ContainerReplicaPendingOps {
       notifySubscribers(completedOps, containerID, false);
     }
     return found;
+  }
+
+  private void removeCommandIndexIfUnused(long commandId,
+      List<ContainerReplicaOp> ops) {
+    for (ContainerReplicaOp op : ops) {
+      if (op.getCommand() != null && op.getCommand().getId() == commandId) {
+        return;
+      }
+    }
+    commandIdToContainer.remove(commandId);
   }
 
   /**
