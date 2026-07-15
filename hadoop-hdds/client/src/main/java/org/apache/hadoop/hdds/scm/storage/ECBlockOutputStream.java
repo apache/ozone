@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_CREATABLE_KEY;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -60,7 +59,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 public class ECBlockOutputStream extends BlockOutputStream {
 
   private final DatanodeDetails datanodeDetails;
-  private final boolean denyContainerAutoCreate;
+  private final boolean containerAutoCreate;
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       currentChunkRspFuture = null;
 
@@ -87,7 +86,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
       Supplier<ExecutorService> executorServiceSupplier
   ) throws IOException {
     this(blockID, xceiverClientManager, pipeline, bufferPool, config, token, clientMetrics,
-        streamBufferArgs, executorServiceSupplier, false);
+        streamBufferArgs, executorServiceSupplier, true);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -100,31 +99,18 @@ public class ECBlockOutputStream extends BlockOutputStream {
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier,
-      boolean denyContainerAutoCreate
+      boolean containerAutoCreate
   ) throws IOException {
     super(blockID, -1, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
-    this.denyContainerAutoCreate = denyContainerAutoCreate;
-    if (denyContainerAutoCreate) {
-      getContainerBlockData().addMetadata(containerCreatableFalseKv());
-    }
+    this.containerAutoCreate = containerAutoCreate;
   }
 
   @Override
-  protected ChunkInfo.Builder decorateChunkInfo(ChunkInfo.Builder builder) {
-    if (!denyContainerAutoCreate) {
-      return builder;
-    }
-    return builder.addMetadata(containerCreatableFalseKv());
-  }
-
-  private static ContainerProtos.KeyValue containerCreatableFalseKv() {
-    return ContainerProtos.KeyValue.newBuilder()
-        .setKey(CONTAINER_CREATABLE_KEY)
-        .setValue(OzoneConsts.CONTAINER_CREATABLE)
-        .build();
+  protected boolean containerAutoCreate() {
+    return containerAutoCreate;
   }
 
   @Override
@@ -309,7 +295,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
-          putBlockAsync(getXceiverClient(), blockData, close, getTokenString());
+          putBlockAsync(getXceiverClient(), blockData, close, getTokenString(), containerAutoCreate());
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {

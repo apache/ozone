@@ -81,6 +81,12 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
+      Long deadline = containerSet.getRecoveringContainerMap().get(containerID);
+      if (deadline != null && containerSet.getCurrentTime() < deadline) {
+        LOG.debug("Skipping stale recovering scrub for container {} - deadline extended",
+            containerID);
+        return new BackgroundTaskResult.EmptyTaskResult();
+      }
       Container con = containerSet.getContainer(containerID);
       if (null != con) {
         con.markContainerUnhealthy();

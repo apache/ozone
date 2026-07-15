@@ -232,7 +232,7 @@ public class ECReconstructionCoordinator implements Closeable {
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
         blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
-        true);
+        false);
   }
 
   @VisibleForTesting

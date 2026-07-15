@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -733,13 +732,9 @@ public class TestHddsDispatcher {
 
   private static ContainerCommandRequestProto withCreatableFalse(
       ContainerCommandRequestProto writeChunk) {
-    WriteChunkRequestProto wc = writeChunk.getWriteChunk();
-    ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo.newBuilder(wc.getChunkData())
-        .addMetadata(ContainerUtils.containerCreatableFalseKv())
-        .build();
     return ContainerCommandRequestProto.newBuilder(writeChunk)
-        .setWriteChunk(WriteChunkRequestProto.newBuilder(wc)
-            .setChunkData(chunk)
+        .setWriteChunk(writeChunk.getWriteChunk().toBuilder()
+            .setContainerAutoCreate(false)
             .build())
         .build();
   }
@@ -765,13 +760,9 @@ public class TestHddsDispatcher {
 
   private static ContainerCommandRequestProto withCreatableFalsePutBlock(
       ContainerCommandRequestProto putBlock) {
-    ContainerProtos.PutBlockRequestProto pb = putBlock.getPutBlock();
-    ContainerProtos.BlockData blockData = ContainerProtos.BlockData.newBuilder(pb.getBlockData())
-        .addMetadata(ContainerUtils.containerCreatableFalseKv())
-        .build();
     return ContainerCommandRequestProto.newBuilder(putBlock)
-        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder(pb)
-            .setBlockData(blockData)
+        .setPutBlock(putBlock.getPutBlock().toBuilder()
+            .setContainerAutoCreate(false)
             .build())
         .build();
   }

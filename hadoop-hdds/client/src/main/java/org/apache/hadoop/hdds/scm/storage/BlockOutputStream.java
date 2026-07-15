@@ -597,7 +597,7 @@ public class BlockOutputStream extends OutputStream {
 
       // if block is full, send the eof
       boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
-      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -907,11 +907,11 @@ public class BlockOutputStream extends OutputStream {
     ChecksumData checksumData = checksum.computeChecksum(chunk, false);
     // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
     // current impl does not support caching both
-    ChunkInfo chunkInfo = decorateChunkInfo(ChunkInfo.newBuilder()
+    ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
         .setLen(effectiveChunkSize)
-        .setChecksumData(checksumData.getProtoBufMessage()))
+        .setChecksumData(checksumData.getProtoBufMessage())
         .build();
 
     long flushPos = totalWriteChunkLength;
@@ -964,7 +964,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {
@@ -1148,11 +1148,11 @@ public class BlockOutputStream extends OutputStream {
     ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer, true);
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
-    ChunkInfo.Builder revisedChunkInfo = decorateChunkInfo(ChunkInfo.newBuilder()
+    ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + chunkID)
         .setOffset(lastPartialChunkOffset)
         .setLen(revisedChunkSize)
-        .setChecksumData(revisedChecksumData.getProtoBufMessage()));
+        .setChecksumData(revisedChecksumData.getProtoBufMessage());
     // if full chunk
     if (revisedChunkSize == config.getStreamBufferSize()) {
       revisedChunkInfo.addMetadata(FULL_CHUNK_KV);
@@ -1161,10 +1161,15 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Subclasses may add chunk metadata (e.g. EC reconstruction write flags).
+   * @return true when the DataNode may auto-create a missing container for this write.
    */
-  protected ChunkInfo.Builder decorateChunkInfo(ChunkInfo.Builder builder) {
-    return builder;
+  protected boolean containerAutoCreate() {
+    return true;
+  }
+
+  @VisibleForTesting
+  public boolean isContainerAutoCreate() {
+    return containerAutoCreate();
   }
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {
