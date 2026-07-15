@@ -1826,7 +1826,7 @@ public class TestReplicationManager {
   private DatanodeInfo mockDatanodeWithApparentVersion(
       DatanodeDetails dn, HDDSVersion version) {
     DatanodeInfo info = mock(DatanodeInfo.class);
-    when(info.getApparentHddsVersion()).thenReturn(version);
+    when(info.getLastKnownApparentVersion()).thenReturn(version);
     when(nodeManager.getDatanodeInfo(dn)).thenReturn(info);
     return info;
   }

@@ -80,4 +80,26 @@ public interface ComponentVersion {
   default Optional<? extends UpgradeAction> action() {
     return Optional.empty();
   }
+
+  /**
+   * Returns the version with the lowest feature set among the given versions,
+   * so callers can pick a version that is mutually supported by all of them.
+   * Comparison is done through {@link #isSupportedBy}, which respects the
+   * negative/unknown-future-version convention, rather than comparing the
+   * opaque {@link #serialize()} values directly.
+   *
+   * @throws IllegalArgumentException if no versions are provided.
+   */
+  static ComponentVersion min(ComponentVersion... versions) {
+    if (versions.length == 0) {
+      throw new IllegalArgumentException("At least one version is required.");
+    }
+    ComponentVersion lowest = versions[0];
+    for (int i = 1; i < versions.length; i++) {
+      if (versions[i].isSupportedBy(lowest)) {
+        lowest = versions[i];
+      }
+    }
+    return lowest;
+  }
 }

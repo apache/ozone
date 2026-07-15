@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.junit.jupiter.api.Test;
 
@@ -36,17 +37,34 @@ public class TestReplicateContainerCommand {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(1L, target,
-            HDDSVersion.STREAM_BLOCK_SUPPORT);
+        ReplicateContainerCommand.toTarget(1L, target, HDDSVersion.ZDU);
 
     ReplicateContainerCommandProto proto = cmd.getProto();
     ReplicateContainerCommand deserialized =
         ReplicateContainerCommand.getFromProtobuf(proto);
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
-        deserialized.getApparentVersion());
+    assertEquals(HDDSVersion.ZDU, deserialized.getApparentVersion());
     assertEquals(target.getUuid(),
         deserialized.getTargetDatanode().getUuid());
+  }
+
+  @Test
+  public void testLayoutFeatureApparentVersionRoundTrip() {
+    // Pre-ZDU datanodes report a layout feature as their apparent version.
+    // The type must survive serialization rather than being erased to an
+    // HDDSVersion.
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, target,
+            HDDSLayoutFeature.HBASE_SUPPORT);
+
+    ReplicateContainerCommandProto proto = cmd.getProto();
+    ReplicateContainerCommand deserialized =
+        ReplicateContainerCommand.getFromProtobuf(proto);
+
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
+        deserialized.getApparentVersion());
   }
 
   @Test

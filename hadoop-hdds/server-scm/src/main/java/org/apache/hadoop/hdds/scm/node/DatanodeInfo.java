@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -158,33 +157,6 @@ public class DatanodeInfo extends DatanodeDetails {
     } finally {
       lock.readLock().unlock();
     }
-  }
-
-  /**
-   * Returns the apparent version last reported by this datanode as
-   * an {@link HDDSVersion}. SCM uses this as the version datanodes should follow
-   * so that every node involved in an operation agrees on a mutually-supported
-   * version.
-   *
-   * @throws IllegalStateException if the datanode reported a version newer than
-   *     this SCM recognizes. SCM must be upgraded before datanodes, so a newer
-   *     datanode is illegal and should have been fenced out of the cluster.
-   */
-  public HDDSVersion getApparentHddsVersion() {
-    ComponentVersion apparentVersion = getLastKnownApparentVersion();
-    if (apparentVersion == null) {
-      // Datanodes are expected to report their version on every heartbeat.
-      // Warn rather than silently defaulting forever if reporting is broken.
-      LOG.warn("Datanode {} has no reported apparent version; falling back " +
-          "to {}.", this, HDDSVersion.DEFAULT_VERSION);
-      return HDDSVersion.DEFAULT_VERSION;
-    }
-    if (apparentVersion == HDDSVersion.UNKNOWN_VERSION) {
-      throw new IllegalStateException("Datanode " + this + " reported an " +
-          "apparent version newer than SCM recognizes. SCM must be upgraded " +
-          "before datanodes.");
-    }
-    return HDDSVersion.deserialize(apparentVersion.serialize());
   }
 
   /**

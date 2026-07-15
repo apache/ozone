@@ -22,6 +22,7 @@ import static java.util.Collections.emptyList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 
 /**
  * SCM command to request replication of a container.
@@ -43,7 +45,7 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
-  private HDDSVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
+  private ComponentVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
 
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -51,7 +53,7 @@ public final class ReplicateContainerCommand
   }
 
   public static ReplicateContainerCommand toTarget(long containerID,
-      DatanodeDetails target, HDDSVersion apparentVersion) {
+      DatanodeDetails target, ComponentVersion apparentVersion) {
     ReplicateContainerCommand cmd =
         new ReplicateContainerCommand(containerID, emptyList(), target);
     cmd.apparentVersion = apparentVersion;
@@ -95,7 +97,7 @@ public final class ReplicateContainerCommand
    *     replication. SCM computes this as the lowest apparent version among the
    *     nodes involved.
    */
-  public HDDSVersion getApparentVersion() {
+  public ComponentVersion getApparentVersion() {
     return apparentVersion;
   }
 
@@ -150,8 +152,8 @@ public final class ReplicateContainerCommand
       cmd.setPriority(protoMessage.getPriority());
     }
     if (protoMessage.hasApparentVersion()) {
-      cmd.apparentVersion =
-          HDDSVersion.deserialize(protoMessage.getApparentVersion());
+      cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+          protoMessage.getApparentVersion());
     }
     return cmd;
   }

@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -199,7 +198,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   /**
-   * Returns the lowest apparent (finalized) version among the given datanodes,
+   * Returns the lowest apparent version among the given datanodes,
    * so every node involved in an operation uses the same, mutually-supported
    * version.
    *
@@ -207,20 +206,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    *     callers must not proceed with an operation involving a node SCM does
    *     not know about.
    */
-  default HDDSVersion getLowestApparentVersion(DatanodeDetails... nodes)
+  default ComponentVersion getLowestApparentVersion(DatanodeDetails... nodes)
       throws NodeNotFoundException {
-    HDDSVersion lowest = HDDSVersion.SOFTWARE_VERSION;
-    for (DatanodeDetails dn : nodes) {
-      DatanodeInfo info = getDatanodeInfo(dn);
+    ComponentVersion[] versions = new ComponentVersion[nodes.length];
+    for (int i = 0; i < nodes.length; i++) {
+      DatanodeInfo info = getDatanodeInfo(nodes[i]);
       if (info == null) {
-        throw new NodeNotFoundException(dn.getID());
+        throw new NodeNotFoundException(nodes[i].getID());
       }
-      HDDSVersion version = info.getApparentHddsVersion();
-      if (version.serialize() < lowest.serialize()) {
-        lowest = version;
-      }
+      versions[i] = info.getLastKnownApparentVersion();
     }
-    return lowest;
+    return ComponentVersion.min(versions);
   }
 
   /**

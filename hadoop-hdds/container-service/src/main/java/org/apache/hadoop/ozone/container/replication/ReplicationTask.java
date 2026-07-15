@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.util.List;
 import java.util.Objects;
-import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
@@ -31,7 +31,7 @@ public class ReplicationTask extends AbstractReplicationTask {
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
-  private final HDDSVersion apparentVersion;
+  private final ComponentVersion apparentVersion;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
 
@@ -133,7 +133,7 @@ public class ReplicationTask extends AbstractReplicationTask {
    *     can use this to gate version-dependent protocol features so that the
    *     newer side downgrades to a behavior the older side understands.
    */
-  public HDDSVersion getApparentVersion() {
+  public ComponentVersion getApparentVersion() {
     return apparentVersion;
   }
 
