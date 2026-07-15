@@ -58,7 +58,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -256,6 +255,10 @@ public class TestSnapshotDefragService {
         tableName, StringCodec.get(), CodecBufferCodec.get(true));
     putString(sourceTable, key, "source-value");
     sourceStore.flushDB();
+    Set<String> liveFilesBeforeIngestion = ((RDBStore) sourceStore).getDb()
+        .getLiveFilesMetaData().stream()
+        .map(LiveFileMetaData::fileName)
+        .collect(Collectors.toSet());
 
     if (liveSstType == LiveSstType.PREVIOUSLY_INGESTED) {
       File externalFile = tempDir.resolve("external-" + UUID.randomUUID()
@@ -269,10 +272,18 @@ public class TestSnapshotDefragService {
       sourceTable.loadFromFile(externalFile);
     }
 
-    LiveFileMetaData liveFile = ((RDBStore) sourceStore).getDb()
+    List<LiveFileMetaData> candidateFiles = ((RDBStore) sourceStore).getDb()
         .getLiveFilesMetaData().stream()
-        .max(Comparator.comparingLong(LiveFileMetaData::largestSeqno))
-        .orElseThrow(() -> new IllegalStateException("No live SST file"));
+        .filter(file -> tableName.equals(
+            StringUtils.bytes2String(file.columnFamilyName())))
+        .filter(file -> liveSstType != LiveSstType.PREVIOUSLY_INGESTED ||
+            !liveFilesBeforeIngestion.contains(file.fileName()))
+        .collect(Collectors.toList());
+    if (candidateFiles.size() != 1) {
+      throw new IllegalStateException("Expected one live SST file, found " +
+          candidateFiles.size());
+    }
+    LiveFileMetaData liveFile = candidateFiles.get(0);
     Path sourceFile = Paths.get(liveFile.path(), liveFile.fileName());
     Path deltaFile = tempDir.resolve("delta-" + UUID.randomUUID() + ".sst");
     Files.createLink(deltaFile, sourceFile);
