@@ -17,190 +17,164 @@
 
 package org.apache.hadoop.hdds.tracing;
 
-import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
-import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for application-aware and ozone tracing init modes.
+ * Tests tracing init for enabled, application-aware configs.
  */
 public class TestTracingInitModes {
 
-  private OpenTelemetrySdk appSdk;
-
-  @AfterEach
-  public void tearDown() {
-    TracingUtil.reconfigureTracing("reset", tracingConfig(false, false));
-    if (appSdk != null) {
-      appSdk.getSdkTracerProvider().shutdown();
-      appSdk = null;
-    }
+  /** Reset tracing state before each test. */
+  @BeforeEach
+  public void resetGlobalState() {
+    TracingUtil.shutdownTracing();
     GlobalOpenTelemetry.resetForTest();
   }
 
-  private static MutableConfigurationSource conf(boolean enabled, boolean appAware) {
-    MutableConfigurationSource c = new InMemoryConfigurationForTesting();
-    c.setBoolean("ozone.tracing.enabled", enabled);
-    c.setBoolean("ozone.tracing.client.application-aware", appAware);
-    return c;
+  /** Tear down tracing state after each test. */
+  @AfterEach
+  public void cleanup() {
+    TracingUtil.shutdownTracing();
+    GlobalOpenTelemetry.resetForTest();
   }
 
-  private static TracingConfig tracingConfig(boolean enabled, boolean appAware) {
-    return conf(enabled, appAware).getObject(TracingConfig.class);
+  /** Build config with the two tracing flags set. */
+  private static MutableConfigurationSource config(boolean enabled, boolean applicationAware) {
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
+    conf.setBoolean("ozone.tracing.enabled", enabled);
+    conf.setBoolean("ozone.tracing.client.application-aware", applicationAware);
+    return conf;
   }
 
-  private void registerAppGlobalTracer() {
+  /** enabled=true: Ozone may start a new root span. */
+  @Test
+  public void testEnabledModeStartsRootSpans() {
+    MutableConfigurationSource conf = config(true, true);
+    TracingUtil.initTracing("enabled-svc", conf);
+    assertTrue(TracingUtil.isTracingActive(conf));
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertTrue(Span.current().getSpanContext().isValid(),
+          "Enabled tracing should produce a valid root span");
+    }
+  }
+
+  /** app-aware, no app tracer: active but no root span without a parent. */
+  @Test
+  public void testApplicationAwareWithoutGlobalDoesNotStartRoot() {
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("app-aware-svc", conf);
+    assertTrue(TracingUtil.isTracingActive(conf));
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertFalse(Span.current().getSpanContext().isValid(),
+          "Application-aware mode must NOT manufacture a root span");
+    }
+  }
+
+  /** app-aware + W3C parent on the wire: child span is created. */
+  @Test
+  public void testApplicationAwareExtendsExtractedContext() {
     SdkTracerProvider provider = SdkTracerProvider.builder().build();
-    appSdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
-    GlobalOpenTelemetry.set(appSdk);
-  }
+    OpenTelemetrySdk external = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
 
-  @Test
-  public void testApplicationAwareClientJoinsExistingTraceOnly() throws Exception {
-    registerAppGlobalTracer();
-    MutableConfigurationSource config = conf(false, true);
-
-    assertThat(TracingUtil.shouldInstallTraceProxy(config))
-        .as("app-aware + global OTel should enable trace proxy")
-        .isTrue();
-    TracingUtil.initClientTracing("client", config);
-
-    ServiceImpl impl = new ServiceImpl();
-    Service proxy = createProxy(impl, Service.class, config);
-    assertThat(proxy).isNotSameAs(impl);
-
-    proxy.normalMethod();
-    assertThat(impl.wasSpanActive())
-        .as("application-aware client must not root-trace alone")
-        .isFalse();
-
-    Span appSpan = GlobalOpenTelemetry.get().getTracer("app").spanBuilder("app-op").startSpan();
-    try (Scope ignored = appSpan.makeCurrent()) {
-      impl = new ServiceImpl();
-      proxy = createProxy(impl, Service.class, config);
-      proxy.normalMethod();
-      assertThat(impl.wasSpanActive())
-          .as("application-aware client should join active app trace")
-          .isTrue();
-    } finally {
-      appSpan.end();
-    }
-  }
-
-  @Test
-  public void testClientOffUnlessOzoneTracingEnabled() throws Exception {
-    MutableConfigurationSource offConfig = conf(false, true);
-    TracingUtil.initClientTracing("client", offConfig);
-
-    ServiceImpl impl = new ServiceImpl();
-    assertThat(createProxy(impl, Service.class, offConfig)).isSameAs(impl);
-    TracingUtil.executeInNewSpan("alone", () ->
-        assertThat(Span.current().getSpanContext().isValid())
-            .as("no span should be created when tracing is fully off")
-            .isFalse());
-    assertThat(TracingUtil.shouldInstallTraceProxy(offConfig))
-        .as("no global OTel and tracing disabled → no proxy")
-        .isFalse();
-
-    tearDown();
-
-    MutableConfigurationSource onConfig = conf(true, true);
-    TracingUtil.initClientTracing("client", onConfig);
-    assertThat(TracingUtil.shouldInstallTraceProxy(onConfig))
-        .as("ozone tracing enabled → proxy should be installed")
-        .isTrue();
-
-    Span root = TracingUtil.importAndCreateSpan("root", null);
-    try (Scope ignored = root.makeCurrent()) {
-      assertThat(Span.current().getSpanContext().isValid())
-          .as("OZONE mode should allow root spans without incoming context")
-          .isTrue();
-    } finally {
-      root.end();
-    }
-  }
-
-  @Test
-  public void testServiceApplicationAwarePassThroughVsOzoneRoots() throws Exception {
-    TracingUtil.initServiceTracing("parent-export", tracingConfig(true, false));
+    Span external1 = external.getTracer("external").spanBuilder("external-root").startSpan();
     String parentCarrier;
-    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("parent")) {
+    try (Scope ignored = external1.makeCurrent()) {
       parentCarrier = TracingUtil.exportCurrentSpan();
+    } finally {
+      external1.end();
     }
-    assertThat(parentCarrier)
-        .as("OZONE mode should export a non-empty W3C trace context")
-        .isNotEmpty();
-    tearDown();
+    provider.shutdown();
+    assertFalse(parentCarrier.isEmpty(), "exported carrier should be non-empty");
 
-    TracingUtil.initServiceTracing("scm", tracingConfig(false, true));
-    assertThat(TracingUtil.shouldInstallTraceProxy(conf(false, true)))
-        .as("server APPLICATION pass-through alone must not wrap client RPC proxies")
-        .isFalse();
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("app-aware-extract", conf);
+    assertTrue(TracingUtil.isTracingActive(conf));
 
-    assertThat(TracingUtil.importAndCreateSpan("server-op", "").getSpanContext().isValid())
-        .as("APPLICATION mode must not start root spans without client trace context")
-        .isFalse();
-
-    Span child = TracingUtil.importAndCreateSpan("server-op", parentCarrier);
-    assertThat(child.getSpanContext().isValid())
-        .as("APPLICATION mode should create a child span from W3C carrier")
-        .isTrue();
+    Span child = TracingUtil.importAndCreateSpan("child", parentCarrier);
     try (Scope ignored = child.makeCurrent()) {
-      assertThat(Span.current().getSpanContext().isValid())
-          .as("imported child span should be active in context")
-          .isTrue();
+      assertTrue(child.getSpanContext().isValid(),
+          "Application-aware mode should honor a wire-propagated parent context");
     } finally {
       child.end();
     }
+  }
 
-    tearDown();
+  /** app-aware + GlobalOpenTelemetry set: still no root span without a parent. */
+  @Test
+  public void testApplicationAwareAdoptsGlobalTracer() {
+    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    OpenTelemetrySdk appGlobal = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
+    GlobalOpenTelemetry.set(appGlobal);
 
-    TracingUtil.initServiceTracing("scm", tracingConfig(true, false));
-    Span root = TracingUtil.importAndCreateSpan("root", null);
-    assertThat(root.getSpanContext().isValid())
-        .as("OZONE mode should allow root spans without incoming context")
-        .isTrue();
-    try (Scope ignored = root.makeCurrent()) {
-      assertThat(Span.current().getSpanContext().isValid()).isTrue();
-    } finally {
-      root.end();
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("adopt-global", conf);
+    assertTrue(TracingUtil.isTracingActive(conf));
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertFalse(Span.current().getSpanContext().isValid(),
+          "Application-aware (with adopted global) must NOT manufacture a root span");
+    }
+    provider.shutdown();
+  }
+
+  /** Both flags false: tracing is off. */
+  @Test
+  public void testOffModeIsInactive() {
+    MutableConfigurationSource conf = config(false, false);
+    TracingUtil.initTracing("off-svc", conf);
+    assertFalse(TracingUtil.isTracingActive(conf),
+        "With both flags false, tracing must be inactive");
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertFalse(Span.current().getSpanContext().isValid(),
+          "Inactive tracing must not produce a valid span");
     }
   }
 
+  /** Reconfig app-aware → enabled: root spans allowed after reconfig. */
   @Test
-  public void testReconfigureSwitchesToApplicationPassThrough() throws Exception {
-    TracingUtil.initServiceTracing("om", tracingConfig(true, true));
-    Span root = TracingUtil.importAndCreateSpan("before", null);
-    assertThat(root.getSpanContext().isValid())
-        .as("OZONE mode should allow root spans before reconfigure")
-        .isTrue();
-    root.end();
+  public void testReconfigureFromAppAwareToEnabled() {
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("reconfig", conf);
+    assertTrue(TracingUtil.isTracingActive(conf));
 
-    TracingUtil.reconfigureTracing("om", tracingConfig(false, true));
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertFalse(Span.current().getSpanContext().isValid(),
+          "Application-aware mode must not manufacture a root span");
+    }
 
-    Span after = TracingUtil.importAndCreateSpan("after", "");
-    assertThat(after.getSpanContext().isValid())
-        .as("reconfigure should use initServiceTracing → APPLICATION pass-through, not root traces")
-        .isFalse();
+    MutableConfigurationSource newConf = config(true, true);
+    TracingUtil.reconfigureTracing("reconfig", newConf.getObject(TracingConfig.class));
+    assertTrue(TracingUtil.isTracingActive(newConf));
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertTrue(Span.current().getSpanContext().isValid(),
+          "After reconfigure to enabled, a root span should be valid");
+    }
   }
 
+  /** OpenTelemetry.noop() is a singleton — used to detect a real app global. */
   @Test
-  public void testTracingConfigApplicationAwareDefault() {
-    TracingConfig cfg = new InMemoryConfigurationForTesting()
-        .getObject(TracingConfig.class);
-    assertThat(cfg.isClientApplicationAware())
-        .as("ozone.tracing.client.application-aware defaults to true")
-        .isTrue();
+  public void testNoopSingletonIdentity() {
+    assertEquals(OpenTelemetry.noop(), OpenTelemetry.noop());
+    assertNotEquals(OpenTelemetry.noop(),
+        OpenTelemetrySdk.builder().setTracerProvider(SdkTracerProvider.builder().build()).build());
   }
 }
