@@ -679,13 +679,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @param contextBuilder the builder to enrich in-place
    */
   private void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
+    if (!ozoneManager.isS3STSEnabled()) {
+      return;
+    }
+
     final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
     if (stsTokenIdentifier != null) {
       contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
-    }
-
-    if (!ozoneManager.isS3STSEnabled()) {
-      return;
     }
 
     final S3Authentication s3Authentication = OzoneManager.getS3Auth();
