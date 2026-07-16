@@ -1230,6 +1230,12 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
     assertNotNull(copyObjectResponse.copyObjectResult().eTag());
 
+    // The metadata was replaced in place: the new entry is present and the old one is gone.
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(key));
+    assertThat(head.metadata())
+        .containsEntry("meta2", "v2")
+        .doesNotContainKey("meta1");
+
     // The object is still readable with its original content after the in-place copy.
     ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
         b -> b.bucket(bucketName).key(key));
