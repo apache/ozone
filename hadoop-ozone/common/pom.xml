@@ -107,10 +107,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-managed-rocksdb</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-interface-client</artifactId>
     </dependency>
     <dependency>
@@ -233,20 +229,6 @@
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
           </annotationProcessors>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <configuration>
-          <ignoredUnusedDeclaredDependencies>
-            <!--
-              OMConfigKeys references ManagedCompactRangeOptions.BottommostLevelCompaction, an enum
-              inherited from org.rocksdb.CompactRangeOptions. Bytecode resolves it to the rocksdb
-              class, so the analyzer does not see the hdds-managed-rocksdb reference.
-            -->
-            <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-managed-rocksdb:jar</ignoredUnusedDeclaredDependency>
-          </ignoredUnusedDeclaredDependencies>
         </configuration>
       </plugin>
       <plugin>
