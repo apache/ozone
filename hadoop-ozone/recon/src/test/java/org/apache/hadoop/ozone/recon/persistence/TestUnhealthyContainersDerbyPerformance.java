@@ -221,28 +221,38 @@ public class TestUnhealthyContainersDerbyPerformance {
   // One-time setup: create Derby schema + insert 1 M records
   // -----------------------------------------------------------------------
 
-  private String inMemoryDbName;
+  private String resolvedJdbcUrl;
 
   /**
-   * Initialises the embedded in-memory Derby database and creates the Recon schema.
+   * Initialises an in-memory Derby database and creates the Recon schema so the
+   * benchmark measures pure engine cost without disk I/O. The file-based
+   * counterpart lives in {@link TestUnhealthyContainersFileBasedSyncBenchmark}.
    * Data population is done in dedicated test methods.
-   *
-   * <p>Reuses {@link DerbyDataSourceConfigurationProvider} for all connection settings
-   * and overrides only {@code getJdbcUrl()} to use an in-memory Derby database
-   * ({@code jdbc:derby:memory:...}), eliminating disk I/O and fsync overhead across
-   * the benchmark's insert, replace, and delete transactions.</p>
    */
   @BeforeAll
   public void setUpDatabase(@TempDir Path tempDir) throws Exception {
-    inMemoryDbName = "reconPerf_" + java.util.UUID.randomUUID().toString();
+    resolvedJdbcUrl = "jdbc:derby:memory:reconPerf_" + java.util.UUID.randomUUID();
     LOG.info("=== Derby Performance Benchmark — Setup ===");
+    LOG.info("JDBC URL: {}", resolvedJdbcUrl);
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
         TESTED_STATES.size(), CONTAINER_ID_RANGE, TOTAL_RECORDS);
 
+    Injector injector = createDerbyInjector(tempDir, resolvedJdbcUrl);
+    dao = injector.getInstance(UnhealthyContainersDao.class);
+    schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
+    schemaManager = new ContainerHealthSchemaManager(schemaDefinition, new OzoneConfiguration());
+  }
+
+  /**
+   * Builds a Guice injector wired to a Derby database at {@code jdbcUrl} and
+   * creates the Recon schema. Shared by the in-memory benchmark and the
+   * file-based sync benchmark so both reuse identical connection settings.
+   */
+  static Injector createDerbyInjector(Path tempDir, String jdbcUrl) throws Exception {
     File configDir = Files.createDirectory(tempDir.resolve("Config")).toFile();
     DataSourceConfiguration base = new DerbyDataSourceConfigurationProvider(configDir).get();
 
-    // Reuse DerbyDataSourceConfigurationProvider settings but point to an in-memory DB.
+    // Reuse DerbyDataSourceConfigurationProvider settings but point to the given URL.
     Provider<DataSourceConfiguration> configProvider = () -> new DataSourceConfiguration() {
       @Override
       public String getDriverClass() {
@@ -251,7 +261,7 @@ public class TestUnhealthyContainersDerbyPerformance {
 
       @Override
       public String getJdbcUrl() {
-        return "jdbc:derby:memory:" + inMemoryDbName;
+        return jdbcUrl;
       }
 
       @Override
@@ -318,22 +328,32 @@ public class TestUnhealthyContainersDerbyPerformance {
         new ReconDaoBindingModule());
 
     injector.getInstance(ReconSchemaManager.class).createReconSchema();
-
-    dao = injector.getInstance(UnhealthyContainersDao.class);
-    schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
-    schemaManager = new ContainerHealthSchemaManager(schemaDefinition, new OzoneConfiguration());
+    return injector;
   }
 
   @AfterAll
   public void tearDownDatabase() {
-    if (inMemoryDbName != null) {
-      try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
-          "jdbc:derby:memory:" + inMemoryDbName + ";drop=true")) {
-        conn.isValid(1);
-      } catch (java.sql.SQLException e) {
-        if (!"08006".equals(e.getSQLState())) {
-          LOG.warn("Unexpected SQLState while dropping in-memory Derby DB: {}", e.getSQLState(), e);
-        }
+    teardownDerbyDatabase(resolvedJdbcUrl, LOG);
+  }
+
+  /**
+   * Drops an in-memory Derby DB or shuts down a file-based one (its temp dir is
+   * removed by JUnit). Shared by both benchmark classes.
+   */
+  static void teardownDerbyDatabase(String jdbcUrl, Logger log) {
+    if (jdbcUrl == null) {
+      return;
+    }
+    // Drop an in-memory DB; shut down a file-based DB (its temp dir is removed by JUnit).
+    String teardownUrl = jdbcUrl.contains(":memory:")
+        ? jdbcUrl + ";drop=true"
+        : jdbcUrl.replace(";create=true", "") + ";shutdown=true";
+    try (java.sql.Connection conn = java.sql.DriverManager.getConnection(teardownUrl)) {
+      conn.isValid(1);
+    } catch (java.sql.SQLException e) {
+      // Derby signals a successful drop/shutdown with SQLState 08006.
+      if (!"08006".equals(e.getSQLState())) {
+        log.warn("Unexpected SQLState while tearing down Derby DB: {}", e.getSQLState(), e);
       }
     }
   }
