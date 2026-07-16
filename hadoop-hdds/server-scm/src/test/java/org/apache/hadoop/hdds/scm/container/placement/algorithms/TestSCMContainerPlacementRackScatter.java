@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -40,10 +41,8 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -919,32 +918,20 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(1, chosenNodes.size());
   }
 
-  /**
-   * Within a single rack holding an emptier and a fuller datanode, the intra
-   * rack selection should prefer the less utilized node instead of choosing
-   * uniformly at random.
-   */
   @Test
-  public void chooseNodeWithinRackPrefersLessUtilized() throws SCMException {
-    // Single rack with two datanodes.
+  public void chooseNodeWithinRackPrefersLessUtilizedWhenEnabled() throws SCMException {
     setup(2, 2);
-    updateStorageInDatanode(0, 10, 90);   // emptier node
-    updateStorageInDatanode(1, 90, 10);   // fuller node
+    conf.setBoolean(OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED, true);
+    policy = new SCMContainerPlacementRackScatter(nodeManager, conf, cluster, true, metrics);
+    when(nodeManager.getNodeStat(datanodes.get(0)))
+        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0L, 0L, 0L));
+    when(nodeManager.getNodeStat(datanodes.get(1)))
+        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0L, 0L, 0L));
 
-    Map<DatanodeDetails, Integer> selectedCount = new HashMap<>();
-    selectedCount.put(datanodes.get(0), 0);
-    selectedCount.put(datanodes.get(1), 0);
+    List<DatanodeDetails> chosen = policy.chooseDatanodes(
+        new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
 
-    for (int i = 0; i < 100; i++) {
-      List<DatanodeDetails> chosen = policy.chooseDatanodes(
-          new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
-      assertEquals(1, chosen.size());
-      DatanodeDetails dn = chosen.get(0);
-      selectedCount.put(dn, selectedCount.get(dn) + 1);
-    }
-
-    assertThat(selectedCount.get(datanodes.get(0)))
-        .isGreaterThan(selectedCount.get(datanodes.get(1)));
+    assertEquals(Collections.singletonList(datanodes.get(0)), chosen);
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

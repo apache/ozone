@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -65,6 +66,7 @@ public final class SCMContainerPlacementRackScatter
   // INNER_LOOP is to choose node in each rack
   private static final int INNER_LOOP_MAX_RETRY = 5;
   private final SCMContainerPlacementMetrics metrics;
+  private final boolean capacityAwareNodeSelectionEnabled;
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -78,6 +80,9 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
+    this.capacityAwareNodeSelectionEnabled = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED_DEFAULT);
   }
 
   /**
@@ -91,6 +96,9 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = nodeManager.getClusterNetworkTopologyMap();
     this.metrics = null;
+    this.capacityAwareNodeSelectionEnabled = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED_DEFAULT);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -446,7 +454,9 @@ public final class SCMContainerPlacementRackScatter
       }
       Node node = null;
       try {
-        node = chooseLessUtilizedNode(scope, excludedNodes);
+        node = capacityAwareNodeSelectionEnabled
+            ? chooseLessUtilizedNode(scope, excludedNodes)
+            : networkTopology.chooseRandom(scope, excludedNodes);
       } catch (Exception e) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Error while choosing Node: Scope: {}, Excluded Nodes: " +
@@ -499,10 +509,12 @@ public final class SCMContainerPlacementRackScatter
     // Exclude the first pick so the second candidate is a distinct node.
     // Otherwise a small rack often draws the same node twice and the capacity
     // comparison below is skipped.
-    List<Node> secondExcludedNodes = new ArrayList<>(excludedNodes);
+    List<Node> secondExcludedNodes = excludedNodes == null
+        ? new ArrayList<>() : new ArrayList<>(excludedNodes);
     secondExcludedNodes.add(first);
     Node second = networkTopology.chooseRandom(scope, secondExcludedNodes);
     if (second == null) {
+      LOG.debug("Unable to select a second datanode in rack {} for capacity-aware selection", scope);
       return first;
     }
     SCMNodeMetric firstMetric =
@@ -510,6 +522,7 @@ public final class SCMContainerPlacementRackScatter
     SCMNodeMetric secondMetric =
         getNodeManager().getNodeStat((DatanodeDetails) second);
     if (firstMetric == null || secondMetric == null) {
+      LOG.debug("Missing node metric for capacity-aware selection between {} and {}", first, second);
       return first;
     }
     return firstMetric.isGreater(secondMetric.get()) ? second : first;
