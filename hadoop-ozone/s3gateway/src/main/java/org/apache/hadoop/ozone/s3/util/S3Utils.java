@@ -36,6 +36,7 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -71,6 +72,22 @@ public final class S3Utils {
   public static String s3urlEncode(String str)
       throws UnsupportedEncodingException {
     return urlEncode(str).replace("+", "%20");
+  }
+
+  /**
+   * Returns the persisted S3 {@code Content-Encoding} value, with {@code aws-chunked}
+   * removed per AWS semantics.
+   */
+  public static String normalizeContentEncoding(String contentEncoding) {
+    if (contentEncoding == null || contentEncoding.isEmpty()) {
+      return null;
+    }
+    String normalized = Arrays.stream(contentEncoding.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .filter(value -> !AWS_CHUNKED.equals(value))
+        .collect(Collectors.joining(", "));
+    return normalized.isEmpty() ? null : normalized;
   }
 
   private S3Utils() {

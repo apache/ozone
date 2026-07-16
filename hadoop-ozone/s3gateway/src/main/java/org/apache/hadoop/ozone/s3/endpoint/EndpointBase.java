@@ -120,15 +120,26 @@ public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
   protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+  protected static final String CACHE_CONTROL_CUSTOM = "cache-control-custom";
+  protected static final String EXPIRES_CUSTOM = "expires-custom";
+  protected static final String CONTENT_ENCODING_CUSTOM = "content-encoding-custom";
+  protected static final String CONTENT_LANGUAGE_CUSTOM = "content-language-custom";
+  protected static final String CONTENT_DISPOSITION_CUSTOM = "content-disposition-custom";
 
   // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
   // collides with the system ETag / Content-Type stored under the same key, so
   // it is remapped on write and rebuilt on read; the system value is returned
   // via its own ETag / Content-Type response header.
   private static final Map<String, String> RESERVED_METADATA_KEYS =
-      ImmutableMap.of(
-          ETAG, ETAG_CUSTOM,
-          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+      ImmutableMap.<String, String>builder()
+          .put(ETAG, ETAG_CUSTOM)
+          .put(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM)
+          .put(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM)
+          .put(HttpHeaders.EXPIRES, EXPIRES_CUSTOM)
+          .put(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM)
+          .put(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM)
+          .put(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM)
+          .build();
 
   // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
   private static final Map<String, String> REBUILT_RESERVED_KEYS =
