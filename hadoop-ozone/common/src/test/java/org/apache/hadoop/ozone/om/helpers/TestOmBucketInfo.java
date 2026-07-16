@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -52,6 +53,91 @@ public class TestOmBucketInfo {
 
     assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void versioningStatusDerivedFromLegacyFlag() {
+    // Records written before the versioningStatus field existed deserialize
+    // unchanged: the status is derived from the legacy isVersionEnabled flag.
+    OzoneManagerProtocolProtos.BucketInfo oldRecord =
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("bucket")
+            .setIsVersionEnabled(false)
+            .setStorageType(HddsProtos.StorageTypeProto.DISK)
+            .build();
+    OmBucketInfo bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        bucket.getVersioningStatus());
+    assertFalse(bucket.getIsVersionEnabled());
+    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+
+    oldRecord = oldRecord.toBuilder().setIsVersionEnabled(true).build();
+    bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertEquals(BucketVersioningStatus.ENABLED,
+        bucket.getVersioningStatus());
+    assertTrue(bucket.getIsVersionEnabled());
+    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void versioningStatusProtobufConversion() {
+    // SUSPENDED is not representable by the legacy flag alone, so it must
+    // survive a proto round trip via the new field.
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setVersioningStatus(BucketVersioningStatus.SUSPENDED)
+        .build();
+    assertFalse(bucket.getIsVersionEnabled());
+
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        recovered.getVersioningStatus());
+    assertFalse(recovered.getIsVersionEnabled());
+    assertEquals(bucket, recovered);
+  }
+
+  @Test
+  public void builderKeepsVersioningStatusAndLegacyFlagInSync() {
+    OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1");
+
+    // default is UNVERSIONED
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        builder.build().getVersioningStatus());
+
+    // legacy true -> ENABLED
+    builder.setIsVersionEnabled(true);
+    assertEquals(BucketVersioningStatus.ENABLED,
+        builder.build().getVersioningStatus());
+    assertTrue(builder.build().getIsVersionEnabled());
+
+    // explicit SUSPENDED forces the legacy flag to false
+    builder.setVersioningStatus(BucketVersioningStatus.SUSPENDED);
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
+    assertFalse(builder.build().getIsVersionEnabled());
+
+    // legacy false does not clobber an explicitly SUSPENDED status
+    builder.setIsVersionEnabled(false);
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
+
+    // a null status is a no-op (records without the new field)
+    builder.setVersioningStatus(null);
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
+
+    // legacy false on a never-enabled bucket stays UNVERSIONED
+    OmBucketInfo unversioned = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setIsVersionEnabled(false)
+        .build();
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        unversioned.getVersioningStatus());
   }
 
   @Test

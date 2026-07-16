@@ -66,6 +66,32 @@ public class TestOmBucketArgs {
   }
 
   @Test
+  public void testVersioningStatusIsSetCorrectly() {
+    OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .build();
+
+    OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
+        bucketArgs.getProtobuf());
+
+    // absent means "not being changed"
+    assertNull(argsFromProto.getVersioningStatus());
+
+    bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .setVersioningStatus(BucketVersioningStatus.SUSPENDED)
+        .build();
+
+    argsFromProto = OmBucketArgs.getFromProtobuf(
+        bucketArgs.getProtobuf());
+
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        argsFromProto.getVersioningStatus());
+  }
+
+  @Test
   public void testDefaultReplicationConfigIsSetCorrectly() {
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setBucketName("bucket")
