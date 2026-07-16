@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
@@ -157,6 +159,7 @@ public abstract class EndpointBase {
   private int chunkSize;
   private boolean datastreamEnabled;
   private long datastreamMinLength;
+  private boolean s3StsEnabled;
 
   @Context
   private ContainerRequestContext context;
@@ -221,6 +224,10 @@ public abstract class EndpointBase {
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT, StorageUnit.BYTES);
 
+    s3StsEnabled = getOzoneConfiguration().getBoolean(
+        OZONE_S3G_STS_HTTP_ENABLED_KEY,
+        OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
+
     init();
   }
 
@@ -233,7 +240,7 @@ public abstract class EndpointBase {
    * Called when the handler resolves the {@link S3GAction}.
    */
   protected void applyS3Action(S3GAction action) {
-    if (s3Auth != null) {
+    if (s3Auth != null && s3StsEnabled) {
       s3Auth.setS3Action(S3GActionIamMapper.toS3ActionString(action));
     }
   }
@@ -249,7 +256,7 @@ public abstract class EndpointBase {
    */
   protected <T, E extends Exception> T runWithS3ActionString(String s3Action, CheckedSupplier<T, E> checkedSupplier)
       throws E {
-    if (s3Auth == null) {
+    if (s3Auth == null || !s3StsEnabled) {
       return checkedSupplier.get();
     }
     final String originalS3Action = s3Auth.getS3Action();
