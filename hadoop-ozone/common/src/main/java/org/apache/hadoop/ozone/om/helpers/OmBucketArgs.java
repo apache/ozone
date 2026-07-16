@@ -45,6 +45,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final Boolean isVersionEnabled;
   /**
+   * S3-compatible versioning status; null when not being changed.
+   * Takes precedence over isVersionEnabled when both are set.
+   */
+  private final BucketVersioningStatus versioningStatus;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -73,6 +78,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.isVersionEnabled = b.isVersionEnabled;
+    this.versioningStatus = b.versioningStatus;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
@@ -106,6 +112,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   public Boolean getIsVersionEnabled() {
     return isVersionEnabled;
+  }
+
+  /**
+   * Returns the requested versioning status, or null if not being changed.
+   * @return BucketVersioningStatus
+   */
+  public BucketVersioningStatus getVersioningStatus() {
+    return versioningStatus;
   }
 
   /**
@@ -227,6 +241,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private String volumeName;
     private String bucketName;
     private Boolean isVersionEnabled;
+    private BucketVersioningStatus versioningStatus;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
@@ -258,6 +273,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setIsVersionEnabled(Boolean versionFlag) {
       this.isVersionEnabled = versionFlag;
+      return this;
+    }
+
+    public Builder setVersioningStatus(BucketVersioningStatus status) {
+      this.versioningStatus = status;
       return this;
     }
 
@@ -339,6 +359,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (isVersionEnabled != null) {
       builder.setIsVersionEnabled(isVersionEnabled);
     }
+    if (versioningStatus != null) {
+      builder.setVersioningStatus(versioningStatus.toProto());
+    }
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
@@ -380,6 +403,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     if (bucketArgs.hasIsVersionEnabled()) {
       builder.setIsVersionEnabled(bucketArgs.getIsVersionEnabled());
+    }
+    if (bucketArgs.hasVersioningStatus()) {
+      builder.setVersioningStatus(
+          BucketVersioningStatus.fromProto(bucketArgs.getVersioningStatus()));
     }
     if (bucketArgs.hasStorageType()) {
       builder.setStorageType(StorageType.valueOf(bucketArgs.getStorageType()));
