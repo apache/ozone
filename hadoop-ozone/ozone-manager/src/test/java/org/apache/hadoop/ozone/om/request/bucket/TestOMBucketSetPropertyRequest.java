@@ -24,20 +24,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -505,6 +513,47 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
     assertFalse(dbBucketInfo.getIsVersionEnabled());
+  }
+
+  @Test
+  public void testVersioningStatusRejectedBeforeFinalization()
+      throws Exception {
+    OMRequest request = createSetVersioningStatusRequest(
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        BucketVersioningStatus.ENABLED);
+
+    OMLayoutVersionManager preFinalizedVersionManager =
+        mock(OMLayoutVersionManager.class);
+    when(preFinalizedVersionManager
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(false);
+    ValidationContext preFinalizedContext = ValidationContext.of(
+        preFinalizedVersionManager, omMetadataManager);
+
+    OMException omException = assertThrows(OMException.class,
+        () -> OMBucketSetPropertyRequest
+            .disallowSetBucketPropertyWithVersioningStatus(
+                request, preFinalizedContext));
+    assertEquals(OMException.ResultCodes
+            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omException.getResult());
+
+    // requests without a versioningStatus pass through untouched
+    OMRequest legacyRequest = createSetVersioningFlagRequest(
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), true);
+    assertSame(legacyRequest, OMBucketSetPropertyRequest
+        .disallowSetBucketPropertyWithVersioningStatus(
+            legacyRequest, preFinalizedContext));
+
+    // after finalization the request passes through untouched
+    OMLayoutVersionManager finalizedVersionManager =
+        mock(OMLayoutVersionManager.class);
+    when(finalizedVersionManager
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(true);
+    ValidationContext finalizedContext = ValidationContext.of(
+        finalizedVersionManager, omMetadataManager);
+    assertSame(request, OMBucketSetPropertyRequest
+        .disallowSetBucketPropertyWithVersioningStatus(
+            request, finalizedContext));
   }
 
   private OMRequest createSetVersioningStatusRequest(String volumeName,
