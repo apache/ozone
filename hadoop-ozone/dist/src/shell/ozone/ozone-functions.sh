@@ -1361,7 +1361,7 @@ function ozone_os_tricks
       else
         LINK_FILE="libhadoop.dylib"
         if [ ! -L "$LINK_FILE" ] && [ ! -f "$LINK_FILE" ]; then
-          ln -s "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+          ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
         fi
         export DYLD_LIBRARY_PATH=$OZONE_HOME/lib/native:$DYLD_LIBRARY_PATH
       fi
@@ -1408,7 +1408,7 @@ function ozone_os_tricks
         LINK_FILE="libhadoop.so"
         # If the symbolic file is already exist, skip create it again
         if [ ! -L "$LINK_FILE" ] && [ ! -f "$LINK_FILE" ]; then
-          ln -s "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+          ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
         fi
         export LD_LIBRARY_PATH=$OZONE_HOME/lib/native:$LD_LIBRARY_PATH
       fi
