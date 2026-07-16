@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -127,6 +128,7 @@ public class TestOmMetadataManager {
       VOLUME_TABLE,
       BUCKET_TABLE,
       KEY_TABLE,
+      VERSIONED_KEY_TABLE,
       DELETED_TABLE,
       OPEN_KEY_TABLE,
       MULTIPART_INFO_TABLE,
@@ -179,6 +181,23 @@ public class TestOmMetadataManager {
 
     assertEquals(3, transactionInfo.getTerm());
     assertEquals(250, transactionInfo.getTransactionIndex());
+  }
+
+  @Test
+  public void testVersionedOzoneKeyOrdering() {
+    String prefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key");
+    assertEquals("/vol/buck/key/", prefix);
+
+    // newer versions (larger versionId) must sort before older ones, and all
+    // versioned keys must sort under the key's prefix
+    String v1 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 1L);
+    String v2 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 42L);
+    String v3 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", Long.MAX_VALUE - 1);
+    assertThat(v3).startsWith(prefix).isLessThan(v2);
+    assertThat(v2).startsWith(prefix).isLessThan(v1);
+
+    // fixed-width suffix: identical length regardless of versionId magnitude
+    assertEquals(v1.length(), v3.length());
   }
 
   @Test
