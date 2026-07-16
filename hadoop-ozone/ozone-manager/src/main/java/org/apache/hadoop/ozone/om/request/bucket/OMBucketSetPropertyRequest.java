@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -174,10 +175,29 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       //Check Versioning to update
       Boolean versioning = omBucketArgs.getIsVersionEnabled();
-      if (versioning != null) {
-        bucketInfoBuilder.setIsVersionEnabled(versioning);
-        LOG.debug("Updating bucket versioning for bucket: {} in volume: {}",
-            bucketName, volumeName);
+      BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
+      if (newVersioningStatus == null && versioning != null) {
+        // Legacy flag from older clients: enabling always maps to ENABLED;
+        // disabling maps to SUSPENDED once versioning has ever been enabled
+        // (the S3 state machine forbids returning to UNVERSIONED).
+        if (versioning) {
+          newVersioningStatus = BucketVersioningStatus.ENABLED;
+        } else {
+          newVersioningStatus =
+              dbBucketInfo.getVersioningStatus() == BucketVersioningStatus.UNVERSIONED
+                  ? BucketVersioningStatus.UNVERSIONED : BucketVersioningStatus.SUSPENDED;
+        }
+      }
+      if (newVersioningStatus != null) {
+        if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
+          throw new OMException("Bucket versioning cannot be changed from "
+              + dbBucketInfo.getVersioningStatus() + " to " + newVersioningStatus
+              + "; once enabled, versioning can only be suspended.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+        bucketInfoBuilder.setVersioningStatus(newVersioningStatus);
+        LOG.debug("Updating bucket versioning to {} for bucket: {} in volume: {}",
+            newVersioningStatus, bucketName, volumeName);
       }
 
       //Check quotaInBytes and quotaInNamespace to update

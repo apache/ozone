@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -420,6 +421,112 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Cannot update bucket quota. NamespaceQuota requested " +
             "is less than used namespaceQuota");
+  }
+
+  @Test
+  public void testVersioningStatusTransitions() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // UNVERSIONED -> ENABLED
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED)).validateAndUpdateCache(ozoneManager, 1);
+    assertTrue(response.getOMResponse().getSuccess());
+    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(BucketVersioningStatus.ENABLED, dbBucketInfo.getVersioningStatus());
+    assertTrue(dbBucketInfo.getIsVersionEnabled());
+
+    // ENABLED -> SUSPENDED
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.SUSPENDED)).validateAndUpdateCache(ozoneManager, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
+    assertFalse(dbBucketInfo.getIsVersionEnabled());
+
+    // SUSPENDED -> UNVERSIONED is rejected
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.UNVERSIONED)).validateAndUpdateCache(ozoneManager, 3);
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        response.getOMResponse().getStatus());
+    assertThat(response.getOMResponse().getMessage())
+        .contains("once enabled, versioning can only be suspended");
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // SUSPENDED -> ENABLED
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED)).validateAndUpdateCache(ozoneManager, 4);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.ENABLED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+  }
+
+  @Test
+  public void testLegacyVersioningFlagMapsToStateMachine() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    // legacy false on a never-enabled bucket stays UNVERSIONED
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningFlagRequest(volumeName, bucketName, false))
+        .validateAndUpdateCache(ozoneManager, 1);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // legacy true -> ENABLED
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningFlagRequest(volumeName, bucketName, true))
+        .validateAndUpdateCache(ozoneManager, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.ENABLED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // legacy false after enabling -> SUSPENDED, not UNVERSIONED
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningFlagRequest(volumeName, bucketName, false))
+        .validateAndUpdateCache(ozoneManager, 3);
+    assertTrue(response.getOMResponse().getSuccess());
+    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
+    assertFalse(dbBucketInfo.getIsVersionEnabled());
+  }
+
+  private OMRequest createSetVersioningStatusRequest(String volumeName,
+      String bucketName, BucketVersioningStatus status) {
+    return OMRequest.newBuilder().setSetBucketPropertyRequest(
+        SetBucketPropertyRequest.newBuilder().setBucketArgs(
+            BucketArgs.newBuilder().setBucketName(bucketName)
+                .setVolumeName(volumeName)
+                .setVersioningStatus(status.toProto()).build()))
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  private OMRequest createSetVersioningFlagRequest(String volumeName,
+      String bucketName, boolean isVersionEnabled) {
+    return OMRequest.newBuilder().setSetBucketPropertyRequest(
+        SetBucketPropertyRequest.newBuilder().setBucketArgs(
+            BucketArgs.newBuilder().setBucketName(bucketName)
+                .setVolumeName(volumeName)
+                .setIsVersionEnabled(isVersionEnabled).build()))
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+        .setClientId(UUID.randomUUID().toString()).build();
   }
 
   @Test
