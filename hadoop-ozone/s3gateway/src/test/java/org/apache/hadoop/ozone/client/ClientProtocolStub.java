@@ -578,7 +578,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-                                            String bucketName, String keyName)
+                                            String bucketName, String keyName,
+                                            boolean headOp)
       throws IOException {
     return null;
   }
