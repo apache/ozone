@@ -176,6 +176,22 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
+   * Given a volume, bucket, key and versionId, return the corresponding
+   * versionedKeyTable DB key: the versionId is appended as fixed-width hex of
+   * (Long.MAX_VALUE - versionId), so all versions of a key are adjacent and
+   * ordered newest first.
+   */
+  String getVersionedOzoneKey(String volume, String bucket, String key, long versionId);
+
+  /**
+   * Prefix under which all noncurrent versions of the given key are stored in
+   * the versionedKeyTable. Since key names may themselves contain the
+   * separator, iterating consumers must check that the remainder after this
+   * prefix is exactly one fixed-width versionId suffix.
+   */
+  String getVersionedOzoneKeyPrefix(String volume, String bucket, String key);
+
+  /**
    * Get DB key for a key or prefix in an FSO bucket given existing
    * volume and bucket names.
    */
@@ -407,6 +423,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
 
   Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
+
+  /**
+   * Returns the versionedKeyTable holding noncurrent object versions
+   * (including noncurrent delete markers) of versioning-enabled buckets.
+   *
+   * @return versionedKeyTable.
+   */
+  Table<String, OmKeyInfo> getVersionedKeyTable();
 
   /**
    * Returns the FileTable.

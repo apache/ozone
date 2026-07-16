@@ -162,6 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmVolumeArgs> volumeTable;
   private Table<String, OmBucketInfo> bucketTable;
   private Table<String, OmKeyInfo> keyTable;
+  private Table<String, OmKeyInfo> versionedKeyTable;
 
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
@@ -382,6 +383,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Table<String, OmKeyInfo> getVersionedKeyTable() {
+    return versionedKeyTable;
+  }
+
+  @Override
   public Table<String, OmKeyInfo> getFileTable() {
     return fileTable;
   }
@@ -499,6 +505,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE_DEF, cacheType);
     bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE_DEF, cacheType);
     keyTable = initializer.get(OMDBDefinition.KEY_TABLE_DEF);
+    versionedKeyTable = initializer.get(OMDBDefinition.VERSIONED_KEY_TABLE_DEF);
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
     multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
@@ -655,6 +662,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
     return builder.toString();
+  }
+
+  @Override
+  public String getVersionedOzoneKey(String volume, String bucket, String key, long versionId) {
+    return getVersionedOzoneKeyPrefix(volume, bucket, key)
+        + String.format("%016x", Long.MAX_VALUE - versionId);
+  }
+
+  @Override
+  public String getVersionedOzoneKeyPrefix(String volume, String bucket, String key) {
+    return getOzoneKey(volume, bucket, key) + OM_KEY_PREFIX;
   }
 
   @Override
