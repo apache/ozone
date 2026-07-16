@@ -1243,6 +1243,15 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // S3-compatible object versioning fields. versionId identifies an object
+  // version: assigned once from the committing transaction's index when the
+  // version is created, then frozen. A delete marker is a record with
+  // isDeleteMarker set and no data blocks. isNullVersion marks the single
+  // overwritable "null version" slot per key (writes while versioning is
+  // suspended, or objects that predate enabling versioning).
+    optional uint64 versionId = 23;
+    optional bool isDeleteMarker = 24;
+    optional bool isNullVersion = 25;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
