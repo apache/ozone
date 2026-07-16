@@ -1746,10 +1746,23 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testReconstructionGlobalLimitDisabledByDefault() throws IOException {
+  public void testReconstructionGlobalLimitDisabledByDefault()
+      throws IOException, NodeNotFoundException {
     assertEquals(0, rmConf.getReconstructionGlobalLimit());
     ReplicationManager rm = createReplicationManager();
     assertEquals(0, rm.getReconstructionInFlightLimit());
+    assertFalse(rm.isReconstructionLimitReached());
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
     assertFalse(rm.isReconstructionLimitReached());
   }
 
@@ -1826,15 +1839,18 @@ public class TestReplicationManager {
     ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
         2L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(2)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(2)),
+        (ECReplicationConfig) repConfig);
     ReconstructECContainersCommand cmd3 = new ReconstructECContainersCommand(
         3L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)),
+        (ECReplicationConfig) repConfig);
 
     rm.sendThrottledReconstructionCommand(container, cmd1);
     rm.sendThrottledReconstructionCommand(container, cmd2);
@@ -1858,7 +1874,8 @@ public class TestReplicationManager {
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
-        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
     assertEquals(1, rm.getInflightReconstructionCount());
 
@@ -1885,7 +1902,8 @@ public class TestReplicationManager {
         1L, Collections.emptyList(),
         ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
             MockDatanodeDetails.randomDatanodeDetails()),
-        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
+        (ECReplicationConfig) repConfig);
     rm.sendThrottledReconstructionCommand(container, cmd);
     assertEquals(1, rm.getInflightReconstructionCount());
 
@@ -1948,13 +1966,13 @@ public class TestReplicationManager {
     AtomicInteger rejected = new AtomicInteger();
 
     for (int t = 0; t < threadCount; t++) {
-      final long containerId = t + 100;
+      final long commandIdBase = t + 100;
       executor.submit(() -> {
         try {
           startLatch.await();
           for (int i = 0; i < attemptsPerThread; i++) {
             ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
-                containerId + i, Collections.emptyList(),
+                commandIdBase + i, Collections.emptyList(),
                 ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
                 ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
                 (ECReplicationConfig) repConfig);
@@ -1973,12 +1991,14 @@ public class TestReplicationManager {
       });
     }
 
-    startLatch.countDown();
-    assertTrue(doneLatch.await(30, TimeUnit.SECONDS));
-    executor.shutdown();
-
-    assertEquals(2, rm.getInflightReconstructionCount());
-    assertEquals(2, accepted.get());
-    assertTrue(rejected.get() > 0);
+    try {
+      startLatch.countDown();
+      assertTrue(doneLatch.await(30, TimeUnit.SECONDS));
+      assertEquals(2, rm.getInflightReconstructionCount());
+      assertEquals(2, accepted.get());
+      assertTrue(rejected.get() > 0);
+    } finally {
+      executor.shutdown();
+    }
   }
 }
