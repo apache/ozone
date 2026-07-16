@@ -442,6 +442,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return inflightReconstructionCount.get();
   }
 
+  @VisibleForTesting
+  Integer getReconstructionPendingFragmentCount(long cmdId) {
+    return reconstructionCommandIdToPendingFragmentCount.get(cmdId);
+  }
+
   /**
    * Returns the maximum number of inflight reconstruction commands allowed
    * across the cluster at any given time.
@@ -603,6 +608,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           "Global reconstruction limit (" + getReconstructionInFlightLimit()
               + ") reached for container " + containerInfo.getContainerID());
     }
+    final long cmdId = command.getId();
+    final int fragmentCount = command.getMissingContainerIndexes().size();
+    reconstructionCommandIdToPendingFragmentCount.put(cmdId, fragmentCount);
     boolean sent = false;
     try {
       List<DatanodeDetails> targets = command.getTargetDatanodes();
@@ -619,6 +627,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       sent = true;
     } finally {
       if (!sent) {
+        reconstructionCommandIdToPendingFragmentCount.remove(cmdId);
         releaseReconstructionSlot();
       }
     }
@@ -771,7 +780,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
             targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
-      reconstructionCommandIdToPendingFragmentCount.put(cmd.getId(), targetIndexes.size());
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
