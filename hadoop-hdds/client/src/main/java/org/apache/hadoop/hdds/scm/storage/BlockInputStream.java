@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -322,6 +323,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (!initialized) {
       initialize();
     }
+
+    if (pos < 0 || pos > length) {
+      if (pos == 0) {
+        // It is possible for length and pos to be zero in which case
+        // seek should return instead of throwing exception
+        return true;
+      }
+      throw new EOFException(
+          "EOF encountered at pos: " + pos + " for block: " + blockID);
+    }
+
     checkOpen();
     int len = buffer.remaining();
     int innerRetries = 0;

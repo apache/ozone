@@ -190,7 +190,11 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   public boolean readFully(long position, ByteBuffer buffer) throws IOException {
     if (!isStreamBlockInputStream) {
-      return false;
+      if (buffer.remaining() == 0) {
+        return true;
+      }
+      pRead(position, buffer);
+      return true;
     }
 
     final long oldPos = getPos();
@@ -207,6 +211,49 @@ public class MultipartInputStream extends ExtendedInputStream {
       seek(oldPos);
     }
     return true;
+  }
+
+  public void pRead(long offset, ByteBuffer buffer) throws IOException {
+    int partIdx = Arrays.binarySearch(partOffsets, offset);
+    if (partIdx < 0) {
+      partIdx = -partIdx - 2;
+    }
+
+    int len = buffer.remaining();
+    while (len > 0) {
+      if (partIdx < 0 || partIdx >= partStreams.size()) {
+        throw new EOFException("EOF encountered at pos: " + offset + " for key: " + key);
+      }
+
+      PartInputStream current = partStreams.get(partIdx);
+      if (!(current instanceof ExtendedInputStream)) {
+        throw new IOException("Positioned read is not supported by stream type: "
+            + current.getClass().getName());
+      }
+      ExtendedInputStream extendedStream = (ExtendedInputStream) current;
+
+      long offsetInPart = offset - partOffsets[partIdx];
+      int numBytesToRead = Math.min(len, (int) (current.getLength() - offsetInPart));
+      if (numBytesToRead <= 0) {
+        throw new EOFException("EOF encountered at pos: " + offset + " for key: " + key);
+      }
+
+      int bufferLimit = buffer.limit();
+      try {
+        if (numBytesToRead < len) {
+          buffer.limit(buffer.position() + numBytesToRead);
+        }
+        if (!extendedStream.readFully(offsetInPart, buffer)) {
+          throw new IOException("Positioned read failed on part stream");
+        }
+      } finally {
+        buffer.limit(bufferLimit);
+      }
+
+      len -= numBytesToRead;
+      offset += numBytesToRead;
+      partIdx++;
+    }
   }
 
   public synchronized void initialize() throws IOException {
