@@ -112,6 +112,16 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  // S3-compatible object versioning. versionId is allocated once when a
+  // version is written and then frozen, and increases within a key so its
+  // versions can be ordered newest first; absent on records that predate
+  // versioning support (treated as the null version). A delete marker has
+  // isDeleteMarker set and no data blocks. isNullVersion marks the single
+  // overwritable "null version" slot per key.
+  private final Long versionId;
+  private final boolean isDeleteMarker;
+  private final boolean isNullVersion;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -130,6 +140,9 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.versionId = b.versionId;
+    this.isDeleteMarker = b.isDeleteMarker;
+    this.isNullVersion = b.isNullVersion;
   }
 
   /**
@@ -469,6 +482,22 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileChecksum;
   }
 
+  /**
+   * @return the object version identity, or null for records that predate
+   * versioning support (treated as the null version).
+   */
+  public Long getVersionId() {
+    return versionId;
+  }
+
+  public boolean isDeleteMarker() {
+    return isDeleteMarker;
+  }
+
+  public boolean isNullVersion() {
+    return isNullVersion;
+  }
+
   @Override
   public String toString() {
     return "OmKeyInfo{" +
@@ -511,6 +540,9 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private Long versionId = null;
+    private boolean isDeleteMarker;
+    private boolean isNullVersion;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -533,6 +565,9 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.versionId = obj.versionId;
+      this.isDeleteMarker = obj.isDeleteMarker;
+      this.isNullVersion = obj.isNullVersion;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -704,6 +739,21 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setVersionId(Long versionId) {
+      this.versionId = versionId;
+      return this;
+    }
+
+    public Builder setDeleteMarker(boolean deleteMarker) {
+      this.isDeleteMarker = deleteMarker;
+      return this;
+    }
+
+    public Builder setNullVersion(boolean nullVersion) {
+      this.isNullVersion = nullVersion;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -855,6 +905,16 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
+    if (versionId != null) {
+      kb.setVersionId(versionId);
+    }
+    // only persisted when set, to keep records without versioning unchanged
+    if (isDeleteMarker) {
+      kb.setIsDeleteMarker(true);
+    }
+    if (isNullVersion) {
+      kb.setIsNullVersion(true);
+    }
     return kb.build();
   }
 
@@ -908,6 +968,15 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
+    }
+    if (keyInfo.hasVersionId()) {
+      builder.setVersionId(keyInfo.getVersionId());
+    }
+    if (keyInfo.hasIsDeleteMarker()) {
+      builder.setDeleteMarker(keyInfo.getIsDeleteMarker());
+    }
+    if (keyInfo.hasIsNullVersion()) {
+      builder.setNullVersion(keyInfo.getIsNullVersion());
     }
     return builder;
   }
