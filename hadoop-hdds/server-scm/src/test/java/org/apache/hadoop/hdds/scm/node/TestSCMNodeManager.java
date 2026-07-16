@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVers
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -646,6 +647,40 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Restored apparent version should restore finalized count");
+    }
+  }
+
+  @Test
+  public void testDatanodeFinalizationCountsSoftwareVersionMatch()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      // With no datanodes, all software versions trivially match SCM.
+      assertTrue(nodeManager.getDatanodeFinalizationCounts().allSoftwareVersionsMatchScmVersion(),
+          "With no datanodes, all software versions trivially match SCM");
+
+      // A finalized datanode runs SCM's software version.
+      registerWithCapacity(nodeManager, defaultVersionProto(), success);
+      assertTrue(nodeManager.getDatanodeFinalizationCounts().allSoftwareVersionsMatchScmVersion(),
+          "A finalized datanode runs SCM's software version");
+
+      // A pre-finalized datanode runs SCM's software version even though its apparent version is lower,
+      // so all datanodes still match SCM's software version.
+      DatanodeDetails preFinalizedNode = registerWithCapacity(nodeManager,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION), success);
+      assertTrue(nodeManager.getDatanodeFinalizationCounts().allSoftwareVersionsMatchScmVersion(),
+          "A pre-finalized datanode still runs SCM's software version");
+
+      // Report a lower software version for one datanode: it no longer matches SCM.
+      nodeManager.processVersionReport(preFinalizedNode,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION));
+      assertFalse(nodeManager.getDatanodeFinalizationCounts().allSoftwareVersionsMatchScmVersion(),
+          "A datanode on a lower software version should not match SCM");
+
+      // Restore the datanode to SCM's software version: all datanodes match again.
+      nodeManager.processVersionReport(preFinalizedNode,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION));
+      assertTrue(nodeManager.getDatanodeFinalizationCounts().allSoftwareVersionsMatchScmVersion(),
+          "Restoring the datanode to SCM's software version should make all datanodes match again");
     }
   }
 

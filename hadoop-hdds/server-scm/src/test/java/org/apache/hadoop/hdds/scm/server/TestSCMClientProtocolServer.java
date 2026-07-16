@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
@@ -284,8 +285,8 @@ public class TestSCMClientProtocolServer {
   }
 
   @Test
-  public void testGetSoftwareVersionReturnsLocalVersion() throws IOException {
-    assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getSoftwareVersion());
+  public void testGetPeerUpgradeStatusReturnsLocalVersion() throws IOException {
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, server.getPeerUpgradeStatus());
   }
 
   @Test
@@ -348,7 +349,7 @@ public class TestSCMClientProtocolServer {
   public void testFinalizeRejectsUnreachablePeer() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
-    when(unreachable.getSoftwareVersion()).thenThrow(new IOException("connection refused"));
+    when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
 
     try (SCMClientProtocolServer testServer =
              peerCheckServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
@@ -359,21 +360,53 @@ public class TestSCMClientProtocolServer {
     verify(finalizationManager, never()).finalizeUpgrade();
   }
 
+  @Test
+  public void testFinalizeProceedsWhenAllDatanodesMatchScmVersion() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
+        Collections.emptyList(), new NodeManager.DatanodeFinalizationCounts(3, 3, true))) {
+      testServer.finalizeUpgrade();
+      verify(finalizationManager).finalizeUpgrade();
+    }
+  }
+
+  @Test
+  public void testFinalizeRejectsDatanodeWithMismatchedVersion() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
+        Collections.emptyList(), new NodeManager.DatanodeFinalizationCounts(3, 3, false))) {
+      assertThrows(SCMException.class, testServer::finalizeUpgrade);
+    }
+    verify(finalizationManager, never()).finalizeUpgrade();
+  }
+
   private SCMClientProtocolServer peerCheckServer(
       FinalizationManager finalizationManager, List<SCMNodeDetails> peers) throws IOException {
+    // Default to all datanode versions matching SCM so the SCM peer checks are exercised in isolation.
+    return peerCheckServer(finalizationManager, peers, new NodeManager.DatanodeFinalizationCounts(0, 0, true));
+  }
+
+  private SCMClientProtocolServer peerCheckServer(
+      FinalizationManager finalizationManager, List<SCMNodeDetails> peers,
+      NodeManager.DatanodeFinalizationCounts datanodeCounts) throws IOException {
+
     StorageContainerManager mockScm = mockStorageContainerManager();
     when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
     when(mockScm.getConfiguration()).thenReturn(new OzoneConfiguration());
+
     SCMHANodeDetails haNodeDetails = mock(SCMHANodeDetails.class);
     when(haNodeDetails.getPeerNodeDetails()).thenReturn(peers);
     when(mockScm.getSCMHANodeDetails()).thenReturn(haNodeDetails);
-    return new SCMClientProtocolServer(
-        new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
+
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getDatanodeFinalizationCounts()).thenReturn(datanodeCounts);
+    when(mockScm.getScmNodeManager()).thenReturn(nodeManager);
+    return new SCMClientProtocolServer(new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
   }
 
   private StorageContainerLocationProtocol peerClient(HDDSVersion version) throws IOException {
     StorageContainerLocationProtocol client = mock(StorageContainerLocationProtocol.class);
-    when(client.getSoftwareVersion()).thenReturn(version);
+    when(client.getPeerUpgradeStatus()).thenReturn(version);
     return client;
   }
 

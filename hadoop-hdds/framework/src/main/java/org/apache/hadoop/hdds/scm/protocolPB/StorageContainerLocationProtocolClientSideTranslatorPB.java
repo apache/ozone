@@ -1242,15 +1242,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public HDDSVersion getSoftwareVersion() throws IOException {
-    StorageContainerLocationProtocolProtos.GetSoftwareVersionRequestProto req =
-        StorageContainerLocationProtocolProtos.GetSoftwareVersionRequestProto
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto req =
+        StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto
             .newBuilder()
             .build();
 
-    StorageContainerLocationProtocolProtos.GetSoftwareVersionResponseProto response =
-        submitRequest(Type.GetSoftwareVersion, builder -> builder.setGetSoftwareVersionRequest(req))
-            .getGetSoftwareVersionResponse();
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto response =
+        submitRequest(Type.GetPeerUpgradeStatus, builder -> builder.setGetPeerUpgradeStatusRequest(req))
+            .getGetPeerUpgradeStatusResponse();
     return HDDSVersion.deserialize(response.getScmSoftwareVersion());
   }
 

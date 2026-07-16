@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -147,11 +148,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   /**
-   * @return DatanodeFinalizationCounts, finalized and total healthy node counts
+   * @return DatanodeFinalizationCounts, finalized and total healthy node counts, and whether all
+   * healthy datanodes run SCM's software version
    */
   default DatanodeFinalizationCounts getDatanodeFinalizationCounts() {
     int finalizedNodes = 0;
     int totalHealthyNodes = 0;
+    boolean allSoftwareVersionsMatchScm = true;
 
     for (DatanodeInfo dn : getAllNodes()) {
       try {
@@ -180,6 +183,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
         } else {
           finalizedNodes++;
         }
+
+        // Track whether every healthy datanode is running the same software version as SCM. A
+        // datanode on a lower (or unknown) software version must not be present when SCM finalizes.
+        if (!HDDSVersion.SOFTWARE_VERSION.equals(dnSoftwareVersion)) {
+          allSoftwareVersionsMatchScm = false;
+          // This is expected during a rolling upgrade. Do not flood the logs with one message for every datanode.
+          LOG.debug("Datanode {} software version {} does not match SCM software version {}.",
+              dn.getHostName(), dnSoftwareVersion, HDDSVersion.SOFTWARE_VERSION);
+        }
       } catch (NodeNotFoundException e) {
         // Node was removed while we were iterating. This is OK, skip it.
         LOG.debug("Node {} not found while waiting for finalization, " +
@@ -187,7 +199,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       }
     }
 
-    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes);
+    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes, allSoftwareVersionsMatchScm);
   }
 
   /**
@@ -498,11 +510,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   final class DatanodeFinalizationCounts {
     private final int numFinalizedDatanodes;
     private final int totalHealthyDatanodes;
+    private final boolean allSoftwareVersionsMatchScm;
 
     public DatanodeFinalizationCounts(int numFinalizedDatanodes,
-                                      int totalHealthyDatanodes) {
+                                      int totalHealthyDatanodes,
+                                      boolean allSoftwareVersionsMatchScm) {
       this.numFinalizedDatanodes = numFinalizedDatanodes;
       this.totalHealthyDatanodes = totalHealthyDatanodes;
+      this.allSoftwareVersionsMatchScm = allSoftwareVersionsMatchScm;
     }
 
     public int getNumFinalizedDatanodes() {
@@ -515,6 +530,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
     public boolean allNodesFinalized() {
       return numFinalizedDatanodes == totalHealthyDatanodes;
+    }
+
+    /**
+     * @return true if every healthy datanode reports the same software version as SCM
+     * ({@link HDDSVersion#SOFTWARE_VERSION}), vacuously true when there are no healthy datanodes
+     */
+    public boolean allSoftwareVersionsMatchScmVersion() {
+      return allSoftwareVersionsMatchScm;
     }
   }
 }

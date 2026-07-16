@@ -1174,6 +1174,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       validatePeerScmVersionsBeforeFinalize();
+      validateDatanodeVersionsBeforeFinalize();
       scm.getFinalizationManager().finalizeUpgrade();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
     } catch (Exception ex) {
@@ -1183,7 +1184,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public HDDSVersion getSoftwareVersion() throws IOException {
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
     return HDDSVersion.SOFTWARE_VERSION;
   }
 
@@ -1208,7 +1209,7 @@ public class SCMClientProtocolServer implements
       StorageContainerLocationProtocol peerClient = null;
       try {
         peerClient = HAUtils.getScmContainerClientForNode(conf, target);
-        HDDSVersion peerVersion = peerClient.getSoftwareVersion();
+        HDDSVersion peerVersion = peerClient.getPeerUpgradeStatus();
         if (!peerVersion.equals(leaderVersion)) {
           LOG.warn("SCM peer {} is running software version {} but leader is running version {}. "
               + "Rejecting finalize command.", peerId, peerVersion, leaderVersion);
@@ -1225,6 +1226,25 @@ public class SCMClientProtocolServer implements
       throw new SCMException("Finalize rejected: the following SCM peers did not confirm matching software "
           + "version (expected version=" + leaderVersion + "): " + String.join(", ", failedPeers),
           ResultCodes.UNSUPPORTED_OPERATION);
+    }
+  }
+
+  /**
+   * Verifies that every healthy datanode runs the same software version as this SCM before
+   * finalization begins. Datanodes finalize only after SCM instructs them to, so this does not
+   * require them to be finalized; it requires their binaries to match SCM's software version.
+   * Rejects the finalize command if any healthy datanode reports a differing (or unknown) software
+   * version. The resulting exception propagates back to the OM (which triggered finalization) and on
+   * to the client, leaving nothing finalized.
+   */
+  private void validateDatanodeVersionsBeforeFinalize() throws SCMException {
+    NodeManager.DatanodeFinalizationCounts counts =
+        scm.getScmNodeManager().getDatanodeFinalizationCounts();
+    if (!counts.allSoftwareVersionsMatchScmVersion()) {
+      LOG.warn("Rejecting finalize command: not all {} healthy datanodes are running SCM's software "
+          + "version {}.", counts.getTotalHealthyDatanodes(), HDDSVersion.SOFTWARE_VERSION);
+      throw new SCMException("Finalize rejected: not all healthy datanodes are running the SCM software version "
+          + HDDSVersion.SOFTWARE_VERSION, ResultCodes.UNSUPPORTED_OPERATION);
     }
   }
 

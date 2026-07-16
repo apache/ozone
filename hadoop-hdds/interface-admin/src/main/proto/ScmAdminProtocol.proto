@@ -91,7 +91,7 @@ message ScmContainerLocationRequest {
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
   optional QueryUpgradeStatusRequestProto queryUpgradeStatusRequest = 53;
   optional FinalizeUpgradeRequestProto finalizeUpgradeRequest = 54;
-  optional GetSoftwareVersionRequestProto getSoftwareVersionRequest = 55;
+  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 55;
 }
 
 message ScmContainerLocationResponse {
@@ -154,7 +154,7 @@ message ScmContainerLocationResponse {
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
   optional QueryUpgradeStatusResponseProto queryUpgradeStatusResponse = 53;
   optional FinalizeUpgradeResponseProto finalizeUpgradeResponse = 54;
-  optional GetSoftwareVersionResponseProto getSoftwareVersionResponse = 55;
+  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 55;
 
   enum Status {
     OK = 1;
@@ -216,7 +216,7 @@ enum Type {
   SuppressContainer = 48;
   QueryUpgradeStatus = 49;
   FinalizeUpgrade = 50;
-  GetSoftwareVersion = 51;
+  GetPeerUpgradeStatus = 51;
 }
 
 /**
@@ -611,10 +611,10 @@ message FinalizeUpgradeRequestProto {
 message FinalizeUpgradeResponseProto {
 }
 
-message GetSoftwareVersionRequestProto {
+message GetPeerUpgradeStatusRequestProto {
 }
 
-message GetSoftwareVersionResponseProto {
+message GetPeerUpgradeStatusResponseProto {
   // Serialized HDDSVersion.SOFTWARE_VERSION of the responding SCM binary.
   optional int32 scmSoftwareVersion = 1;
 }

@@ -81,7 +81,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   Set<Type> FOLLOWER_READABLE_COMMAND_TYPES = Collections.unmodifiableSet(EnumSet.of(
       Type.InSafeMode,
       Type.GetSafeModeRuleStatuses,
-      Type.GetSoftwareVersion));
+      Type.GetPeerUpgradeStatus));
   
   /**
    * Asks SCM where a container should be allocated. SCM responds with the
@@ -533,7 +533,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * it queries one specific SCM without a leader round-trip. A version not recognized by the calling
    * binary deserializes to {@link HDDSVersion#UNKNOWN_VERSION}.
    */
-  HDDSVersion getSoftwareVersion() throws IOException;
+  HDDSVersion getPeerUpgradeStatus() throws IOException;
 
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
