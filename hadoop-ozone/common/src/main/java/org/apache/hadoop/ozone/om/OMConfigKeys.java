@@ -685,7 +685,7 @@ public final class OMConfigKeys {
   /**
    * Bottommost level compaction type for manual compaction.
    * Invalid values will default to kSkip.
-   * Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce), 3 (kForceOptimized).
+   * Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
    * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
    */
   public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =

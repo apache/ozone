@@ -111,8 +111,7 @@ public class CompactionService extends BackgroundService {
     return compactableTables;
   }
 
-  @VisibleForTesting
-  public ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction() {
+  ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction() {
     return bottommostLevelCompaction;
   }
 
