@@ -340,7 +340,7 @@ jobs:
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
-      script-args: -Ptest-${{ matrix.profile }} -Drocks_tools_native
+      script-args: -Ptest-${{ matrix.profile }} -Phadoop-native-lib -Drocks_tools_native
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.profile }}
       timeout-minutes: 90
