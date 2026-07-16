@@ -396,4 +396,27 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     return req;
   }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithVersioningStatus(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)) {
+      SetBucketPropertyRequest propReq =
+          req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && propReq.getBucketArgs().hasVersioningStatus()) {
+        throw new OMException("Cluster does not have the object versioning"
+            + " feature finalized yet, but the request contains a bucket"
+            + " versioning status. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }
