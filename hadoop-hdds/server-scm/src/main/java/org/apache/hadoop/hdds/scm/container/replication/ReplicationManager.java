@@ -467,12 +467,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   private boolean tryReserveReconstructionSlot() {
     int limit = getReconstructionInFlightLimit();
-    if (limit <= 0) {
-      return true;
-    }
     while (true) {
       int current = inflightReconstructionCount.get();
-      if (current >= limit) {
+      if (limit > 0 && current >= limit) {
         return false;
       }
       if (inflightReconstructionCount.compareAndSet(current, current + 1)) {
