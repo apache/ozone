@@ -250,7 +250,7 @@
                 <goals>
                   <goal>run</goal>
                 </goals>
-                <phase>generate-sources</phase>
+                <phase>initialize</phase>
                 <configuration>
                   <target>
                     <untar compression="gzip" dest="${project.build.directory}/rocksdb/" src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.source.version}.tar.gz" />

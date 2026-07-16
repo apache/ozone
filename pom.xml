@@ -2664,6 +2664,44 @@
               </execution>
             </executions>
           </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-x86_64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>prepare-package</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-darwin-aarch64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>prepare-package</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
       </build>
     </profile>
