@@ -596,7 +596,7 @@ public class BlockOutputStream extends OutputStream {
 
       // if block is full, send the eof
       boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
-      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -963,7 +963,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {
@@ -1157,6 +1157,18 @@ public class BlockOutputStream extends OutputStream {
       revisedChunkInfo.addMetadata(FULL_CHUNK_KV);
     }
     return revisedChunkInfo.build();
+  }
+
+  /**
+   * @return true when the DataNode may auto-create a missing container for this write.
+   */
+  protected boolean containerAutoCreate() {
+    return true;
+  }
+
+  @VisibleForTesting
+  public boolean isContainerAutoCreate() {
+    return containerAutoCreate();
   }
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {
