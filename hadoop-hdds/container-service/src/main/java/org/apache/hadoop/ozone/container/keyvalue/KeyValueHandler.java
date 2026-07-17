@@ -697,6 +697,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return putBlockResponseSuccess(request, blockDataProto);
   }
 
@@ -1105,7 +1106,15 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
+    if (kvContainer.getContainerState() != RECOVERING) {
+      return;
+    }
+    containerSet.updateRecoveringContainerTimeout(kvContainer.getContainerData().getContainerID());
   }
 
   /**
