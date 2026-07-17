@@ -2158,6 +2158,14 @@
                       <bannedImport>io.netty.util.internal.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Classes (e.g. FileInputStream, FileOutputStream) overriding the Object.finalize() method will cause gc to run a much longer time</reason>
+                    <bannedImports>
+                      <bannedImport>java.io.FileInputStream</bannedImport>
+                      <bannedImport>java.io.FileOutputStream</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
