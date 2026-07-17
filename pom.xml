@@ -2624,7 +2624,7 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-linux-library</id>
+                <id>fetch-linux-x86_64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
@@ -2637,7 +2637,20 @@
                 </configuration>
               </execution>
               <execution>
-                <id>fetch-mac-library</id>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
@@ -2655,14 +2668,14 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
             <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
             <executions>
               <execution>
-                <id>extract-linux-library</id>
+                <id>extract-linux-x86_64-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
-                <phase>prepare-package</phase>
-                <inherited>false</inherited>
+                <phase>generate-resources</phase>
                 <configuration>
                   <target>
                     <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
@@ -2673,12 +2686,11 @@
                 </configuration>
               </execution>
               <execution>
-                <id>extract-mac-library</id>
+                <id>extract-darwin-aarch64-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
-                <phase>prepare-package</phase>
-                <inherited>false</inherited>
+                <phase>generate-resources</phase>
                 <configuration>
                   <target>
                     <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
@@ -2995,7 +3007,7 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-linux-library</id>
+                <id>fetch-linux-x86_64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
@@ -3008,7 +3020,20 @@
                 </configuration>
               </execution>
               <execution>
-                <id>fetch-mac-library</id>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
@@ -3026,14 +3051,14 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
             <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
             <executions>
               <execution>
-                <id>extract-linux-library</id>
+                <id>extract-linux-x86_64-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
-                <phase>prepare-package</phase>
-                <inherited>false</inherited>
+                <phase>generate-resources</phase>
                 <configuration>
                   <target>
                     <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
@@ -3044,12 +3069,11 @@
                 </configuration>
               </execution>
               <execution>
-                <id>extract-mac-library</id>
+                <id>extract-darwin-aarch64-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
-                <phase>prepare-package</phase>
-                <inherited>false</inherited>
+                <phase>generate-resources</phase>
                 <configuration>
                   <target>
                     <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
