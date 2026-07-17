@@ -287,23 +287,45 @@ public class TestChunkInputStream {
 
   @Test
   public void testPositionedRead() throws Exception {
-    byte[] buffer = new byte[50];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(50);
     int bytesRead = chunkStream.read(30, byteBuffer);
-
     assertEquals(50, bytesRead);
     byte[] expected = Arrays.copyOfRange(chunkData, 30, 80);
-    assertArrayEquals(expected, buffer);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    // Read backward
+    byteBuffer = ByteBuffer.allocate(50);
+    bytesRead = chunkStream.read(10, byteBuffer);
+    assertEquals(50, bytesRead);
+    expected = Arrays.copyOfRange(chunkData, 10, 60);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    // Read forward
+    byteBuffer = ByteBuffer.allocate(50);
+    bytesRead = chunkStream.read(90, byteBuffer);
+    assertEquals(10, bytesRead);
+    expected = new byte[50];
+    System.arraycopy(chunkData, 90, expected, 0, 10);
+    assertArrayEquals(expected, byteBuffer.array());
   }
 
   @Test
   public void testPositionedReadFully() throws Exception {
     ByteBuffer byteBuffer = ByteBuffer.allocate(40);
     chunkStream.readFully(50, byteBuffer);
-    byteBuffer.flip();
-    byte[] actual = new byte[40];
-    byteBuffer.get(actual);
     byte[] expected = Arrays.copyOfRange(chunkData, 50, 90);
-    assertArrayEquals(expected, actual);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    byteBuffer = ByteBuffer.allocate(50);
+    chunkStream.readFully(10, byteBuffer);
+    expected = Arrays.copyOfRange(chunkData, 10, 60);
+    assertArrayEquals(expected, byteBuffer.array());
+
+
+    byteBuffer = ByteBuffer.allocate(50);
+    chunkStream.read(90, byteBuffer);
+    expected = new byte[50];
+    System.arraycopy(chunkData, 90, expected, 0, 10);
+    assertArrayEquals(expected, byteBuffer.array());
   }
 }
