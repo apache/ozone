@@ -36,6 +36,7 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,7 +44,9 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,11 +65,13 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   private BasicRootedOzoneClientAdapterImpl adapter;
   private OzoneBucket bucket;
+  private ClientProtocol proxy;
 
   @BeforeEach
   public void setUp() throws Exception {
     adapter = mock(BasicRootedOzoneClientAdapterImpl.class, CALLS_REAL_METHODS);
     bucket = mock(OzoneBucket.class);
+    proxy = mock(ClientProtocol.class);
     doReturn(bucket).when(adapter).getBucket(any(OFSPath.class), eq(false));
 
     // Inject a mock object store so the volume/snapshot dispatch branches can
@@ -77,10 +82,29 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     when(volume.getCreationTime()).thenReturn(Instant.EPOCH);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    Field field =
-        BasicRootedOzoneClientAdapterImpl.class.getDeclaredField("objectStore");
+    setField(adapter, "objectStore", objectStore);
+    setField(adapter, "proxy", proxy);
+    warmLayoutCache("vol", "bucket");
+  }
+
+  private static void setField(Object target, String name, Object value)
+      throws Exception {
+    Field field = BasicRootedOzoneClientAdapterImpl.class.getDeclaredField(name);
     field.setAccessible(true);
-    field.set(adapter, objectStore);
+    field.set(target, value);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void warmLayoutCache(String volumeName, String bucketName)
+      throws Exception {
+    Field cacheField =
+        BasicRootedOzoneClientAdapterImpl.class.getDeclaredField(
+            "validatedBucketLayouts");
+    cacheField.setAccessible(true);
+    ConcurrentHashMap<String, BucketLayout> cache =
+        new ConcurrentHashMap<>();
+    cache.put(volumeName + "/" + bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    cacheField.set(adapter, cache);
   }
 
   private static OzoneFileStatus fileStatus(boolean isDir) {
@@ -101,25 +125,27 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void keyPathThreadsHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
-        .thenReturn(fileStatus(false));
+    when(proxy.getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        anyBoolean())).thenReturn(fileStatus(false));
 
     assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user", true).isDir());
 
     ArgumentCaptor<Boolean> headOp = ArgumentCaptor.forClass(Boolean.class);
-    verify(bucket).getFileStatus(anyString(), headOp.capture());
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        headOp.capture());
     assertTrue(headOp.getValue());
   }
 
   @Test
   public void fourArgOverloadDoesNotUseHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
-        .thenReturn(fileStatus(true));
+    when(proxy.getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        anyBoolean())).thenReturn(fileStatus(true));
 
     assertTrue(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user").isDir());
-    verify(bucket).getFileStatus(anyString(), eq(false));
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        eq(false));
   }
 
   @Test
@@ -130,8 +156,8 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void fileNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
-        .thenThrow(new OMException("missing",
+    when(proxy.getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        anyBoolean())).thenThrow(new OMException("missing",
             OMException.ResultCodes.FILE_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
         () -> adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
@@ -140,8 +166,8 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void otherOMExceptionPropagates() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
-        .thenThrow(new OMException("boom",
+    when(proxy.getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        anyBoolean())).thenThrow(new OMException("boom",
             OMException.ResultCodes.INTERNAL_ERROR));
     assertThrows(OMException.class,
         () -> adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
@@ -150,8 +176,8 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void bucketNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
-        .thenThrow(new OMException("no bucket",
+    when(proxy.getOzoneFileStatus(eq("vol"), eq("bucket"), anyString(),
+        anyBoolean())).thenThrow(new OMException("no bucket",
             OMException.ResultCodes.BUCKET_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
         () -> adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
