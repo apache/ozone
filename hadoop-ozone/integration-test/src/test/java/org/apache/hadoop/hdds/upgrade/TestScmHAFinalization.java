@@ -237,7 +237,6 @@ public class TestScmHAFinalization {
     cluster.waitForClusterToBeReady();
 
     finalizationFuture.get();
-    waitForScmToFinalize(cluster.getActiveSCM());
     HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Once the leader tells the client finalization is complete, wait for all
     // followers to catch up so we can check their state.
