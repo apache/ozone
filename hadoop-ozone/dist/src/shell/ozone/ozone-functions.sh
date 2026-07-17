@@ -1354,7 +1354,7 @@ function ozone_os_tricks
         TARGET_FILE="libhadoop_osx_aarch_64.dylib"
       fi
 
-     pushd . > /dev/null && cd lib/native
+      pushd lib/native > /dev/null
       # If no matching file variant was found for the current environment
       if [ -z "$TARGET_FILE" ]; then
         echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
