@@ -1884,6 +1884,8 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
       assertThat(exception.getMessage())
           .contains(BucketLayout.OBJECT_STORE.name());
     } finally {
+      objectStore.getVolume(obsBucket.getVolumeName())
+          .deleteBucket(obsBucket.getName());
       objectStore.deleteVolume(obsBucket.getVolumeName());
     }
   }
