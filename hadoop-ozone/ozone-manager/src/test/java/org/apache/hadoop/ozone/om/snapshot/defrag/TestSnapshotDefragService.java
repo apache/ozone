@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -1104,6 +1105,67 @@ public class TestSnapshotDefragService {
       verify(snapshotMetrics, Mockito.never()).incNumSnapshotFullDefrag();
       verify(snapshotMetrics, Mockito.never()).incNumSnapshotIncDefrag();
       // Verify checkpoint was closed in finally block
+      verify(checkpointMetadataManager).close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckpointCleanupOnDefragFailure(boolean previousSnapshotExists) throws IOException {
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap2");
+    SnapshotInfo previousSnapshotInfo;
+    if (previousSnapshotExists) {
+      previousSnapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap1");
+      snapshotInfo.setPathPreviousSnapshotId(previousSnapshotInfo.getSnapshotId());
+    } else {
+      previousSnapshotInfo = null;
+    }
+
+    SnapshotChainManager chainManager = mock(SnapshotChainManager.class);
+    try (MockedStatic<SnapshotUtils> mockedStatic = Mockito.mockStatic(SnapshotUtils.class)) {
+      mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
+          eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
+      if (previousSnapshotExists) {
+        mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
+            eq(previousSnapshotInfo.getSnapshotId()))).thenReturn(previousSnapshotInfo);
+      }
+
+      SnapshotDefragService spyDefragService = Mockito.spy(defragService);
+      doReturn(Pair.of(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+
+      @SuppressWarnings("resource") // Mock object, no actual resource management needed
+      OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
+      File checkpointPath = tempDir.resolve("checkpoint_" + System.nanoTime()).toAbsolutePath().toFile();
+      // Create actual checkpoint directory to verify cleanup
+      assertTrue(checkpointPath.mkdirs(), "Failed to create checkpoint directory for test");
+      assertTrue(checkpointPath.exists(), "Checkpoint directory should exist before defragmentation");
+
+      DBStore checkpointDBStore = mock(DBStore.class);
+      when(checkpointMetadataManager.getStore()).thenReturn(checkpointDBStore);
+      when(checkpointDBStore.getDbLocation()).thenReturn(checkpointPath);
+      doNothing().when(checkpointMetadataManager).close();
+      doReturn(checkpointMetadataManager).when(spyDefragService).createCheckpoint(any(), any());
+
+      TablePrefixInfo prefixInfo = new TablePrefixInfo(Collections.emptyMap());
+      when(metadataManager.getTableBucketPrefix(anyString(), anyString())).thenReturn(prefixInfo);
+
+      // Make the defrag operation throw IOException to simulate failure
+      IOException defragException = new IOException("Defrag failed");
+      if (previousSnapshotExists) {
+        Mockito.doThrow(defragException).when(spyDefragService).performIncrementalDefragmentation(
+            any(), any(), anyInt(), any(), any(), any());
+      } else {
+        Mockito.doThrow(defragException).when(spyDefragService).performFullDefragmentation(
+            any(), any(), any());
+      }
+
+      // Attempt defragmentation and verify exception is thrown
+      IOException thrownException = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+          () -> spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
+      assertEquals("Defrag failed", thrownException.getMessage());
+
+      // Verify that checkpointMetadataManager.close() was called in the finally block
+      // This confirms the finally block executed despite the exception
       verify(checkpointMetadataManager).close();
     }
   }
