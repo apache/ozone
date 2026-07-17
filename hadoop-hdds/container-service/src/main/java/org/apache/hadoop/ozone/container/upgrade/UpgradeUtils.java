@@ -36,7 +36,8 @@ public final class UpgradeUtils {
         .setSoftwareVersion(softwareVersion).build();
   }
 
-  public static DatanodeVersionProto toVersionProto(ComponentVersion apparentVersion, ComponentVersion softwareVersion) {
+  public static DatanodeVersionProto toVersionProto(ComponentVersion apparentVersion,
+                                                    ComponentVersion softwareVersion) {
     return DatanodeVersionProto.newBuilder()
         .setApparentVersion(apparentVersion.serialize())
         .setSoftwareVersion(softwareVersion.serialize())
