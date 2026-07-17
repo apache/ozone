@@ -475,6 +475,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
+        updateDatanodePortsIfChanged(datanodeDetails, layoutInfo);
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
                 datanodeDetails);
@@ -547,6 +548,33 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     return versionChanged;
   }
 
+  private boolean isPortChange(DatanodeDetails oldNode, DatanodeDetails newNode) {
+    return !toPortMap(oldNode.getPorts()).equals(toPortMap(newNode.getPorts()));
+  }
+
+  private Map<DatanodeDetails.Port.Name, Integer> toPortMap(
+      List<DatanodeDetails.Port> ports) {
+    Map<DatanodeDetails.Port.Name, Integer> portMap = new HashMap<>();
+    for (DatanodeDetails.Port port : ports) {
+      portMap.put(port.getName(), port.getValue());
+    }
+    return portMap;
+  }
+
+  private void updateDatanodePortsIfChanged(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutInfo) throws NodeNotFoundException {
+    DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
+    if (!isPortChange(oldNode, datanodeDetails)) {
+      return;
+    }
+    LOG.info("Update the ports for registered datanode {}, " +
+            "oldPorts = {}, newPorts = {}.",
+        datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
+    nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+    DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
+    scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+  }
+
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
@@ -562,6 +590,9 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
       metrics.incNumHBProcessed();
       updateDatanodeOpState(datanodeDetails);
+      DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
+      updateDatanodePortsIfChanged(datanodeDetails,
+          oldNode.getLastKnownLayoutVersion());
     } catch (NodeNotFoundException e) {
       metrics.incNumHBProcessingFailed();
       LOG.error("SCM trying to process heartbeat from an " +

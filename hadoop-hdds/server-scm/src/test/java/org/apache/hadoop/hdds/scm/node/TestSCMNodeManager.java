@@ -38,6 +38,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_ADDRESS_UPDATE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -2100,6 +2101,89 @@ public class TestSCMNodeManager {
       assertEquals(emptyList(), nodeManager.getNodesByAddress(hostName));
       assertEquals(emptyList(), nodeManager.getNodesByAddress(ipAddress));
     }
+  }
+
+  /**
+   * Test node register with updated ports only.
+   */
+  @Test
+  public void testScmRegisterNodeWithUpdatedPorts()
+      throws IOException, NodeNotFoundException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMContext nodeManagerContext = SCMContext.emptyContext();
+    try (SCMNodeManager nodeManager = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        nodeManagerContext, lvm)) {
+      DatanodeID nodeId = DatanodeID.randomID();
+      DatanodeDetails node = createDatanodeWithPorts(nodeId, 9855, false);
+      nodeManager.register(node, null, null, CORRECT_LAYOUT_PROTO);
+
+      DatanodeDetails storedNode = nodeManager.getNodeStateManager().getNode(node);
+      assertTrue(storedNode.getPorts().stream()
+          .noneMatch(p -> p.getName() == DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+
+      DatanodeDetails updatedNode = createDatanodeWithPorts(nodeId, 9855, true);
+      nodeManager.register(updatedNode, null, null, CORRECT_LAYOUT_PROTO);
+
+      storedNode = nodeManager.getNodeStateManager().getNode(node);
+      assertTrue(storedNode.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+      assertEquals(9855,
+          storedNode.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM).getValue());
+      verify(eventPublisher, times(1)).fireEvent(NODE_ADDRESS_UPDATE, storedNode);
+    }
+  }
+
+  /**
+   * Test heartbeat updates ports when only ports change.
+   */
+  @Test
+  public void testScmHeartbeatWithUpdatedPorts()
+      throws IOException, NodeNotFoundException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMContext nodeManagerContext = SCMContext.emptyContext();
+    try (SCMNodeManager nodeManager = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        nodeManagerContext, lvm)) {
+      DatanodeID nodeId = DatanodeID.randomID();
+      DatanodeDetails node = createDatanodeWithPorts(nodeId, 9855, false);
+      nodeManager.register(node, null, null, CORRECT_LAYOUT_PROTO);
+      nodeManager.processLayoutVersionReport(node, CORRECT_LAYOUT_PROTO);
+
+      DatanodeDetails updatedNode = createDatanodeWithPorts(nodeId, 9855, true);
+      nodeManager.processHeartbeat(updatedNode, null);
+
+      DatanodeDetails storedNode = nodeManager.getNodeStateManager().getNode(node);
+      assertTrue(storedNode.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+      assertEquals(9855,
+          storedNode.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM).getValue());
+      verify(eventPublisher, times(1)).fireEvent(NODE_ADDRESS_UPDATE, storedNode);
+    }
+  }
+
+  private DatanodeDetails createDatanodeWithPorts(DatanodeID nodeId, int ratisPort,
+      boolean includeDatastreamPort) {
+    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder()
+        .setID(nodeId)
+        .setHostName("host1")
+        .setIpAddress("1.2.3.4");
+    for (DatanodeDetails.Port.Name name : DatanodeDetails.Port.Name.V0_PORTS) {
+      builder.addPort(DatanodeDetails.newPort(name, ratisPort));
+    }
+    if (includeDatastreamPort) {
+      builder.addPort(DatanodeDetails.newPort(
+          DatanodeDetails.Port.Name.RATIS_DATASTREAM, ratisPort));
+    }
+    return builder.build();
   }
 
   /**
