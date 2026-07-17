@@ -1848,6 +1848,56 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testGetFileStatusUsesSingleOmRpcAfterCacheWarm() throws Exception {
+    Path path = new Path(bucketPath, "single-rpc-stat-test");
+    fs.mkdirs(path);
+    // Warm the bucket layout cache; ignore metrics from the first stat.
+    fs.getFileStatus(path);
+
+    long getFileStatusBefore = getOMMetrics().getNumGetFileStatus();
+    long bucketInfoBefore = getOMMetrics().getNumBucketInfos();
+
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status.isDirectory());
+
+    assertEquals(getFileStatusBefore + 1, getOMMetrics().getNumGetFileStatus());
+    assertEquals(bucketInfoBefore, getOMMetrics().getNumBucketInfos());
+  }
+
+  @Test
+  void testGetFileStatusOnBucketRoot() throws Exception {
+    FileStatus status = fs.getFileStatus(bucketPath);
+    assertTrue(status.isDirectory());
+  }
+
+  @Test
+  void testGetFileStatusOnObjectStoreBucketRejectsInvalidLayout()
+      throws Exception {
+    OzoneBucket obsBucket =
+        TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    Path obsBucketPath = new Path(
+        new Path(OZONE_URI_DELIMITER + obsBucket.getVolumeName()),
+        obsBucket.getName());
+    try {
+      IllegalArgumentException exception = assertThrows(
+          IllegalArgumentException.class, () -> fs.getFileStatus(obsBucketPath));
+      assertThat(exception.getMessage())
+          .contains(BucketLayout.OBJECT_STORE.name());
+    } finally {
+      objectStore.deleteVolume(obsBucket.getVolumeName());
+    }
+  }
+
+  @Test
+  void testGetFileStatusMissingFile() throws Exception {
+    Path missingFile = new Path(bucketPath, "missing-file-" +
+        RandomStringUtils.secure().nextAlphanumeric(5));
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.getFileStatus(missingFile));
+    assertThat(exception.getMessage()).contains("No such file or directory");
+  }
+
+  @Test
   void testUnbuffer() throws IOException {
     String testKeyName = "testKey2";
     Path path = new Path(bucketPath, testKeyName);
