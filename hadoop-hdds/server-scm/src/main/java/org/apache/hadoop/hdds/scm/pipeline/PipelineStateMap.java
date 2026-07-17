@@ -303,7 +303,7 @@ class PipelineStateMap {
    */
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    return getPipeline(pipelineID).getContainers();
+    return getPipeline(pipelineID).copyContainers();
   }
 
   /**
@@ -378,11 +378,9 @@ class PipelineStateMap {
       return pipeline;
     }
     final Pipeline updated = pipeline.toBuilder().setState(state).build();
-    PipelineInfo oldInfo = getPipeline(pipelineID);
-
     PipelineInfo newInfo = new PipelineInfo(updated);
 
-    for (ContainerID cid : oldInfo.copyContainers()) {
+    for (ContainerID cid : info.getContainers()) {
       newInfo.addContainer(cid);
     }
 

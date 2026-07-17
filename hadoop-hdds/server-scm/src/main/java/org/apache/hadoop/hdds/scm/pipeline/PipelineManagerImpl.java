@@ -472,7 +472,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   private void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
-    NavigableSet<ContainerID> containerIDs = new TreeSet<>(stateManager.getContainers(pipelineId));
+    Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     ContainerManager containerManager = scmContext.getScm()
         .getContainerManager();
     for (ContainerID containerID : containerIDs) {
