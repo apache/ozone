@@ -1172,14 +1172,7 @@ public class ContainerBalancerTask implements Runnable {
    * @return true if Datanode should be excluded, else false
    */
   private boolean shouldExcludeDatanode(DatanodeDetails datanode) {
-    if (excludeNodes.contains(datanode.getHostName()) ||
-        excludeNodes.contains(datanode.getIpAddress())) {
-      return true;
-    } else if (!includeNodes.isEmpty()) {
-      return !includeNodes.contains(datanode.getHostName()) &&
-          !includeNodes.contains(datanode.getIpAddress());
-    }
-    return false;
+    return ContainerBalancer.shouldExcludeDatanode(datanode, excludeNodes, includeNodes);
   }
 
   /**
