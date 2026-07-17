@@ -1592,7 +1592,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.compaction.service.bottommostlevelcompaction</name>
+    <name>ozone.om.compaction.service.bottommost-level-compaction</name>
     <value>kSkip</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>

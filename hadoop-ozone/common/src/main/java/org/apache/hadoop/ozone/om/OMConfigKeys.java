@@ -689,7 +689,7 @@ public final class OMConfigKeys {
    * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
    */
   public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
-      "ozone.om.compaction.service.bottommostlevelcompaction";
+      "ozone.om.compaction.service.bottommost-level-compaction";
   public static final BottommostLevelCompaction
       OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = BottommostLevelCompaction.kSkip;
 
