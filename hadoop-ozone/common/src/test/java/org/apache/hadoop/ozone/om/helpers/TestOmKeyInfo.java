@@ -142,6 +142,13 @@ public class TestOmKeyInfo {
     assertEquals(4242L, recovered.getVersionId());
     assertTrue(recovered.isDeleteMarker());
     assertTrue(recovered.isNullVersion());
+
+    // records differing only in a versioning field must not compare equal
+    OmKeyInfo plain = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertNotEquals(plain, plain.toBuilder().setVersionId(1L).build());
+    assertNotEquals(plain, plain.toBuilder().setDeleteMarker(true).build());
+    assertNotEquals(plain, plain.toBuilder().setNullVersion(true).build());
   }
 
   private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {

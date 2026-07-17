@@ -352,6 +352,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         (this.acls != null) ? this.acls.toString() : null);
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
         String.valueOf(this.isVersionEnabled));
+    auditMap.put(OzoneConsts.VERSIONING_STATUS, this.versioningStatus.name());
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
@@ -423,6 +424,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return toBuilder()
         .setStorageType(source.getStorageType())
         .setIsVersionEnabled(source.getIsVersionEnabled())
+        .setVersioningStatus(source.getVersioningStatus())
         .setBucketEncryptionKey(source.getEncryptionKeyInfo())
         .setUsedBytes(source.getUsedBytes())
         .setUsedNamespace(source.getUsedNamespace())

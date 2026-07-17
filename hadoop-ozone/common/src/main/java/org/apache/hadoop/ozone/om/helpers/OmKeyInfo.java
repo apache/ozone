@@ -513,6 +513,9 @@ public final class OmKeyInfo extends WithParentObjectId
         ", isFile=" + isFile +
         ", fileName='" + fileName + '\'' +
         ", acls=" + acls +
+        ", versionId=" + versionId +
+        ", isDeleteMarker=" + isDeleteMarker +
+        ", isNullVersion=" + isNullVersion +
         '}';
   }
 
@@ -1014,7 +1017,10 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
-        getObjectID() == omKeyInfo.getObjectID();
+        getObjectID() == omKeyInfo.getObjectID() &&
+        Objects.equals(versionId, omKeyInfo.versionId) &&
+        isDeleteMarker == omKeyInfo.isDeleteMarker &&
+        isNullVersion == omKeyInfo.isNullVersion;
 
     if (isEqual && checkUpdateID) {
       isEqual = getUpdateID() == omKeyInfo.getUpdateID();
