@@ -26,6 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -71,9 +73,7 @@ public class TestDiskBalancerSubCommandUtil {
 
     assertEquals("10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
         target.getClientRpcAddress());
-    assertEquals("nodename (10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT
-            + " / " + DN_UUID + ")",
-        target.getDisplayName());
+    assertEquals(DN_UUID, target.getDisplayName());
   }
 
   @Test
@@ -98,7 +98,7 @@ public class TestDiskBalancerSubCommandUtil {
   }
 
   @Test
-  public void testGetDatanodeHostAndIpIncludesUuid() {
+  public void testGetDatanodeHostAndIp() {
     HddsProtos.DatanodeDetailsProto nodeProto = buildNode(
         "6d8157c2-280d-4eb2-a264-d388b05a0a87",
         "ozone-datanode-2.ozone_default",
@@ -106,9 +106,17 @@ public class TestDiskBalancerSubCommandUtil {
         HDDS_DATANODE_CLIENT_PORT_DEFAULT).getNodeID();
 
     assertEquals(
-        "ozone-datanode-2.ozone_default (172.18.0.6:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT
-            + " / 6d8157c2-280d-4eb2-a264-d388b05a0a87)",
+        "ozone-datanode-2.ozone_default (172.18.0.6:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")",
         DiskBalancerSubCommandUtil.getDatanodeHostAndIp(nodeProto));
+  }
+
+  @Test
+  public void testNormalizeNodeIds() {
+    List<String> normalized = DiskBalancerSubCommandUtil.normalizeNodeIds(
+        Arrays.asList("uuid1,", " uuid2"));
+    assertEquals(2, normalized.size());
+    assertEquals("uuid1", normalized.get(0));
+    assertEquals("uuid2", normalized.get(1));
   }
 
   private static HddsProtos.Node buildNode(

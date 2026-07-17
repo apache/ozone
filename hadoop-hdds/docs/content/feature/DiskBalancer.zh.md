@@ -146,16 +146,17 @@ ozone admin datanode diskbalancer report [<datanode-address or -id> ...] [--in-s
 
 ### 命令选项
 
-| Option                              | Description                                                                                                                                                                                                      | Example                                        |
-|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| `<datanode-address-or-id>`          | 一个或多个数据节点标识符作为位置参数。每个可以是：<br>- 主机名（例如 `DN-1`）- 使用默认 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如 `DN-1:19864`）<br>- IP 地址（例如 `192.168.1.10`）<br>- 带端口的 IP 地址（例如 `192.168.1.10:19864`）<br>- 数据节点 UUID（例如 `a3b63511-bdf8-4fa1-8ab6-d19c0e806f84`）- 通过 SCM 解析<br>- 标准输入 (`-`) - 从标准输入读取标识符，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`a3b63511-bdf8-4fa1-8ab6-d19c0e806f84`<br>`-` |
-| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 且 HEALTHY 的数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
-| `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
-| `-t/--threshold-percentage`         | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
-| `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
-| `-p/--parallel-thread`              | 并行线程数（默认值：5）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
-| `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：true）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
-| `-c/--container-states`             | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
+| Option                      | Description                                                                                                                                                                                                      | Example                                        |
+|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| `<datanode-address>`        | 一个或多个数据节点地址作为位置参数。每个可以是：<br>- 主机名（例如 `DN-1`）- 使用默认 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如 `DN-1:19864`）<br>- IP 地址（例如 `192.168.1.10`）<br>- 带端口的 IP 地址（例如 `192.168.1.10:19864`）<br>- 标准输入 (`-`) - 从标准输入读取地址，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
+| `--node-id`                 | 数据节点 UUID。需要通过 SCM 解析为 CLIENT_RPC 地址。                                                                                                                                                                                                                                        | `--node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84` |
+| `--in-service-datanodes`    | 它向 SCM 查询所有 IN_SERVICE 且 HEALTHY 的数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
+| `--json`                    | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
+| `-t/--threshold-percentage` | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
+| `-b/--bandwidth-in-mb`      | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
+| `-p/--parallel-thread`      | 并行线程数（默认值：5）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even` | 磁盘平衡完成后自动停止（默认值：true）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+| `-c/--container-states`     | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
 
 ### 示例
 **启动 DiskBalancer：**
@@ -165,7 +166,7 @@ ozone admin datanode diskbalancer report [<datanode-address or -id> ...] [--in-s
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
 
 # 使用数据节点 UUID 启动 DiskBalancer
-ozone admin datanode diskbalancer start a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
+ozone admin datanode diskbalancer start --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
 
 # 在所有 IN_SERVICE 且 HEALTHY 的数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start --in-service-datanodes

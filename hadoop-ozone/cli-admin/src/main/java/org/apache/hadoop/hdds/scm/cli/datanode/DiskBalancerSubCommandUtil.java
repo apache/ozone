@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,6 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolClientSideTranslatorPB;
@@ -83,28 +83,69 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
+   * Normalizes {@code --node-id} values, including comma-separated lists and trailing commas when
+   * the shell splits {@code uuid1, uuid2} into separate arguments.
+   */
+  static List<String> normalizeNodeIds(List<String> rawNodeIds) {
+    List<String> normalized = new ArrayList<>();
+    if (rawNodeIds == null) {
+      return normalized;
+    }
+    for (String rawNodeId : rawNodeIds) {
+      if (rawNodeId == null || rawNodeId.isEmpty()) {
+        continue;
+      }
+      for (String nodeId : rawNodeId.split(",\\s*")) {
+        String trimmed = nodeId.trim();
+        if (!trimmed.isEmpty()) {
+          normalized.add(trimmed);
+        }
+      }
+    }
+    return normalized;
+  }
+
+  /**
+   * Resolves a datanode hostname or host:port to a CLIENT_RPC address without contacting SCM.
+   */
+  static DatanodeTarget resolveDatanodeAddress(String nodeArg) {
+    return new DatanodeTarget(nodeArg, nodeArg);
+  }
+
+  /**
+   * Resolves a datanode UUID to a CLIENT_RPC address via SCM.
+   */
+  static DatanodeTarget resolveDatanodeTargetByUuid(ScmClient scmClient, String nodeUuid)
+      throws IOException {
+    if (!isDatanodeUuid(nodeUuid)) {
+      throw new IOException("Invalid datanode UUID: " + nodeUuid);
+    }
+
+    HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeUuid));
+    HddsProtos.DatanodeDetailsProto nodeId = node.getNodeID();
+    if (!node.hasNodeID() || (!nodeId.hasUuid() && !nodeId.hasUuid128() && !nodeId.hasId())) {
+      throw new IOException("Datanode not found: " + nodeUuid);
+    }
+
+    DatanodeDetails details = DatanodeDetails.getFromProtoBuf(nodeId);
+    if (details.getIpAddress() == null || details.getIpAddress().isEmpty()) {
+      throw new IOException("Datanode not found: " + nodeUuid);
+    }
+
+    String address = getClientRpcAddress(details);
+    return new DatanodeTarget(address, nodeUuid);
+  }
+
+  /**
    * Resolves a datanode identifier to a CLIENT_RPC address.
    * Accepts datanode UUID, hostname, or host:port.
    */
   static DatanodeTarget resolveDatanodeTarget(ScmClient scmClient, String nodeArg)
       throws IOException {
     if (!isDatanodeUuid(nodeArg)) {
-      return new DatanodeTarget(nodeArg, nodeArg);
+      return resolveDatanodeAddress(nodeArg);
     }
-
-    HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeArg));
-    HddsProtos.DatanodeDetailsProto nodeId = node.getNodeID();
-    if (!node.hasNodeID() || (!nodeId.hasUuid() && !nodeId.hasUuid128() && !nodeId.hasId())) {
-      throw new IOException("Datanode not found: " + nodeArg);
-    }
-
-    DatanodeDetails details = DatanodeDetails.getFromProtoBuf(nodeId);
-    if (details.getIpAddress() == null || details.getIpAddress().isEmpty()) {
-      throw new IOException("Datanode not found: " + nodeArg);
-    }
-
-    String address = getClientRpcAddress(details);
-    return new DatanodeTarget(address, getDatanodeHostAndIp(nodeId));
+    return resolveDatanodeTargetByUuid(scmClient, nodeArg);
   }
 
   /**
@@ -143,7 +184,7 @@ final class DiskBalancerSubCommandUtil {
    * Used for batch operations with --in-service-datanodes flag.
    *
    * @param scmClient the SCM client
-   * @return map of address (ip:port) to display string (hostname (ip:port / uuid) or ip:port / uuid)
+   * @return map of address (ip:port) to display string (hostname (ip:port) or ip:port)
    * @throws IOException if SCM query fails
    */
   public static Map<String, String> getAllOperableNodesClientRpcAddress(
@@ -163,7 +204,7 @@ final class DiskBalancerSubCommandUtil {
         String address = getClientRpcAddress(details);
         addressToDisplay.put(address, getDatanodeHostAndIp(node.getNodeID()));
       } catch (IOException e) {
-        System.out.println(e.getMessage());
+        System.err.println(e.getMessage());
       }
     }
 
@@ -180,9 +221,8 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Returns a formatted string combining hostname, IP address, and datanode UUID
-   * from DatanodeDetailsProto.
-   * Format: {@code hostname (ip:port / uuid)} or {@code ip:port / uuid}.
+   * Returns a formatted string combining hostname and IP address from DatanodeDetailsProto.
+   * Format: {@code hostname (ip:port)} or {@code ip:port}.
    *
    * @param nodeProto the DatanodeDetailsProto from the diskbalancer info
    * @return formatted datanode identifier for status/report output
@@ -197,35 +237,10 @@ final class DiskBalancerSubCommandUtil {
         .findFirst()
         .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT); // Default port if not found
 
-    // Format the output string
     String addressPort = ipAddress + ":" + port;
-    String addressWithUuid = appendDatanodeUuid(addressPort, nodeProto);
     if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
-      return hostname + " (" + addressWithUuid + ")";
+      return hostname + " (" + addressPort + ")";
     }
-    return addressWithUuid;
-  }
-
-  private static String appendDatanodeUuid(
-      String addressPort, HddsProtos.DatanodeDetailsProto nodeProto) {
-    String uuid = extractDatanodeUuid(nodeProto);
-    if (uuid == null || uuid.isEmpty()) {
-      return addressPort;
-    }
-    return addressPort + " / " + uuid;
-  }
-
-  private static String extractDatanodeUuid(HddsProtos.DatanodeDetailsProto nodeProto) {
-    if (nodeProto.hasUuid() && !nodeProto.getUuid().isEmpty()) {
-      return nodeProto.getUuid();
-    }
-    if (nodeProto.hasUuid128()) {
-      HddsProtos.UUID uuid128 = nodeProto.getUuid128();
-      return new UUID(uuid128.getMostSigBits(), uuid128.getLeastSigBits()).toString();
-    }
-    if (nodeProto.hasId()) {
-      return DatanodeID.fromProto(nodeProto.getId()).toString();
-    }
-    return null;
+    return addressPort;
   }
 }
