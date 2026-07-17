@@ -24,9 +24,9 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 declare -i rc
 
-if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
+if [[ -d "${BASE_DIR}/ozone-ui" ]]; then
   (
-    cd "${BASE_DIR}/ozone-ui/src" || exit 1
+    cd "${BASE_DIR}/ozone-ui" || exit 1
     # Install dependencies if node_modules doesn't exist
     if [[ ! -d "node_modules" ]]; then
       pnpm install --frozen-lockfile
@@ -57,7 +57,7 @@ if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
   fi
 else
   rc=0
-  echo "ozone-ui/src not found. Skipping UI lint."
+  echo "ozone-ui not found. Skipping UI lint."
 fi
 
 ERROR_PATTERN="error"
