@@ -59,7 +59,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -135,7 +135,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   private Map<DatanodeID, DatanodeSimulationState> datanodesMap;
 
   private ScheduledExecutorService heartbeatScheduler;
-  private LayoutVersionProto layoutInfo;
+  private DatanodeVersionProto versionInfo;
 
   @CommandLine.ParentCommand
   private Freon freonCommand;
@@ -396,7 +396,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
                          DatanodeSimulationState dn) {
     try {
       SCMHeartbeatRequestProto heartbeat = dn.heartbeatRequest(endpoint,
-          layoutInfo);
+          versionInfo);
       SCMHeartbeatResponseProto response = client.sendHeartbeat(heartbeat);
       dn.ackHeartbeatResponse(response);
 
@@ -415,7 +415,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
         client.register(
             dn.getDatanodeDetails().getExtendedProtoBufMessage(),
             dn.createNodeReport(), dn.createFullContainerReport(),
-            dn.createPipelineReport(), this.layoutInfo);
+            dn.createPipelineReport(), this.versionInfo);
       }
     } catch (Exception e) {
       LOGGER.info("Error sending heartbeat for {}: {}",
@@ -439,19 +439,19 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
     scmContainerClient = HAUtils.getScmContainerClient(conf);
 
-    this.layoutInfo = createLayoutInfo();
+    this.versionInfo = createVersionInfo();
   }
 
-  private LayoutVersionProto createLayoutInfo() throws IOException {
+  private DatanodeVersionProto createVersionInfo() throws IOException {
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString());
 
     DatanodeVersionManager versionManager = new DatanodeVersionManager(layoutStorage, null);
 
-    return LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(
+    return DatanodeVersionProto.newBuilder()
+        .setApparentVersion(
             versionManager.getApparentVersion().serialize())
-        .setSoftwareLayoutVersion(
+        .setSoftwareVersion(
             versionManager.getSoftwareVersion().serialize())
         .build();
   }
@@ -492,7 +492,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
         SCMRegisteredResponseProto response =
             client.register(
                 dn.getDatanodeDetails().getExtendedProtoBufMessage(),
-                nodeReport, containerReports, pipelineReports, this.layoutInfo);
+                nodeReport, containerReports, pipelineReports, this.versionInfo);
         if (response.hasHostname() && response.hasIpAddress()) {
           dn.getDatanodeDetails().setHostName(response.getHostname());
           dn.getDatanodeDetails().setIpAddress(response.getIpAddress());
@@ -512,7 +512,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
     try {
       reconClient.register(dn.getDatanodeDetails().getExtendedProtoBufMessage(),
-          nodeReport, containerReports, pipelineReports, this.layoutInfo);
+          nodeReport, containerReports, pipelineReports, this.versionInfo);
     } catch (IOException e) {
       LOGGER.error("Error register datanode to Recon", e);
     }

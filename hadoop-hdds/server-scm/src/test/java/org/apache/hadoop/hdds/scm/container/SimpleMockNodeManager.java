@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -308,7 +308,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void processVersionReport(DatanodeDetails datanodeDetails,
-                                   LayoutVersionProto layoutReport) {
+                                   DatanodeVersionProto versionReport) {
   }
 
   /**
@@ -436,7 +436,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReport,
-                                    LayoutVersionProto layoutreport) {
+                                    DatanodeVersionProto versionReport) {
     return null;
   }
 

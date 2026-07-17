@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -375,10 +375,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * Process Node LayoutVersion report.
    *
    * @param datanodeDetails
-   * @param layoutReport
+   * @param versionReport
    */
   void processVersionReport(DatanodeDetails datanodeDetails,
-                            LayoutVersionProto layoutReport);
+                            DatanodeVersionProto versionReport);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the

@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -97,13 +97,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
-      LayoutVersionProto versionInfo = null;
-      if (!heartbeat.hasDataNodeLayoutVersion()) {
+      DatanodeVersionProto versionInfo = null;
+      if (!heartbeat.hasDatanodeVersion()) {
         // Backward compatibility to make sure old Datanodes can still talk to
         // SCM.
         versionInfo = toVersionProto(INITIAL_VERSION, INITIAL_VERSION);
       } else {
-        versionInfo = heartbeat.getDataNodeLayoutVersion();
+        versionInfo = heartbeat.getDatanodeVersion();
       }
 
       LOG.debug("Processing DataNode Layout Report.");
@@ -251,13 +251,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
-   * Layout report event payload with origin.
+   * Datanode version report event payload with origin.
    */
-  public static class LayoutReportFromDatanode
-      extends ReportFromDatanode<LayoutVersionProto> {
+  public static class versionReportFromDatanode
+      extends ReportFromDatanode<DatanodeVersionProto> {
 
-    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
-                                  LayoutVersionProto report) {
+    public versionReportFromDatanode(DatanodeDetails datanodeDetails,
+                                     DatanodeVersionProto report) {
       super(datanodeDetails, report);
     }
   }

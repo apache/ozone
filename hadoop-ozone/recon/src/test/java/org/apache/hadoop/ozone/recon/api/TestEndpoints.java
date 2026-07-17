@@ -82,7 +82,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -428,7 +428,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = defaultVersionProto();
+    DatanodeVersionProto versionInfo = defaultVersionProto();
 
     DatanodeDetailsProto datanodeDetailsProto3 =
         DatanodeDetailsProto.newBuilder()
@@ -467,7 +467,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto, layoutInfo);
+              containerReportsProto, pipelineReportsProto, versionInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
@@ -1277,7 +1277,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultVersionProto())
+            .setDatanodeVersion(defaultVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);

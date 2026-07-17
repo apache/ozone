@@ -25,7 +25,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMDatanodeRequest;
@@ -71,9 +71,9 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    LayoutVersionProto versionInfo = null;
-    if (request.hasDataNodeLayoutVersion()) {
-      versionInfo = request.getDataNodeLayoutVersion();
+    DatanodeVersionProto versionInfo = null;
+    if (request.hasDatanodeVersion()) {
+      versionInfo = request.getDatanodeVersion();
     } else {
       // Backward compatibility to make sure old Datanodes can still talk to
       // SCM.

@@ -18,31 +18,31 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewDatanodeVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
 /**
  * Asks DataNode to finalize new upgrade version.
  */
 public class FinalizeVersionCommand
-    extends SCMCommand<FinalizeNewLayoutVersionCommandProto> {
+    extends SCMCommand<FinalizeNewDatanodeVersionCommandProto> {
 
   private boolean finalizeUpgrade = false;
-  private LayoutVersionProto versionInfo;
+  private DatanodeVersionProto versionInfo;
 
-  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
-                                LayoutVersionProto versionInfo,
+  public FinalizeVersionCommand(boolean finalizeNewDatanodeVersion,
+                                DatanodeVersionProto versionInfo,
                                 long id) {
     super(id);
-    finalizeUpgrade = finalizeNewLayoutVersion;
+    finalizeUpgrade = finalizeNewDatanodeVersion;
     this.versionInfo = versionInfo;
   }
 
-  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
-                                LayoutVersionProto versionInfo) {
+  public FinalizeVersionCommand(boolean finalizeNewDatanodeVersion,
+                                DatanodeVersionProto versionInfo) {
     super();
-    finalizeUpgrade = finalizeNewLayoutVersion;
+    finalizeUpgrade = finalizeNewDatanodeVersion;
     this.versionInfo = versionInfo;
   }
 
@@ -53,24 +53,24 @@ public class FinalizeVersionCommand
    */
   @Override
   public SCMCommandProto.Type getType() {
-    return SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+    return SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
   }
 
   @Override
-  public FinalizeNewLayoutVersionCommandProto getProto() {
-    return FinalizeNewLayoutVersionCommandProto.newBuilder()
-        .setFinalizeNewLayoutVersion(finalizeUpgrade)
+  public FinalizeNewDatanodeVersionCommandProto getProto() {
+    return FinalizeNewDatanodeVersionCommandProto.newBuilder()
+        .setFinalizeNewDatanodeVersion(finalizeUpgrade)
         .setCmdId(getId())
-        .setDataNodeLayoutVersion(versionInfo)
+        .setDatanodeVersion(versionInfo)
         .build();
   }
 
   public static FinalizeVersionCommand getFromProtobuf(
-      FinalizeNewLayoutVersionCommandProto finalizeProto) {
+      FinalizeNewDatanodeVersionCommandProto finalizeProto) {
     Objects.requireNonNull(finalizeProto, "finalizeProto == null");
     return new FinalizeVersionCommand(
-        finalizeProto.getFinalizeNewLayoutVersion(),
-        finalizeProto.getDataNodeLayoutVersion(), finalizeProto.getCmdId());
+        finalizeProto.getFinalizeNewDatanodeVersion(),
+        finalizeProto.getDatanodeVersion(), finalizeProto.getCmdId());
   }
 
   @Override

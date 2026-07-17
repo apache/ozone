@@ -296,7 +296,7 @@ public class TestNodeStateManager {
     UUID dnUuid = UUID.randomUUID();
     String ipAddress = "1.2.3.4";
     String hostName = "test-host";
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+    StorageContainerDatanodeProtocolProtos.DatanodeVersionProto
             layoutVersionProto =
             UpgradeUtils.toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION);
     DatanodeDetails dn = DatanodeDetails.newBuilder()
@@ -309,7 +309,7 @@ public class TestNodeStateManager {
 
     String newIpAddress = "2.3.4.5";
     String newHostName = "new-host";
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+    StorageContainerDatanodeProtocolProtos.DatanodeVersionProto
             newLayoutVersionProto = UpgradeUtils.defaultVersionProto();
     DatanodeDetails newDn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)

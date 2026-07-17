@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewDatanodeVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -51,7 +51,7 @@ public class FinalizeVersionCommandHandler implements CommandHandler {
     MetricsRegistry registry = new MetricsRegistry(
         FinalizeVersionCommandHandler.class.getSimpleName());
     this.opsLatencyMs =
-        registry.newRate(SCMCommandProto.Type.finalizeNewLayoutVersionCommand + "Ms");
+        registry.newRate(SCMCommandProto.Type.finalizeNewDatanodeVersionCommand + "Ms");
   }
 
   /**
@@ -69,10 +69,10 @@ public class FinalizeVersionCommandHandler implements CommandHandler {
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     DatanodeStateMachine dsm = context.getParent();
-    final FinalizeNewLayoutVersionCommandProto finalizeCommand =
+    final FinalizeNewDatanodeVersionCommandProto finalizeCommand =
         ((FinalizeVersionCommand) command).getProto();
     try {
-      if (finalizeCommand.getFinalizeNewLayoutVersion()) {
+      if (finalizeCommand.getFinalizeNewDatanodeVersion()) {
         if (dsm.getVersionManager().needsFinalization()) {
           LOG.info("Finalize upgrade called.");
           dsm.getVersionManager().finalizeUpgrade();
@@ -93,7 +93,7 @@ public class FinalizeVersionCommandHandler implements CommandHandler {
    */
   @Override
   public SCMCommandProto.Type getCommandType() {
-    return SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+    return SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
   }
 
   /**
