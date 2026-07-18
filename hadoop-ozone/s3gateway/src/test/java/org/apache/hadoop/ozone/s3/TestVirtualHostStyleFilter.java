@@ -179,4 +179,41 @@ public class TestVirtualHostStyleFilter {
         () -> virtualHostStyleFilter.filter(requestContext));
     assertThat(exception).hasMessageContaining(expectErrorMessage);
   }
+
+  @ParameterizedTest
+  @CsvSource(value = {
+      // hostname / IPv4, with and without a port
+      "s3g.example.com,s3g.example.com",
+      "s3g.example.com:9878,s3g.example.com",
+      "bucket.s3g.example.com:9878,bucket.s3g.example.com",
+      "192.168.1.10,192.168.1.10",
+      "192.168.1.10:9878,192.168.1.10",
+      // bracketed IPv6 literal, with and without a port
+      "[::1],::1",
+      "[::1]:9878,::1",
+      "[2001:db8::1],2001:db8::1",
+      "[2001:db8::1]:9878,2001:db8::1",
+      // bare IPv6 literal has no port to strip; must be returned unchanged
+      "::1,::1",
+      "2001:db8::1,2001:db8::1",
+      // malformed host (unbalanced bracket) falls back to the raw value
+      "[::1,[::1",
+  })
+  public void testCheckHostWithoutPort(String host, String expected) {
+    assertEquals(expected,
+        new VirtualHostStyleFilter().checkHostWithoutPort(host));
+  }
+
+  @Test
+  public void testVirtualHostStyleWithoutPort() throws Exception {
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    // Host header without a port still resolves the bucket.
+    ContainerRequest containerRequest = createContainerRequest(
+        "mybucket.localhost", "/myfile", null, true);
+    virtualHostStyleFilter.filter(containerRequest);
+    URI expected = new URI("http://" + s3HttpAddr + "/mybucket/myfile");
+    assertEquals(expected, containerRequest.getRequestUri());
+  }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.HostAndPort;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -143,11 +144,21 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     return match;
   }
 
-  private String checkHostWithoutPort(String host) {
-    int portIndex = host.lastIndexOf(':');
-    if (portIndex >= 0) {
-      return host.substring(0, portIndex);
-    } else {
+  /**
+   * Strips a trailing port from the Host header, if present. Uses bracket-aware
+   * parsing so IPv6 literals are handled correctly: {@code [::1]:9878} and
+   * {@code [::1]} both yield {@code ::1}, and a bare {@code 2001:db8::1} (whose
+   * colons are part of the address, not a port) is returned unchanged. A plain
+   * {@code lastIndexOf(':')} would mistake an address segment for the port.
+   */
+  @VisibleForTesting
+  String checkHostWithoutPort(String host) {
+    try {
+      return HostAndPort.fromString(host).getHost();
+    } catch (IllegalArgumentException e) {
+      // Malformed Host header (e.g. unbalanced brackets): fall back to the raw
+      // value so it is rejected with a clear "no matching domain" error rather
+      // than failing with an internal error.
       return host;
     }
   }
