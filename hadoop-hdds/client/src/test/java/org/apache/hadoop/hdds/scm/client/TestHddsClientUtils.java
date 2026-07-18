@@ -176,6 +176,50 @@ public class TestHddsClientUtils {
   }
 
   @Test
+  public void testClientAddressIPv6() {
+    // Bare IPv6 literal without port: port falls back to the default and the
+    // host must be re-bracketed before the address string is parsed.
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "2001:db8::1");
+    InetSocketAddress addr =
+        HddsUtils.getScmAddressForClients(conf).iterator().next();
+    assertEquals("2001:db8:0:0:0:0:0:1", addr.getHostString());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    // Bracketed IPv6 literal with explicit port.
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "[2001:db8::1]:9876");
+    addr = HddsUtils.getScmAddressForClients(conf).iterator().next();
+    assertEquals("2001:db8:0:0:0:0:0:1", addr.getHostString());
+    assertEquals(9876, addr.getPort());
+
+    // Bracketed IPv6 literal without port (host:port documents port as
+    // optional).
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "[2001:db8::1]");
+    addr = HddsUtils.getScmAddressForClients(conf).iterator().next();
+    assertEquals("2001:db8:0:0:0:0:0:1", addr.getHostString());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+  }
+
+  @Test
+  public void testClientFallbackToScmNamesIPv6() {
+    // Bare IPv6 literal in ozone.scm.names.
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "2001:db8::1");
+    InetSocketAddress addr =
+        HddsUtils.getScmAddressForClients(conf).iterator().next();
+    assertEquals("2001:db8:0:0:0:0:0:1", addr.getHostString());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    // On the ozone.scm.names fallback path an inline port is ignored and the
+    // default client port is used instead (same semantics as
+    // testClientFallbackToScmNamesWithPort).
+    conf.set(OZONE_SCM_NAMES, "[2001:db8::1]:300");
+    addr = HddsUtils.getScmAddressForClients(conf).iterator().next();
+    assertEquals("2001:db8:0:0:0:0:0:1", addr.getHostString());
+    assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+  }
+
+  @Test
   @SuppressWarnings("StringSplitter")
   public void testBlockClientFallbackToClientWithPort() {
     // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY is undefined it should

@@ -165,7 +165,7 @@ public final class HddsUtils {
       }
 
       return Collections.singletonList(
-          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
+          NetUtils.createSocketAddr(getHostPortString(getHostName(address).get(), port)));
     }
   }
 
