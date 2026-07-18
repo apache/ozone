@@ -29,25 +29,36 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -335,5 +346,155 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
         .addCacheEntry(new CacheKey<>(dbKey),
             CacheValue.get(trxnLogIndex, bucketInfo));
     omMetadataManager.getBucketTable().put(dbKey, bucketInfo);
+  }
+
+  @Test
+  public void testQuotaRepairCountsMpuParts() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String legacyKey = "legacyMpuKey";
+    String legacyUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo legacyInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
+        legacyUploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, 1001L);
+    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 1, 100L));
+    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 1, 300L));
+    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 2, 200L));
+    addMultipartInfo(legacyKey, legacyInfo, 1L);
+
+    String splitKey = "splitMpuKey";
+    String splitUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo splitInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
+        splitUploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, 1002L).toBuilder()
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
+    addMultipartInfo(splitKey, splitInfo, 2L);
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 1),
+        createSplitPart(bucketName, splitKey, splitUploadId, 1, 111L));
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 1),
+        createSplitPart(bucketName, splitKey, splitUploadId, 1, 400L));
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 2),
+        createSplitPart(bucketName, splitKey, splitUploadId, 2, 500L));
+
+    String bucketKey = corruptBucketUsage(bucketName, 12345L, 99L, 3L);
+    applyQuotaRepair(request, 4L);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1400L, repaired.getUsedBytes());
+    assertEquals(0L, repaired.getUsedNamespace());
+
+    abortMpu(bucketName, legacyKey, legacyUploadId, BucketLayout.OBJECT_STORE, 1003L);
+    abortMpu(bucketName, splitKey, splitUploadId, BucketLayout.OBJECT_STORE, 1004L);
+    assertEquals(0L, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+  }
+
+  @Test
+  public void testQuotaRepairCountsMpuPartsFso() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    String fsoBucketName = "fsomup" + bucketName;
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, fsoBucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String keyName = "fsoMpuFile";
+    String uploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo mpuInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
+        uploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE, 3001L).toBuilder()
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, fsoBucketName,
+        keyName, RatisReplicationConfig.getInstance(THREE)).build();
+    OMRequestTestUtils.addMultipartInfoToTable(false, omKeyInfo, mpuInfo, 1L, omMetadataManager);
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 1),
+        createSplitPart(fsoBucketName, keyName, uploadId, 1, 100L));
+
+    String bucketKey = corruptBucketUsage(fsoBucketName, 777L, 88L, 2L);
+    applyQuotaRepair(request, 3L);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(300L, repaired.getUsedBytes());
+    assertEquals(0L, repaired.getUsedNamespace());
+    abortMpu(fsoBucketName, keyName, uploadId, BucketLayout.FILE_SYSTEM_OPTIMIZED, 3002L);
+    assertEquals(0L, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+  }
+
+  private AtomicReference<OzoneManagerProtocolProtos.OMRequest> mockQuotaRepairRequest() throws Exception {
+    OzoneManagerProtocolProtos.OMResponse response = mock(OzoneManagerProtocolProtos.OMResponse.class);
+    when(response.getSuccess()).thenReturn(true);
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = new AtomicReference<>();
+    doAnswer(invocation -> {
+      request.set(invocation.getArgument(0, OzoneManagerProtocolProtos.OMRequest.class));
+      return response;
+    }).when(ratisServer).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServer);
+    return request;
+  }
+
+  private void addMultipartInfo(String keyName, OmMultipartKeyInfo multipartInfo, long transactionIndex)
+      throws IOException {
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName,
+        keyName, RatisReplicationConfig.getInstance(ONE)).build();
+    OMRequestTestUtils.addMultipartInfoToTable(false, omKeyInfo, multipartInfo, transactionIndex,
+        omMetadataManager);
+  }
+
+  private String corruptBucketUsage(String bucket, long usedBytes, long usedNamespace, long transactionIndex)
+      throws IOException {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo corrupted = omMetadataManager.getBucketTable().get(bucketKey).toBuilder()
+        .setUsedBytes(usedBytes).setUsedNamespace(usedNamespace).build();
+    omMetadataManager.getBucketTable().put(bucketKey, corrupted);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(transactionIndex, corrupted));
+    return bucketKey;
+  }
+
+  private void applyQuotaRepair(AtomicReference<OzoneManagerProtocolProtos.OMRequest> request,
+      long transactionIndex) throws Exception {
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
+    assertTrue(awaitRepair(quotaRepairTask.repair()));
+    OMClientResponse response = new OMQuotaRepairRequest(request.get())
+        .validateAndUpdateCache(ozoneManager, transactionIndex);
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMQuotaRepairResponse) response).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+  }
+
+  private void abortMpu(String bucket, String keyName, String uploadId, BucketLayout layout,
+      long transactionIndex) throws Exception {
+    OzoneManagerProtocolProtos.OMRequest abortRequest = OMRequestTestUtils.createAbortMPURequest(
+        volumeName, bucket, keyName, uploadId);
+    OzoneManagerProtocolProtos.OMRequest preExecuted;
+    OMClientResponse response;
+    if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      preExecuted = new S3MultipartUploadAbortRequestWithFSO(abortRequest, layout).preExecute(ozoneManager);
+      response = new S3MultipartUploadAbortRequestWithFSO(preExecuted, layout)
+          .validateAndUpdateCache(ozoneManager, transactionIndex);
+    } else {
+      preExecuted = new S3MultipartUploadAbortRequest(abortRequest, layout).preExecute(ozoneManager);
+      response = new S3MultipartUploadAbortRequest(preExecuted, layout)
+          .validateAndUpdateCache(ozoneManager, transactionIndex);
+    }
+    assertTrue(response.getOMResponse().getSuccess());
+  }
+
+  private PartKeyInfo createPart(String keyName, String uploadId, int partNumber, long dataSize) {
+    return PartKeyInfo.newBuilder().setPartNumber(partNumber)
+        .setPartName(OmMultipartUpload.getDbKey(volumeName, bucketName, keyName, uploadId))
+        .setPartKeyInfo(KeyInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setKeyName(keyName).setDataSize(dataSize).setCreationTime(Time.now()).setModificationTime(Time.now())
+            .setType(HddsProtos.ReplicationType.RATIS).setFactor(ONE).build())
+        .build();
+  }
+
+  private OmMultipartPartInfo createSplitPart(String bucket, String keyName, String uploadId,
+      int partNumber, long dataSize) {
+    OmKeyInfo partKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, keyName,
+        RatisReplicationConfig.getInstance(ONE)).setDataSize(dataSize)
+        .addMetadata(OzoneConsts.ETAG, "etag-" + partNumber).build();
+    return OmMultipartPartInfo.from(OmMultipartUpload.getDbKey(volumeName, bucket, keyName, uploadId),
+        partNumber, partKeyInfo);
   }
 }
