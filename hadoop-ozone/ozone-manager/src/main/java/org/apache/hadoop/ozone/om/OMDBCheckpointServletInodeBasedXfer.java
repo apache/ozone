@@ -483,7 +483,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   Map<UUID, Path> getSnapshotDirsFromDB(OMMetadataManager activeOMMetadataManager, OMMetadataManager omMetadataManager,
       OmSnapshotLocalDataManager localDataManager) throws IOException {
     Map<UUID, Path> snapshotPaths = new HashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iter =
+    try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>> iter =
         omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iter.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> kv = iter.next();

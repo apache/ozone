@@ -144,8 +144,7 @@ public final class OMMultipartUploadUtils {
     }
 
     OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
-    try (TableIterator<OmMultipartPartKey,
-        ? extends Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
+    try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
         iterator = omMetadataManager.getMultipartPartsTable().iterator(prefix)) {
       while (iterator.hasNext()) {
         Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> kv = iterator.next();
