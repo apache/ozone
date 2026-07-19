@@ -25,12 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
@@ -39,7 +43,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit test for Basic*OzoneFileSystem.
@@ -135,6 +141,37 @@ public class TestBasicOzoneFileSystems {
       fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {
+      // hostname / IPv4 authority (behaviour unchanged)
+      "ofs://host:9862/, host, 9862",
+      "ofs://omservice1/, omservice1, -1",
+      // service id with an underscore: HostAndPort tolerates it (URI.getHost does not)
+      "ofs://om_service/, om_service, -1",
+      // IPv6 literal authority, with and without a port; the literal stays bracketed
+      "ofs://[::1]:9862/, [::1], 9862",
+      "ofs://[2001:db8::1]/, [2001:db8::1], -1",
+  })
+  public void testRootedAuthorityParsing(String uri, String expectedHost,
+      int expectedPort) throws Exception {
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    BasicRootedOzoneClientAdapterImpl adapter =
+        mock(BasicRootedOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(ofs).createAdapter(any(), anyString(), anyInt());
+
+    ofs.initialize(new URI(uri), new OzoneConfiguration());
+
+    ArgumentCaptor<String> hostCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Integer> portCaptor = ArgumentCaptor.forClass(Integer.class);
+    verify(ofs).createAdapter(any(), hostCaptor.capture(),
+        portCaptor.capture());
+    assertEquals(expectedHost, hostCaptor.getValue());
+    assertEquals(expectedPort, portCaptor.getValue().intValue());
+
+    // The rebuilt filesystem URI keeps the (bracketed) IPv6 authority intact.
+    assertEquals(new URI(uri).getAuthority(), ofs.getUri().getAuthority());
   }
 
   private void assertDefaultBlockSize(long expected, FileSystem subject) {

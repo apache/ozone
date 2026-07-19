@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.net.HostAndPort;
 import io.opentelemetry.api.trace.Span;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -158,21 +159,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    String omHostOrServiceId;
-    int omPort = -1;
-    // Parse hostname and port
-    String[] parts = authority.split(":");
-    if (parts.length > 2) {
+    // Parse hostname and port. HostAndPort is bracket-aware, so IPv6 literal
+    // authorities (for example [::1]:9862) are split correctly instead of on
+    // every colon.
+    final HostAndPort hostAndPort;
+    try {
+      hostAndPort = HostAndPort.fromString(authority);
+    } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-    omHostOrServiceId = parts[0];
-    if (parts.length == 2) {
-      try {
-        omPort = Integer.parseInt(parts[1]);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
-      }
-    }
+    int omPort = hostAndPort.hasPort() ? hostAndPort.getPort() : -1;
+    String host = hostAndPort.getHost();
+    // Keep IPv6 literals bracketed so the downstream host:port assembly that
+    // builds the OM address stays unambiguous.
+    String omHostOrServiceId = host.contains(":") ? "[" + host + "]" : host;
 
     try {
       uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
