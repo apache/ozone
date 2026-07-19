@@ -26,11 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,13 +43,15 @@ import org.junit.jupiter.api.Test;
  * Complements {@code TestConnectionFailureUtils} (helper-in-isolation)
  * and {@code TestSCMFailoverProxyProviderRefresh} (per-instance refresh)
  * by exercising the actual retry policy whose return value drives the
- * RetryInvocationHandler in production.
+ * RetryInvocationHandler in production. It also verifies wired
+ * suggested-leader failover target selection.
  */
 public class TestSCMFailoverProxyProviderRefreshWired {
 
   private static final String SCM_SERVICE_ID = "scmservice";
   private static final String SCM_NODE_1 = "scm1";
   private static final String SCM_NODE_2 = "scm2";
+  private static final String SCM_NODE_3 = "scm3";
 
   private OzoneConfiguration conf;
 
@@ -119,6 +123,33 @@ public class TestSCMFailoverProxyProviderRefreshWired {
         0, 0, false);
     assertEquals(0, provider.refreshCalls,
         "ServerNotLeaderException is application-level; refresh must NOT fire");
+  }
+
+  @Test
+  public void testFailoverToIpv6SuggestedLeader() {
+    conf.set(OZONE_SCM_NODES_KEY + "." + SCM_SERVICE_ID,
+        SCM_NODE_1 + "," + SCM_NODE_2 + "," + SCM_NODE_3);
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        SCM_SERVICE_ID, SCM_NODE_3), "localhost");
+    SCMBlockLocationFailoverProxyProvider provider =
+        new SCMBlockLocationFailoverProxyProvider(conf);
+    SCMProxyInfo leaderProxy = provider.getSCMProxyInfoList().stream()
+        .filter(proxyInfo -> SCM_NODE_3.equals(proxyInfo.getNodeId()))
+        .findFirst().get();
+    int port = leaderProxy.getAddress().getPort();
+    String leaderHostPort = "[2001:db8::1]:" + port;
+    InetSocketAddress leaderAddress = new InetSocketAddress("2001:db8::1", port);
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3, leaderAddress,
+            leaderHostPort));
+
+    ServerNotLeaderException notLeaderException = new ServerNotLeaderException(
+        RaftPeerId.valueOf(SCM_NODE_1), leaderHostPort, "localhost", "SCM");
+    provider.performFailoverToAssignedLeader(null, notLeaderException);
+    provider.performFailover(null);
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "suggested leader must override the next round-robin SCM");
   }
 
   @Test

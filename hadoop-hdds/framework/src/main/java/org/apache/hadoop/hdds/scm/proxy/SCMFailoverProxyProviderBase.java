@@ -249,19 +249,25 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
                                                            Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
-    if (snle != null && snle.getSuggestedLeader() != null) {
-      Optional<SCMProxyInfo> matchedProxyInfo =
-          scmProxyInfoMap.values().stream().filter(
-              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
-                  .equals(snle.getSuggestedLeader())).findFirst();
-      if (matchedProxyInfo.isPresent()) {
-        newLeader = matchedProxyInfo.get().getNodeId();
-        getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
-            snle.getSuggestedLeader(), newLeader);
-      } else {
-        getLogger().debug("Suggested leader {} does not match with any of the " +
-                "proxyInfo address {}", snle.getSuggestedLeader(),
-            Arrays.toString(scmProxyInfoMap.values().toArray()));
+    String suggestedLeader = snle != null ? snle.getSuggestedLeader() : null;
+    if (suggestedLeader != null) {
+      try {
+        InetSocketAddress suggestedLeaderAddress =
+            NetUtils.createSocketAddr(suggestedLeader);
+        Optional<SCMProxyInfo> matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
+            proxyInfo -> proxyInfo.getAddress().equals(suggestedLeaderAddress)).findFirst();
+        if (matchedProxyInfo.isPresent()) {
+          newLeader = matchedProxyInfo.get().getNodeId();
+          getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
+              suggestedLeader, newLeader);
+        } else {
+          getLogger().debug("Suggested leader {} does not match with any of the " +
+                  "proxyInfo address {}", suggestedLeader,
+              Arrays.toString(scmProxyInfoMap.values().toArray()));
+        }
+      } catch (IllegalArgumentException ex) {
+        getLogger().warn("Ignoring unparseable suggested leader {}",
+            suggestedLeader, ex);
       }
     }
     assignLeaderToNode(newLeader);
