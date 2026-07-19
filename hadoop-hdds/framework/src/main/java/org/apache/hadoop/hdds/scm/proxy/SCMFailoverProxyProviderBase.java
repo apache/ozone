@@ -251,26 +251,42 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
     String suggestedLeader = snle != null ? snle.getSuggestedLeader() : null;
     if (suggestedLeader != null) {
-      try {
-        InetSocketAddress suggestedLeaderAddress =
-            NetUtils.createSocketAddr(suggestedLeader);
-        Optional<SCMProxyInfo> matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
-            proxyInfo -> proxyInfo.getAddress().equals(suggestedLeaderAddress)).findFirst();
-        if (matchedProxyInfo.isPresent()) {
-          newLeader = matchedProxyInfo.get().getNodeId();
-          getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
-              suggestedLeader, newLeader);
-        } else {
-          getLogger().debug("Suggested leader {} does not match with any of the " +
-                  "proxyInfo address {}", suggestedLeader,
-              Arrays.toString(scmProxyInfoMap.values().toArray()));
-        }
-      } catch (IllegalArgumentException ex) {
-        getLogger().warn("Ignoring unparseable suggested leader {}",
-            suggestedLeader, ex);
+      Optional<String> matchedNodeId = findSuggestedLeaderNodeId(suggestedLeader);
+      if (matchedNodeId.isPresent()) {
+        newLeader = matchedNodeId.get();
+        getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
+            suggestedLeader, newLeader);
+      } else {
+        getLogger().debug("Suggested leader {} does not match with any of the " +
+                "proxyInfo address {}", suggestedLeader,
+            Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
     assignLeaderToNode(newLeader);
+  }
+
+  /**
+   * Resolve the suggested-leader authority to a known SCM nodeId. First try a
+   * DNS-free string match against the cached proxy authorities; only when that
+   * misses (for example a bracketed IPv6 literal, whose cached authority is not
+   * bracketed) fall back to a resolved-address comparison, the one branch that
+   * may perform a DNS lookup. Returns empty when nothing matches or the
+   * authority cannot be parsed.
+   */
+  private Optional<String> findSuggestedLeaderNodeId(String suggestedLeader) {
+    Optional<SCMProxyInfo> matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
+        proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress()).equals(suggestedLeader))
+        .findFirst();
+    if (!matchedProxyInfo.isPresent()) {
+      try {
+        InetSocketAddress suggestedLeaderAddress = NetUtils.createSocketAddr(suggestedLeader);
+        matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
+            proxyInfo -> proxyInfo.getAddress().equals(suggestedLeaderAddress)).findFirst();
+      } catch (IllegalArgumentException ex) {
+        getLogger().warn("Ignoring unparseable suggested leader {}", suggestedLeader, ex);
+      }
+    }
+    return matchedProxyInfo.map(SCMProxyInfo::getNodeId);
   }
 
   @Override

@@ -31,6 +31,7 @@ import java.net.SocketTimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.BeforeEach;
@@ -150,6 +151,36 @@ public class TestSCMFailoverProxyProviderRefreshWired {
 
     assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
         "suggested leader must override the next round-robin SCM");
+  }
+
+  @Test
+  public void testFailoverToSuggestedLeaderMatchesWithoutResolution() {
+    conf.set(OZONE_SCM_NODES_KEY + "." + SCM_SERVICE_ID,
+        SCM_NODE_1 + "," + SCM_NODE_2 + "," + SCM_NODE_3);
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        SCM_SERVICE_ID, SCM_NODE_3), "localhost");
+    SCMBlockLocationFailoverProxyProvider provider =
+        new SCMBlockLocationFailoverProxyProvider(conf);
+    SCMProxyInfo leaderProxy = provider.getSCMProxyInfoList().stream()
+        .filter(proxyInfo -> SCM_NODE_3.equals(proxyInfo.getNodeId()))
+        .findFirst().get();
+    // Give scm3 a distinct resolved IPv4 address so its authority string is
+    // unambiguous among the localhost nodes.
+    InetSocketAddress leaderAddress =
+        new InetSocketAddress("127.0.0.2", leaderProxy.getAddress().getPort());
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3, leaderAddress));
+
+    // Authority taken verbatim from the cached address must match through the
+    // DNS-free string comparison, not the resolved-address fallback.
+    String suggestedLeader = NetUtils.getHostPortString(leaderAddress);
+    ServerNotLeaderException notLeaderException = new ServerNotLeaderException(
+        RaftPeerId.valueOf(SCM_NODE_1), suggestedLeader, "localhost", "SCM");
+    provider.performFailoverToAssignedLeader(null, notLeaderException);
+    provider.performFailover(null);
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "suggested leader must match by authority without DNS resolution");
   }
 
   @Test
