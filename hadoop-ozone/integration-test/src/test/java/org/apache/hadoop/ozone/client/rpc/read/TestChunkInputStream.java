@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.junit.jupiter.api.TestInstance;
 
 /**
@@ -49,7 +49,7 @@ class TestChunkInputStream extends InputStreamTests {
     try (OzoneClient client = getCluster().newClient()) {
       updateConfig(layout);
 
-      TestBucket bucket = TestBucket.newBuilder(client).build();
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
 
       testChunkReadBuffers(bucket);
       testBufferRelease(bucket);
@@ -61,7 +61,7 @@ class TestChunkInputStream extends InputStreamTests {
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testChunkReadBuffers(TestBucket bucket) throws Exception {
+  private void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
     byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
@@ -123,7 +123,7 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  private void testCloseReleasesBuffers(TestBucket bucket) throws Exception {
+  private void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
     bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
@@ -146,7 +146,7 @@ class TestChunkInputStream extends InputStreamTests {
    * Test that ChunkInputStream buffers are released as soon as the last byte
    * of the buffer is read.
    */
-  private void testBufferRelease(TestBucket bucket) throws Exception {
+  private void testBufferRelease(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
     byte[] inputData = bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 

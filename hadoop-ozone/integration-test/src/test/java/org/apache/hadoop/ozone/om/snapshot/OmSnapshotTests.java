@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.test.LambdaTestUtils.await;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -650,7 +651,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithLatestUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -688,7 +689,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithPreviousUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -735,7 +736,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRecreation() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -789,7 +790,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRename() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1669,7 +1670,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffWithKeyOverwrite() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1758,8 +1759,8 @@ public abstract class OmSnapshotTests {
   @Test
   public void testListSnapshotDiffWithInvalidParameters()
       throws Exception {
-    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket = "buck-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume = uniqueObjectName("vol-");
+    String bucket = uniqueObjectName("buck-");
 
     String volErrorMessage = "Volume not found: " + volume;
 
@@ -1781,14 +1782,14 @@ public abstract class OmSnapshotTests {
 
     OzoneBucket ozBucket = ozVolume.getBucket(bucket);
     // Create keys and take snapshots.
-    String key1 = "key-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String key1 = uniqueObjectName("key-1-");
     createFileKey(ozBucket, key1);
-    String snap1 = "snap-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String snap1 = uniqueObjectName("snap-1-");
     createSnapshot(volume, bucket, snap1);
 
-    String key2 = "key-2-" + RandomStringUtils.secure().nextNumeric(5);
+    String key2 = uniqueObjectName("key-2-");
     createFileKey(ozBucket, key2);
-    String snap2 = "snap-2-" + RandomStringUtils.secure().nextNumeric(5);
+    String snap2 = uniqueObjectName("snap-2-");
     createSnapshot(volume, bucket, snap2);
 
     store.snapshotDiff(volume, bucket, snap1, snap2, null, 0,
@@ -2082,8 +2083,8 @@ public abstract class OmSnapshotTests {
   // in_progress when it restarts.
   @Test
   public void testSnapshotDiffWhenOmRestart() throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
@@ -2127,8 +2128,8 @@ public abstract class OmSnapshotTests {
   public void testSnapshotDiffWhenOmRestartAndReportIsPartiallyFetched()
       throws Exception {
     int pageSize = 10;
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffReportOzone diffReport = fetchReportPage(volumeName,
@@ -2209,8 +2210,8 @@ public abstract class OmSnapshotTests {
   @Test
   @Slow("HDDS-9299")
   public void testDayWeekMonthSnapshotCreationAndExpiration() throws Exception {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String bucketA = uniqueObjectName("buc-a-");
     store.createVolume(volumeA);
     OzoneVolume volA = store.getVolume(volumeA);
     createBucket(volA, bucketA);
@@ -2416,10 +2417,10 @@ public abstract class OmSnapshotTests {
   @Test
   public void testSnapshotCompactionDag() throws Exception {
     assumeCanonicalConfig(true);
-    String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket3 = "bucket-3-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume1 = uniqueObjectName("volume-1-");
+    String bucket1 = uniqueObjectName("bucket-1-");
+    String bucket2 = uniqueObjectName("bucket-2-");
+    String bucket3 = uniqueObjectName("bucket-3-");
 
     store.createVolume(volume1);
     OzoneVolume ozoneVolume = store.getVolume(volume1);

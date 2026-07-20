@@ -218,7 +218,7 @@ public class TestS3MultipartUploadCommitPartResponse
     // openkey entry should be there in delete table.
     assertEquals(1, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, multipartKeyInvalid);
     assertThat(rangeKVs.size()).isGreaterThan(0);

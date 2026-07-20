@@ -318,8 +318,18 @@ public final class ContainerProtocolCalls  {
                                                  boolean eof,
                                                  String tokenString)
       throws IOException, InterruptedException, ExecutionException {
+    return putBlockAsync(xceiverClient, containerBlockData, eof, tokenString, true);
+  }
+
+  public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
+                                                 BlockData containerBlockData,
+                                                 boolean eof,
+                                                 String tokenString,
+                                                 boolean containerAutoCreate)
+      throws IOException, InterruptedException, ExecutionException {
     final ContainerCommandRequestProto request = getPutBlockRequest(
-        xceiverClient.getPipeline(), containerBlockData, eof, tokenString);
+        xceiverClient.getPipeline(), containerBlockData, eof, tokenString,
+        containerAutoCreate);
     return xceiverClient.sendCommandAsync(request);
   }
 
@@ -356,10 +366,19 @@ public final class ContainerProtocolCalls  {
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, BlockData containerBlockData, boolean eof,
       String tokenString) throws IOException {
+    return getPutBlockRequest(pipeline, containerBlockData, eof, tokenString, true);
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      Pipeline pipeline, BlockData containerBlockData, boolean eof,
+      String tokenString, boolean containerAutoCreate) throws IOException {
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
             .setBlockData(containerBlockData)
             .setEof(eof);
+    if (!containerAutoCreate) {
+      createBlockRequest.setContainerAutoCreate(false);
+    }
     final String id = pipeline.getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
@@ -467,6 +486,17 @@ public final class ContainerProtocolCalls  {
       ByteString data, String tokenString,
       int replicationIndex, BlockData blockData, boolean close)
       throws IOException, ExecutionException, InterruptedException {
+    return writeChunkAsync(xceiverClient, chunk, blockID, data, tokenString,
+        replicationIndex, blockData, close, true);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public static XceiverClientReply writeChunkAsync(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
+      ByteString data, String tokenString,
+      int replicationIndex, BlockData blockData, boolean close,
+      boolean containerAutoCreate)
+      throws IOException, ExecutionException, InterruptedException {
 
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
@@ -484,6 +514,9 @@ public final class ContainerProtocolCalls  {
               .setBlockData(blockData)
               .setEof(close);
       writeChunkRequest.setBlock(createBlockRequest);
+    }
+    if (!containerAutoCreate) {
+      writeChunkRequest.setContainerAutoCreate(false);
     }
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =

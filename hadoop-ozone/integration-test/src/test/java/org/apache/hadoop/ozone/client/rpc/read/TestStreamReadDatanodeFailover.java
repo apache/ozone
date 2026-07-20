@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterAll;
@@ -173,7 +173,7 @@ class TestStreamReadDatanodeFailover {
     OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
     try (OzoneClient streamClient = OzoneClientFactory.getRpcClient(streamConf);
          OzoneClient legacyClient = cluster.newClient()) {
-      TestBucket streamBucket = TestBucket.newBuilder(streamClient).build();
+      BucketForTesting streamBucket = BucketForTesting.newBuilder(streamClient).build();
       OzoneBucket legacyBucket = legacyClient.getObjectStore()
           .getVolume(streamBucket.delegate().getVolumeName())
           .getBucket(streamBucket.delegate().getName());

@@ -103,7 +103,7 @@ public class TestS3MultipartUploadCompleteRequest
       throws Exception {
     String dbOzoneKey = getMultipartKey(volumeName, bucketName, keyName,
         uploadId);
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, dbOzoneKey);
 

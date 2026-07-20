@@ -121,6 +121,17 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneKey headS3Object(String bucketName, String keyName,
+                               int partNumber) throws IOException {
+    // The stub does not model individual multipart parts, so it returns
+    // whole-object metadata (consistent with getS3KeyDetails). Real part-number
+    // semantics (InvalidPart, per-part size) are covered by the SDK-based
+    // integration tests against a live cluster.
+    return objectStoreStub.getS3Volume().getBucket(bucketName)
+        .headObject(keyName);
+  }
+
+  @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     return objectStoreStub.getS3Volume().getBucket(bucketName).getKey(keyName);
@@ -578,7 +589,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-                                            String bucketName, String keyName)
+                                            String bucketName, String keyName,
+                                            boolean headOp)
       throws IOException {
     return null;
   }

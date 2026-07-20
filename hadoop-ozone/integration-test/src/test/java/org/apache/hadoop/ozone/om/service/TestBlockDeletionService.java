@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
-import org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils;
+import org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -160,7 +160,7 @@ public class TestBlockDeletionService {
       }
     });
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     assertEquals(STORAGE_SPACE_DISTRIBUTION.ordinal(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 

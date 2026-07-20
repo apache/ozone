@@ -2250,6 +2250,24 @@
                 "name": "iterationsStatusInfo",
                 "type": "ContainerBalancerTaskIterationStatusInfoProto",
                 "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "stoppedAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "stopReason",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "stopMessage",
+                "type": "string",
+                "optional": true
               }
             ]
           },

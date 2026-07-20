@@ -1015,6 +1015,22 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * OzoneFS api to get file status for an entry.
+   *
+   * @param keyName Key name
+   * @param headOp  when true, request a metadata-only (type) check so the OM
+   *                skips the pipeline refresh and datanode sorting.
+   * @throws OMException if file does not exist
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  public OzoneFileStatus getFileStatus(String keyName, boolean headOp)
+      throws IOException {
+    return proxy.getOzoneFileStatus(volumeName, name, keyName, headOp);
+  }
+
+  /**
    * Ozone FS api to create a directory. Parent directories if do not exist
    * are created for the input directory.
    *
