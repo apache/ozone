@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
+  private static final String NULL_SPAN_AS_STRING = "";
 
   private static volatile boolean isInit = false;
   private static volatile boolean tracingEnabled;
@@ -74,13 +75,13 @@ public final class TracingUtil {
   }
 
   private static synchronized void initTracing(
-      String serviceName, TracingConfig tracingConfig, boolean preferOzone) {
+      String serviceName, TracingConfig tracingConfig, boolean isReconfig) {
     if (isInit) {
       return;
     }
 
     try {
-      initialize(serviceName, tracingConfig, preferOzone);
+      initialize(serviceName, tracingConfig, isReconfig);
       isInit = true;
       LOG.info("Initialized tracing service: {} (enabled={}, applicationAware={})",
           serviceName, tracingEnabled, applicationAware);
@@ -157,7 +158,7 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName, TracingConfig cfg, boolean preferOzone) {
+  private static void initialize(String serviceName, TracingConfig cfg, boolean isReconfig) {
     tracingEnabled = cfg.isTracingEnabled();
     applicationAware = cfg.isApplicationAware();
 
@@ -168,7 +169,7 @@ public final class TracingUtil {
 
     // Server reconfiguration reprioritizes Ozone's SDK over any adopted global,
     // and re-registers the global name and tracer.
-    if (preferOzone && tracingEnabled) {
+    if (isReconfig && tracingEnabled) {
       initOzoneSdk(serviceName, cfg, true);
       return;
     }
@@ -180,7 +181,9 @@ public final class TracingUtil {
       return;
     }
 
-    initOzoneSdk(serviceName, cfg, tracingEnabled);
+    // No app-supplied global — build Ozone's SDK and always register it as the JVM global,
+    // so any co-resident library observes the same tracer whenever tracing is valid.
+    initOzoneSdk(serviceName, cfg, true);
   }
 
   private static void initOzoneSdk(String serviceName, TracingConfig cfg, boolean registerGlobal) {
@@ -263,10 +266,17 @@ public final class TracingUtil {
 
   /**
    * Export the active tracing span as a string.
+   * When tracing is disabled, not initialized, or no valid span is in scope,
+   * {@link Span#current()} returns an invalid span; there is nothing to encode and this
+   * method returns an empty string. Callers must accept that as "no context to propagate".
    *
-   * @return encoded tracing context.
+   * @return encoded W3C trace context, or empty string if there is no valid active span.
    */
   public static String exportCurrentSpan() {
+    Span currentSpan = Span.current();
+    if (!currentSpan.getSpanContext().isValid()) {
+      return NULL_SPAN_AS_STRING;
+    }
     StringBuilder builder = new StringBuilder();
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     propagator.inject(Context.current(), builder,
@@ -276,12 +286,19 @@ public final class TracingUtil {
 
   /**
    * Create a new scope and use the imported span as the parent.
+   * Short-circuits to an invalid span when there is no usable tracer:
+   *   - tracing was never initialized (tracer is still the noop), or
+   *   - application-aware mode is on but no app-supplied SDK was adopted (sdkTracerProvider == null
+   *     and the current tracer is the noop).
    *
    * @param name          name of the newly created scope
    * @param encodedParent Encoded parent span (could be null or empty)
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
+    if (!hasUsableTracer()) {
+      return Span.getInvalid();
+    }
     if (encodedParent == null || encodedParent.isEmpty()) {
       if (!canStartSpanWithoutParent()) {
         return Span.getInvalid();
@@ -291,16 +308,20 @@ public final class TracingUtil {
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
-    Span extractedParent = Span.fromContext(extract);
-    if (!extractedParent.getSpanContext().isValid()) {
-      if (!canStartSpanWithoutParent()) {
-        return Span.getInvalid();
-      }
-      return tracer.spanBuilder(name).setNoParent().startSpan();
-    }
     return tracer.spanBuilder(name)
         .setParent(extract)
         .startSpan();
+  }
+
+  /**
+   * True when the current tracer can actually build spans — an Ozone-owned SDK is configured,
+   * or an adopted GlobalOpenTelemetry provides a non-noop tracer.
+   */
+  private static boolean hasUsableTracer() {
+    if (sdkTracerProvider != null) {
+      return true;
+    }
+    return GlobalOpenTelemetry.isSet() && isRealGlobal(GlobalOpenTelemetry.get());
   }
 
   /**
@@ -329,9 +350,18 @@ public final class TracingUtil {
     return conf.getObject(TracingConfig.class).isTracingEnabled();
   }
 
+  /**
+   * Returns true when tracing may actually produce spans:
+   *   - fully enabled (ozone.tracing.enabled=true), or
+   *   - application-aware AND an SDK is configured (either Ozone-owned or an adopted global);
+   *     without an SDK, application-aware is a passthrough that would emit noop spans anyway.
+   */
   public static boolean isTracingActive(ConfigurationSource conf) {
     TracingConfig tc = conf.getObject(TracingConfig.class);
-    return tc.isTracingEnabled() || tc.isApplicationAware();
+    if (tc.isTracingEnabled()) {
+      return true;
+    }
+    return tc.isApplicationAware() && hasUsableTracer();
   }
 
   /**
@@ -534,7 +564,7 @@ public final class TracingUtil {
 
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
-    if (conf == null || !isTracingActive(conf)) {
+    if (conf == null || !isTracingActive(conf) || !hasUsableTracer()) {
       return () -> { };
     }
 
