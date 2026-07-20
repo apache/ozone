@@ -375,6 +375,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -565,6 +569,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     OzoneKey key;
     try {
@@ -572,7 +581,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      key = getClientProtocol().headS3Object(bucketName, keyPath);
+      // A partNumber is validated against the object's parts and yields the
+      // metadata of that part; an out-of-range part throws InvalidPart.
+      key = (partNumber != 0) ?
+          getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
+          getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(

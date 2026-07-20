@@ -1600,6 +1600,16 @@
       If this is empty, no column families are compacted.
     </description>
   </property>
+  <property>
+    <name>ozone.om.compaction.service.bottommost-level-compaction</name>
+    <value>kSkip</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Bottommost level compaction type for compaction.
+      Invalid values will default to kSkip.
+      Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>

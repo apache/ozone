@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
+import org.rocksdb.CompactRangeOptions.BottommostLevelCompaction;
 
 /**
  * Ozone Manager Constants.
@@ -692,6 +693,17 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
+
+  /**
+   * Bottommost level compaction type for manual compaction.
+   * Invalid values will default to kSkip.
+   * Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
+   * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
+      "ozone.om.compaction.service.bottommost-level-compaction";
+  public static final BottommostLevelCompaction
+      OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = BottommostLevelCompaction.kSkip;
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.

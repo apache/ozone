@@ -1864,11 +1864,24 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
                                          int partNumber) throws IOException {
+    return getOzoneKeyDetails(
+        getS3PartOmKeyInfo(bucketName, keyName, partNumber, false));
+  }
+
+  @Override
+  public OzoneKey headS3Object(String bucketName, String keyName,
+                               int partNumber) throws IOException {
+    return OzoneKey.fromKeyInfo(
+        getS3PartOmKeyInfo(bucketName, keyName, partNumber, true));
+  }
+
+  private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
+      int partNumber, boolean isHeadOp) throws IOException {
     OmKeyInfo keyInfo;
     if (omVersion.compareTo(OzoneManagerVersion.S3_PART_AWARE_GET) >= 0) {
-      keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber);
+      keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber, isHeadOp);
     } else {
-      keyInfo = getS3KeyInfo(bucketName, keyName, false);
+      keyInfo = getS3KeyInfo(bucketName, keyName, isHeadOp);
       List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
           .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
           .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
@@ -1879,7 +1892,7 @@ public class RpcClient implements ClientProtocol {
           .mapToLong(OmKeyLocationInfo::getLength)
           .sum());
     }
-    return getOzoneKeyDetails(keyInfo);
+    return keyInfo;
   }
 
   @Nonnull
@@ -1907,7 +1920,8 @@ public class RpcClient implements ClientProtocol {
 
   @Nonnull
   private OmKeyInfo getS3PartKeyInfo(
-      String bucketName, String keyName, int partNumber) throws IOException {
+      String bucketName, String keyName, int partNumber, boolean isHeadOp)
+      throws IOException {
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
 
@@ -1921,6 +1935,7 @@ public class RpcClient implements ClientProtocol {
         .setLatestVersionLocation(getLatestVersionLocation)
         .setForceUpdateContainerCacheFromSCM(false)
         .setMultipartUploadPartNumber(partNumber)
+        .setHeadOp(isHeadOp)
         .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);

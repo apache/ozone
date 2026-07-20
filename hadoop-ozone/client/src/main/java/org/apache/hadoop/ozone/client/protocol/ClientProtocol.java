@@ -157,6 +157,20 @@ public interface ClientProtocol {
   OzoneKey headS3Object(String bucketName, String keyName) throws IOException;
 
   /**
+   * Look up metadata for a single part of a multipart object in S3 context.
+   * Uses HEAD semantics (no block tokens or pipeline refresh), while still
+   * validating the requested part number.
+   *
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @param partNumber Multipart-upload part number
+   * @return {@link OzoneKey} for the requested part
+   * @throws IOException
+   */
+  OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
+      throws IOException;
+
+  /**
    * Get OzoneKey in S3 context.
    * @param bucketName Name of the Bucket
    * @param keyName Key name

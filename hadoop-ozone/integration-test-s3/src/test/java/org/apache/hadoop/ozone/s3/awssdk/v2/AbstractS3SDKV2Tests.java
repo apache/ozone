@@ -1495,6 +1495,60 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetNotExistedPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, (int) (5 * MB), new HashMap<>(), Collections.emptyList());
+
+    // Reading a part number beyond the object's part count must fail with
+    // InvalidPart, instead of returning an empty (0-byte) object.
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.getObject(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .partNumber(4)));
+    assertEquals(400, exception.statusCode());
+    assertEquals("InvalidPart", exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testHeadObjectPartNumber(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, (int) (5 * MB), new HashMap<>(), Collections.emptyList());
+
+    // HEAD with a valid part number returns that part's metadata, including the
+    // total number of parts.
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .partNumber(1));
+    assertEquals(3, headObjectResponse.partsCount());
+
+    // HEAD with a part number beyond the object's part count must fail with
+    // HTTP 400, instead of returning whole-object metadata. HEAD has no
+    // response body, so only the status code is available to the client.
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.headObject(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .partNumber(4)));
+    assertEquals(400, exception.statusCode());
+  }
+
+  @Test
   public void testHeadObjectReturnsTaggingCount() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

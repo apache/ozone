@@ -276,7 +276,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   /**
    * Returns an iterator for pending deleted directories all buckets.
    */
-  default TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
+  default TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
     return getDeletedDirEntries(null, null);
   }
 
@@ -284,7 +284,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories for volume and bucket.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+  TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
   default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)

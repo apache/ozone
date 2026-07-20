@@ -220,8 +220,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
 
   private void processFSOKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
       Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-        fileTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = fileTable.iterator()) {
       
       while (fileIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
@@ -248,8 +247,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOBSKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
-         keyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyIterator = keyTable.iterator()) {
 
       while (keyIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
@@ -273,8 +271,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-             openFileTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = openFileTable.iterator()) {
       while (fileIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
         addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
@@ -285,8 +282,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenKeys(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
-             openKeyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyIterator = openKeyTable.iterator()) {
       while (keyIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
         addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
@@ -309,7 +305,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
+    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
              multipartInfoTable.iterator()) {
 
       while (mpuIterator.hasNext()) {
@@ -350,8 +346,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
 
   private void prepareDirIdTree(Map<Long, Pair<Long, String>> bucketVolMap) throws Exception {
     // Add bucket volume tree
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucketIterator = 
-        bucketTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>> bucketIterator = bucketTable.iterator()) {
       
       while (bucketIterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = bucketIterator.next();
@@ -370,7 +365,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
 
     // Add dir tree
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> directoryIterator = 
+    try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>> directoryIterator =
         directoryTable.iterator()) {
       
       while (directoryIterator.hasNext()) {
