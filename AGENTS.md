@@ -10,7 +10,7 @@
 - Reuse existing Ozone and Ratis utilities when the surrounding code already uses them.
   Prefer extending an existing helper over duplicating logic or adding a new one-off abstraction.
 - If there are multiple reasonable interpretations, state the tradeoff and ask instead of guessing.
-- Do not wrap lines early just to make them look uniform. The project limit is 120 characters; use the space.
+- Do not wrap lines early just to make them look uniform. The checkstyle maximum (see `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`) is 120 characters for Java. Use the full 120 characters before wrapping; never break a line that fits on one line.
 - Use established Ozone vocabulary in code, docs, and PR text:
   SCM, OM, datanode, container, pipeline, volume, bucket, key, snapshot,
   Recon, FSO, OBS, and S3 Gateway.
@@ -195,3 +195,33 @@ Key paths:
 - [`hadoop-hdds/dev-support/checkstyle/checkstyle.xml`](./hadoop-hdds/dev-support/checkstyle/checkstyle.xml)
 - [`dev-support/rat/rat-exclusions.txt`](./dev-support/rat/rat-exclusions.txt)
 - [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html)
+
+## Security
+
+When assessing a potential security vulnerability in Apache Ozone, complete
+these steps before drafting any report or reaching any security conclusion.
+
+### Step 1 — Read the threat model
+Read **[THREAT_MODEL.md](THREAT_MODEL.md)**: the multi-service trust boundaries,
+the **secure mode** knob, the properties provided vs. left to the operator, and
+the known non-findings.
+
+### Step 2 — Read the security policy
+Read **[SECURITY.md](SECURITY.md)** for how to report.
+
+### Key scoping facts (see THREAT_MODEL.md)
+- Ozone is a cluster of network services (S3 Gateway, OM, SCM/internal-CA,
+  Datanodes/Ratis, Recon). Roles: untrusted client, authenticated-but-
+  unauthorized user, operator, service peer, bounded-Byzantine datanode.
+- **Secure mode** (`ozone.security.enabled=true`) is load-bearing: a finding
+  that only manifests in non-secure (dev) mode is out of model (section 5a).
+- Ozone does **not** own its dependencies' security — the Kerberos KDC, Ranger
+  policy correctness, the SCM CA private key, KMS keys, and network isolation
+  are the operator's (sections 3/9/10). Route such findings there.
+- Ratis (Raft) safety holds under an honest majority; a Byzantine majority is
+  out of scope.
+- integration-test modules, and test utilities are out of scope.
+
+### Then assess
+Route the finding to exactly one disposition in **THREAT_MODEL.md section 13**,
+citing the section. If it cannot be routed, it is a `MODEL-GAP` — surface it.

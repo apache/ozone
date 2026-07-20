@@ -158,7 +158,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
 
     Table<String, OmMultipartKeyInfo> table =
         (Table<String, OmMultipartKeyInfo>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> iterator = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmMultipartKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {

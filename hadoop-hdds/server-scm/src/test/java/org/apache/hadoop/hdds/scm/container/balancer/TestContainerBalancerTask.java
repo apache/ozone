@@ -43,9 +43,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -432,6 +436,60 @@ public class TestContainerBalancerTask {
     assertFalse(zeroOrNegSizeContainerMoved);
   }
 
+  @Test
+  public void testConcurrentMoveCallbacksAccumulateMovedBytesAtomically() throws Exception {
+    int concurrentParties = 10;
+    CyclicBarrier completionBarrier = new CyclicBarrier(concurrentParties);
+    AtomicInteger completionOrder = new AtomicInteger(0);
+    ExecutorService moveCompletionExecutor = Executors.newFixedThreadPool(concurrentParties);
+
+    try {
+      when(moveManager.move(any(ContainerID.class), any(DatanodeDetails.class),
+          any(DatanodeDetails.class)))
+          .thenAnswer(invocation -> {
+            CompletableFuture<MoveManager.MoveResult> future = new CompletableFuture<>();
+            int order = completionOrder.getAndIncrement();
+
+            moveCompletionExecutor.execute(() -> {
+              try {
+                //This forces 10 completion threads to release together
+                if (order < concurrentParties) {
+                  completionBarrier.await(30, TimeUnit.SECONDS);
+                }
+              } catch (Exception e) {
+                future.completeExceptionally(e);
+                return;
+              }
+              future.complete(MoveManager.MoveResult.COMPLETED);
+            });
+            return future;
+          });
+
+      balancerConfiguration.setThreshold(10);
+      balancerConfiguration.setIterations(1);
+      balancerConfiguration.setMaxSizeEnteringTarget(500 * STORAGE_UNIT);
+      balancerConfiguration.setMaxSizeToMovePerIteration(500 * STORAGE_UNIT);
+      balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+
+      startBalancer(balancerConfiguration);
+
+      ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
+      int completedMoves = (int) metrics.getNumContainerMovesCompletedInLatestIteration();
+
+      assertTrue(completedMoves >= concurrentParties, 
+          "Expected at least " + concurrentParties + " completed moves");
+
+      long expectedBytesMoved = 0;
+      for (ContainerID containerID : containerBalancerTask.getContainerToSourceMap().keySet()) {
+        expectedBytesMoved += cidToInfoMap.get(containerID).getUsedBytes();
+      }
+
+      assertEquals(expectedBytesMoved, metrics.getDataSizeMovedInLatestIteration());
+    } finally {
+      moveCompletionExecutor.shutdownNow();
+    }
+  }
+  
   /**
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.

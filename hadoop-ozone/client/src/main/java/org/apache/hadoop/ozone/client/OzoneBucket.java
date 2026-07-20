@@ -1015,6 +1015,22 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * OzoneFS api to get file status for an entry.
+   *
+   * @param keyName Key name
+   * @param headOp  when true, request a metadata-only (type) check so the OM
+   *                skips the pipeline refresh and datanode sorting.
+   * @throws OMException if file does not exist
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  public OzoneFileStatus getFileStatus(String keyName, boolean headOp)
+      throws IOException {
+    return proxy.getOzoneFileStatus(volumeName, name, keyName, headOp);
+  }
+
+  /**
    * Ozone FS api to create a directory. Parent directories if do not exist
    * are created for the input directory.
    *
@@ -1212,6 +1228,33 @@ public class OzoneBucket extends WithMetadata {
    */
   public void deleteObjectTagging(String keyName) throws IOException {
     proxy.deleteObjectTagging(volumeName, name, keyName);
+  }
+
+  /**
+   * Gets the bucketTags for this bucket.
+   * @return Tags for this bucket.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public Map<String, String> getBucketTagging() throws IOException {
+    return proxy.getBucketTagging(volumeName, name);
+  }
+
+  /**
+   * Sets bucketTags on this bucket (replaces existing tag set).
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    proxy.putBucketTagging(volumeName, name, tags);
+  }
+
+  /**
+   * Removes all bucketTags from this bucket.
+   * @throws IOException
+   */
+  public void deleteBucketTagging() throws IOException {
+    proxy.deleteBucketTagging(volumeName, name);
   }
 
   public void setSourcePathExist(boolean b) {

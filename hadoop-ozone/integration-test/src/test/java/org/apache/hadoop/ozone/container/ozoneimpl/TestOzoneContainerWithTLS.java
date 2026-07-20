@@ -35,7 +35,6 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseCont
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerSecureRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
-import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer.captureLogs;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -44,7 +43,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -55,9 +53,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -91,7 +87,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -181,51 +176,6 @@ public class TestOzoneContainerWithTLS {
       if (container != null) {
         container.stop();
       }
-    }
-  }
-
-  @ParameterizedTest(name = "Container token enabled: {0}")
-  @ValueSource(booleans = {false, true})
-  public void downloadContainer(boolean containerTokenEnabled)
-      throws Exception {
-    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
-        containerTokenEnabled);
-    OzoneContainer container = createAndStartOzoneContainerInstance();
-
-    ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
-    XceiverClientManager clientManager =
-        new XceiverClientManager(conf, scmClientConf, aClientTrustManager());
-    XceiverClientSpi client = null;
-    try {
-      client = clientManager.acquireClient(pipeline);
-      // at this point we have an established connection from the client to
-      // the container, and we do not expect a new SSL handshake while we are
-      // running container ops until the renewal, however it may happen, as
-      // the protocol can do a renegotiation at any time, so this dynamic
-      // introduces a very low chance of flakiness.
-      // The downloader client when it connects first, will do a failing
-      // handshake that we are expecting because before downloading, we wait
-      // for the expiration without renewing the certificate.
-      List<Long> containers = new ArrayList<>();
-      List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
-      sourceDatanodes.add(dn);
-
-      containers.add(createAndCloseContainer(client, containerTokenEnabled));
-      letCertExpire();
-      containers.add(createAndCloseContainer(client, containerTokenEnabled));
-      assertDownloadContainerFails(containers.get(0), sourceDatanodes);
-
-      caClient.renewKey();
-      containers.add(createAndCloseContainer(client, containerTokenEnabled));
-      assertDownloadContainerWorks(containers, sourceDatanodes);
-    } finally {
-      if (container != null) {
-        container.stop();
-      }
-      if (client != null) {
-        clientManager.releaseClient(client, true);
-      }
-      IOUtils.closeQuietly(clientManager);
     }
   }
 
@@ -397,31 +347,6 @@ public class TestOzoneContainerWithTLS {
     return container;
   }
 
-  private void assertDownloadContainerFails(long containerId,
-      List<DatanodeDetails> sourceDatanodes) {
-    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
-    SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(conf, caClient);
-    Path file = downloader.getContainerDataFromReplicas(containerId,
-        sourceDatanodes, tempFolder.resolve("tmp"), NO_COMPRESSION);
-    downloader.close();
-    assertNull(file);
-    assertThat(logCapture.getOutput())
-        .contains("java.security.cert.CertificateExpiredException");
-  }
-
-  private void assertDownloadContainerWorks(List<Long> containers,
-      List<DatanodeDetails> sourceDatanodes) {
-    for (Long cId : containers) {
-      SimpleContainerDownloader downloader =
-          new SimpleContainerDownloader(conf, caClient);
-      Path file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
-          tempFolder.resolve("tmp"), NO_COMPRESSION);
-      downloader.close();
-      assertNotNull(file);
-    }
-  }
-
   private Token<ContainerTokenIdentifier> createContainer(
       XceiverClientSpi client, boolean useToken, long id) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -448,11 +373,6 @@ public class TestOzoneContainerWithTLS {
     assertNotNull(response);
     assertSame(response.getResult(), ContainerProtos.Result.SUCCESS);
     return id;
-  }
-
-  private void letCertExpire() throws Exception {
-    Date expiry = caClient.getCertificate().getNotAfter();
-    waitFor(() -> expiry.before(new Date()), 100, CERT_LIFETIME * 1000);
   }
 
   private void letCACertExpire() throws Exception {

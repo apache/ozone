@@ -47,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -54,7 +55,6 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -532,8 +532,9 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
     try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
+      HttpServletResponse mockResponse = mockHttpServletResponse(fileOutputStream);
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new HashSet<>(), tmpdir);
+          mockResponse, new HashSet<>(), tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -577,8 +578,9 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
     try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
+      HttpServletResponse mockResponse = mockHttpServletResponse(fileOutputStream);
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList, tmpdir);
+          mockResponse, toExcludeList, tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -596,6 +598,33 @@ public class TestOMDbCheckpointServlet {
 
     initialCheckpointSet.removeAll(finalCheckpointSet);
     assertThat(initialCheckpointSet).contains(dummyFile.getName());
+  }
+
+  private static HttpServletResponse mockHttpServletResponse(OutputStream out)
+      throws IOException {
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    ServletOutputStream sos = new ServletOutputStream() {
+      @Override
+      public void write(int b) throws IOException {
+        out.write(b);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        out.write(b, off, len);
+      }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
+
+      @Override
+      public void setWriteListener(WriteListener writeListener) {
+      }
+    };
+    when(response.getOutputStream()).thenReturn(sos);
+    return response;
   }
 
   /**

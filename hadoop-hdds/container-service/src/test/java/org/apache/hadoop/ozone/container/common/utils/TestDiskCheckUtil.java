@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mockStatic;
 import java.io.File;
 import java.nio.file.FileSystemException;
 import java.nio.file.OpenOption;
+import java.nio.file.Path;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -84,7 +85,10 @@ public class TestDiskCheckUtil {
   @Test
   public void testReadWrite() {
     assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
+    assertTestFileDeleted();
+  }
 
+  private void assertTestFileDeleted() {
     // Test file should have been deleted.
     File[] children = testDir.listFiles();
     assertNotNull(children);
@@ -95,16 +99,16 @@ public class TestDiskCheckUtil {
   public void testCheckReadWriteDiskFull() {
     try (MockedStatic<FileUtils> mockService = mockStatic(FileUtils.class)) {
       // fos.write(writtenBytes) also through FileSystemException with the message
-      mockService.when(() -> FileUtils.newOutputStreamForceAtClose(any(File.class), any(OpenOption[].class)))
+      mockService.when(() -> FileUtils.newOutputStreamForceAtClose(any(Path.class), any(OpenOption[].class)))
           .thenThrow(new FileSystemException("No space left on device"));
 
-      String path = testDir.getAbsolutePath();
       assertThrows(FileSystemException.class,
-          () -> FileUtils.newOutputStreamForceAtClose(new File(path), new OpenOption[2]));
+          () -> FileUtils.newOutputStreamForceAtClose(testDir.toPath(), new OpenOption[2]));
 
       // Test that checkReadWrite returns true for the disk full case
       boolean result = DiskCheckUtil.checkReadWrite(testDir, testDir, 1024);
       assertTrue(result, "checkReadWrite should return true when disk is full");
+      assertTestFileDeleted();
     }
   }
 }

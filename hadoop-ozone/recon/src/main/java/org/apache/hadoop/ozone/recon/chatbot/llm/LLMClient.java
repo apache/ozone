@@ -36,22 +36,29 @@ public interface LLMClient {
   /**
    * The core action: Send a conversation to an AI and wait for its answer.
    *
+   * <p>When {@code tools} is non-null, the model may reply with native tool calls instead of (or in
+   * addition to) text. Text-only callers (summarization, fallback) pass {@code null}.</p>
+   *
    * <p>API keys are always resolved server-side via
    * {@link org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper} from
    * the Hadoop credential store or {@code ozone-site.xml}. There is no per-request
    * key parameter — all callers should be cluster admins using the shared server key.</p>
    *
-   * @param messages   The back-and-forth chat history so far (System Prompts, User Questions, etc.)
-   * @param model      The specific model name (e.g. "gpt-4.1" or "gemini-2.5-flash")
-   * @param parameters Extra rules like "temperature" (how creative the AI should be) or
-   *                   "max_tokens" (how long the answer can be)
+   * @param messages The back-and-forth chat history so far (System Prompts, User Questions, etc.)
+   * @param model    Requested model name (optional; falls back to configured default when unsupported)
+   * @param provider Requested provider name (optional; falls back via routing rules when unsupported)
+   * @param params   Generation settings (temperature, max tokens), applied when building the provider
+   *                 model (LangChain4j 0.35.0 does not support per-request overrides on {@code ChatRequest})
+   * @param tools    Tools the model may call, or {@code null} for a plain text-only completion
    * @return A standardized LLMResponse object containing the AI's final text.
    * @throws LLMException if the network fails, the API key is missing, or the provider returns an error.
    */
   LLMResponse chatCompletion(
       List<ChatMessage> messages,
       String model,
-      Map<String, Object> parameters) throws LLMException;
+      String provider,
+      GenParams params,
+      List<ToolSpec> tools) throws LLMException;
 
   /**
    * Returns whether this client is ready to work (e.g. has an API key configured).
@@ -111,17 +118,17 @@ public interface LLMClient {
     // How many "words" the AI answered with
     private final int completionTokens;
 
-    // Extra sneaky information about the answer (like why it stopped typing)
-    private final Map<String, Object> metadata;
+    // Native tool calls requested by the LLM
+    private final List<ToolCallRequest> toolCalls;
 
     public LLMResponse(String content, String model,
                        int promptTokens, int completionTokens,
-                       Map<String, Object> metadata) {
+                       List<ToolCallRequest> toolCalls) {
       this.content = content;
       this.model = model;
       this.promptTokens = promptTokens;
       this.completionTokens = completionTokens;
-      this.metadata = metadata;
+      this.toolCalls = toolCalls;
     }
 
     public String getContent() {
@@ -145,8 +152,52 @@ public interface LLMClient {
       return promptTokens + completionTokens;
     }
 
-    public Map<String, Object> getMetadata() {
-      return metadata;
+    public List<ToolCallRequest> getToolCalls() {
+      return toolCalls;
+    }
+  }
+
+  /** Native tool definition passed to the LLM (name, description, JSON parameter schema). */
+  class ToolSpec {
+    private final String name;
+    private final String description;
+    private final Map<String, Object> parametersSchema;
+
+    public ToolSpec(String name, String description, Map<String, Object> parametersSchema) {
+      this.name = name;
+      this.description = description;
+      this.parametersSchema = parametersSchema;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    public Map<String, Object> getParametersSchema() {
+      return parametersSchema;
+    }
+  }
+
+  /** One tool invocation requested by the LLM (tool name and JSON arguments). */
+  class ToolCallRequest {
+    private final String toolName;
+    private final String argumentsJson;
+
+    public ToolCallRequest(String toolName, String argumentsJson) {
+      this.toolName = toolName;
+      this.argumentsJson = argumentsJson;
+    }
+
+    public String getToolName() {
+      return toolName;
+    }
+
+    public String getArgumentsJson() {
+      return argumentsJson;
     }
   }
 
@@ -157,29 +208,12 @@ public interface LLMClient {
    */
   class LLMException extends Exception {
 
-    // Keep track of the HTTP Error Code (like 401 Unauthorized or 404 Not Found)
-    private final int statusCode;
-
     public LLMException(String message) {
-      this(message, -1);
-    }
-
-    public LLMException(String message, int statusCode) {
       super(message);
-      this.statusCode = statusCode;
     }
 
     public LLMException(String message, Throwable cause) {
-      this(message, -1, cause);
-    }
-
-    public LLMException(String message, int statusCode, Throwable cause) {
       super(message, cause);
-      this.statusCode = statusCode;
-    }
-
-    public int getStatusCode() {
-      return statusCode;
     }
   }
 }

@@ -25,6 +25,7 @@ import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -197,6 +198,30 @@ public class TestFSORepairTool {
     String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
     assertEquals(expectedOutput, reportOutput);
+  }
+
+  /**
+   * Flush temp.db writes after every entry so the batch commit/reset path runs for both the
+   * reachable and pendingToDelete tables across all trees, and verify the report is unchanged.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testBatchedTempWrites() {
+    String expectedOutput = serializeReport(fullReport);
+
+    int exitCode = dryRun("--batch-size", "1");
+    assertEquals(0, exitCode, err.getOutput());
+
+    String reportOutput = extractRelevantSection(out.getOutput());
+    assertEquals(expectedOutput, reportOutput);
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testInvalidBatchSize() {
+    int exitCode = dryRun("--batch-size", "0");
+    assertNotEquals(0, exitCode);
+    assertThat(err.getOutput()).contains("--batch-size must be at least 1");
   }
 
   /**

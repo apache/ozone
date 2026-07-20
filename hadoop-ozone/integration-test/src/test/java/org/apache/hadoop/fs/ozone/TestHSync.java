@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -719,8 +720,7 @@ public class TestHSync {
     // test file with all blocks pre-allocated
     omMetrics.resetNumKeyHSyncs();
     long writtenSize = 0;
-    try (OzoneOutputStream outputStream = bucket.createKey("key-" +
-            RandomStringUtils.secure().nextNumeric(5),
+    try (OzoneOutputStream outputStream = bucket.createKey(uniqueObjectName("key-"),
         BLOCK_SIZE * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
       // make sure at least writing 2 blocks data
       while (writtenSize <= BLOCK_SIZE) {

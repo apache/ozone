@@ -937,7 +937,7 @@ public class OzoneManagerServiceProviderImpl
       return;
     }
     if (LOG.isDebugEnabled()) {
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, ?>> iterator = table.iterator()) {
         long count = Iterators.size(iterator);
         LOG.debug("{} Table count: {}", tableName, count);
       } catch (IOException ioException) {

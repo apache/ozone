@@ -298,6 +298,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (container == null && ((isWriteStage || isCombinedStage)
           || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock)) {
+
+        if (!ContainerUtils.isContainerCreatable(msg)) {
+          StorageContainerException sce = new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+          return ContainerUtils.logAndReturnError(LOG, sce, msg);
+        }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
