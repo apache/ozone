@@ -17,99 +17,177 @@
 
 # Ozone UI Monorepo
 
-This monorepo contains three React applications for Apache Ozone UI components:
+A Vite + React 18 + TypeScript monorepo (managed with **pnpm workspaces**) that
+hosts the Apache Ozone web applications and a shared component library. Styling
+is built on **Ant Design v5** themed with the Ozone UI design tokens.
 
-## Applications
+## Applications & packages
 
-- **Recon** - Data node management and monitoring
-- **SCM** - Storage Container Manager interface  
-- **OM** - Ozone Manager interface
+| Package                 | Directory         | Description                                    |
+| ----------------------- | ----------------- | ---------------------------------------------- |
+| `@ozone-ui/shared`      | `packages/shared` | Design system: theme + reusable components     |
+| `@ozone-ui/ozone-recon` | `packages/recon`  | Recon – datanode management and monitoring     |
+| `@ozone-ui/ozone-scm`   | `packages/scm`    | SCM – Storage Container Manager interface      |
+| `@ozone-ui/ozone-om`    | `packages/om`     | OM – Ozone Manager interface                   |
 
-## Structure
+## Folder layout
 
 ```
-hadoop-ui/src/
-├── packages/
-│   ├── shared/           # Shared components and utilities
-│   ├── recon/           # Recon application
-│   ├── scm/             # SCM application
-│   └── om/              # OM application
-├── package.json         # Root package.json with workspace configuration
-└── pnpm-workspace.yaml  # PNPM workspace configuration
+ozone-ui/                         # pnpm workspace root
+├── README.md
+├── package.json                  # Root scripts + shared dev dependencies
+├── pnpm-workspace.yaml           # Workspace globs (./packages/**)
+├── pnpm-lock.yaml
+├── tsconfig.json                 # Base TS config, extended by each package
+├── vite.config.shared.ts         # Shared Vite config helpers for the apps
+├── eslint.config.js              # Flat ESLint config
+└── packages/
+    ├── shared/                   # @ozone-ui/shared (design system)
+    │   └── src/
+    │       ├── theme/            # tokens, Ant Design theme, ThemeProvider
+    │       ├── components/       # Sidebar, UtilityBar, PageHeader, Card, ...
+    │       ├── utils/            # menuUtils, ...
+    │       └── index.ts          # Public entry point (barrel)
+    ├── recon/                    # @ozone-ui/ozone-recon (Vite app)
+    ├── scm/                      # @ozone-ui/ozone-scm   (Vite app)
+    └── om/                       # @ozone-ui/ozone-om    (Vite app)
 ```
 
-## Development
+## Prerequisites
 
-### Prerequisites
+- Node.js `>= 20` (Node 20 LTS recommended)
+- pnpm `>= 8.15.7` (`corepack enable` provides the pinned version)
 
-- Node.js >= 20.0.0 (Node 20 LTS recommended)
-- PNPM >= 8.0.0
-
-### Installation
+## Install
 
 ```bash
-# Install all dependencies
-pnpm install
+cd ozone-ui
+pnpm install          # installs all workspace dependencies
 ```
 
-### Development
+## Develop
+
+The `shared` package is consumed as a built artifact, so build it once (and
+after any change to it) before/while running an app:
 
 ```bash
-# Start development server for a specific app
-pnpm dev:recon
-pnpm dev:scm
-pnpm dev:om
+cd ozone-ui
 
-# Build shared components (run this first if you make changes to shared)
-pnpm build:shared
+pnpm build:shared      # compile @ozone-ui/shared -> packages/shared/dist
+
+pnpm dev:recon         # start the Recon app dev server
+pnpm dev:scm           # start the SCM app dev server
+pnpm dev:om            # start the OM app dev server
 ```
 
-### Building
+## Build
 
 ```bash
-# Build all applications
-pnpm build
+cd ozone-ui
 
-# Build specific application
-pnpm build:recon
+pnpm build             # build shared, then all three apps
+pnpm build:recon       # build a single app
 pnpm build:scm
 pnpm build:om
-
-# Build only shared components
-pnpm build:shared
+pnpm build:shared      # build only the shared library
 ```
 
-Build outputs are placed in:
-- `build/recon/` - Recon application build
-- `build/scm/` - SCM application build  
-- `build/om/` - OM application build
+Application build output is written to `build/{recon,scm,om}/`.
 
-### Clean
+## Lint & clean
 
 ```bash
-# Clean all build artifacts and node_modules
-pnpm clean
+pnpm lint              # ESLint across the workspace
+pnpm clean             # remove build/ and all dist/ + node_modules
+pnpm clean:cache       # clear Vite caches
+pnpm clean:all         # clean + clean:cache
 ```
 
-## Architecture
+## Using the design system
 
-### Shared Components
+Each app mounts the theme once near its root (already wired in
+`packages/{om,scm,recon}/src/main.tsx`), then consumes shared components and
+tokens from `@ozone-ui/shared`:
 
-The `@hadoop-ui/shared` package contains:
+```tsx
+import { BrowserRouter } from 'react-router-dom';
+import {
+  ThemeProvider,
+  AppLayout,
+  Sidebar,
+  PageHeader,
+  Card,
+  KeyValuePair,
+  Chip,
+} from '@ozone-ui/shared';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
 
-- **Components**: Reusable React components (e.g., Sidebar)
-- **Utils**: Shared utility functions (e.g., menu utilities)
-- **Types**: TypeScript type definitions
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ThemeProvider>
+        <AppLayout
+          sider={
+            <Sidebar
+              logo={<span style={{ color: '#fff', padding: 12 }}>Ozone</span>}
+              items={[{ key: 'overview', label: 'Overview', path: '/' }]}
+            />
+          }
+        >
+          <PageHeader title="Datanodes" subtitle="12 healthy" />
+          <Card
+            title="Instance details"
+            emphasis="elevated"
+            collapsible
+            extra={<Chip color="green" variant="dot">Healthy</Chip>}
+          >
+            <KeyValuePair label="Hostname" value="dn-01.ozone.local" />
+            <KeyValuePair label="UUID" value="a1b2c3" copyable />
+          </Card>
+        </AppLayout>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+}
+```
 
-### Individual Applications
+> `Sidebar` is router-aware, so render it within a `react-router-dom` context
+> (e.g. `BrowserRouter`); it highlights the active item and navigates on select.
 
-Each application (`recon`, `scm`, `om`) is a standalone Vite + React + TypeScript application that can import from the shared package.
+### What's in `@ozone-ui/shared`
 
-## Technology Stack
+- **`theme/`**
+  - `colors`, `semanticColors`, `textStyles`, `fontFamilies`, `spacing`,
+    `radius` — design tokens (source of truth for colour and typography).
+  - `ozoneTheme` — an Ant Design v5 `ThemeConfig` derived from the tokens.
+  - `ThemeProvider` — wraps `ConfigProvider` with the theme and accepts optional
+    per-app `themeOverrides`.
+- **`components/`** (derived from the components recurring across the mockups)
+  - `UtilityBar` — global top bar (leading/title, centre, actions).
+  - `Sidebar` — collapsible, router-aware navigation rail driven by `items`
+    (with `path`s) and `logo` props; integrates with `react-router-dom`.
+  - `AppLayout` — page shell (sider + header + content).
+  - `PageHeader` — page title with breadcrumb, subtitle and actions.
+  - `Card` — surface with `outlined`/`elevated`/`filled` emphasis and an
+    optional `collapsible` header.
+  - `KeyValuePair` — label/value pair (vertical or horizontal, optional link/copy).
+  - `Chip` — pill: `full`/`dot` variant, `standard`/`small` size, colour and
+    `selected`/`closable` states.
+  - `Alert` — inline status banner (info/success/warning/error).
+  - `TextLink` — themed inline link with optional external affordance.
+  - `IconButton` — square icon-only button with accessible label + tooltip.
+  - `Icon` — inline-SVG icon set (`currentColor`, tree-shakeable).
 
-- **Build Tool**: Vite
+Prefer the tokens/theme over hard-coded colours or font sizes so re-theming
+stays centralised.
+
+## Technology stack
+
+- **Build**: Vite 5 (apps), `tsc` (shared library)
 - **Framework**: React 18
-- **Language**: TypeScript
-- **UI Library**: Ant Design v5
-- **Package Manager**: PNPM (with workspaces)
-- **Monorepo**: PNPM Workspaces 
+- **Language**: TypeScript 5.6
+- **UI**: Ant Design v5, themed with the Ozone UI design tokens
+- **Fonts**: Roboto / Roboto Mono (`@fontsource/roboto`), Plus Jakarta Sans (app titles)
+- **Package manager / monorepo**: pnpm workspaces
