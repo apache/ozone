@@ -18,14 +18,19 @@
 package org.apache.hadoop.ozone.dn.volume;
 
 import static org.apache.commons.io.IOUtils.readFully;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,7 +38,9 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,176 +67,219 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeState;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.AfterParameterizedClassInvocation;
+import org.junit.jupiter.params.BeforeParameterizedClassInvocation;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests datanode can detect failed volumes.
  */
+@ParameterizedClass
+@ValueSource(booleans = {true, false})
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
 class TestDatanodeHddsVolumeFailureDetection {
   private static final int KEY_SIZE = 128;
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void corruptChunkFile(boolean schemaV3) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
-      try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+  @Parameter
+  private boolean schemaV3;
 
-        // write a file
-        String keyName = UUID.randomUUID().toString();
-        long containerId = createKey(bucket, keyName);
+  private MiniOzoneCluster cluster;
 
-        // corrupt chunk file by rename file->dir
-        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
-        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
-        MutableVolumeSet volSet = oc.getVolumeSet();
-        StorageVolume vol0 = volSet.getVolumesList().get(0);
-        HddsVolume volume = assertInstanceOf(HddsVolume.class, vol0);
-        Path chunksPath = Paths.get(
-            volume.getStorageDir().getPath(),
-            volume.getClusterID(),
-            Storage.STORAGE_DIR_CURRENT,
-            Storage.CONTAINER_DIR + "0",
-            String.valueOf(containerId),
-            OzoneConsts.STORAGE_DIR_CHUNKS
-        );
-        File[] chunkFiles = chunksPath.toFile().listFiles();
-        assertNotNull(chunkFiles);
+  @BeforeParameterizedClassInvocation
+  void initCluster() throws Exception {
+    cluster = newCluster(schemaV3);
+  }
 
-        try {
-          for (File chunkFile : chunkFiles) {
-            DatanodeTestUtils.injectDataFileFailure(chunkFile);
-          }
+  @AfterEach
+  void restoreVolume() throws Exception {
+    MutableVolumeSet volumeSet = cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getVolumeSet();
+    if (!volumeSet.getVolumesList().isEmpty()) {
+      return;
+    }
+    // A schema V3 volume failure closes the shared DB, which requires a
+    // datanode restart. Schema V2 uses per-container DBs, so restoring the
+    // volume to the active map is sufficient for the next test.
+    if (schemaV3) {
+      cluster.restartHddsDatanode(0, true);
+      return;
+    }
+    StorageVolume volume = volumeSet.getFailedVolumesList().get(0);
+    volume.setState(VolumeState.NORMAL);
+    volume.start();
+    volumeSet.setVolumeMapForTesting(
+        Collections.singletonMap(volume.getStorageDir().getPath(), volume));
+  }
 
-          // simulate bad volume by removing write permission on root dir
-          // refer to HddsVolume.check()
-          DatanodeTestUtils.simulateBadVolume(vol0);
-
-          // read written file to trigger checkVolumeAsync
-          readKeyToTriggerCheckVolumeAsync(bucket, keyName);
-
-          // should trigger checkVolumeAsync and
-          // a failed volume should be detected
-          DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
-        } finally {
-          // restore for cleanup
-          DatanodeTestUtils.restoreBadVolume(vol0);
-          for (File chunkFile : chunkFiles) {
-            DatanodeTestUtils.restoreDataFileFromFailure(chunkFile);
-          }
-        }
-      }
+  @AfterParameterizedClassInvocation
+  void shutdown() {
+    if (cluster != null) {
+      cluster.close();
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void corruptContainerFile(boolean schemaV3) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
-      // create a container
-      ContainerWithPipeline container;
-      OzoneConfiguration conf = cluster.getConf();
-      try (ScmClient scmClient = new ContainerOperationClient(conf)) {
-        container = scmClient.createContainer(ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE, OzoneConsts.OZONE);
-      }
+  @Test
+  void corruptChunkFile() throws Exception {
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
-      // corrupt container file by removing write permission on
-      // container metadata dir, since container update operation
-      // use a create temp & rename way, so we can't just rename
-      // container file to simulate corruption
+      // write a file
+      String keyName = UUID.randomUUID().toString();
+      long containerId = createKey(bucket, keyName);
+
+      // corrupt chunk file by rename file->dir
       HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
       OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
       MutableVolumeSet volSet = oc.getVolumeSet();
       StorageVolume vol0 = volSet.getVolumesList().get(0);
-      Container<?> c1 = oc.getContainerSet().getContainer(
-          container.getContainerInfo().getContainerID());
-      File metadataDir = new File(c1.getContainerFile().getParent());
+      HddsVolume volume = assertInstanceOf(HddsVolume.class, vol0);
+      Path chunksPath = Paths.get(
+          volume.getStorageDir().getPath(),
+          volume.getClusterID(),
+          Storage.STORAGE_DIR_CURRENT,
+          Storage.CONTAINER_DIR + "0",
+          String.valueOf(containerId),
+          OzoneConsts.STORAGE_DIR_CHUNKS
+      );
+      File[] chunkFiles = chunksPath.toFile().listFiles();
+      assertNotNull(chunkFiles);
+
       try {
-        DatanodeTestUtils.injectContainerMetaDirFailure(metadataDir);
+        for (File chunkFile : chunkFiles) {
+          DatanodeTestUtils.injectDataFileFailure(chunkFile);
+        }
 
         // simulate bad volume by removing write permission on root dir
         // refer to HddsVolume.check()
         DatanodeTestUtils.simulateBadVolume(vol0);
 
-        // close container to trigger checkVolumeAsync
-        assertThrows(IOException.class, c1::close);
+        // read written file to trigger checkVolumeAsync
+        readKeyToTriggerCheckVolumeAsync(bucket, keyName);
 
-        // should trigger CheckVolumeAsync and
+        // should trigger checkVolumeAsync and
         // a failed volume should be detected
-        DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
+        waitForHandleFailedVolume(volSet);
       } finally {
         // restore for cleanup
         DatanodeTestUtils.restoreBadVolume(vol0);
-        DatanodeTestUtils.restoreContainerMetaDirFromFailure(metadataDir);
+        for (File chunkFile : chunkFiles) {
+          DatanodeTestUtils.restoreDataFileFromFailure(chunkFile);
+        }
       }
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void corruptDbFile(boolean schemaV3) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
-      try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+  @Test
+  void corruptContainerFile() throws Exception {
+    // create a container
+    ContainerWithPipeline container;
+    OzoneConfiguration conf = cluster.getConf();
+    try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+      container = scmClient.createContainer(ReplicationType.STAND_ALONE,
+          ReplicationFactor.ONE, OzoneConsts.OZONE);
+    }
 
-        // write a file, will create container1
-        String keyName = UUID.randomUUID().toString();
-        long containerId = createKey(bucket, keyName);
+    // corrupt container file by removing write permission on
+    // container metadata dir, since container update operation
+    // use a create temp & rename way, so we can't just rename
+    // container file to simulate corruption
+    HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+    OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+    MutableVolumeSet volSet = oc.getVolumeSet();
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
+    Container<?> c1 = oc.getContainerSet().getContainer(
+        container.getContainerInfo().getContainerID());
+    File metadataDir = new File(c1.getContainerFile().getParent());
+    try {
+      DatanodeTestUtils.injectContainerMetaDirFailure(metadataDir);
 
-        // close container1
-        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
-        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
-        Container<?> c1 = oc.getContainerSet().getContainer(containerId);
-        c1.close();
+      // simulate bad volume by removing write permission on root dir
+      // refer to HddsVolume.check()
+      DatanodeTestUtils.simulateBadVolume(vol0);
 
-        // create container2, and container1 is kicked out of cache
-        OzoneConfiguration conf = cluster.getConf();
-        try (ScmClient scmClient = new ContainerOperationClient(conf)) {
-          ContainerWithPipeline c2 = scmClient.createContainer(
-              ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
-              OzoneConsts.OZONE);
-          assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
-        }
+      // close container to trigger checkVolumeAsync
+      assertThrows(IOException.class, c1::close);
 
-        // corrupt db by rename dir->file
-        File dbDir;
+      // should trigger CheckVolumeAsync and
+      // a failed volume should be detected
+      waitForHandleFailedVolume(volSet);
+    } finally {
+      // restore for cleanup
+      DatanodeTestUtils.restoreBadVolume(vol0);
+      DatanodeTestUtils.restoreContainerMetaDirFromFailure(metadataDir);
+    }
+  }
+
+  @Test
+  void corruptDbFile() throws Exception {
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+
+      // write a file, will create container1
+      String keyName = UUID.randomUUID().toString();
+      long containerId = createKey(bucket, keyName);
+
+      // close container1
+      HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+      OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+      Container<?> c1 = oc.getContainerSet().getContainer(containerId);
+      c1.close();
+
+      // create container2, and container1 is kicked out of cache
+      OzoneConfiguration conf = cluster.getConf();
+      try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+        ContainerWithPipeline c2 = scmClient.createContainer(
+            ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+            OzoneConsts.OZONE);
+        assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
+      }
+
+      // corrupt db by rename dir->file
+      File dbDir;
+      if (schemaV3) {
+        dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
+            .getDbFile().getAbsolutePath());
+      } else {
+        File metadataDir = new File(c1.getContainerFile().getParent());
+        dbDir = new File(metadataDir, containerId + OzoneConsts.DN_CONTAINER_DB);
+      }
+
+      MutableVolumeSet volSet = oc.getVolumeSet();
+      StorageVolume vol0 = volSet.getVolumesList().get(0);
+
+      try {
+        DatanodeTestUtils.injectDataDirFailure(dbDir);
         if (schemaV3) {
-          dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
-              .getDbFile().getAbsolutePath());
-        } else {
-          File metadataDir = new File(c1.getContainerFile().getParent());
-          dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+          // remove rocksDB from cache
+          DatanodeStoreCache.getInstance().removeDB(dbDir.getAbsolutePath());
         }
 
-        MutableVolumeSet volSet = oc.getVolumeSet();
-        StorageVolume vol0 = volSet.getVolumesList().get(0);
+        // simulate bad volume by removing write permission on root dir
+        // refer to HddsVolume.check()
+        DatanodeTestUtils.simulateBadVolume(vol0);
 
-        try {
-          DatanodeTestUtils.injectDataDirFailure(dbDir);
-          if (schemaV3) {
-            // remove rocksDB from cache
-            DatanodeStoreCache.getInstance().removeDB(dbDir.getAbsolutePath());
-          }
+        readKeyToTriggerCheckVolumeAsync(bucket, keyName);
 
-          // simulate bad volume by removing write permission on root dir
-          // refer to HddsVolume.check()
-          DatanodeTestUtils.simulateBadVolume(vol0);
-
-          readKeyToTriggerCheckVolumeAsync(bucket, keyName);
-
-          // should trigger CheckVolumeAsync and
-          // a failed volume should be detected
-          DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
-        } finally {
-          // restore all
-          DatanodeTestUtils.restoreBadVolume(vol0);
-          DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
-        }
+        // should trigger CheckVolumeAsync and
+        // a failed volume should be detected
+        waitForHandleFailedVolume(volSet);
+      } finally {
+        // restore all
+        DatanodeTestUtils.restoreBadVolume(vol0);
+        DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
       }
     }
   }
@@ -240,64 +290,55 @@ class TestDatanodeHddsVolumeFailureDetection {
    * As a workaround, we test the helper method directly.
    * As we test the helper method directly, we cannot test for schemas older than V3.
    *
-   * @param schemaV3
    * @throws Exception
    */
-  @ParameterizedTest
-  @ValueSource(booleans = {true})
-  void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
-      try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+  @Test
+  void corruptDbFileWithoutDbHandleCacheInvalidation() throws Exception {
+    assumeTrue(schemaV3);
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
-        // write a file, will create container1
-        String keyName = UUID.randomUUID().toString();
-        long containerId = createKey(bucket, keyName);
+      // write a file, will create container1
+      String keyName = UUID.randomUUID().toString();
+      long containerId = createKey(bucket, keyName);
 
-        // close container1
-        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
-        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
-        Container<?> c1 = oc.getContainerSet().getContainer(containerId);
-        c1.close();
+      // close container1
+      HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+      OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+      Container<?> c1 = oc.getContainerSet().getContainer(containerId);
+      c1.close();
 
-        // create container2, and container1 is kicked out of cache
-        OzoneConfiguration conf = cluster.getConf();
-        try (ScmClient scmClient = new ContainerOperationClient(conf)) {
-          ContainerWithPipeline c2 = scmClient.createContainer(
-              ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
-              OzoneConsts.OZONE);
-          assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
-        }
+      // create container2, and container1 is kicked out of cache
+      OzoneConfiguration conf = cluster.getConf();
+      try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+        ContainerWithPipeline c2 = scmClient.createContainer(
+            ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+            OzoneConsts.OZONE);
+        assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
+      }
 
-        // corrupt db by rename dir->file
-        File dbDir;
-        if (schemaV3) {
-          dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
-              .getDbFile().getAbsolutePath());
-        } else {
-          File metadataDir = new File(c1.getContainerFile().getParent());
-          dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
-        }
+      // corrupt db by rename dir->file
+      File dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
+          .getDbFile().getAbsolutePath());
 
-        MutableVolumeSet volSet = oc.getVolumeSet();
-        HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
+      MutableVolumeSet volSet = oc.getVolumeSet();
+      HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
 
-        try {
-          DatanodeTestUtils.injectDataDirFailure(dbDir);
-          // simulate bad volume by removing write permission on root dir
-          // refer to HddsVolume.check()
-          DatanodeTestUtils.simulateBadVolume(vol0);
+      try {
+        DatanodeTestUtils.injectDataDirFailure(dbDir);
+        // simulate bad volume by removing write permission on root dir
+        // refer to HddsVolume.check()
+        DatanodeTestUtils.simulateBadVolume(vol0);
 
-          // one volume health check got automatically executed when the cluster started
-          // the second health should log the rocksdb failure but return a healthy-volume status
-          assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
-          // the third health check should log the rocksdb failure and return a failed-volume status
-          assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
-        } finally {
-          // restore all
-          DatanodeTestUtils.restoreBadVolume(vol0);
-          DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
-        }
+        // one volume health check got automatically executed when the cluster started
+        // the second health should log the rocksdb failure but return a healthy-volume status
+        assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
+        // the third health check should log the rocksdb failure and return a failed-volume status
+        assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
+      } finally {
+        // restore all
+        DatanodeTestUtils.restoreBadVolume(vol0);
+        DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
       }
     }
   }
@@ -307,6 +348,13 @@ class TestDatanodeHddsVolumeFailureDetection {
     try (InputStream is = bucket.readKey(key)) {
       assertThrows(IOException.class, () -> readFully(is, new byte[KEY_SIZE]));
     }
+  }
+
+  private static void waitForHandleFailedVolume(MutableVolumeSet volumeSet) throws Exception {
+    DatanodeTestUtils.waitForHandleFailedVolume(volumeSet, 1);
+    // The failed map retains the restored schema V2 volume between tests.
+    // Wait for removal from the active map to ensure this failure completed.
+    GenericTestUtils.waitFor(() -> volumeSet.getVolumesList().isEmpty(), 100, 10000);
   }
 
   private static MiniOzoneCluster newCluster(boolean schemaV3)
@@ -319,6 +367,10 @@ class TestDatanodeHddsVolumeFailureDetection {
     // keep the cache size = 1, so we could trigger io exception on
     // reading on-disk db instance
     ozoneConfig.setInt(OZONE_CONTAINER_CACHE_SIZE, 1);
+    ozoneConfig.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    ozoneConfig.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    ozoneConfig.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, TimeUnit.SECONDS);
+    ozoneConfig.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, TimeUnit.SECONDS);
     if (!schemaV3) {
       ContainerTestUtils.disableSchemaV3(ozoneConfig);
     }
