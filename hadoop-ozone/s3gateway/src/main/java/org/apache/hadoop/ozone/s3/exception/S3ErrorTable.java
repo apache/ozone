@@ -134,6 +134,10 @@ public enum S3ErrorTable {
       "BucketAlreadyExists", "The requested bucket name is not available" +
       " as it already exists.", HTTP_CONFLICT),
 
+  BUCKET_ALREADY_OWNED_BY_YOU(
+      "BucketAlreadyOwnedByYou", "Your previous request to create the named" +
+      " bucket succeeded and you already own it.", HTTP_CONFLICT),
+
   INVALID_TAG(
       "InvalidTag", "Your request contains tag input that is not valid.", HTTP_BAD_REQUEST),
 

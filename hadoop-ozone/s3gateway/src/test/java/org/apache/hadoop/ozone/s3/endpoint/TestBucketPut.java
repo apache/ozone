@@ -20,11 +20,14 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,12 +38,15 @@ import org.junit.jupiter.api.Test;
  */
 public class TestBucketPut {
 
+  private static final String OTHER_BUCKET_OWNER = "other-s3-owner";
+
   private String bucketName = OzoneConsts.BUCKET;
   private BucketEndpoint bucketEndpoint;
+  private OzoneClient clientStub;
 
   @BeforeEach
   public void setup() throws Exception {
-    OzoneClient clientStub = new OzoneClientStub();
+    clientStub = new OzoneClientStub();
 
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
@@ -48,12 +54,21 @@ public class TestBucketPut {
   }
 
   @Test
-  public void testCreateBucketAndFailOnDuplicate() throws Exception {
+  public void testCreateBucketAndFailOnDuplicateWithSameOWNER() throws Exception {
     Response response = bucketEndpoint.put(bucketName, null);
     assertEquals(HTTP_OK, response.getStatus());
     assertNotNull(response.getLocation());
 
-    // Create-bucket on an existing bucket fails
+    assertErrorResponse(BUCKET_ALREADY_OWNED_BY_YOU,
+        () -> bucketEndpoint.put(bucketName, null));
+  }
+
+  @Test
+  public void testCreateBucketAndFailOnDuplicateWithDifferentOwner() throws Exception {
+    clientStub.getObjectStore().createVolume(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    clientStub.getObjectStore().getS3Volume().createBucket(bucketName,
+        BucketArgs.newBuilder().setOwner(OTHER_BUCKET_OWNER).build());
+
     assertErrorResponse(BUCKET_ALREADY_EXISTS,
         () -> bucketEndpoint.put(bucketName, null));
   }
