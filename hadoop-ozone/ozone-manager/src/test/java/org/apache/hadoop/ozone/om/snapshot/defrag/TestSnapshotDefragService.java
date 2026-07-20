@@ -795,7 +795,7 @@ public class TestSnapshotDefragService {
                 }
               }))) {
         defragService.performIncrementalDefragmentation(previousSnapshotInfo,
-            snapshotInfo, 1, checkpointStore, prefixInfo,
+            snapshotInfo, checkpointStore, prefixInfo,
             ImmutableSet.of(tableName));
       }
 
@@ -807,10 +807,8 @@ public class TestSnapshotDefragService {
   /**
    * Tests the incremental defragmentation process between two snapshots.
    *
-   * <p>This parameterized test validates the {@code performIncrementalDefragmentation} method
-   * across different version scenarios (0, 1, 2, 10) to ensure all snapshot
-   * delta files are rewritten into fresh external SST files before
-   * ingestion.</p>
+   * <p>This test validates that all snapshot delta files are rewritten into
+   * fresh external SST files before ingestion.</p>
    *
    * <h3>Test Data Generation:</h3>
    * Creates 67,600 synthetic key-value pairs (26×26×100) distributed across two snapshots
@@ -848,13 +846,11 @@ public class TestSnapshotDefragService {
    *   <li>Ensures all incremental tables are ultimately ingested</li>
    * </ul>
    *
-   * @param currentVersion the snapshot version being defragmented (0 for initial, >0 for subsequent)
    * @throws Exception if any error occurs during the test execution
    */
   @SuppressWarnings("checkstyle:MethodLength")
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 10})
-  public void testPerformIncrementalDefragmentation(int currentVersion) throws Exception {
+  @Test
+  public void testPerformIncrementalDefragmentation() throws Exception {
     DBStore checkpointDBStore = mock(DBStore.class);
     String samePrefix = "samePrefix";
     String snap1Prefix = "snap1Prefix";
@@ -995,7 +991,7 @@ public class TestSnapshotDefragService {
         String tableName = i.getArgument(0, String.class);
         return checkpointTables.get(tableName);
       }).when(checkpointDBStore).getTable(anyString());
-      defragService.performIncrementalDefragmentation(snap1Info, snap2Info, currentVersion, checkpointDBStore,
+      defragService.performIncrementalDefragmentation(snap1Info, snap2Info, checkpointDBStore,
           prefixInfo, incrementalTables);
       assertEquals(incrementalTables, new HashSet<>(dumpedFileName.values()));
       assertEquals(ingestedFiles, dumpedFileName);
@@ -1086,7 +1082,7 @@ public class TestSnapshotDefragService {
       IOException defragException = new IOException("Defrag failed");
       if (previousSnapshotExists) {
         Mockito.doThrow(defragException).when(spyDefragService).performIncrementalDefragmentation(
-            eq(previousSnapshotInfo), eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+            eq(previousSnapshotInfo), eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
             eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       } else {
         Mockito.doThrow(defragException).when(spyDefragService).performFullDefragmentation(
@@ -1193,7 +1189,7 @@ public class TestSnapshotDefragService {
       doNothing().when(spyDefragService).performFullDefragmentation(eq(checkpointDBStore), eq(prefixInfo),
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       doNothing().when(spyDefragService).performIncrementalDefragmentation(eq(previousSnapshotInfo),
-          eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+          eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       AtomicInteger lockAcquired = new AtomicInteger(0);
       AtomicInteger lockReleased = new AtomicInteger(0);
@@ -1242,7 +1238,7 @@ public class TestSnapshotDefragService {
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       if (previousSnapshotExists) {
         verifier.verify(spyDefragService).performIncrementalDefragmentation(eq(previousSnapshotInfo),
-            eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+            eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
             eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       } else {
         verifier.verify(spyDefragService).performFullDefragmentation(eq(checkpointDBStore), eq(prefixInfo),
