@@ -59,3 +59,19 @@ export const findSelectedKey = (
   }
   return { selectedKey: null, header: null };
 };
+
+/** Resolve the route path associated with a menu item key, if any. */
+export const getMenuItemPath = (items: MenuItem[], key: string): string | undefined => {
+  for (const item of items) {
+    if (item.key === key) {
+      return item.path;
+    }
+    if (item.children) {
+      const path = getMenuItemPath(item.children, key);
+      if (path !== undefined) {
+        return path;
+      }
+    }
+  }
+  return undefined;
+};

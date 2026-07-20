@@ -16,109 +16,101 @@
  * limitations under the License.
  */
 
-import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { Menu, Layout } from 'antd';
-import { DashboardOutlined, DoubleLeftOutlined, EditOutlined } from '@ant-design/icons';
-import { useLocation } from 'react-router-dom';
-import { MenuItem, getNavMenuItem, findSelectedKey } from '../../utils/menuUtils';
+import React, { useEffect, useState } from 'react';
+import { Layout, Menu, type MenuProps } from 'antd';
+import { DoubleLeftOutlined } from '@ant-design/icons';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { MenuItem, findSelectedKey, getMenuItemPath } from '../../utils/menuUtils';
 
-type SiderProps = {
-  setHeader: Dispatch<SetStateAction<string>>;
-};
+export interface SidebarProps {
+  /** Navigation items to render in the rail. Each item may carry a `path`. */
+  items: MenuItem[];
+  /** Branding shown when the rail is expanded (e.g. a logo + product name). */
+  logo?: React.ReactNode;
+  /** Branding shown when the rail is collapsed (defaults to `logo`). */
+  collapsedLogo?: React.ReactNode;
+  /** Called with the active item's label whenever the active route changes. */
+  onHeaderChange?: (header: string) => void;
+  /** Controlled collapsed state. When omitted the component manages its own. */
+  collapsed?: boolean;
+  /** Initial collapsed state when uncontrolled. */
+  defaultCollapsed?: boolean;
+  /** Called whenever the collapsed state changes. */
+  onCollapse?: (collapsed: boolean) => void;
+  /** Expanded rail width. Defaults to `'15%'`. */
+  width?: string | number;
+  /** Collapsed rail width in px. Defaults to `56`. */
+  collapsedWidth?: number;
+}
 
-// Logo components using the favicon
-const expandedSidebarLogo = (
-  <span style={{ padding: '8px 0px 8px 12px', display: 'block', alignItems: 'center' }}>
-    <img
-      src="/shared/icons/favicon.ico"
-      alt="Ozone Logo"
-      style={{
-        width: '24px',
-        height: '24px',
-        marginRight: '8px',
-        display: 'inline-block',
-        verticalAlign: 'middle',
-      }}
-    />
-    <span style={{ color: '#fff', fontSize: '16px', fontWeight: 'bold' }}>Ozone</span>
-  </span>
-);
-
-const collapsedSidebarLogo = (
-  <span style={{ padding: '12px 12px', display: 'block', textAlign: 'center' }}>
-    <img
-      src="/shared/icons/favicon.ico"
-      alt="Ozone Logo"
-      style={{
-        width: '24px',
-        height: '24px',
-      }}
-    />
-  </span>
-);
-
-const Sidebar: React.FC<SiderProps> = ({ setHeader }) => {
-  const [collapsed, setCollapsed] = useState<boolean>(false);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+/**
+ * Application navigation rail.
+ *
+ * The rail is router-aware (via `react-router-dom`): it highlights the item that
+ * matches the current location and navigates on selection, so applications do
+ * not have to wire selection/navigation themselves. It is still fully
+ * configurable — the consuming application supplies the menu `items` (with
+ * `path`s) and its own `logo` — so no app-specific routes or branding are baked
+ * in. Must be rendered within a react-router context (e.g. `BrowserRouter`).
+ */
+export const Sidebar: React.FC<SidebarProps> = ({
+  items,
+  logo,
+  collapsedLogo,
+  onHeaderChange,
+  collapsed: collapsedProp,
+  defaultCollapsed = false,
+  onCollapse,
+  width = '15%',
+  collapsedWidth = 56,
+}) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [internalCollapsed, setInternalCollapsed] = useState<boolean>(defaultCollapsed);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : internalCollapsed;
 
-  const navigationItems: MenuItem[] = [
-    getNavMenuItem('Overview', 'Overview', '/', <DashboardOutlined />, undefined),
-    getNavMenuItem('Configurations', 'Configurations', undefined, <EditOutlined />, [
-      getNavMenuItem(
-        'Application Settings',
-        'Application Settings',
-        '/appconfig',
-        undefined,
-        undefined
-      ),
-      getNavMenuItem(
-        'Profile Settings',
-        'Profile Settings',
-        '/profileconfig',
-        undefined,
-        undefined
-      ),
-    ]),
-  ];
+  const { selectedKey, header } = findSelectedKey(items, location.pathname);
 
   useEffect(() => {
-    const { selectedKey: newSelectedKey, header: newHeader } = findSelectedKey(
-      navigationItems,
-      location.pathname
-    );
+    if (header) {
+      onHeaderChange?.(header);
+    }
+  }, [header, onHeaderChange]);
 
-    if (newSelectedKey && newSelectedKey !== selectedKey) {
-      setSelectedKey(newSelectedKey);
+  const handleCollapse = (value: boolean) => {
+    if (!isControlled) {
+      setInternalCollapsed(value);
     }
-    // we are sure that header will be present if selectedKey is found,
-    // But just in case nothing breaks due to any change it is better to explicitly check
-    // that newHeader is not null
-    if (newHeader) {
-      setHeader(newHeader);
+    onCollapse?.(value);
+  };
+
+  const handleSelect: MenuProps['onSelect'] = ({ key }) => {
+    const path = getMenuItemPath(items, key);
+    if (path) {
+      navigate(path);
     }
-  }, [location.pathname, selectedKey, setHeader]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+
+  const branding = collapsed ? (collapsedLogo ?? logo) : logo;
 
   return (
     <Layout.Sider
       prefixCls="navbar"
-      collapsible={true}
+      collapsible
       collapsed={collapsed}
-      collapsedWidth={56}
-      onCollapse={(value: boolean) => setCollapsed(value)}
-      width={'15%'}
+      collapsedWidth={collapsedWidth}
+      onCollapse={handleCollapse}
+      width={width}
       trigger={<DoubleLeftOutlined />}
     >
-      {collapsed ? collapsedSidebarLogo : expandedSidebarLogo}
+      {branding}
       <Menu
         theme="dark"
-        defaultSelectedKeys={['Overview']}
-        selectedKeys={selectedKey ? [selectedKey] : []}
         mode="inline"
-        items={navigationItems}
-        onSelect={({ keyPath }) => {
-          setHeader([...keyPath].map(keyPath.pop, keyPath).join(' / '));
-        }}
+        items={items}
+        selectedKeys={selectedKey ? [selectedKey] : []}
+        onSelect={handleSelect}
       />
     </Layout.Sider>
   );

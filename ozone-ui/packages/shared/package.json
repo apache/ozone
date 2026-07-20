@@ -20,7 +20,8 @@
   },
   "peerDependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.3.0"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
+    "react-router-dom": "^7.3.0",
     "typescript": "~5.6.2"
   }
 } 

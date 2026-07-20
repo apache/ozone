@@ -46,6 +46,7 @@ export const TextLink: React.FC<TextLinkProps> = ({
 
   return (
     <Typography.Link
+      {...rest}
       style={{
         fontSize: scale.fontSize,
         lineHeight: `${scale.lineHeight}px`,
@@ -55,7 +56,6 @@ export const TextLink: React.FC<TextLinkProps> = ({
         ...style,
       }}
       {...externalProps}
-      {...rest}
     >
       {children}
       {external && <Icon name="external-link" size={size === 'small' ? 12 : 14} />}

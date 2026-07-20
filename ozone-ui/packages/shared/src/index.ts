@@ -21,6 +21,7 @@ export * from './theme';
 
 // Components
 export { default as Sidebar } from './components/Sidebar/Sidebar';
+export type { SidebarProps } from './components/Sidebar/Sidebar';
 export { default as AppLayout } from './components/AppLayout/AppLayout';
 export type { AppLayoutProps } from './components/AppLayout/AppLayout';
 export { default as UtilityBar } from './components/UtilityBar/UtilityBar';

@@ -110,6 +110,7 @@ Each app mounts the theme once near its root (already wired in
 tokens from `@ozone-ui/shared`:
 
 ```tsx
+import { BrowserRouter } from 'react-router-dom';
 import {
   ThemeProvider,
   AppLayout,
@@ -125,23 +126,35 @@ import '@fontsource/roboto/700.css';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppLayout sider={<Sidebar setHeader={() => {}} />}>
-        <PageHeader title="Datanodes" subtitle="12 healthy" />
-        <Card
-          title="Instance details"
-          emphasis="elevated"
-          collapsible
-          extra={<Chip color="green" variant="dot">Healthy</Chip>}
+    <BrowserRouter>
+      <ThemeProvider>
+        <AppLayout
+          sider={
+            <Sidebar
+              logo={<span style={{ color: '#fff', padding: 12 }}>Ozone</span>}
+              items={[{ key: 'overview', label: 'Overview', path: '/' }]}
+            />
+          }
         >
-          <KeyValuePair label="Hostname" value="dn-01.ozone.local" />
-          <KeyValuePair label="UUID" value="a1b2c3" copyable />
-        </Card>
-      </AppLayout>
-    </ThemeProvider>
+          <PageHeader title="Datanodes" subtitle="12 healthy" />
+          <Card
+            title="Instance details"
+            emphasis="elevated"
+            collapsible
+            extra={<Chip color="green" variant="dot">Healthy</Chip>}
+          >
+            <KeyValuePair label="Hostname" value="dn-01.ozone.local" />
+            <KeyValuePair label="UUID" value="a1b2c3" copyable />
+          </Card>
+        </AppLayout>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 ```
+
+> `Sidebar` is router-aware, so render it within a `react-router-dom` context
+> (e.g. `BrowserRouter`); it highlights the active item and navigates on select.
 
 ### What's in `@ozone-ui/shared`
 
@@ -153,7 +166,8 @@ export default function App() {
     per-app `themeOverrides`.
 - **`components/`** (derived from the components recurring across the mockups)
   - `UtilityBar` — global top bar (leading/title, centre, actions).
-  - `Sidebar` — collapsible navigation rail.
+  - `Sidebar` — collapsible, router-aware navigation rail driven by `items`
+    (with `path`s) and `logo` props; integrates with `react-router-dom`.
   - `AppLayout` — page shell (sider + header + content).
   - `PageHeader` — page title with breadcrumb, subtitle and actions.
   - `Card` — surface with `outlined`/`elevated`/`filled` emphasis and an
@@ -171,7 +185,7 @@ stays centralised.
 
 ## Technology stack
 
-- **Build**: Vite 6 (apps), `tsc` (shared library)
+- **Build**: Vite 5 (apps), `tsc` (shared library)
 - **Framework**: React 18
 - **Language**: TypeScript 5.6
 - **UI**: Ant Design v5, themed with the Ozone UI design tokens
