@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * Tests S3 Multipart Upload Complete request.
  */
 public class TestS3MultipartUploadCompleteRequest
-    extends TestS3MultipartRequest {
+    extends S3MultipartRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {
@@ -103,7 +103,7 @@ public class TestS3MultipartUploadCompleteRequest
       throws Exception {
     String dbOzoneKey = getMultipartKey(volumeName, bucketName, keyName,
         uploadId);
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, dbOzoneKey);
 

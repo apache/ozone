@@ -440,7 +440,7 @@
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
         <configuration>
-          <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
+          <pnpmInheritsProxyConfigFromMaven>false</pnpmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
           <nodeVersion>v${nodejs.version}</nodeVersion>

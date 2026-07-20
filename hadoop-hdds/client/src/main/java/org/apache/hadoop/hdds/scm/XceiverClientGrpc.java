@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -37,7 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+import java.util.concurrent.locks.LockSupport;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -89,13 +91,13 @@ import org.slf4j.LoggerFactory;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final XceiverClientMetrics metrics;
   private final Semaphore semaphore;
   private long timeout;
+  private final long streamReadTimeoutNanos;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
@@ -121,6 +123,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     Objects.requireNonNull(config, "config == null");
     setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
         OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
+        .getStreamReadTimeout().toNanos();
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -252,7 +256,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   /**
    * Closes all the communication channels of the client one-by-one.
    * When a channel is closed, no further requests can be sent via the channel,
-   * and the method waits to finish all ongoing communication.
+   * and any in-flight RPCs are cancelled immediately (shutdownNow semantics).
    */
   @Override
   public void close() {
@@ -261,37 +265,23 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return;
     }
 
+    // Use shutdownNow() (not the graceful shutdown()) so in-flight RPCs are
+    // cancelled and the channel terminates immediately. close() is frequently
+    // invoked from cache eviction while the XceiverClientManager clientCache
+    // monitor is held (HDDS-15849); a blocking graceful drain there serializes
+    // every concurrent acquireClient()/releaseClient() call.
     for (ChannelInfo channelInfo : dnChannelInfoMap.values()) {
-      channelInfo.getChannel().shutdown();
-    }
-
-    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_WAIT_MAX_SECONDS);
-    long deadline = System.nanoTime() + maxWaitNanos;
-    List<ManagedChannel> nonTerminatedChannels = dnChannelInfoMap.values()
-        .stream()
-        .map(ChannelInfo::getChannel)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
-
-    while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
-      nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
+      ManagedChannel channel = channelInfo.getChannel();
+      channel.shutdownNow();
       try {
-        Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
+        if (!channel.awaitTermination(SHUTDOWN_WAIT_MAX_SECONDS, TimeUnit.SECONDS)) {
+          LOG.warn("Channel {} did not terminate within {}s.", channel, SHUTDOWN_WAIT_MAX_SECONDS);
+        }
       } catch (InterruptedException e) {
-        LOG.error("Interrupted while waiting for channels to terminate", e);
+        LOG.error("Interrupted while waiting for channel termination", e);
         Thread.currentThread().interrupt();
         break;
       }
-    }
-
-    List<DatanodeID> failedChannels = dnChannelInfoMap.entrySet()
-        .stream()
-        .filter(e -> !e.getValue().getChannel().isTerminated())
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toList());
-
-    if (!failedChannels.isEmpty()) {
-      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
 
     dnChannelInfoMap.clear();
@@ -567,19 +557,53 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public void streamRead(ContainerCommandRequestProto request,
-      StreamingReadResponse streamObserver) {
+      StreamingReadResponse streamObserver) throws IOException {
+    final ClientCallStreamObserver<ContainerCommandRequestProto> obs = streamObserver.getRequestObserver();
+
+    if (!obs.isReady()) {
+      LOG.debug("->{}: flow control stall (isReady=false) for block={} offset={} length={}. Waiting.",
+          streamObserver,
+          request.getReadBlock().getBlockID().getLocalID(),
+          request.getReadBlock().getOffset(),
+          request.getReadBlock().getLength());
+      final long deadlineNs = System.nanoTime() + streamReadTimeoutNanos;
+      while (!obs.isReady() && System.nanoTime() - deadlineNs < 0) {
+        LockSupport.parkNanos(10_000_000L);
+        if (Thread.currentThread().isInterrupted()) {
+          Thread.currentThread().interrupt();
+          throw new InterruptedIOException("Interrupted while waiting for stream to become ready: " + streamObserver);
+        }
+      }
+      if (!obs.isReady()) {
+        throw new TimeoutIOException("Timed out waiting for stream to become ready: " + streamObserver);
+      }
+    }
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("->{}, send onNext request {}",
           streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
     }
-    streamObserver.getRequestObserver().onNext(request);
+    obs.onNext(request);
   }
 
   @Override
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
+    initStreamRead(blockID, streamObserver, Collections.emptySet());
+  }
+
+  /**
+   * Start a streaming read, skipping datanodes that previously failed for this block stream.
+   */
+  public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver,
+      Set<DatanodeID> excludedDatanodes) throws IOException {
     final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
+      if (excludedDatanodes.contains(dn.getID())) {
+        LOG.debug("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
+            dn, dn.getUuidString(), blockID.getContainerBlockID());
+        continue;
+      }
       try {
         checkOpen(dn);
         semaphore.acquire();

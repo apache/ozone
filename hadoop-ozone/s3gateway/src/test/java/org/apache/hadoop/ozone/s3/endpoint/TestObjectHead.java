@@ -23,7 +23,9 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
@@ -42,6 +44,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,8 +53,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,6 +108,14 @@ public class TestObjectHead {
   @Test
   public void testHeadFailByBadName() throws Exception {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
+  }
+
+  @Test
+  public void testHeadWithNegativePartNumber() throws Exception {
+    keyEndpoint.queryParamsForTest()
+        .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> keyEndpoint.head(bucketName, "key1"));
   }
 
   @Test
@@ -229,6 +243,37 @@ public class TestObjectHead {
     assertNotNull(response.getHeaderString(TAG_COUNT_HEADER),
         "HeadObject must include x-amz-tagging-count when object has tags (AWS TagCount)");
     assertEquals("2", response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void testHeadSeparatesUserContentTypeMetadataFromObjectContentType()
+      throws Exception {
+    String keyName = "typed-with-user-meta";
+    String objectContentType = "image/jpeg";
+    String userContentType = "user/custom-type";
+
+    // PUT with both the object's Content-Type and a colliding user
+    // x-amz-meta-content-type.
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn(objectContentType);
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(
+        CUSTOM_METADATA_HEADER_PREFIX + "content-type", userContentType);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "head-content"));
+
+    // The user value is remapped, so the object's Content-Type is preserved.
+    assertEquals(objectContentType,
+        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+
+    // HEAD returns the object Content-Type as the standard header and the user
+    // value as x-amz-meta-content-type.
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals(objectContentType,
+        response.getHeaderString(HttpHeaders.CONTENT_TYPE));
+    assertEquals(userContentType,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "content-type"));
   }
 
   private byte[] createKey(String keyPath) throws IOException {

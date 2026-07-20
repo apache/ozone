@@ -50,6 +50,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -60,6 +61,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -850,8 +853,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void warmUpEdekCache(final ExecutorService executor, final int delay, final int interval, int maxRetries) {
     Set<String> keys = new HashSet<>();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> iterator =
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>> iterator =
             metadataManager.getBucketTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
@@ -3309,6 +3311,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omHostName;
   }
 
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
+  }
+
   @VisibleForTesting
   public OzoneManagerHttpServer getHttpServer() {
     return httpServer;
@@ -3702,7 +3709,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+    try (TableIterator<String, Table.KeyValue<String, OmDBTenantState>>
         iterator = tenantStateTable.iterator()) {
 
       final List<TenantState> tenantStateList = new ArrayList<>();
@@ -4110,7 +4117,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
-      LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
+      if (OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(ex)) {
+        LOG.error(
+            "Failed to download snapshot from leader {}: local disk appears full or over quota "
+                + "on the OM ratis snapshot volume (see previous ERROR for path/usable space). "
+                + "Free disk or adjust {}, {}, or {} before bootstrap can succeed.",
+            leaderId,
+            OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+            OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
+            OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER);
+      } else {
+        LOG.error("Failed to download snapshot from Leader {}.", leaderId, ex);
+      }
       cleanupCheckpoint(omDBCheckpoint);
       return null;
     }

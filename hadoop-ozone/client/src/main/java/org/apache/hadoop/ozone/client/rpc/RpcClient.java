@@ -1706,16 +1706,25 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive)
       throws IOException {
+    deleteKey(volumeName, bucketName, keyName, recursive, null);
+  }
+
+  @Override
+  public void deleteKey(
+      String volumeName, String bucketName, String keyName, boolean recursive,
+      String expectedETag) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+    OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRecursive(recursive)
-        .build();
-    ozoneManagerClient.deleteKey(keyArgs);
+        .setRecursive(recursive);
+    if (expectedETag != null) {
+      keyArgs.setExpectedETag(expectedETag);
+    }
+    ozoneManagerClient.deleteKey(keyArgs.build());
   }
 
   @Override
@@ -1855,11 +1864,24 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
                                          int partNumber) throws IOException {
+    return getOzoneKeyDetails(
+        getS3PartOmKeyInfo(bucketName, keyName, partNumber, false));
+  }
+
+  @Override
+  public OzoneKey headS3Object(String bucketName, String keyName,
+                               int partNumber) throws IOException {
+    return OzoneKey.fromKeyInfo(
+        getS3PartOmKeyInfo(bucketName, keyName, partNumber, true));
+  }
+
+  private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
+      int partNumber, boolean isHeadOp) throws IOException {
     OmKeyInfo keyInfo;
     if (omVersion.compareTo(OzoneManagerVersion.S3_PART_AWARE_GET) >= 0) {
-      keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber);
+      keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber, isHeadOp);
     } else {
-      keyInfo = getS3KeyInfo(bucketName, keyName, false);
+      keyInfo = getS3KeyInfo(bucketName, keyName, isHeadOp);
       List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
           .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
           .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
@@ -1870,7 +1892,7 @@ public class RpcClient implements ClientProtocol {
           .mapToLong(OmKeyLocationInfo::getLength)
           .sum());
     }
-    return getOzoneKeyDetails(keyInfo);
+    return keyInfo;
   }
 
   @Nonnull
@@ -1898,7 +1920,8 @@ public class RpcClient implements ClientProtocol {
 
   @Nonnull
   private OmKeyInfo getS3PartKeyInfo(
-      String bucketName, String keyName, int partNumber) throws IOException {
+      String bucketName, String keyName, int partNumber, boolean isHeadOp)
+      throws IOException {
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
 
@@ -1912,6 +1935,7 @@ public class RpcClient implements ClientProtocol {
         .setLatestVersionLocation(getLatestVersionLocation)
         .setForceUpdateContainerCacheFromSCM(false)
         .setMultipartUploadPartNumber(partNumber)
+        .setHeadOp(isHeadOp)
         .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
@@ -2265,13 +2289,14 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-      String bucketName, String keyName) throws IOException {
+      String bucketName, String keyName, boolean headOp) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setHeadOp(headOp)
         .build();
     return ozoneManagerClient.getFileStatus(keyArgs);
   }
@@ -2883,6 +2908,55 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    return ozoneManagerClient.getBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName,
+      Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addAllTags(tags)
+        .build();
+    ozoneManagerClient.putBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    ozoneManagerClient.deleteBucketTagging(bucketArgs);
   }
 
   private static ExecutorService createThreadPoolExecutor(

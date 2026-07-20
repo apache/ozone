@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test Key ACL requests.
  */
-public class TestOMKeyAclRequest extends TestOMKeyRequest {
+public class TestOMKeyAclRequest extends OMKeyRequestTests {
 
   @Test
   public void testKeyAddAclRequest() throws Exception {

@@ -1294,4 +1294,62 @@ public class TestOmMetadataManager {
 
     assertEquals(25, noPagination.size());
   }
+
+  @Test
+  public void testListKeysSpecialKeyNames() throws Exception {
+    List<String> keyNames = Arrays.asList(" ", "\"",
+        "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__");
+
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    assertEquals("/volumeA/bucketA/ ",
+        omMetadataManager.getOzoneKey(volumeName, bucketName, " "));
+
+    for (int i = 0; i < keyNames.size(); i++) {
+      addKeysToOM(volumeName, bucketName, keyNames.get(i), i);
+    }
+
+    List<String> listedKeys = omMetadataManager.listKeys(volumeName, bucketName,
+        null, null, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+
+    assertEquals(keyNames, listedKeys);
+  }
+
+  @Test
+  public void testListKeysWithWhitespaceAndNewlinePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    String spaceOnly = " ";
+    String spacePrefixed = " x";
+    String doubleSpacePrefixed = "  y";
+    String newlinePrefixed = "\nbar";
+    String normalKey = "normal";
+
+    List<String> allKeys = Arrays.asList(
+        spaceOnly, spacePrefixed, doubleSpacePrefixed, newlinePrefixed, normalKey);
+    for (int i = 0; i < allKeys.size(); i++) {
+      addKeysToOM(volumeName, bucketName, allKeys.get(i), i);
+    }
+
+    List<String> spacePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, spaceOnly, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList(spaceOnly, doubleSpacePrefixed, spacePrefixed),
+        spacePrefixMatches);
+
+    List<String> newlinePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, "\n", 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Collections.singletonList(newlinePrefixed), newlinePrefixMatches);
+  }
 }

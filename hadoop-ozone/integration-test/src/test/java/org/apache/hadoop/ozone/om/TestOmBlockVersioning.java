@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
@@ -67,9 +68,9 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
   @Test
   public void testAllocateCommit() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
@@ -149,9 +150,9 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
   @Test
   public void testReadLatestVersion() throws Exception {
 
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);

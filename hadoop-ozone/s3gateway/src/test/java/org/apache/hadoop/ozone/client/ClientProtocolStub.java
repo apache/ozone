@@ -121,6 +121,17 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneKey headS3Object(String bucketName, String keyName,
+                               int partNumber) throws IOException {
+    // The stub does not model individual multipart parts, so it returns
+    // whole-object metadata (consistent with getS3KeyDetails). Real part-number
+    // semantics (InvalidPart, per-part size) are covered by the SDK-based
+    // integration tests against a live cluster.
+    return objectStoreStub.getS3Volume().getBucket(bucketName)
+        .headObject(keyName);
+  }
+
+  @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     return objectStoreStub.getS3Volume().getBucket(bucketName).getKey(keyName);
@@ -311,6 +322,14 @@ public class ClientProtocolStub implements ClientProtocol {
   public void deleteKey(String volumeName, String bucketName, String keyName,
                         boolean recursive) throws IOException {
     getBucket(volumeName, bucketName).deleteKey(keyName);
+  }
+
+  @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName,
+                        boolean recursive, String expectedETag)
+      throws IOException {
+    ((OzoneBucketStub) getBucket(volumeName, bucketName))
+        .deleteKey(keyName, expectedETag);
   }
 
   @Override
@@ -570,7 +589,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-                                            String bucketName, String keyName)
+                                            String bucketName, String keyName,
+                                            boolean headOp)
       throws IOException {
     return null;
   }
@@ -871,4 +891,19 @@ public class ClientProtocolStub implements ClientProtocol {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName) throws IOException {
+    return getBucket(volumeName, bucketName).getBucketTagging();
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putBucketTagging(tags);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
+    getBucket(volumeName, bucketName).deleteBucketTagging();
+  }
 }

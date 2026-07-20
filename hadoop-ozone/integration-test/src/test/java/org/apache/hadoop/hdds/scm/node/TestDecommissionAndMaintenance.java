@@ -34,10 +34,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -213,7 +213,7 @@ public class TestDecommissionAndMaintenance {
 
     waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONED);
     // Ensure one node transitioned to DECOMMISSIONING
-    List<DatanodeDetails> decomNodes = nm.getNodes(
+    List<DatanodeInfo> decomNodes = nm.getNodes(
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(1, decomNodes.size());
@@ -325,7 +325,7 @@ public class TestDecommissionAndMaintenance {
         toDecommission.get(3).getIpAddress(), toDecommission.get(4).getIpAddress()), false);
 
     // Ensure no nodes transitioned to DECOMMISSIONING or DECOMMISSIONED
-    List<DatanodeDetails> decomNodes = nm.getNodes(
+    List<DatanodeInfo> decomNodes = nm.getNodes(
         DECOMMISSIONING,
         HEALTHY);
     assertEquals(0, decomNodes.size());
@@ -503,7 +503,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to maintenance
@@ -537,14 +537,14 @@ public class TestDecommissionAndMaintenance {
         .limit(2)
         .collect(Collectors.toList());
     scmClient.startMaintenanceNodes(ecMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
     assertThat(cm.getContainerReplicas(ecContainer.containerID()).size()).isGreaterThanOrEqualTo(6);
     scmClient.recommissionNodes(ecMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()));
     // Ensure the 2 DNs go to IN_SERVICE
     for (DatanodeDetails dn : ecMaintenance) {
@@ -571,7 +571,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to entering_maintenance
@@ -717,7 +717,7 @@ public class TestDecommissionAndMaintenance {
         getDNHostAndPort(toMaintenance.get(5))), 0, false);
 
     // Ensure no nodes transitioned to MAINTENANCE
-    List<DatanodeDetails> maintenanceNodes = nm.getNodes(
+    List<DatanodeInfo> maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
     assertEquals(0, maintenanceNodes.size());
