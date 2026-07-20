@@ -67,9 +67,7 @@ public class OBSBucketHandler extends BucketHandler {
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
       iterator.seek(key);
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
@@ -111,9 +109,7 @@ public class OBSBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
     long keyDataSizeWithReplica = 0L;
 
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
 
       String seekPrefix = OM_KEY_PREFIX +
           vol +

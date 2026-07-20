@@ -95,7 +95,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.4</jackson2-bom.version>
+    <jackson2-bom.version>2.21.5</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -157,7 +157,7 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.135.Final</netty.version>
+    <netty.version>4.1.136.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -1301,11 +1301,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>ozone-csi</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-datanode</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -2163,6 +2158,14 @@
                       <bannedImport>io.netty.util.internal.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Classes (e.g. FileInputStream, FileOutputStream) overriding the Object.finalize() method will cause gc to run a much longer time</reason>
+                    <bannedImports>
+                      <bannedImport>java.io.FileInputStream</bannedImport>
+                      <bannedImport>java.io.FileOutputStream</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
@@ -2387,7 +2390,6 @@
           <systemPropertyVariables>
             <hadoop.log.dir>${project.build.directory}/log</hadoop.log.dir>
             <hadoop.tmp.dir>${project.build.directory}/tmp</hadoop.tmp.dir>
-            <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
             <java.security.egd>${java.security.egd}</java.security.egd>
             <java.security.krb5.conf>${project.build.directory}/test-classes/krb5.conf</java.security.krb5.conf>
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>

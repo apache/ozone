@@ -1964,9 +1964,12 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
     getObjectRequestOne.setPartNumber(4);
-    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
-    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
-    assertEquals(0, partOneContentLength);
+    // Reading a part number beyond the object's part count must fail with
+    // InvalidPart, instead of returning an empty (0-byte) object.
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(getObjectRequestOne));
+    assertEquals(400, ase.getStatusCode());
+    assertEquals("InvalidPart", ase.getErrorCode());
   }
 
   @Test

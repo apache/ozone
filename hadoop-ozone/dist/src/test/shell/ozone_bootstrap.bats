@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,22 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*** Settings ***
-Documentation       Smoketest Ozone CSI service
-Library             OperatingSystem
-Library             BuiltIn
-Library             String
-Resource            commonlib.robot
-Test Timeout        1 minutes
+load ozone-functions_test_helper
 
-*** Keywords ***
-CSI Socket check
-   Execute                          [ -S /tmp/csi.sock ]
+bootstrap_ozone() {
+  export OZONE_LIBEXEC_DIR="${BATS_TEST_DIRNAME}/../../shell/ozone"
+  unset OZONE_BOOTSTRAPPED OZONE_HOME
+  ozone_bootstrap
+}
 
-*** Test Cases ***
-Check if CSI server is started
-   Wait Until Keyword Succeeds      3min       1sec      CSI Socket check
+@test "ozone_bootstrap does not force the IPv4 stack by default" {
+  unset OZONE_OPTS
 
-Test CSI identity service
-   ${result} =             Execute                        csc -e unix:///tmp/csi.sock identity plugin-info
-                           Should Contain                 ${result}             org.apache.hadoop.ozone
+  bootstrap_ozone
+
+  [[ -z "${OZONE_OPTS}" ]]
+}
+
+@test "ozone_bootstrap preserves an explicit IPv4 stack preference" {
+  export OZONE_OPTS="-Djava.net.preferIPv4Stack=true"
+
+  bootstrap_ozone
+
+  [[ "${OZONE_OPTS}" == "-Djava.net.preferIPv4Stack=true" ]]
+}

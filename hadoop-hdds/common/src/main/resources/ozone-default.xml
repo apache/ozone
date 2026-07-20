@@ -953,6 +953,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.placement.rack.scatter.capacity.aware.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SCM, MANAGEMENT</tag>
+    <description>
+      Enables capacity-aware datanode selection within a rack when SCMContainerPlacementRackScatter is used.
+      When enabled, SCM chooses the less utilized of two randomly selected datanodes.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
