@@ -232,10 +232,10 @@ const Overview: React.FC<{}> = () => {
                     <WrappedInfoIcon title={totalCapacityDesc} />
                   </span>
                 ),
-                value: storageReport?.capacity ?? 'N/A',
+                value: storageReport?.capacity ?? 0,
               }, {
                 title: 'OZONE USED SPACE',
-                value: storageReport?.used ?? 'N/A',
+                value: storageReport?.used ?? 0,
                 color: '#f4a233'
               }, {
                 title: (
@@ -253,7 +253,7 @@ const Overview: React.FC<{}> = () => {
                 color: '#11073a'
               }, {
                 title: 'CONTAINER PRE-ALLOCATED',
-                value: storageReport?.committed ?? 'N/A',
+                value: storageReport?.committed ?? 0,
                 color: '#f47b2d'
               }]}
               error={clusterState.error}

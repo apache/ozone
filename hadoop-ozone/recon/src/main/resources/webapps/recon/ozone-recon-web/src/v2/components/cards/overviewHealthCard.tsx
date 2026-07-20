@@ -112,22 +112,21 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   return (
     <Card
       data-testid={`overview-Health-${title}`}
-      size="small"
-      className={"overview-card"}
+      size='small'
+      className={'overview-card'}
       loading={loading}
       title={titleElement}
       headStyle={cardHeadStyle}
       bodyStyle={cardBodyStyle}
-      style={cardStyle}
-    >
+      style={cardStyle}>
       <Row gutter={[11, 0]}>
         <Col span={12}>
           Health
           {healthIndicator}
         </Col>
-        <Col className="health-availability" span={10}>
+        <Col className='health-availability' span={10}>
           Availability
-          <span className="health-availability-value">
+          <span className='health-availability-value'>
             {available}/{total}
           </span>
         </Col>

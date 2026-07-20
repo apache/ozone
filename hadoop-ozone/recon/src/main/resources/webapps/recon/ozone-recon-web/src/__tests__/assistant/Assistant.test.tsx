@@ -124,7 +124,7 @@ describe('Assistant Tests', () => {
     // Wait for the response
     await waitFor(() => {
       // Markdown bold should render as a strong tag
-      expect(screen.getByText('Markdown')).toHaveStyle('font-weight: bold');
+      expect(screen.getByText('Markdown')).toHaveStyle('font-weight: bolder');
       // Table should render
       expect(screen.getByRole('table')).toBeVisible();
     });
