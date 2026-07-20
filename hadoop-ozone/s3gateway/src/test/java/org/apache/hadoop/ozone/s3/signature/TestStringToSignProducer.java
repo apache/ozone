@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREA
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -298,44 +299,69 @@ public class TestStringToSignProducer {
     assertEquals(expectedResult, actualResult);
   }
 
+  /**
+   * presignedPut: client sends unsigned x-amz-acl on a presigned PUT URL.
+   * For presigned auth (unsignedPayload=true), extra x-amz-* headers must not fail validation.
+   */
   @Test
-  public void testUnsignedPayloadBypassesXAmzHeaderCheck() throws Exception {
-    // We add an x-amz-acl header that is NOT in SignedHeaders
-    String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
-        + DATE_FORMATTER.format(LocalDate.now())
-        + "/us-east-1/s3/aws4_request, "
-        + "SignedHeaders=host, "
-        + "Signature=db81b057718d7c1b3b" +
-        "8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
-
-    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
-    headerMap.putSingle("Authorization", authHeader);
-    headerMap.putSingle("host", "0.0.0.0:9878");
-    // Extra unsigned header
-    headerMap.putSingle("x-amz-acl", "public-read");
-
-    ContainerRequestContext context = setupContext(
-        new URI("https://0.0.0.0:9878/"),
-        "PUT",
-        headerMap,
-        new MultivaluedHashMap<>());
-
-    // Simulate query parameter authentication where signPayload is false
+  public void testPresignedUrlSkipsXAmzHeaderCheck() throws Exception {
     SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
-        .setDate(LocalDate.now().format(DATE_FORMATTER))
+        .setDate(DATE_FORMATTER.format(LocalDate.now()))
         .setDateTime(DATETIME)
         .setAwsAccessId("ozone")
         .setSignature("dummy")
         .setSignedHeaders("host")
         .setCredentialScope("ozone/" + DATE_FORMATTER.format(LocalDate.now()) + "/us-east-1/s3/aws4_request")
         .setAlgorithm(SignatureProcessor.AWS4_SIGNING_ALGORITHM)
-        // This makes unsignedPayload = true in createSignatureBase
-        .setSignPayload(false) 
+        .setSignPayload(false)
         .build();
-    signatureInfo.setUnfilteredURI("/");
+    signatureInfo.setUnfilteredURI("/bucket/key");
 
-    // This should NOT throw an exception bypasses the strict
-    // x-amz-* header validation.
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    headerMap.putSingle("host", "0.0.0.0:9878");
+    headerMap.putSingle("x-amz-acl", "public-read");
+    headerMap.putSingle("x-amz-security-token", "some-sts-token");
+
+    ContainerRequestContext context = setupContext(
+        new URI("https://0.0.0.0:9878/bucket/key"),
+        "PUT",
+        headerMap,
+        new MultivaluedHashMap<>());
+
     StringToSignProducer.createSignatureBase(signatureInfo, context);
+  }
+
+  /**
+   * Header-based auth must still reject x-amz-* headers that are not in SignedHeaders.
+   */
+  @Test
+  public void testHeaderAuthStillValidatesXAmzHeaders() throws Exception {
+    String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
+        + DATE_FORMATTER.format(LocalDate.now())
+        + "/us-east-1/s3/aws4_request, "
+        + "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+        + "Signature=db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
+
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    headerMap.putSingle("Authorization", authHeader);
+    headerMap.putSingle("host", "0.0.0.0:9878");
+    headerMap.putSingle("x-amz-content-sha256", "UNSIGNED-PAYLOAD");
+    headerMap.putSingle("x-amz-date", DATETIME);
+    headerMap.putSingle("x-amz-security-token", "some-sts-token");
+
+    ContainerRequestContext context = setupContext(
+        new URI("https://0.0.0.0:9878/bucket/key"),
+        "GET",
+        headerMap,
+        new MultivaluedHashMap<>());
+
+    SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
+        headerMap.getFirst("Authorization"),
+        headerMap.getFirst("x-amz-date")).parseSignature();
+    signatureInfo.setUnfilteredURI("/bucket/key");
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> StringToSignProducer.createSignatureBase(signatureInfo, context));
+    assertEquals(S3_AUTHINFO_CREATION_ERROR.getCode(), ex.getCode());
   }
 }

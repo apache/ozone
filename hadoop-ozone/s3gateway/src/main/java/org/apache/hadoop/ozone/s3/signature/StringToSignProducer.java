@@ -57,7 +57,6 @@ import org.slf4j.LoggerFactory;
 public final class StringToSignProducer {
 
   public static final String X_AMAZ_DATE = "x-amz-date";
-  private static final String X_AMZ_ACL = "x-amz-acl";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -359,20 +358,28 @@ public final class StringToSignProducer {
   private static void validateCanonicalHeaders(
       String canonicalHeaders,
       Map<String, String> headers,
-      Boolean unsignedPaylod
+      boolean unsignedPayload
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
+    // For presigned (query-string) authentication, only the explicitly listed
+    // SignedHeaders need to appear in the canonical request.  Any x-amz-*
+    // headers the HTTP client adds to the request do NOT need to be signed.
+    // Enforce the x-amz-* check only for header-based (Authorization header) auth.
+    if (unsignedPayload) {
+      return;
+    }
+
     for (String header : headers.keySet().stream()
         .filter(s -> s.startsWith("x-amz-"))
         .collect(Collectors.toSet())) {
       if (!(canonicalHeaders.contains(header + ":"))) {
         // According to AWS Signature V4 documentation using Authorization Header
         // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-        // The x-amz-content-sha256 and x-amz-acl header is not required for CanonicalHeaders
-        if (X_AMZ_CONTENT_SHA256.equals(header) || X_AMZ_ACL.equals(header)) {
+        // The x-amz-content-sha256 header is not required for CanonicalHeaders
+        if (X_AMZ_CONTENT_SHA256.equals(header)) {
           continue;
         }
         LOG.error("The SignedHeaders list must include all "
