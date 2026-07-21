@@ -59,16 +59,8 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
           git clone --depth=1 --branch=master https://github.com/$REPO_OWNER/ozone-site.git ozone-site
-          
-          # Check if $BRANCH_NAME branch exists remotely
           cd ozone-site
-          if git ls-remote --heads origin $BRANCH_NAME | grep -q $BRANCH_NAME; then
-            echo "PR branch exists, checking it out for comparison"
-            git fetch --depth=1 origin $BRANCH_NAME
-            git checkout -B $BRANCH_NAME FETCH_HEAD
-          else
-            echo "PR branch does not exist, staying on master for comparison"
-          fi
+          echo "Using master as baseline for doc comparison and PR branch creation"
 
       - name: Check if documentation changed
         if: steps.check-site-repo.outputs.exists == 'true'
@@ -131,12 +123,13 @@ jobs:
         run: |
           cd ozone-site
           
-          echo "Current branch: $(git branch --show-current)"
-          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Baseline branch: master"
+          echo "Baseline commit: $(git rev-parse master)"
           
-          # Create/reset branch at current commit
+          # Always recreate the PR branch from master so merged changes are not replayed.
+          git checkout master
           git checkout -B "$BRANCH_NAME"
-          echo "Created/reset branch $BRANCH_NAME at current commit"
+          echo "Created branch $BRANCH_NAME from master"
           
           git add "$TARGET_FILE"
           
