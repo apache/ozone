@@ -527,16 +527,13 @@ final class TestSecureOzoneCluster {
     scm = HddsTestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
     GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
+    scm.start();
+    setupOm(conf);
 
-    try {
-      scm.start();
-      setupOm(conf);
-      om.start();
-    } catch (Exception ex) {
-      // Expects timeout failure from scmClient in om but om user login via
-      // kerberos should succeed.
-      assertThat(logs.getOutput()).contains("Ozone Manager login successful");
-    }
+    // Expects timeout failure from scmClient in om but om user login via
+    // kerberos should succeed.
+    Exception ex = assertThrows(Exception.class, om::start);
+    assertThat(logs.getOutput()).contains("Ozone Manager login successful");
   }
 
   @Test
@@ -544,20 +541,16 @@ final class TestSecureOzoneCluster {
     initSCM();
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
     GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
-    try {
-      // Create a secure SCM instance as om client will connect to it
-      scm = HddsTestUtils.getScmSimple(conf);
-      scm.start();
+    // Create a secure SCM instance as om client will connect to it
+    scm = HddsTestUtils.getScmSimple(conf);
+    scm.start();
 
-      setupOm(conf);
-      om.setCertClient(new CertificateClientTestImpl(conf));
-      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
-      om.start();
-    } catch (Exception ex) {
-      // Expects timeout failure from scmClient in om but om user login via
-      // kerberos should succeed.
-      assertThat(logs.getOutput()).contains("Ozone Manager login successful");
-    }
+    setupOm(conf);
+    om.setCertClient(new CertificateClientTestImpl(conf));
+    om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
+    om.start();
+
+    // positive case (happy-path)
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
             testUserPrincipal, testUserKeytab.getCanonicalPath());
@@ -572,6 +565,7 @@ final class TestSecureOzoneCluster {
             .setAdminName("admin")
             .build());
 
+    // negative (an unauthenticated client gets rejected)
     ugi = UserGroupInformation.createUserForTesting(
         "testuser1", new String[] {"test"});
 
@@ -717,24 +711,20 @@ final class TestSecureOzoneCluster {
     S3SecretValue attempt1 = omClient.getS3Secret(username);
 
     // A second getS3Secret on the same username should throw exception
-    try {
-      omClient.getS3Secret(username);
-    } catch (OMException omEx) {
-      assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
-          omEx.getResult());
-    }
+    OMException omEx = assertThrows(OMException.class,
+        () -> omClient.getS3Secret(username));
+    assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+        omEx.getResult());
 
     // Revoke the existing secret
     omClient.revokeS3Secret(username);
 
     // Set secret should fail since the accessId is revoked
     final String secretKeySet = "somesecret1";
-    try {
-      omClient.setS3Secret(username, secretKeySet);
-    } catch (OMException omEx) {
-      assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
-          omEx.getResult());
-    }
+    omEx = assertThrows(OMException.class,
+        () -> omClient.setS3Secret(username, secretKeySet));
+    assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
+        omEx.getResult());
 
     // Get a new secret
     S3SecretValue attempt3 = omClient.getS3Secret(username);
@@ -750,12 +740,10 @@ final class TestSecureOzoneCluster {
     assertEquals(secretKeySet, attempt4.getAwsSecret());
 
     // A second getS3Secret on the same username should throw exception
-    try {
-      omClient.getS3Secret(username);
-    } catch (OMException omEx) {
-      assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
-          omEx.getResult());
-    }
+    omEx = assertThrows(OMException.class,
+        () -> omClient.getS3Secret(username));
+    assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+        omEx.getResult());
 
     // Clean up
     omClient.revokeS3Secret(username);
