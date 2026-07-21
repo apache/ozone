@@ -330,26 +330,18 @@ final class TestSecureOzoneCluster {
   }
 
   @Test
-  void testSecureScmStartupSuccess() throws Exception {
+  void testSecureScmStartupAndAccessControl() throws Exception {
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
-    //Reads the SCM Info from SCM instance
     scm.start();
+
+    // Case 1: SCM starts up and exposes its cluster info and cert trust chain.
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
     assertEquals(scmId, scmInfo.getScmId());
     assertEquals(2, scm.getScmCertificateClient().getTrustChain().size());
-  }
 
-  @Test
-  void testSCMSecurityProtocol() throws Exception {
-
-    initSCM();
-    scm = HddsTestUtils.getScmSimple(conf);
-    //Reads the SCM Info from SCM instance
-    scm.start();
-
-    // Case 1: User with Kerberos credentials should succeed.
+    // Case 2: SCM security protocol - user with Kerberos credentials succeeds.
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
             testUserPrincipal, testUserKeytab.getCanonicalPath());
@@ -369,13 +361,12 @@ final class TestSecureOzoneCluster {
           .hasMessageContaining("Certificate not found");
     }
 
-    // Case 2: User without Kerberos credentials should fail.
+    // Case 3: SCM security protocol - user without Kerberos credentials fails.
     ugi = UserGroupInformation.createRemoteUser("test");
     ugi.setAuthenticationMethod(AuthMethod.TOKEN);
+    String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
     try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
         getScmSecurityClient(conf, ugi)) {
-
-      String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
       IOException ioException = assertThrows(IOException.class,
           securityClient::getCACertificate);
       assertThat(ioException).hasMessageContaining(cannotAuthMessage);
@@ -384,35 +375,23 @@ final class TestSecureOzoneCluster {
       assertThat(ioException).hasMessageContaining(cannotAuthMessage);
     }
 
-  }
-
-  @Test
-  void testAdminAccessControlException() throws Exception {
-    initSCM();
-    scm = HddsTestUtils.getScmSimple(conf);
-    //Reads the SCM Info from SCM instance
-    scm.start();
-
-    //case 1: Run admin command with non-admin user.
-    UserGroupInformation ugi =
-        UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+    // Case 4: SCM admin protocol - authenticated non-admin user is denied.
+    ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
         testUserPrincipal, testUserKeytab.getCanonicalPath());
     StorageContainerLocationProtocol scmRpcClient =
         HAUtils.getScmContainerClient(conf, ugi);
-    IOException ioException = assertThrows(IOException.class,
+    IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
-    assertThat(ioException).hasMessageContaining("Access denied");
+    assertThat(adminException).hasMessageContaining("Access denied");
 
-    // Case 2: User without Kerberos credentials should fail.
+    // Case 5: SCM admin protocol - user without Kerberos credentials fails.
     ugi = UserGroupInformation.createRemoteUser("test");
     ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-    scmRpcClient =
-        HAUtils.getScmContainerClient(conf, ugi);
-
-    String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-    ioException = assertThrows(IOException.class,
+    scmRpcClient = HAUtils.getScmContainerClient(conf, ugi);
+    adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
-    assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+    assertThat(adminException)
+        .hasMessageContaining(cannotAuthMessage);
   }
 
   private void initSCM() throws IOException {
