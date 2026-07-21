@@ -256,7 +256,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   @ParameterizedTest
   @MethodSource("isStreamEnableAndData")
-  public void testByteBufferPositionedReadFullyWithInvalidPosition(boolean isStreamEnable, int position) throws IOException {
+  public void testByteBufferPositionedReadFullyWithInvalidPosition(
+      boolean isStreamEnable, int position) throws IOException {
     OzoneConfiguration conf = cluster().getConf();
     conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
     try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
