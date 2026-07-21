@@ -612,10 +612,11 @@ final class TestSecureOzoneCluster {
   }
 
   /**
-   * Tests delegation token renewal.
+   * Tests delegation token renewal failure cases. The successful get/renew
+   * happy path is covered by TestDelegationToken#testDelegationToken.
    */
   @Test
-  void testDelegationTokenRenewal() throws Exception {
+  void testDelegationTokenRenewalFailures() throws Exception {
     GenericTestUtils.setLogLevel(Server.class, INFO);
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
 
@@ -641,21 +642,10 @@ final class TestSecureOzoneCluster {
         OmTransportFactory.create(conf, ugi, null),
         RandomStringUtils.secure().nextAscii(5));
 
-    // Since client is already connected get a delegation token
+    // Since client is already connected get a delegation token to seed the
+    // renewal failure cases below.
     Token<OzoneTokenIdentifier> token = omClient.getDelegationToken(
         new Text("om"));
-
-    // Check if token is of right kind and renewer is running om instance
-    assertNotNull(token);
-    assertEquals("OzoneToken", token.getKind().toString());
-    assertEquals(SecurityUtil.buildTokenService(
-        om.getNodeDetails().getRpcAddress()).toString(),
-        token.getService().toString());
-
-    // Renew delegation token
-    long expiryTime = omClient.renewDelegationToken(token);
-    assertThat(expiryTime).isGreaterThan(0);
-    omLogs.clearOutput();
 
     // Test failure of delegation renewal
     // 1. When token maxExpiryTime exceeds (maxDate in the past)
