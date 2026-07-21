@@ -103,13 +103,8 @@ public class TestKeyValueStreamDataChannel {
   public void testClosePutBlockBehavior(boolean datastreamPutBlockEnabled) throws Exception {
     File tempFile = File.createTempFile("test-kv-close-" + datastreamPutBlockEnabled, ".tmp");
     tempFile.deleteOnExit();
-    KeyValueStreamDataChannel channel = newChannel(tempFile);
+    KeyValueStreamDataChannel channel = newChannelWithPutBlockCommittedOnClose(tempFile);
     AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
-    if (datastreamPutBlockEnabled) {
-      channel.setDatastreamPutBlockEnabled(datastreamPutBlockEnabled);
-      channel.setPutBlockProcessor(processed::set);
-    }
-
     final byte[] data = RandomUtils.secure().randomBytes(50);
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
         PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
@@ -185,7 +180,7 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getContainerID()).thenReturn(123L);
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
-    KeyValueStreamDataChannel writeChannel = new KeyValueStreamDataChannel(tempFile, mockContainerData, mockMetrics);
+    KeyValueStreamDataChannel writeChannel = new KeyValueStreamDataChannel(tempFile, mockContainerData, null, mockMetrics);
     assertThrows(StorageContainerException.class,
         () -> writeChannel.assertSpaceAvailability(1));
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
@@ -417,7 +412,7 @@ public class TestKeyValueStreamDataChannel {
     return f;
   }
 
-  private static KeyValueStreamDataChannel newChannel(File tempFile) throws Exception {
+  private static KeyValueStreamDataChannel newChannelWithPutBlockCommittedOnClose(File tempFile) throws Exception {
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
     when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(1000L, 1000L, 0L));
@@ -425,7 +420,7 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getContainerID()).thenReturn(123L);
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
-    return new KeyValueStreamDataChannel(tempFile, mockContainerData, mockMetrics);
+    return new KeyValueStreamDataChannel(tempFile, mockContainerData, null, mockMetrics);
   }
 
   private static void write(KeyValueStreamDataChannel channel, byte[] data)

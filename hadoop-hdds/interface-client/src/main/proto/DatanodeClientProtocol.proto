@@ -88,6 +88,8 @@ enum Type {
   GetContainerChecksumInfo = 23;
   // Allows us to read a block
   ReadBlock = 24;
+  // Initializes a stream for writing data with PutBlock commited on close.
+  StreamInitWithPutBlock = 25;
 }
 
 

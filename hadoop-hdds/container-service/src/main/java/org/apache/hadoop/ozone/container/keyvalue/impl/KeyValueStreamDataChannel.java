@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.ReferenceCountedObject;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,27 +50,23 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   private final AtomicReference<ContainerCommandRequestProto> putBlockRequest
       = new AtomicReference<>();
   private final AtomicBoolean closed = new AtomicBoolean();
-  private boolean datastreamPutBlockEnabled;
-  private StreamPutBlockProcessor putBlockProcessor;
+  private final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock;
 
   KeyValueStreamDataChannel(File file, ContainerData containerData,
-                            ContainerMetrics metrics)
-      throws StorageContainerException {
+                            CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock,
+                            ContainerMetrics metrics) throws StorageContainerException {
     super(file, containerData, metrics);
-    datastreamPutBlockEnabled = false;
-  }
-
-  public void setDatastreamPutBlockEnabled(boolean enabled) {
-    this.datastreamPutBlockEnabled = enabled;
-  }
-
-  public void setPutBlockProcessor(StreamPutBlockProcessor processor) {
-    this.putBlockProcessor = processor;
+    this.putBlock = putBlock;
   }
 
   @Override
   ContainerProtos.Type getType() {
     return ContainerProtos.Type.StreamWrite;
+  }
+
+  @Override
+  boolean isPutBlockCommittedOnClose() {
+    return putBlock == null;
   }
 
   @Override
@@ -120,7 +117,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   public void close() throws IOException {
     if (closed.compareAndSet(false, true)) {
       try {
-        if (datastreamPutBlockEnabled) {
+        if (isPutBlockCommittedOnClose()) {
           // This path requires the client appends the PutBlock at the
           // end of the stream.
           closeWithStreamPutBlock();
@@ -253,9 +250,9 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     final ContainerCommandRequestProto proto =
         closeBuffers(buffers, super::writeFileChannel);
     putBlockRequest.set(proto);
-    Preconditions.checkState(putBlockProcessor != null);
-    putBlockProcessor.processPutBlock(proto);
-    setLinked();
+    Preconditions.checkState(putBlock != null);
+    putBlock.accept(proto);
+    link();
   }
 
   interface WriteMethod {
