@@ -197,6 +197,9 @@ public class MultipartInputStream extends ExtendedInputStream {
     seek(position);
     try {
       int remainingBeforeRead = buffer.remaining();
+      if (remainingBeforeRead == 0) {
+        return true;
+      }
       read(new ByteBufferReader(buffer) {
         @Override
         int readImpl(InputStream inputStream) throws IOException {
