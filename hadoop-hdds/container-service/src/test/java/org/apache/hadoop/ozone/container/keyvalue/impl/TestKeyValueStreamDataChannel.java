@@ -101,11 +101,11 @@ public class TestKeyValueStreamDataChannel {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testClosePutBlockBehavior(boolean datastreamPutBlockEnabled) throws Exception {
-    File tempFile = File.createTempFile("test-kv-close-" + datastreamPutBlockEnabled, ".tmp");
+  public void testClosePutBlockBehavior(boolean commitPutBlockOnClose) throws Exception {
+    File tempFile = File.createTempFile("test-kv-close-" + commitPutBlockOnClose, ".tmp");
     tempFile.deleteOnExit();
     AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
-    KeyValueStreamDataChannel channel = newChannel(tempFile, datastreamPutBlockEnabled, processed);
+    KeyValueStreamDataChannel channel = newChannel(tempFile, commitPutBlockOnClose, processed);
     final byte[] data = RandomUtils.secure().randomBytes(50);
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
         PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
@@ -119,7 +119,7 @@ public class TestKeyValueStreamDataChannel {
     assertThat(processed.get()).isNull();
     channel.close();
 
-    if (datastreamPutBlockEnabled) {
+    if (commitPutBlockOnClose) {
       assertEquals(PUT_BLOCK_PROTO, processed.get());
       assertEquals(PUT_BLOCK_PROTO, channel.getPutBlockRequest());
       assertTrue(channel.isLinked());
@@ -414,7 +414,7 @@ public class TestKeyValueStreamDataChannel {
   }
 
   private static KeyValueStreamDataChannel newChannel(
-      File tempFile, boolean datastreamPutBlockEnabled,
+      File tempFile, boolean commitPutBlockOnClose,
       AtomicReference<ContainerCommandRequestProto> processed) throws Exception {
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
@@ -424,7 +424,7 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
     CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock =
-        datastreamPutBlockEnabled ? processed::set : null;
+        commitPutBlockOnClose ? processed::set : null;
     return new KeyValueStreamDataChannel(tempFile, mockContainerData, putBlock, mockMetrics);
   }
 

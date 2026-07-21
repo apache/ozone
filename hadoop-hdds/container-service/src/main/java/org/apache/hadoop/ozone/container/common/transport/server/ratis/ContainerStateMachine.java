@@ -161,7 +161,6 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private final Semaphore applyTransactionSemaphore;
   private final boolean waitOnBothFollowers;
-  private final boolean datastreamPutBlockEnabled;
   private final HddsDatanodeService datanodeService;
   private static Semaphore semaphore = new Semaphore(1);
   private final AtomicBoolean peersValidated;
@@ -303,9 +302,6 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
-
-    this.datastreamPutBlockEnabled = conf.getObject(
-        DatanodeConfiguration.class).isDatastreamPutBlockEnabled();
 
     this.writeChunkWaitMaxNs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
         ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT, TimeUnit.NANOSECONDS);
