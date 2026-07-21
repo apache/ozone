@@ -63,6 +63,9 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDeleteRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
@@ -348,6 +351,12 @@ public final class OzoneManagerRatisUtils {
       return new S3PutBucketTaggingRequest(omRequest);
     case DeleteBucketTagging:
       return new S3DeleteBucketTaggingRequest(omRequest);
+    case SetLifecycleConfiguration:
+      return new OMLifecycleConfigurationSetRequest(omRequest);
+    case DeleteLifecycleConfiguration:
+      return new OMLifecycleConfigurationDeleteRequest(omRequest);
+    case SetLifecycleServiceStatus:
+      return new OMLifecycleSetServiceStatusRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);

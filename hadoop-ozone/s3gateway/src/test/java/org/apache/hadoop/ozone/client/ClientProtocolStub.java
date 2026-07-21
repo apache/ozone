@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -116,6 +117,17 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneKey headS3Object(String bucketName, String keyName)
       throws IOException {
+    return objectStoreStub.getS3Volume().getBucket(bucketName)
+        .headObject(keyName);
+  }
+
+  @Override
+  public OzoneKey headS3Object(String bucketName, String keyName,
+                               int partNumber) throws IOException {
+    // The stub does not model individual multipart parts, so it returns
+    // whole-object metadata (consistent with getS3KeyDetails). Real part-number
+    // semantics (InvalidPart, per-part size) are covered by the SDK-based
+    // integration tests against a live cluster.
     return objectStoreStub.getS3Volume().getBucket(bucketName)
         .headObject(keyName);
   }
@@ -578,7 +590,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-                                            String bucketName, String keyName)
+                                            String bucketName, String keyName,
+                                            boolean headOp)
       throws IOException {
     return null;
   }
@@ -893,5 +906,22 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
     getBucket(volumeName, bucketName).deleteBucketTagging();
+  }
+
+  @Override
+  public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException {
+    return getBucket(volumeName, bucketName).getLifecycleConfiguration();
+  }
+
+  @Override
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    getBucket(lifecycleConfiguration.getVolume(), lifecycleConfiguration.getBucket())
+        .setLifecycleConfiguration(lifecycleConfiguration);
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
+
   }
 }

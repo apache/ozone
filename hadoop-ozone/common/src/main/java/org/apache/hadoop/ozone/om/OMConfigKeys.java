@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
+import org.rocksdb.CompactRangeOptions.BottommostLevelCompaction;
 
 /**
  * Ozone Manager Constants.
@@ -171,6 +172,40 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
 
   /**
+   * Properties for Key/Object Lifecycle feature.
+   */
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL =
+      "ozone.lifecycle.service.interval";
+  public static final String
+      OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT = "24h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT =
+      "ozone.lifecycle.service.timeout";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT
+      = "2h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_WORKERS =
+      "ozone.lifecycle.service.workers";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT
+      = 5;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_ENABLED =
+      "ozone.lifecycle.service.enabled";
+  public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = false;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
+      "ozone.lifecycle.service.delete.batch-size";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000;
+  // Batch limit for aborting incomplete multipart uploads, based on total part count
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK =
+      "ozone.lifecycle.service.mpu.abort.limit.per.task";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT = 1000;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT =
+      "ozone.lifecycle.service.delete.cached.directory.max-count";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;
+
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED =
+      "ozone.lifecycle.service.move.to.trash.enabled";
+  public static final boolean
+      OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT = true;
+
+  /**
    * OM Ratis related configurations.
    */
   public static final String OZONE_OM_RATIS_PORT_KEY
@@ -290,6 +325,18 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
+
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY =
+      "ozone.om.bootstrap.min.space";
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT = "5GB";
+
+  /**
+   * Multiplier applied to the leader-reported estimated SST bytes when deciding
+   * minimum free space before downloading a checkpoint (tar + unpack headroom).
+   */
+  public static final String OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY =
+      "ozone.om.bootstrap.checkpoint.estimated.space.headroom.ratio";
+  public static final double OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT = 2.0D;
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -680,6 +727,17 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
+
+  /**
+   * Bottommost level compaction type for manual compaction.
+   * Invalid values will default to kSkip.
+   * Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
+   * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
+      "ozone.om.compaction.service.bottommost-level-compaction";
+  public static final BottommostLevelCompaction
+      OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = BottommostLevelCompaction.kSkip;
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.

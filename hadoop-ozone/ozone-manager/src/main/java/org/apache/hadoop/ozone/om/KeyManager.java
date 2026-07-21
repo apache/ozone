@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
@@ -276,7 +277,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   /**
    * Returns an iterator for pending deleted directories all buckets.
    */
-  default TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
+  default TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
     return getDeletedDirEntries(null, null);
   }
 
@@ -284,7 +285,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories for volume and bucket.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+  TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
   default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)
@@ -363,4 +364,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return BackgroundService
    */
   CompactionService getCompactionService();
+
+  /**
+   * Returns the instance of key/object lifecycle service.
+   * @return Background service.
+   */
+  KeyLifecycleService getKeyLifecycleService();
 }

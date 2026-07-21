@@ -162,6 +162,12 @@ enum Type {
   PutBucketTagging = 144;
   GetBucketTagging = 145;
   DeleteBucketTagging = 146;
+
+  SetLifecycleConfiguration = 147;
+  GetLifecycleConfiguration   = 148;
+  DeleteLifecycleConfiguration = 149;
+  GetLifecycleServiceStatus    = 150;
+  SetLifecycleServiceStatus     = 151;
 }
 
 enum SafeMode {
@@ -312,8 +318,7 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
-
-  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest      = 144;
 
   // TODO: PutBucketTagging — tags in bucketArgs.tags; OM persists to BucketInfo.tags.
   optional PutBucketTaggingRequest          putBucketTaggingRequest         = 145;
@@ -321,6 +326,13 @@ message OMRequest {
   optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
   // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
+
+  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 148;
+  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 149;
+  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 150;
+  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
+  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
+
 }
 
 message OMResponse {
@@ -454,7 +466,6 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
-
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 
   // TODO: Empty ack after OM applies tag set to OmBucketInfo.
@@ -463,6 +474,12 @@ message OMResponse {
   optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
   // TODO: Empty ack after OM clears BucketInfo.tags.
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
+
+  optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 147;
+  optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 148;
+  optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 149;
+  optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
+  optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
 }
 
 enum Status {
@@ -598,6 +615,9 @@ enum Status {
     ETAG_NOT_AVAILABLE = 100;
 
     ATOMIC_WRITE_CONFLICT = 101;
+
+    LIFECYCLE_CONFIGURATION_NOT_FOUND = 102;
+    UPDATE_ID_NOT_MATCH = 103;
 }
 
 /**
@@ -1409,6 +1429,7 @@ message RenameKeysResponse{
 message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
+    optional uint64 updateID = 3;
 }
 
 message RenameKeyResponse{
@@ -1421,12 +1442,20 @@ message DeleteKeyRequest {
 
 message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
+    optional RequestSource sourceType = 2 [default = USER];
+}
+
+enum RequestSource {
+  USER = 1;
+  LIFECYCLE = 2;
+  TRASH = 3;
 }
 
 message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    repeated uint64 updateIDs = 4; // each key's update ID when key is identified for deletion
 }
 
 message DeleteKeyError {
@@ -2499,6 +2528,110 @@ message ReadConsistencyHint {
 }
 
 /**
+S3 lifecycles (filter, expiration, rule and configuration).
+ */
+message LifecycleFilterTag {
+  required string key = 1;
+  required string value = 2;
+}
+
+message LifecycleRuleAndOperator {
+  optional string prefix = 1;
+  repeated LifecycleFilterTag tags = 2;
+}
+
+// TODO: proto 2.5 does not support oneof fields, once we start using protoc 3.x, consider to refactor these message using "oneof"
+/*
+message LifecycleFilter {
+  oneof Filter {
+      string prefix = 1;
+      LifecycleFilterTag tag = 2;
+      LifecycleRuleAndOperator andOperator = 3;
+   }
+}
+
+message LifecycleExpiration {
+  oneof Condition {
+     uint32 days = 1;
+     string date = 2;
+  }
+}
+
+message LifecycleRule {
+  //...
+  oneof Condition {
+    optional string prefix = 4;
+    optional LifecycleFilter filter = 5;
+  }
+  //...
+}
+ */
+message LifecycleFilter {
+  optional string prefix = 1;
+  optional LifecycleFilterTag tag = 2;
+  optional LifecycleRuleAndOperator andOperator = 3;
+}
+
+message LifecycleExpiration {
+  optional uint32 days = 1;
+  optional string date = 2;
+}
+
+message AbortIncompleteMultipartUpload {
+  optional uint32 daysAfterInitiation = 1;
+}
+
+message LifecycleRule {
+  required string id = 1;
+  required bool enabled = 2;
+  repeated LifecycleAction action = 3;
+  optional string prefix = 4;
+  optional LifecycleFilter filter = 5;
+}
+
+message LifecycleAction {
+  optional LifecycleExpiration expiration = 1;
+  optional AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = 2;
+}
+
+message LifecycleConfiguration {
+  required string volume = 1;
+  required string bucket = 2;
+  required BucketLayoutProto bucketLayout = 3;
+  required uint64 creationTime = 4;
+  repeated LifecycleRule rules = 5;
+  optional uint64 objectID = 6;
+  optional uint64 updateID = 7;
+  optional uint64 bucketObjectID = 8;
+}
+
+message SetLifecycleConfigurationRequest {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message SetLifecycleConfigurationResponse {
+
+}
+
+message GetLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message GetLifecycleConfigurationResponse {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message DeleteLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message DeleteLifecycleConfigurationResponse {
+
+}
+
+/**
  The OM service that takes care of Ozone namespace.
 */
 service OzoneManagerService {
@@ -2535,4 +2668,20 @@ message DeleteBucketTaggingRequest {
 
 // TODO: Success response; bucket has no tags after commit.
 message DeleteBucketTaggingResponse {
+}
+
+message GetLifecycleServiceStatusRequest {
+}
+
+message GetLifecycleServiceStatusResponse {
+  required bool isEnabled = 1;
+  optional bool isSuspended = 2;
+  repeated string runningBuckets = 3;
+}
+
+message SetLifecycleServiceStatusRequest {
+  required bool suspend = 1;
+}
+
+message SetLifecycleServiceStatusResponse {
 }
