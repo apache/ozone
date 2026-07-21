@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,10 +36,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests S3 Initiate Multipart Upload request.
@@ -117,23 +117,40 @@ public class TestS3InitiateMultipartUploadRequest
 
   }
 
-  @Test
-  public void testValidateAndUpdateCacheSetsSchemaVersionZeroBeforeFinalization()
-      throws Exception {
+  /**
+   * The schema version is a server-owned decision resolved in {@code preExecute}
+   * (on the leader) from the finalized layout version; {@code
+   * validateAndUpdateCache} only forwards the stamped value into the persisted
+   * multipart info row. Pre-finalization -> legacy (0); finalized -> split (1).
+   */
+  @ParameterizedTest
+  @CsvSource({
+      // finalized, expectedSchemaVersion (0 = LEGACY, 1 = SPLIT_PARTS_TABLE)
+      "false, 0",
+      "true, 1",
+  })
+  public void testSchemaVersionStampedInPreExecuteByServer(
+      boolean finalized, int expectedSchemaVersion) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
+    if (finalized) {
+      finalizeMpuPartsTableSplit();
+    }
+
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    // preExecute (leader) stamps the schema version onto the request.
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
-    S3InitiateMultipartUploadRequest request =
-        getS3InitiateMultipartUploadReq(modifiedRequest);
+    assertEquals(expectedSchemaVersion,
+        modifiedRequest.getInitiateMultiPartUploadRequest().getSchemaVersion());
 
-    OMClientResponse response =
-        request.validateAndUpdateCache(ozoneManager, 100L);
+    // validateAndUpdateCache only forwards the already-stamped value.
+    OMClientResponse response = getS3InitiateMultipartUploadReq(modifiedRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         response.getOMResponse().getStatus());
 
@@ -143,70 +160,51 @@ public class TestS3InitiateMultipartUploadRequest
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    assertEquals(0, multipartKeyInfo.getSchemaVersion());
+    assertEquals(expectedSchemaVersion, multipartKeyInfo.getSchemaVersion());
   }
 
-  @Test
-  public void testValidateAndUpdateCacheSetsSchemaVersionOneAfterFinalization()
-      throws Exception {
+  /**
+   * The schema version is server-owned: a client-supplied value on the request
+   * is ignored and overwritten in {@code preExecute} with the server decision,
+   * in both directions (client asks for split pre-finalization, and client asks
+   * for legacy post-finalization).
+   */
+  @ParameterizedTest
+  @CsvSource({
+      // finalized, expectedSchemaVersion (0 = LEGACY, 1 = SPLIT_PARTS_TABLE)
+      "false, 0",
+      "true, 1",
+  })
+  public void testServerIgnoresClientSuppliedSchemaVersion(
+      boolean finalized, int expectedSchemaVersion) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
-    // Finalized cluster: the split parts-table schema is allowed.
-    when(ozoneManager.getVersionManager()
-        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
+    if (finalized) {
+      finalizeMpuPartsTableSplit();
+    }
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
-    OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
-    S3InitiateMultipartUploadRequest request =
-        getS3InitiateMultipartUploadReq(modifiedRequest);
-
-    OMClientResponse response =
-        request.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        response.getOMResponse().getStatus());
-
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-        modifiedRequest.getInitiateMultiPartUploadRequest()
-            .getKeyArgs().getMultipartUploadID());
-    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
-        .getMultipartInfoTable().get(multipartKey);
-    assertNotNull(multipartKeyInfo);
-    assertEquals(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION,
-        multipartKeyInfo.getSchemaVersion());
-  }
-
-  @Test
-  public void testValidateAndUpdateCacheIgnoresClientSuppliedSchemaVersion()
-      throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    // Pre-finalized cluster: isAllowed(MPU_PARTS_TABLE_SPLIT) defaults to false
-    // on the mock, so the server decision is legacy. A client must not be able
-    // to force the split parts-table schema on a cluster that may downgrade.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-
+    // Client supplies the opposite of what the server should decide.
+    int clientSuppliedSchemaVersion = finalized
+        ? OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION
+        : OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION;
     OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(
         volumeName, bucketName, keyName, Collections.emptyMap(),
         Collections.emptyMap());
     clientRequest = clientRequest.toBuilder()
         .setInitiateMultiPartUploadRequest(
             clientRequest.getInitiateMultiPartUploadRequest().toBuilder()
-                .setSchemaVersion(
-                    OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION))
+                .setSchemaVersion(clientSuppliedSchemaVersion))
         .build();
 
     // preExecute must overwrite the client value with the server decision.
     OMRequest modifiedRequest =
         getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
-    assertEquals(OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION,
+    assertEquals(expectedSchemaVersion,
         modifiedRequest.getInitiateMultiPartUploadRequest().getSchemaVersion());
 
     OMClientResponse response = getS3InitiateMultipartUploadReq(modifiedRequest)
@@ -220,53 +218,7 @@ public class TestS3InitiateMultipartUploadRequest
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    // The persisted schema is legacy despite the client asking for split.
-    assertEquals(OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION,
-        multipartKeyInfo.getSchemaVersion());
-  }
-
-  @Test
-  public void testValidateAndUpdateCacheServerOverridesClientLegacyAfterFinalization()
-      throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    // Finalized cluster: server decision is split, and a client asking for
-    // legacy must not downgrade it (schema version is server-owned).
-    when(ozoneManager.getVersionManager()
-        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-
-    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(
-        volumeName, bucketName, keyName, Collections.emptyMap(),
-        Collections.emptyMap());
-    clientRequest = clientRequest.toBuilder()
-        .setInitiateMultiPartUploadRequest(
-            clientRequest.getInitiateMultiPartUploadRequest().toBuilder()
-                .setSchemaVersion(OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION))
-        .build();
-
-    OMRequest modifiedRequest =
-        getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
-    assertEquals(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION,
-        modifiedRequest.getInitiateMultiPartUploadRequest().getSchemaVersion());
-
-    OMClientResponse response = getS3InitiateMultipartUploadReq(modifiedRequest)
-        .validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        response.getOMResponse().getStatus());
-
-    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
-        modifiedRequest.getInitiateMultiPartUploadRequest()
-            .getKeyArgs().getMultipartUploadID());
-    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
-        .getMultipartInfoTable().get(multipartKey);
-    assertNotNull(multipartKeyInfo);
-    assertEquals(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION,
-        multipartKeyInfo.getSchemaVersion());
+    assertEquals(expectedSchemaVersion, multipartKeyInfo.getSchemaVersion());
   }
 
   @Test

@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
@@ -112,11 +113,28 @@ public class S3MultipartRequestTests {
               args.getVolumeName(), args.getBucketName(),
               "owner", BucketLayout.DEFAULT);
         });
+    // MPU request tests default to a pre-finalized layout version, i.e. a
+    // cluster that has not finalized MPU_PARTS_TABLE_SPLIT. Newly initiated
+    // uploads therefore use the legacy (schema 0) inline parts layout. Tests
+    // that need the finalized behaviour (split parts table, schema 1) opt in
+    // by calling finalizeMpuPartsTableSplit().
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
+  }
+
+  /**
+   * Simulate a cluster that has finalized the multipart parts-table split
+   * layout feature, so newly initiated uploads resolve to the split (schema 1)
+   * parts-table layout. This stubs the exact signal the request path checks
+   * ({@code isAllowed(MPU_PARTS_TABLE_SPLIT)}) rather than the metadata layout
+   * version, which the MPU schema gate does not read directly.
+   */
+  protected void finalizeMpuPartsTableSplit() {
+    when(ozoneManager.getVersionManager()
+        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
   }
 
   @AfterEach

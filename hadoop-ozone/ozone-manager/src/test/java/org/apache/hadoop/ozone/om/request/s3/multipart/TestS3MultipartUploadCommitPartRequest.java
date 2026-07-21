@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,7 +50,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -155,14 +153,15 @@ public class TestS3MultipartUploadCommitPartRequest
 
     String multipartUploadID =
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
-            keyName, 1);
+            keyName, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+    assertEquals(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION,
+        multipartKeyInfo.getSchemaVersion());
 
     long clientID = Time.now();
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
@@ -188,15 +187,13 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    // Tests must explicitly bump metadata layout version to simulate finalized OM.
-    when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
-        .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
-
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
+    // Upload is initiated on a pre-finalized cluster, so it uses the legacy
+    // (schema 0) inline layout.
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
@@ -213,6 +210,10 @@ public class TestS3MultipartUploadCommitPartRequest
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
     assertEquals(0, multipartKeyInfo.getSchemaVersion());
+
+    // Cluster finalizes the split feature; the pre-existing legacy part must
+    // still be committable.
+    finalizeMpuPartsTableSplit();
 
     long clientID = Time.now();
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.jupiter.api.Test;
@@ -143,15 +141,13 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    // Tests must explicitly bump metadata layout version to simulate finalized OM.
-    when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
-        .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
-
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
+    // Upload is initiated on a pre-finalized cluster, so it uses the legacy
+    // (schema 0) inline layout.
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
@@ -168,6 +164,10 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
     assertEquals(0, multipartKeyInfo.getSchemaVersion());
+
+    // Cluster finalizes the split feature, the pre-existing legacy upload must
+    // still be abortable.
+    finalizeMpuPartsTableSplit();
 
     OMRequest abortMPURequest =
         doPreExecuteAbortMPU(volumeName, bucketName, keyName,
