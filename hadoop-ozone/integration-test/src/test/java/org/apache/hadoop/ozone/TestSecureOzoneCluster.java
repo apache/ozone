@@ -223,7 +223,7 @@ final class TestSecureOzoneCluster {
   }
 
   @AfterAll
-  static void tearDownKdc() throws Exception {
+  static void tearDownKdc() {
     stopMiniKdc();
   }
 
@@ -460,8 +460,10 @@ final class TestSecureOzoneCluster {
   }
 
   /**
-   * Tests secure OM initialization against a shared SCM, covering the success
-   * case, the failure case, and re-initialization of an already-initialized OM.
+   * Tests secure OM initialization against a shared SCM, covering the
+   * delegation-token/secret-key config-validation failure, the login success
+   * case, the Kerberos failure case, and re-initialization of an
+   * already-initialized OM.
    */
   @Test
   void testSecureOMInitialization() throws Exception {
@@ -469,7 +471,20 @@ final class TestSecureOzoneCluster {
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
 
-    // Case 1: Test the secure om Initialization Success
+    // Case 1: Test the secure om Initialization Failure due to delegation token
+    // and secret key configuration don't meet requirement.
+    conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
+    conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class, () -> setupOm(conf));
+    assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
+        "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
+        "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
+    // Restore valid durations so the remaining cases can start OM.
+    conf.unset(HDDS_SECRET_KEY_EXPIRY_DURATION);
+    conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, DELEGATION_TOKEN_MAX_TIME_MS);
+
+    // Case 2: Test the secure om Initialization Success
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
     GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
     setupOm(conf);
@@ -478,18 +493,18 @@ final class TestSecureOzoneCluster {
     logs.clearOutput();
     stopOm();
 
-    // Case 2: Test the secure om Initialization Failure. Storage is already
-    // initialized by Case 1, and createOm with a non-existent principal fails
+    // Case 3: Test the secure om Initialization Failure. Storage is already
+    // initialized by Case 2, and createOm with a non-existent principal fails
     // at Kerberos login before any storage check or RPC bind, so no additional
     // setup is required.
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "non-existent-user@EXAMPLE.com");
     testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
 
-    // Case 3: Test functionality to init secure OM when it is already initialized.
+    // Case 4: Test functionality to init secure OM when it is already initialized.
     // The failure cases above left a non-existent principal and an invalid auth
     // method on conf; restore the valid values before re-initializing. A fresh
-    // RPC port is also required: Case 1's start() failed before starting the RPC
+    // RPC port is also required: Case 2's start() failed before starting the RPC
     // server, so its listener selector loop never ran and stop() cannot release
     // the bound port.
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
@@ -511,9 +526,7 @@ final class TestSecureOzoneCluster {
     assertThat(logOutput)
         .doesNotContain("Successfully stored SCM signed certificate");
 
-    if (om.stop()) {
-      om.join();
-    }
+    stopOm();
 
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
@@ -534,30 +547,9 @@ final class TestSecureOzoneCluster {
     validateCertificate(certificate);
   }
 
-  /**
-   * Tests the secure om Initialization Failure due to delegation token and secret key configuration don't meet
-   * requirement.
-   */
-  @Test
-  void testSecureOMDelegationTokenSecretManagerInitializationFailure() throws Exception {
-    initSCM();
-    // Create a secure SCM instance as om client will connect to it
-    scm = HddsTestUtils.getScmSimple(conf);
-    scm.start();
-    conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
-    conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
-    IllegalArgumentException exception = assertThrows(
-        IllegalArgumentException.class, () -> setupOm(conf));
-    assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
-        "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
-        "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
-  }
-
   @Test
   void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
-    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
@@ -592,7 +584,7 @@ final class TestSecureOzoneCluster {
             ClientId.randomId().toString());
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
-    logs = LogCapturer.captureLogs(Client.class);
+    LogCapturer logs = LogCapturer.captureLogs(Client.class);
     IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
     assertThat(ioException).hasMessageContaining(exMessage);
@@ -622,8 +614,9 @@ final class TestSecureOzoneCluster {
 
   private void stopOm() {
     if (om != null) {
-      om.stop();
-      om.join();
+      if (om.stop()) {
+        om.join();
+      }
       om = null;
     }
   }
