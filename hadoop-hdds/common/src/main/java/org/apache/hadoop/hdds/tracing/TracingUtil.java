@@ -222,6 +222,21 @@ public final class TracingUtil {
   }
 
   /**
+   * Whether to wrap the delegate in a JDK tracing proxy.
+   * Fully enabled: always wrap. App-aware: wrap only when parent span is valid
+   */
+  private static boolean shouldCreateTracingProxy(ConfigurationSource conf) {
+    TracingConfig tc = conf.getObject(TracingConfig.class);
+    if (tc.isTracingEnabled()) {
+      return true;
+    }
+    if (!tc.isApplicationAware() || !hasUsableTracer()) {
+      return false;
+    }
+    return Span.current().getSpanContext().isValid();
+  }
+
+  /**
    * Build the SdkTracerProvider using the configured OTLP endpoint and sampler.
    * Extracted so both enabled and application-aware modes share exporter/sampler setup.
    */
@@ -337,7 +352,7 @@ public final class TracingUtil {
    */
   public static <T> T createProxy(
       T delegate, Class<T> itf, ConfigurationSource conf) {
-    if (!isTracingActive(conf)) {
+    if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
     Class<?> aClass = delegate.getClass();
