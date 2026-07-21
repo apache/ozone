@@ -66,7 +66,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
   @Override
   boolean isPutBlockCommittedOnClose() {
-    return putBlock == null;
+    return putBlock != null;
   }
 
   @Override
@@ -103,8 +103,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   }
 
   public ContainerCommandRequestProto getPutBlockRequest() {
-    return Objects.requireNonNull(putBlockRequest.get(),
-        () -> "putBlockRequest == null, " + this);
+    return putBlockRequest.get();
   }
 
   void assertOpen() throws IOException {
@@ -252,7 +251,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     putBlockRequest.set(proto);
     Preconditions.checkState(putBlock != null);
     putBlock.accept(proto);
-    link();
+    setLinked();
   }
 
   interface WriteMethod {

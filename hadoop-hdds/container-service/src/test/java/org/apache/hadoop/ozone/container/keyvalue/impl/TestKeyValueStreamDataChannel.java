@@ -71,6 +71,7 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.ReferenceCountedObject;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -103,8 +104,8 @@ public class TestKeyValueStreamDataChannel {
   public void testClosePutBlockBehavior(boolean datastreamPutBlockEnabled) throws Exception {
     File tempFile = File.createTempFile("test-kv-close-" + datastreamPutBlockEnabled, ".tmp");
     tempFile.deleteOnExit();
-    KeyValueStreamDataChannel channel = newChannelWithPutBlockCommittedOnClose(tempFile);
     AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
+    KeyValueStreamDataChannel channel = newChannel(tempFile, datastreamPutBlockEnabled, processed);
     final byte[] data = RandomUtils.secure().randomBytes(50);
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
         PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
@@ -412,7 +413,9 @@ public class TestKeyValueStreamDataChannel {
     return f;
   }
 
-  private static KeyValueStreamDataChannel newChannelWithPutBlockCommittedOnClose(File tempFile) throws Exception {
+  private static KeyValueStreamDataChannel newChannel(
+      File tempFile, boolean datastreamPutBlockEnabled,
+      AtomicReference<ContainerCommandRequestProto> processed) throws Exception {
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
     when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(1000L, 1000L, 0L));
@@ -420,7 +423,9 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getContainerID()).thenReturn(123L);
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
-    return new KeyValueStreamDataChannel(tempFile, mockContainerData, null, mockMetrics);
+    CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock =
+        datastreamPutBlockEnabled ? processed::set : null;
+    return new KeyValueStreamDataChannel(tempFile, mockContainerData, putBlock, mockMetrics);
   }
 
   private static void write(KeyValueStreamDataChannel channel, byte[] data)
