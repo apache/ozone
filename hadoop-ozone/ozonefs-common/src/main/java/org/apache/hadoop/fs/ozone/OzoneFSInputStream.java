@@ -176,9 +176,7 @@ public class OzoneFSInputStream extends FSInputStream
           return remainingBeforeRead - buf.remaining();
         }
       } catch (EOFException e) {
-        if (remainingBeforeRead - buf.remaining() == 0) {
-          return -1;
-        }
+        return -1;
       }
     }
 
