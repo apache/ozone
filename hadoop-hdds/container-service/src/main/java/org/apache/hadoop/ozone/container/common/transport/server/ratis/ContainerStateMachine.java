@@ -737,7 +737,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-        dispatchCommand(request, context);
+    dispatchCommand(request, context);
   }
 
   @Override
