@@ -49,6 +49,15 @@ public final class ReplicateContainerCommand
     return cmd;
   }
 
+  /**
+   * Test-only factory that fills in the latest apparent version, so callers
+   * that do not exercise mixed-version handling don't need to specify it.
+   */
+  public static ReplicateContainerCommand forTest(long containerID,
+      DatanodeDetails target) {
+    return toTarget(containerID, target, HDDSVersion.SOFTWARE_VERSION);
+  }
+
   private ReplicateContainerCommand(long containerID, DatanodeDetails target) {
     this.containerID = containerID;
     this.targetDatanode = Objects.requireNonNull(target, "target == null");

@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,13 +49,11 @@ public class TestCommandQueue {
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
-    SCMCommand<?> replicationCommand = ReplicateContainerCommand.toTarget(
-        containerID, MockDatanodeDetails.randomDatanodeDetails(),
-        HDDSVersion.SOFTWARE_VERSION);
+    SCMCommand<?> replicationCommand = ReplicateContainerCommand.forTest(
+        containerID, MockDatanodeDetails.randomDatanodeDetails());
 
     ReplicateContainerCommand lowReplicationCommand = ReplicateContainerCommand
-        .toTarget(containerID, MockDatanodeDetails.randomDatanodeDetails(),
-            HDDSVersion.SOFTWARE_VERSION);
+        .forTest(containerID, MockDatanodeDetails.randomDatanodeDetails());
     lowReplicationCommand.setPriority(StorageContainerDatanodeProtocolProtos
         .ReplicationCommandPriority.LOW);
 

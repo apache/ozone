@@ -84,24 +84,22 @@ public class TestReplicateContainerCommandHandler {
       DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
       ReplicateContainerCommand command =
-          ReplicateContainerCommand.toTarget(1, target, HDDSVersion.SOFTWARE_VERSION);
+          ReplicateContainerCommand.forTest(1, target);
       commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
       String metricsName = ReplicationTask.METRIC_NAME;
       assertEquals(commandHandler.getMetricsName(), metricsName);
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 1);
 
-      commandHandler.handle(ReplicateContainerCommand.toTarget(2, target, HDDSVersion.SOFTWARE_VERSION),
+      commandHandler.handle(ReplicateContainerCommand.forTest(2, target),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.toTarget(3, target, HDDSVersion.SOFTWARE_VERSION),
-          ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(
-          ReplicateContainerCommand.toTarget(4, target,
-              HDDSVersion.SOFTWARE_VERSION),
+      commandHandler.handle(ReplicateContainerCommand.forTest(3, target),
           ozoneContainer, stateContext, connectionManager);
       commandHandler.handle(
-          ReplicateContainerCommand.toTarget(5, target,
-              HDDSVersion.SOFTWARE_VERSION),
+          ReplicateContainerCommand.forTest(4, target),
+          ozoneContainer, stateContext, connectionManager);
+      commandHandler.handle(
+          ReplicateContainerCommand.forTest(5, target),
           ozoneContainer, stateContext, connectionManager);
 
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(5L);

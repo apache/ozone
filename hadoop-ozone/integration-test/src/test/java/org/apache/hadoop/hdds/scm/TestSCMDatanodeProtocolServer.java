@@ -23,7 +23,6 @@ import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
@@ -42,7 +41,7 @@ public class TestSCMDatanodeProtocolServer {
         mock(OzoneStorageContainerManager.class);
 
     ReplicateContainerCommand command = ReplicateContainerCommand
-        .toTarget(1, randomDatanodeDetails(), HDDSVersion.SOFTWARE_VERSION);
+        .forTest(1, randomDatanodeDetails());
     command.setTerm(5L);
     command.setDeadline(1234L);
     StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =

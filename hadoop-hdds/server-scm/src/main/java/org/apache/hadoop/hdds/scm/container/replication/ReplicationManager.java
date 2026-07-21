@@ -534,7 +534,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       cmd.setReplicaIndex(replicaIndex);
       sendDatanodeCommand(cmd, containerInfo, source);
     } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen", e);
+      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
+          + "command for container " + containerID + " from source " + source + " to target " + target
+          + ". Should not happen", e);
     }
   }
 
@@ -640,7 +642,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       command.setPriority(ReplicationCommandPriority.LOW);
       sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
     } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager. Should not happen", e);
+      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
+          + "command for container " + container.getContainerID() + " from source " + source
+          + " to target " + target + ". Should not happen", e);
     }
   }
 

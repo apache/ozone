@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -62,7 +62,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -802,7 +801,7 @@ public class TestReplicationSupervisor {
 
   private ReplicateContainerCommand createCommand(long containerId) {
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerId, datanode, HDDSVersion.SOFTWARE_VERSION);
+        ReplicateContainerCommand.forTest(containerId, datanode);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }
@@ -1050,7 +1049,7 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
     for (int i = 0; i < 10; i++) {
       DatanodeDetails target = datanodes.get(i % datanodes.size());
-      rs.addTask(new ReplicationTask(toTarget(i, target, HDDSVersion.SOFTWARE_VERSION), noopReplicator));
+      rs.addTask(new ReplicationTask(forTest(i, target), noopReplicator));
     }
   }
 }

@@ -109,6 +109,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -1218,8 +1219,8 @@ public class TestReplicationManager {
     // command will be pushed from source to target
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
-    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
-        containerInfo.getContainerID(), target, HDDSVersion.SOFTWARE_VERSION);
+    ReplicateContainerCommand command = ReplicateContainerCommand.forTest(
+        containerInfo.getContainerID(), target);
     command.setReplicaIndex(1);
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
 
@@ -1769,28 +1770,45 @@ public class TestReplicationManager {
     return info;
   }
 
-  @Test
-  public void testApparentVersionIsLowestOfSourceAndTarget()
-      throws NotLeaderException, NodeNotFoundException {
+  /**
+   * Regardless of which datanode is newer, and regardless of the command
+   * sending path, the replicate command must carry the lowest apparent version
+   * among the source and target datanodes.
+   */
+  @ParameterizedTest
+  @CsvSource({
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false",
+  })
+  public void testApparentVersionIsLowestOfSourceAndTarget(
+      boolean throttled, boolean sourceNewer)
+      throws CommandTargetOverloadedException, NotLeaderException,
+      NodeNotFoundException {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
 
-    // Source is newer than target, so the lowest common version is the
-    // target's version, not the peer the command is sent to.
-    mockDatanodeWithApparentVersion(source, HDDSVersion.STREAM_BLOCK_SUPPORT);
-    mockDatanodeWithApparentVersion(target,
-        HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
+    HDDSVersion lower = HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+    HDDSVersion higher = HDDSVersion.STREAM_BLOCK_SUPPORT;
+    mockDatanodeWithApparentVersion(source, sourceNewer ? higher : lower);
+    mockDatanodeWithApparentVersion(target, sourceNewer ? lower : higher);
     when(nodeManager.getLowestApparentVersion(source, target))
         .thenCallRealMethod();
 
-    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        1, source, target, clock.millis() + rmConf.getEventTimeout());
+    if (throttled) {
+      mockReplicationCommandCounts(dn -> 0, dn -> 0);
+      replicationManager.sendThrottledReplicationCommand(containerInfo,
+          Collections.singletonList(source), target, 1);
+    } else {
+      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+          1, source, target, clock.millis() + rmConf.getEventTimeout());
+    }
 
-    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
-        captureSentReplicateCommand().getApparentVersion());
+    assertEquals(lower, captureSentReplicateCommand().getApparentVersion());
   }
 
   @Test
