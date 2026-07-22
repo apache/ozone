@@ -211,9 +211,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // TODO: The datanode UUID is not used meaningfully, consider deprecating
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
+    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockOnCloseEnabled()
+        ? ContainerProtos.Type.StreamInitWithPutBlock
+        : ContainerProtos.Type.StreamInit;
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
+            .setCmdType(streamInitType)
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
@@ -431,14 +434,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         if (e != null || reply == null || !reply.isSuccess()) {
           LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
           try {
-            executePutBlock(true, false);
+            submitPutBlockAsync(blockData, true, force, flushPos, byteBufferList);
           } catch (IOException ex) {
             throw new CompletionException(ex);
           }
         }
       });
+      if (config.isDatastreamPutBlockOnCloseEnabled()) {
+        return;
+      }
     }
 
+    submitPutBlockAsync(blockData, close, force, flushPos, byteBufferList);
+  }
+
+  private void submitPutBlockAsync(BlockData blockData, boolean close, boolean force,
+      long flushPos, List<StreamBuffer> byteBufferList) throws IOException {
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);

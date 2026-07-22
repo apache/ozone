@@ -373,6 +373,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case StreamInit:
+    case StreamInitWithPutBlock:
     case StreamWrite:
     case FinalizeBlock:
       return false;
