@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -51,7 +51,7 @@ final class OzoneContract extends AbstractOzoneContract {
   protected String getRootURI() throws IOException {
     try (OzoneClient client = getCluster().newClient()) {
       BucketLayout layout = getConf().getEnum(OZONE_DEFAULT_BUCKET_LAYOUT, BucketLayout.DEFAULT);
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+      OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout);
       return String.format("%s://%s.%s/", getScheme(), bucket.getName(), bucket.getVolumeName());
     }
   }

@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -100,7 +100,7 @@ public abstract class TestReplicationConfigPreference implements NonHATests.Test
       conf.unset(key);
     }
 
-    TestDataUtil.createVolume(client, VOLUME_NAME);
+    DataTestUtil.createVolume(client, VOLUME_NAME);
     volume = client.getObjectStore().getVolume(VOLUME_NAME);
   }
 

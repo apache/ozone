@@ -76,7 +76,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
@@ -165,7 +165,7 @@ public class TestDecommissionAndMaintenance {
     cluster = clusterProvider.provide();
     setManagers();
     client = cluster.newClient();
-    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
+    bucket = DataTestUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
@@ -831,7 +831,7 @@ public class TestDecommissionAndMaintenance {
   private void generateData(int keyCount, String keyPrefix,
       ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
-      TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
+      DataTestUtil.createKey(bucket, keyPrefix + i, replicationConfig,
           "this is the content".getBytes(StandardCharsets.UTF_8));
     }
   }

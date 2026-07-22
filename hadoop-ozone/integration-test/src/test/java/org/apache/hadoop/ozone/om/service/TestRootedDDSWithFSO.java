@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -91,7 +91,7 @@ public class TestRootedDDSWithFSO {
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, getFSOBucketLayout());
+        DataTestUtil.createVolumeAndBucket(client, getFSOBucketLayout());
     String volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     String bucketName = bucket.getName();

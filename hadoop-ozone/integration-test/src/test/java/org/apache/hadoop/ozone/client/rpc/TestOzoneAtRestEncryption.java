@@ -86,7 +86,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -299,7 +299,7 @@ class TestOzoneAtRestEncryption {
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
 
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(StandardCharsets.UTF_8));
 
@@ -307,7 +307,7 @@ class TestOzoneAtRestEncryption {
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     // Overwrite the key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(StandardCharsets.UTF_8));
 

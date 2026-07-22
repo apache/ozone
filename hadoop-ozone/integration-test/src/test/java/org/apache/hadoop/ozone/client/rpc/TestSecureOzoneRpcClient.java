@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.DataTestUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
@@ -61,7 +61,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -167,7 +167,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       String keyName = UUID.randomUUID().toString();
 
       long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
-      TestDataUtil.createKey(bucket, keyName, replication, value.getBytes(UTF_8));
+      DataTestUtil.createKey(bucket, keyName, replication, value.getBytes(UTF_8));
 
       assertEquals(committedBytes + value.getBytes(UTF_8).length,
           ozoneManager.getMetrics().getDataCommittedBytes());

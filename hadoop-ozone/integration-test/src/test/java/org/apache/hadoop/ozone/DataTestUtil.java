@@ -56,9 +56,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 /**
  * Utility to help to generate test data.
  */
-public final class TestDataUtil {
+public final class DataTestUtil {
 
-  private TestDataUtil() {
+  private DataTestUtil() {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,

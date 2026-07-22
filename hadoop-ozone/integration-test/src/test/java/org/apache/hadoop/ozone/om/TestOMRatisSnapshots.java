@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.TestDataUtil.readFully;
+import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;

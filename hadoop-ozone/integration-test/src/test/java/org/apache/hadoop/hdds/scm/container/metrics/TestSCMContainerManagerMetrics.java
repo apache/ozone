@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
@@ -137,7 +137,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // Create key should create container on DN.
-    TestDataUtil.createKeys(cluster(), 1);
+    DataTestUtil.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =

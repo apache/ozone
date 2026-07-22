@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -74,7 +74,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     client = cluster().newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
@@ -97,7 +97,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
                 (int) OzoneConsts.MB)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
+    DataTestUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());

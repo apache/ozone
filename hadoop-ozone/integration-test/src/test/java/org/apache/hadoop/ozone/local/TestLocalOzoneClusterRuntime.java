@@ -28,7 +28,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -93,7 +93,7 @@ class TestLocalOzoneClusterRuntime {
       assertServicePortsReachable(cluster);
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(clientConf)) {
-        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+        DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
       }
     }
   }

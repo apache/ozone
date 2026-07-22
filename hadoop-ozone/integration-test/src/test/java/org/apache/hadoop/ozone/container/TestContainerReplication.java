@@ -67,7 +67,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -190,7 +190,7 @@ class TestContainerReplication {
 
     OzoneBucket bucket = volume.getBucket(BUCKET);
 
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         RatisReplicationConfig.getInstance(THREE),
         "Hello".getBytes(UTF_8));
   }
@@ -204,7 +204,7 @@ class TestContainerReplication {
 
     byte[] b = new byte[size];
     b = RandomUtils.secure().randomBytes(b.length);
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         new ECReplicationConfig("RS-3-2-1k"), b);
     return b;
   }

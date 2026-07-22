@@ -69,7 +69,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.TestHelper;
@@ -177,7 +177,7 @@ class TestReconAndAdminContainerCLI {
     String volumeName = "vol1";
     String bucketName = "bucket1";
 
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(
         client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String keyNameR3 = "key1";
@@ -432,7 +432,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
+    DataTestUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())
