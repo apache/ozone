@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.google.common.collect.Maps;
@@ -193,7 +194,7 @@ public final class TestDataUtil {
     OzoneVolume volume = objectStore.getVolume(vol);
     String sourceBucket = bukName;
     if (createLinkedBucket) {
-      sourceBucket = bukName + RandomStringUtils.secure().nextNumeric(5);
+      sourceBucket = uniqueObjectName(bukName);
     }
     volume.createBucket(sourceBucket, bucketArgs);
     OzoneBucket ozoneBucket = volume.getBucket(sourceBucket);
@@ -232,12 +233,12 @@ public final class TestDataUtil {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
-        String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-        String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+        String volumeName = uniqueObjectName("volume");
+        String bucketName = uniqueObjectName("bucket");
         OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout, replicationConfig);
         if (createLinkedBucket) {
-          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.secure().nextNumeric(5);
+          String targetBucketName = uniqueObjectName(ozoneBucket.getName());
           ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
         }
         return ozoneBucket;

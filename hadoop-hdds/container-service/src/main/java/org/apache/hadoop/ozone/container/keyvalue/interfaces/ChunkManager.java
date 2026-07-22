@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
  * Chunk Manager allows read, write, delete and listing of chunks in a container.
@@ -131,7 +132,9 @@ public interface ChunkManager {
   }
 
   default StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
+          Container container, BlockID blockID,
+          CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
+          ContainerMetrics metrics)
           throws StorageContainerException {
     return null;
   }

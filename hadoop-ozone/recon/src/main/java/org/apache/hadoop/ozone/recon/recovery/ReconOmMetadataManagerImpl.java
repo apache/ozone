@@ -207,8 +207,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       return result;
     }
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-                 iterator = volumeTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>> iterator = volumeTable.iterator()) {
 
       while (iterator.hasNext() && result.size() < maxKeys) {
         Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -283,7 +282,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // Unlike in {@link OmMetadataManagerImpl}, the buckets are queried directly
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>>
         iterator = getBucketTable().iterator(seekPrefix)) {
 
       while (currentCount < maxNumOfBuckets && iterator.hasNext()) {
@@ -341,8 +340,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       return result;
     }
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-             iterator = bucketTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>> iterator = bucketTable.iterator()) {
       while (currentCount < maxNumberOfBuckets && iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
         OmBucketInfo omBucketInfo = kv.getValue();

@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -36,11 +37,12 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test {@link RepeatedOmKeyInfo#getCodec(boolean)}.
+ * Test {@link RepeatedOmKeyInfo#getOpenKeyTableCodec(boolean)}.
  */
 public class TestRepeatedOmKeyInfoCodec
     extends Proto2CodecTestBase<RepeatedOmKeyInfo> {
@@ -51,7 +53,7 @@ public class TestRepeatedOmKeyInfoCodec
 
   @Override
   public Codec<RepeatedOmKeyInfo> getCodec() {
-    return RepeatedOmKeyInfo.getCodec(true);
+    return RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
   }
 
   private OmKeyInfo getKeyInfo(int chunkNum) {
@@ -94,7 +96,7 @@ public class TestRepeatedOmKeyInfoCodec
   }
 
   public void testWithoutPipeline(int chunkNum) throws IOException {
-    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     long bucketId = Time.now();
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey, bucketId);
@@ -108,9 +110,9 @@ public class TestRepeatedOmKeyInfoCodec
 
   public void testCompatibility(int chunkNum) throws IOException {
     final Codec<RepeatedOmKeyInfo> codecWithoutPipeline
-        = RepeatedOmKeyInfo.getCodec(true);
+        = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
     final Codec<RepeatedOmKeyInfo> codecWithPipeline
-        = RepeatedOmKeyInfo.getCodec(false);
+        = RepeatedOmKeyInfo.getOpenKeyTableCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     long bucketId = Time.now();
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey, bucketId);
@@ -125,7 +127,7 @@ public class TestRepeatedOmKeyInfoCodec
     final OmKeyInfo key = getKeyInfo(1);
     long bucketId = Time.now();
     final RepeatedOmKeyInfo subject = new RepeatedOmKeyInfo(key, bucketId);
-    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
     final AtomicBoolean failed = new AtomicBoolean();
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
         .build();
@@ -149,5 +151,100 @@ public class TestRepeatedOmKeyInfoCodec
       Thread.sleep(100);
     }
     assertFalse(failed.get());
+  }
+
+  private OmKeyInfo getKeyInfoWithOpenKeyFields(int chunkNum) {
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+    for (int i = 0; i < chunkNum; i++) {
+      BlockID blockID = new BlockID(i, i);
+      OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(blockID)
+          .setPipeline(pipeline)
+          .build();
+      omKeyLocationInfoList.add(keyLocationInfo);
+    }
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
+        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+    return new OmKeyInfo.Builder()
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setVolumeName(VOLUME)
+        .setBucketName(BUCKET)
+        .setKeyName(KEYNAME)
+        .setObjectID(Time.now())
+        .setUpdateID(Time.now())
+        .setDataSize(100)
+        .setOmKeyLocationInfos(
+            Collections.singletonList(omKeyLocationInfoGroup))
+        .setExpectedDataGeneration(12345L)
+        .build();
+  }
+
+  @Test
+  void testRegularCodecIncludesOpenKeyFields() throws IOException {
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
+    OmKeyInfo keyWithFields = getKeyInfoWithOpenKeyFields(1);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyWithFields, bucketId);
+
+    byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
+    RepeatedKeyInfo proto = RepeatedKeyInfo.parseFrom(rawData);
+
+    assertTrue(proto.getKeyInfo(0).hasExpectedDataGeneration());
+    assertEquals(12345L, proto.getKeyInfo(0).getExpectedDataGeneration());
+  }
+
+  @Test
+  void testDeletedTableCodecExcludesOpenKeyFields() throws IOException {
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getDeletedTableCodec(true);
+    OmKeyInfo keyWithFields = getKeyInfoWithOpenKeyFields(1);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyWithFields, bucketId);
+
+    byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
+    RepeatedKeyInfo proto = RepeatedKeyInfo.parseFrom(rawData);
+
+    assertFalse(proto.getKeyInfo(0).hasExpectedDataGeneration());
+
+    RepeatedOmKeyInfo deserialized = codec.fromPersistedFormat(rawData);
+    assertEquals(VOLUME, deserialized.getOmKeyInfoList().get(0).getVolumeName());
+    assertEquals(BUCKET, deserialized.getOmKeyInfoList().get(0).getBucketName());
+    assertEquals(bucketId, deserialized.getBucketId());
+  }
+
+  @Test
+  void testDeletedTableCodecCanReadRegularCodecData() throws IOException {
+    final Codec<RepeatedOmKeyInfo> regularCodec = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
+    final Codec<RepeatedOmKeyInfo> deletedTableCodec = RepeatedOmKeyInfo.getDeletedTableCodec(true);
+
+    OmKeyInfo keyWithFields = getKeyInfoWithOpenKeyFields(1);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyWithFields, bucketId);
+
+    byte[] rawData = regularCodec.toPersistedFormat(repeatedOmKeyInfo);
+    RepeatedOmKeyInfo deserialized = deletedTableCodec.fromPersistedFormat(rawData);
+
+    assertEquals(VOLUME, deserialized.getOmKeyInfoList().get(0).getVolumeName());
+    assertEquals(12345L, deserialized.getOmKeyInfoList().get(0).getExpectedDataGeneration());
+  }
+
+  @Test
+  void testDeletedTableCodecProducesSmallerOutput() throws IOException {
+    final Codec<RepeatedOmKeyInfo> regularCodec = RepeatedOmKeyInfo.getOpenKeyTableCodec(true);
+    final Codec<RepeatedOmKeyInfo> deletedTableCodec = RepeatedOmKeyInfo.getDeletedTableCodec(true);
+
+    OmKeyInfo keyWithFields = getKeyInfoWithOpenKeyFields(1);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyWithFields, bucketId);
+
+    byte[] regularData = regularCodec.toPersistedFormat(repeatedOmKeyInfo);
+    byte[] deletedTableData = deletedTableCodec.toPersistedFormat(repeatedOmKeyInfo);
+
+    assertTrue(deletedTableData.length < regularData.length,
+        "deletedTable codec should produce smaller output");
   }
 }

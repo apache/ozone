@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,6 +108,14 @@ public class TestObjectHead {
   @Test
   public void testHeadFailByBadName() throws Exception {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
+  }
+
+  @Test
+  public void testHeadWithNegativePartNumber() throws Exception {
+    keyEndpoint.queryParamsForTest()
+        .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> keyEndpoint.head(bucketName, "key1"));
   }
 
   @Test

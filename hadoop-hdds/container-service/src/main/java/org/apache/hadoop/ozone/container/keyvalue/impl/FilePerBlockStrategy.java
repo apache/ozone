@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.util.Shell;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,12 +114,13 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
-          throws StorageContainerException {
+      Container container, BlockID blockID,
+      CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
+      ContainerMetrics metrics) throws StorageContainerException {
     checkLayoutVersion(container);
     final File chunkFile = getChunkFile(container, blockID);
     return new KeyValueStreamDataChannel(chunkFile,
-        container.getContainerData(), metrics);
+        container.getContainerData(), putBlock, metrics);
   }
 
   @Override

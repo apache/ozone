@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -434,6 +435,48 @@ public class TestDiskBalancerService {
 
     assertThat(exception)
         .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testNodeStateUpdatedRetainsPausedWhenPersistFails(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-pause-persist-failure").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    svc.refresh(new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true));
+    breakDiskBalancerInfoPersistence(infoDir);
+
+    svc.nodeStateUpdated(NodeOperationalState.DECOMMISSIONING);
+
+    assertEquals(DiskBalancerRunningStatus.PAUSED,
+        svc.getDiskBalancerInfo().getOperationalState());
+    assertTrue(svc.getTasks().isEmpty());
+    svc.shutdown();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testNodeStateUpdatedRevertsToPausedWhenResumePersistFails(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-resume-persist-failure").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    svc.refresh(new DiskBalancerInfo(DiskBalancerRunningStatus.PAUSED, 10.0d, 100L, 5, true));
+    breakDiskBalancerInfoPersistence(infoDir);
+
+    svc.nodeStateUpdated(NodeOperationalState.IN_SERVICE);
+
+    assertEquals(DiskBalancerRunningStatus.PAUSED,
+        svc.getDiskBalancerInfo().getOperationalState());
+    assertTrue(svc.getTasks().isEmpty());
+    svc.shutdown();
+  }
+
+  private void breakDiskBalancerInfoPersistence(File infoDir) throws IOException {
+    File infoFile = getDiskBalancerInfoFile(infoDir);
+    FileUtils.deleteQuietly(infoFile);
+    assertTrue(infoFile.mkdirs(), "Failed to replace diskBalancer.info with a directory");
   }
 
   @ContainerTestVersionInfo.ContainerTest

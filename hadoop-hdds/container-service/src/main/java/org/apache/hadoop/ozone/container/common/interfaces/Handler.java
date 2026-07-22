@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -108,7 +109,8 @@ public abstract class Handler {
   }
 
   public abstract StateMachine.DataChannel getStreamDataChannel(
-          Container container, ContainerCommandRequestProto msg)
+          Container container, ContainerCommandRequestProto msg,
+          CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
           throws StorageContainerException;
 
   /**

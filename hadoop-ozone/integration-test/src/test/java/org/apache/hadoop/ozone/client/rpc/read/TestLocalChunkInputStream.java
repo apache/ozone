@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -98,7 +98,7 @@ public class TestLocalChunkInputStream extends TestChunkInputStream {
       updateConfig(layout);
       assumeTrue(DomainSocketFactory.getInstance(getCluster().getConf()).isServiceReady());
 
-      TestBucket bucket = TestBucket.newBuilder(client).build();
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
       GenericTestUtils.LogCapturer logCapturer1 =
           GenericTestUtils.LogCapturer.captureLogs(LocalChunkInputStream.LOG);
       GenericTestUtils.LogCapturer logCapturer2 =
@@ -122,7 +122,7 @@ public class TestLocalChunkInputStream extends TestChunkInputStream {
     try (OzoneClient client = getCluster().newClient()) {
       assumeTrue(DomainSocketFactory.getInstance(getCluster().getConf()).isServiceReady());
 
-      TestBucket bucket = TestBucket.newBuilder(client).build();
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
       GenericTestUtils.LogCapturer logCapturer1 =
           GenericTestUtils.LogCapturer.captureLogs(XceiverClientShortCircuit.LOG);
       GenericTestUtils.LogCapturer logCapturer2 =

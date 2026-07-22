@@ -178,7 +178,7 @@ public class TestDNDataDistributionFinalization {
 
     // Wait for finalization to complete
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // Create more data and deletions to test post-finalization behavior
@@ -221,7 +221,7 @@ public class TestDNDataDistributionFinalization {
         });
     // Wait for finalization
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // Verify the system can handle scenarios where pendingDeleteBlockCount
