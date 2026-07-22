@@ -42,6 +42,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
@@ -107,6 +108,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -175,6 +178,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmPrefixInfo> prefixTable;
   private Table<String, TransactionInfo> transactionInfoTable;
   private Table<String, String> metaTable;
+  private Table<String, OmLifecycleConfiguration> lifecycleConfigurationTable;
+  private Table<String, OmLifecycleScanState> lifecycleScanStateTable;
 
   // Tables required for multi-tenancy
   private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
@@ -532,6 +537,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
+    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
   }
 
   /**
@@ -1730,6 +1738,75 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
+    return lifecycleConfigurationTable;
+  }
+
+  @Override
+  public Table<String, OmLifecycleScanState> getLifecycleScanStateTable() {
+    return lifecycleScanStateTable;
+  }
+
+  /**
+   * @return list all LifecycleConfigurations.
+   */
+  @Override
+  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
+    List<OmLifecycleConfiguration> result = Lists.newArrayList();
+
+    /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>>>
+        cacheIterator = getLifecycleConfigurationTable().cacheIterator();
+
+    OmLifecycleConfiguration lifecycleConfiguration;
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>> entry =
+          cacheIterator.next();
+      lifecycleConfiguration = entry.getValue().getCacheValue();
+      if (lifecycleConfiguration == null) {
+        // lifecycleConfiguration null means it's a deleted.
+        continue;
+      }
+      result.add(lifecycleConfiguration);
+    }
+
+    return result;
+  }
+
+
+  /**
+   * Fetches the lifecycle configuration by bucketName.
+   *
+   * @param bucketName bucketName of the lifecycle configuration
+   * @return OmLifecycleConfiguration
+   * @throws IOException
+   */
+  @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    Objects.requireNonNull(bucketName, "bucketName == null");
+    OmLifecycleConfiguration value = null;
+    try {
+      String bucketKey = getBucketKey(volumeName, bucketName);
+      value = getLifecycleConfigurationTable().get(bucketKey);
+      if (value == null) {
+        LOG.debug("lifecycle configuration of bucket /{}/{} not found.",
+            volumeName, bucketName);
+        throw new OMException("Lifecycle configuration not found",
+            LIFECYCLE_CONFIGURATION_NOT_FOUND);
+      }
+      value.valid();
+      return value;
+    } catch (IOException ex) {
+      LOG.error("Exception while getting lifecycle configuration for " +
+          "bucket: /{}/{}, LifecycleConfiguration {}", volumeName, bucketName,
+          value != null ? value.getProtobuf() : "", ex);
+
+      throw ex;
+    }
   }
 
   /**
