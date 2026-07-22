@@ -20,6 +20,7 @@ package org.apache.hadoop.conf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -134,6 +135,14 @@ public abstract class ConfigurationFieldsTests {
    */
   @SuppressWarnings("checkstyle:visibilitymodifier")
   protected Set<String> filtersForDefaultValueCollisionCheck = new HashSet<>();
+
+  /**
+   * A set of property keys that are allowed to contain a newline.
+   * Entries are skipped by {@link #testXmlValuesHaveNoEmbeddedNewlines}; keep
+   * this empty unless a value genuinely requires a line break, otherwise the
+   * embedded newline corrupts the runtime string (see HDDS-8046).
+   */
+  protected Set<String> xmlPropsAllowedToContainNewline = new HashSet<>();
 
   /**
    * Abstract method to be used by subclasses for initializing base
@@ -668,6 +677,35 @@ public abstract class ConfigurationFieldsTests {
       LOG.info("Checked {} default values for collision.", valuesChecked);
     }
 
+  }
 
+  /**
+   * Verifies no default value in the XML embeds a line break, which would
+   * corrupt the runtime string (see HDDS-8046). Legitimate cases opt out via
+   * {@link #xmlPropsAllowedToContainNewline}.
+   */
+  @Test
+  public void testXmlValuesHaveNoEmbeddedNewlines() {
+    Set<String> xmlValuesWithNewlines = new HashSet<>();
+    for (Map.Entry<String, String> entry : xmlKeyValueMap.entrySet()) {
+      String value = entry.getValue();
+      if (value == null) {
+        continue;
+      }
+      if (xmlPropsAllowedToContainNewline.contains(entry.getKey())) {
+        LOG.info("XML Property: {} AllowedToContainNewline", entry.getKey());
+        continue;
+      }
+      if (value.indexOf('\n') != -1 || value.indexOf('\r') != -1) {
+        xmlValuesWithNewlines.add(entry.getKey());
+      }
+    }
+
+    assertTrue(xmlValuesWithNewlines.isEmpty(),
+        "These properties in " + xmlFilename + " have an embedded line break in "
+            + "their <value>, which corrupts the runtime string:  " + xmlValuesWithNewlines
+            + " Put the value on a single line. If the newline is genuinely required, "
+            + "add the property to xmlPropsAllowedToContainNewline (in "
+            + "initializeMemberVariables) with a reason + Jira. See HDDS-8082.");
   }
 }
