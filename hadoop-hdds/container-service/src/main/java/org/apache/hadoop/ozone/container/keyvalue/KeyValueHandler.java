@@ -174,6 +174,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -273,7 +274,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-      Container container, ContainerCommandRequestProto msg)
+      Container container, ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
       throws StorageContainerException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     checkContainerOpen(kvContainer);
@@ -283,7 +285,7 @@ public class KeyValueHandler extends Handler {
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
 
       return chunkManager.getStreamDataChannel(kvContainer,
-          blockID, metrics);
+          blockID, putBlock, metrics);
     } else {
       throw new StorageContainerException("Malformed request.",
           ContainerProtos.Result.IO_EXCEPTION);
@@ -698,6 +700,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return putBlockResponseSuccess(request, blockDataProto);
   }
 
@@ -1106,7 +1109,15 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
+    if (kvContainer.getContainerState() != RECOVERING) {
+      return;
+    }
+    containerSet.updateRecoveringContainerTimeout(kvContainer.getContainerData().getContainerID());
   }
 
   /**

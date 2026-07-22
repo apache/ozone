@@ -179,8 +179,7 @@ public class FSORepairTool extends RepairTool {
         }
 
         // Iterate all volumes or a specific volume if specified
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-                 volumeIterator = volumeTable.iterator()) {
+        try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>> volumeIterator = volumeTable.iterator()) {
           try {
             openTempDB();
           } catch (IOException e) {
@@ -214,7 +213,7 @@ public class FSORepairTool extends RepairTool {
             } else {
 
               // Iterate all buckets in the volume.
-              try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+              try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>>
                        bucketIterator = bucketTable.iterator()) {
                 bucketIterator.seek(volumeKey);
                 while (bucketIterator.hasNext()) {
@@ -255,8 +254,7 @@ public class FSORepairTool extends RepairTool {
         return false;
       }
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
-               snapshotInfoTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
         while (iterator.hasNext()) {
           SnapshotInfo snapshotInfo = iterator.next().getValue();
           String snapshotPath = (volumeName + "/" + bucketName).replaceFirst("^/", "");
@@ -333,7 +331,7 @@ public class FSORepairTool extends RepairTool {
       String bucketPrefix = OM_KEY_PREFIX + volume.getObjectID() + OM_KEY_PREFIX + bucket.getObjectID();
 
       try (BatchedTempWriter writer = new BatchedTempWriter(pendingToDeleteTable)) {
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> deletedDirIterator =
+        try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deletedDirIterator =
                  deletedDirectoryTable.iterator()) {
           deletedDirIterator.seek(bucketPrefix);
           while (deletedDirIterator.hasNext()) {
@@ -386,8 +384,7 @@ public class FSORepairTool extends RepairTool {
           OM_KEY_PREFIX +
           bucket.getObjectID();
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirIterator =
-               directoryTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>> dirIterator = directoryTable.iterator()) {
         dirIterator.seek(bucketPrefix);
         while (dirIterator.hasNext()) {
           Table.KeyValue<String, OmDirectoryInfo> dirEntry = dirIterator.next();
@@ -413,8 +410,7 @@ public class FSORepairTool extends RepairTool {
       }
 
       // Check for pendingToDelete and orphaned files
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               fileIterator = fileTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = fileTable.iterator()) {
         fileIterator.seek(bucketPrefix);
         while (fileIterator.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> fileEntry = fileIterator.next();
@@ -484,8 +480,7 @@ public class FSORepairTool extends RepairTool {
 
       Collection<String> childDirs = new ArrayList<>();
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-               dirIterator = directoryTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>> dirIterator = directoryTable.iterator()) {
         String dirPrefix = buildReachableKey(volume, bucket, currentDir);
         // Start searching the directory table at the current directory's
         // prefix to get its immediate children.
@@ -513,8 +508,7 @@ public class FSORepairTool extends RepairTool {
       Collection<String> childDirs = new ArrayList<>();
 
       // Find child directories and mark them as pendingToDelete
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-               dirIterator = directoryTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>> dirIterator = directoryTable.iterator()) {
         // Start searching the directory table at the current directory's
         // prefix to get its immediate children.
         dirIterator.seek(dirPrefix);
@@ -537,8 +531,7 @@ public class FSORepairTool extends RepairTool {
       }
 
       // Find child files and mark them as pendingToDelete
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-               fileTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = fileTable.iterator()) {
         fileIterator.seek(dirPrefix);
         while (fileIterator.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> childFileEntry = fileIterator.next();

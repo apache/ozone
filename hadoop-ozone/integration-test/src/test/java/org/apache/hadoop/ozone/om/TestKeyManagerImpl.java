@@ -1523,13 +1523,11 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setMultipartUploadPartNumber(99)
             .build();
-    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
-    assertEquals(keyName, omKeyInfo.getKeyName());
-    assertNotNull(omKeyInfo.getLatestVersionLocations());
-
-    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
-    assertNotNull(locationList);
-    assertEquals(0, locationList.size());
+    // Reading a part number beyond the object's part count must fail with
+    // InvalidPart, instead of returning an empty (0-byte) result.
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test"));
+    assertEquals(OMException.ResultCodes.INVALID_PART, ex.getResult());
   }
 
   private OmKeyInfo getMockedOmKeyInfo(OmBucketInfo bucketInfo, long parentId, String key, long objectId) {

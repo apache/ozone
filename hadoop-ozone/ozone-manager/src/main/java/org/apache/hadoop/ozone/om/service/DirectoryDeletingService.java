@@ -385,10 +385,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private static final class DeletedDirSupplier implements Closeable {
-    private final TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-        deleteTableIterator;
+    private final TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deleteTableIterator;
 
-    private DeletedDirSupplier(TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> deleteTableIterator) {
+    private DeletedDirSupplier(TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deleteTableIterator) {
       this.deleteTableIterator = deleteTableIterator;
     }
 

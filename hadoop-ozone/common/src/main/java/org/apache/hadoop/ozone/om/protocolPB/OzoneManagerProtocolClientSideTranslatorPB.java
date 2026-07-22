@@ -2209,6 +2209,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
         .setLatestVersionLocation(args.getLatestVersionLocation())
+        .setHeadOp(args.isHeadOp())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()

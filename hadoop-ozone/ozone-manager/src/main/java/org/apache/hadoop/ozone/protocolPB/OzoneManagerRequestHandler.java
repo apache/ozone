@@ -1077,10 +1077,21 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setHeadOp(keyArgs.getHeadOp())
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
-    rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
+    OzoneFileStatusProto status =
+        impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion);
+    if (keyArgs.getHeadOp() && status.hasKeyInfo()) {
+      // A head op only needs the entry type. The block locations are not
+      // refreshed for a head op (they carry no pipeline) and the caller does
+      // not use them, so drop them to keep the response small (HDDS-15678).
+      status = status.toBuilder()
+          .setKeyInfo(status.getKeyInfo().toBuilder().clearKeyLocationList())
+          .build();
+    }
+    rb.setStatus(status);
 
     return rb.build();
   }

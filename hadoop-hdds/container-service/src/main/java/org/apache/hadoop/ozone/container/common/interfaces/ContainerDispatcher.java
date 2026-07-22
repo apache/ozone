@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
  * Dispatcher acts as the bridge between the transport layer and
@@ -108,7 +110,9 @@ public interface ContainerDispatcher {
    * When uploading using stream, get StreamDataChannel.
    */
   default StateMachine.DataChannel getStreamDataChannel(
-      ContainerCommandRequestProto msg) throws StorageContainerException {
+      ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
+      throws StorageContainerException {
     throw new UnsupportedOperationException(
         "getStreamDataChannel not supported.");
   }

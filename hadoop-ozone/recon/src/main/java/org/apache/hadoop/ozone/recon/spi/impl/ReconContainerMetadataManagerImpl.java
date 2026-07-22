@@ -351,8 +351,7 @@ public class ReconContainerMetadataManagerImpl
       long containerId, String prevKeyPrefix, int limit) throws IOException {
 
     Map<ContainerKeyPrefix, Integer> prefixes = new LinkedHashMap<>();
-    try (TableIterator<ContainerKeyPrefix,
-        ? extends KeyValue<ContainerKeyPrefix, Integer>>
+    try (TableIterator<ContainerKeyPrefix, Table.KeyValue<ContainerKeyPrefix, Integer>>
              containerIterator = containerKeyTable.iterator()) {
       ContainerKeyPrefix seekKey;
       boolean skipPrevKey = false;
@@ -439,7 +438,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   private class ContainerMetadataIterator implements SeekableIterator<Long, ContainerMetadata> {
-    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
+    private TableIterator<ContainerKeyPrefix, Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
     private KeyValue<ContainerKeyPrefix, Integer> currentKey;
 
     ContainerMetadataIterator()
@@ -613,8 +612,7 @@ public class ReconContainerMetadataManagerImpl
       String keyPrefix, long keyVersion) throws IOException {
 
     Map<KeyPrefixContainer, Integer> containers = new LinkedHashMap<>();
-    try (TableIterator<KeyPrefixContainer,
-        ? extends KeyValue<KeyPrefixContainer, Integer>> keyIterator =
+    try (TableIterator<KeyPrefixContainer, Table.KeyValue<KeyPrefixContainer, Integer>> keyIterator =
              keyContainerTable.iterator()) {
       KeyPrefixContainer seekKey;
       if (keyVersion != -1) {

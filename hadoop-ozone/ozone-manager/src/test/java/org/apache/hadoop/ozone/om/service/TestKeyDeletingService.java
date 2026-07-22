@@ -401,7 +401,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // key1 belongs to snapshot, so it should not be deleted when
       // KeyDeletingService runs. But key2 can be reclaimed as it doesn't
       // belong to any snapshot scope.
-      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+      List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = metadataManager.getDeletedTable().getRangeKVs(
           null, 100, ozoneKey1);
       assertThat(rangeKVs.size()).isGreaterThan(0);

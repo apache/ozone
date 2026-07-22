@@ -180,7 +180,7 @@ public class TestDNDataDistributionFinalization {
 
     // Wait for finalization to complete
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
 
     // Verify finalization completed
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
@@ -226,7 +226,7 @@ public class TestDNDataDistributionFinalization {
         });
     // Wait for finalization
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
 
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
