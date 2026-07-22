@@ -529,7 +529,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       parameters = new Parameters();
     }
     ClosedContainerReadResolver resolver = new ClosedContainerReadResolver(dispatcher,
-      containerController, datanodeDetails);
+        containerController, datanodeDetails);
     RaftServerConfigKeys.DataStream.setServerApiResolver(parameters, resolver);
 
     return new XceiverServerRatis(hddsDatanodeService, datanodeDetails, dispatcher,
