@@ -2295,7 +2295,7 @@ public class KeyManagerImpl implements KeyManager {
       List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap) {
     Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine),
         "clientMachine is empty");
-    Preconditions.checkNotNull(clusterMap, "clusterMap is null");
+    Objects.requireNonNull(clusterMap, "clusterMap is null");
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
           final Node client = getClientNode(clientMachine, nodes, clusterMap);
