@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putBucketTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -188,7 +188,7 @@ public class TestS3GatewayMetrics {
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
         bucketName, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
-    assertEquals(BUCKET_ALREADY_OWNED_BY_YOU.getCode(), e.getCode());
+    assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
 
     long curMetric = metrics.getCreateBucketFailure();
     assertEquals(1L, curMetric - oriMetric);
