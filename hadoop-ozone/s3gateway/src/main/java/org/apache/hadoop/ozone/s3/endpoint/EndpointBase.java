@@ -264,7 +264,8 @@ public abstract class EndpointBase {
   }
 
   private boolean isSameBucketOwner(String bucketOwner) {
-    return Objects.equals(getRequestOwner(), bucketOwner);
+    String requestOwner = getRequestOwner();
+    return requestOwner != null && requestOwner.equals(bucketOwner);
   }
 
   private String getRequestOwner() {

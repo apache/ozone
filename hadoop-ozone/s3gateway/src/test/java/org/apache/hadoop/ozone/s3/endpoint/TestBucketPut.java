@@ -21,6 +21,8 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -30,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +41,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestBucketPut {
 
+  private static final String BUCKET_OWNER = "my-s3-owner";
   private static final String OTHER_BUCKET_OWNER = "other-s3-owner";
 
   private String bucketName = OzoneConsts.BUCKET;
@@ -54,22 +58,53 @@ public class TestBucketPut {
   }
 
   @Test
-  public void testCreateBucketAndFailOnDuplicateWithSameOWNER() throws Exception {
-    Response response = bucketEndpoint.put(bucketName, null);
-    assertEquals(HTTP_OK, response.getStatus());
-    assertNotNull(response.getLocation());
+  public void testCreateBucketAndFailOnDuplicateWithSameOwner() throws Exception {
+    BucketEndpoint endpoint = newBucketEndpointWithRequestOwner(BUCKET_OWNER);
+    clientStub.getObjectStore().createVolume(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    clientStub.getObjectStore().getS3Volume().createBucket(bucketName,
+        BucketArgs.newBuilder().setOwner(BUCKET_OWNER).build());
 
     assertErrorResponse(BUCKET_ALREADY_OWNED_BY_YOU,
+        () -> endpoint.put(bucketName, null));
+  }
+
+  @Test
+  public void testCreateBucketAndFailOnDuplicateWithUnknownRequestOwner() throws Exception {
+    clientStub.getObjectStore().createVolume(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    clientStub.getObjectStore().getS3Volume().createBucket(bucketName);
+
+    assertErrorResponse(BUCKET_ALREADY_EXISTS,
         () -> bucketEndpoint.put(bucketName, null));
   }
 
   @Test
   public void testCreateBucketAndFailOnDuplicateWithDifferentOwner() throws Exception {
+    BucketEndpoint endpoint = newBucketEndpointWithRequestOwner(BUCKET_OWNER);
     clientStub.getObjectStore().createVolume(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
     clientStub.getObjectStore().getS3Volume().createBucket(bucketName,
         BucketArgs.newBuilder().setOwner(OTHER_BUCKET_OWNER).build());
 
     assertErrorResponse(BUCKET_ALREADY_EXISTS,
-        () -> bucketEndpoint.put(bucketName, null));
+        () -> endpoint.put(bucketName, null));
+  }
+
+  @Test
+  public void testCreateBucketSuccess() throws Exception {
+    Response response = bucketEndpoint.put(bucketName, null);
+    assertEquals(HTTP_OK, response.getStatus());
+    assertNotNull(response.getLocation());
+  }
+
+  private BucketEndpoint newBucketEndpointWithRequestOwner(String requestOwner) {
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    when(signatureInfo.getAwsAccessId()).thenReturn(requestOwner);
+    when(signatureInfo.getStringToSign()).thenReturn("");
+    when(signatureInfo.getSignature()).thenReturn("");
+
+    return EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(clientStub)
+        .setSignatureInfo(signatureInfo)
+        .build();
   }
 }
