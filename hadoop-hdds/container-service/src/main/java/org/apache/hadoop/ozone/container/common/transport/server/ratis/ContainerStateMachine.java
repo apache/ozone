@@ -784,7 +784,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-    if (!kvStreamDataChannel.isLinked()) {
+    if (!kvStreamDataChannel.link()) {
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "PutBlock was not committed on stream close: " + kvStreamDataChannel));
     }
