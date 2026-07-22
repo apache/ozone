@@ -1,10 +1,10 @@
 ---
 title: Snapshot Trapped Deleted Bytes Accounting
 summary: Per-snapshot accounting of logical data trapped in deleted tables due to snapshot references
-date: 2026-06-22
-jira: TBD
+date: 2026-07-22
+jira: HDDS-15939
 status: proposed
-author: TBD
+author: Sadanand Shenoy
 ---
 
 <!--
@@ -520,16 +520,5 @@ optional uint64 trappedDirNamespace = 26;
 | 6 | `TestDirectoryDeletingService`: reclaimable dir → `trappedDirNamespace` → 0; promote accounts `trappedKey*` when ledger absent |
 | 7–8 | Integration: S1 pins dir, S2 create, expand accounts, S1 delete, full purge |
 | 10 | `TestSnapshotDeletingServiceIntegrationTest` + counter transfer |
-
----
-
-## 13. Future Work
-
-1. Optional billing-specific size breakdown if EC / replication reporting needs differ from quota bytes.
-2. Deprecate `exclusiveSizeDeltaFromDirDeepCleaning` once `trappedKeyBytes` is stable.
-3. HDDS-7968: reclaim eligible keys from snapshot `deletedTable` when AOS table is empty.
-4. Optional `pendingSubtreeBytes` on `deletedDirTable` `OmKeyInfo` at recursive delete to avoid
-   expand walks entirely.
-5. Recon dashboard for per-bucket trapped breakdown without OM leader load.
 
 ---
