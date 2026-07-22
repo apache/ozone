@@ -2913,6 +2913,38 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+
+    OmLifecycleConfiguration lifecycleConfiguration =
+        ozoneManagerClient.getLifecycleConfiguration(volumeName, bucketName);
+    return OzoneLifecycleConfiguration.fromOmLifecycleConfiguration(
+        lifecycleConfiguration);
+  }
+
+  @Override
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    Objects.requireNonNull(lifecycleConfiguration, "lifecycleConfiguration == null");
+    verifyVolumeName(lifecycleConfiguration.getVolume());
+    verifyBucketName(lifecycleConfiguration.getBucket());
+
+    LOG.info("Creating lifecycle configuration for: {}/{}", lifecycleConfiguration.getVolume(),
+        lifecycleConfiguration.getBucket());
+    ozoneManagerClient.setLifecycleConfiguration(lifecycleConfiguration);
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+
+    LOG.info("Deleting lifecycle Configuration for : {}/{}", volumeName, bucketName);
+    ozoneManagerClient.deleteLifecycleConfiguration(volumeName, bucketName);
+  }
+
+  @Override
   public Map<String, String> getBucketTagging(String volumeName, String bucketName)
       throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
@@ -2959,38 +2991,6 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .build();
     ozoneManagerClient.deleteBucketTagging(bucketArgs);
-  }
-
-  @Override
-  public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
-      throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-
-    OmLifecycleConfiguration lifecycleConfiguration =
-        ozoneManagerClient.getLifecycleConfiguration(volumeName, bucketName);
-    return OzoneLifecycleConfiguration.fromOmLifecycleConfiguration(
-        lifecycleConfiguration);
-  }
-
-  @Override
-  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
-    Objects.requireNonNull(lifecycleConfiguration, "lifecycleConfiguration == null");
-    verifyVolumeName(lifecycleConfiguration.getVolume());
-    verifyBucketName(lifecycleConfiguration.getBucket());
-
-    LOG.info("Creating lifecycle configuration for: {}/{}", lifecycleConfiguration.getVolume(),
-        lifecycleConfiguration.getBucket());
-    ozoneManagerClient.setLifecycleConfiguration(lifecycleConfiguration);
-  }
-
-  @Override
-  public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-
-    LOG.info("Deleting lifecycle Configuration for : {}/{}", volumeName, bucketName);
-    ozoneManagerClient.deleteLifecycleConfiguration(volumeName, bucketName);
   }
 
   private static ExecutorService createThreadPoolExecutor(

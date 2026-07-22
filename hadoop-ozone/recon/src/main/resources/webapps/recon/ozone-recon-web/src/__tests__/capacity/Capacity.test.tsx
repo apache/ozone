@@ -25,7 +25,13 @@ import { capacityServer } from '@tests/mocks/capacityMocks/capacityServer';
 import * as mockResponses from '@tests/mocks/capacityMocks/capacityResponseMocks';
 
 vi.mock('@/components/autoReloadPanel/autoReloadPanel', () => ({
-  default: () => <div data-testid="auto-reload-panel" />,
+  default: (props: { onReload?: () => void }) => (
+    <div data-testid="auto-reload-panel">
+      <button data-testid="manual-reload" onClick={() => props.onReload?.()}>
+        reload
+      </button>
+    </div>
+  ),
 }));
 vi.mock('@/components/eChart/eChart', () => ({
   EChart: () => <div data-testid="echart" />,
@@ -49,9 +55,9 @@ describe('Capacity Page', () => {
       return;
     }
     await waitFor(() =>
-      expect(ozoneCapacityCard).toHaveTextContent(/TOTAL\s*10\s*KB/i)
+      expect(ozoneCapacityCard).toHaveTextContent(/TOTAL CAPACITY\s*10\s*KB/i)
     );
-    expect(ozoneCapacityCard).toHaveTextContent(/OZONE USED SPACE\s*4\s*KB/i);
+    expect(ozoneCapacityCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/OTHER USED SPACE\s*2\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/CONTAINER PRE-ALLOCATED\s*1\s*KB/i);
     expect(ozoneCapacityCard).toHaveTextContent(/REMAINING SPACE\s*4\s*KB/i);
@@ -63,7 +69,7 @@ describe('Capacity Page', () => {
       return;
     }
     await waitFor(() =>
-      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*6\s*KB/i)
+      expect(ozoneUsedSpaceCard).toHaveTextContent(/PENDING DELETION\s*7\s*KB/i)
     );
   });
 
@@ -80,7 +86,7 @@ describe('Capacity Page', () => {
       expect(pendingDeletionCard).toHaveTextContent(/OZONE MANAGER\s*2\s*KB/i)
     );
     expect(pendingDeletionCard)
-      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*1\s*KB/i);
+      .toHaveTextContent(/STORAGE CONTAINER MANAGER\s*2\s*KB/i);
     expect(pendingDeletionCard).toHaveTextContent(/DATANODES\s*3\s*KB/i);
 
     const downloadLink = await screen.findByText('Download Insights');
@@ -306,5 +312,133 @@ describe('Capacity Page', () => {
       expect(screen.queryByRole('option', { name: 'dn-16' })).not.toBeInTheDocument()
     );
     expect(screen.queryByRole('option', { name: 'dn-17' })).not.toBeInTheDocument();
+  });
+
+  // Interval constants mirrored from capacity.tsx / autoReload.constants.
+  const PENDING_POLL_INTERVAL = 5 * 1000;
+  const AUTO_RELOAD_INTERVAL = 60 * 1000;
+
+  type EndpointCounts = { storage: number; scm: number; om: number; dn: number };
+
+  // Installs handlers that count how often each endpoint is hit and serves the
+  // supplied DN scan statuses in order (clamped to the last entry afterwards).
+  const setupCountingHandlers = (dnStatuses: string[]) => {
+    const counts: EndpointCounts = { storage: 0, scm: 0, om: 0, dn: 0 };
+    capacityServer.use(
+      rest.get('api/v1/storageDistribution', (_req, res, ctx) => {
+        counts.storage++;
+        return res(ctx.status(200), ctx.json(mockResponses.StorageDistribution));
+      }),
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        if (component === 'dn') {
+          const status = dnStatuses[Math.min(counts.dn, dnStatuses.length - 1)];
+          counts.dn++;
+          return res(
+            ctx.status(200),
+            ctx.json({ ...mockResponses.DnPendingDeletion, status })
+          );
+        }
+        if (component === 'scm') {
+          counts.scm++;
+          return res(ctx.status(200), ctx.json(mockResponses.ScmPendingDeletion));
+        }
+        if (component === 'om') {
+          counts.om++;
+          return res(ctx.status(200), ctx.json(mockResponses.OmPendingDeletion));
+        }
+        return res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+      })
+    );
+    return counts;
+  };
+
+  test('Auto Refresh off: a manual refresh drives the DN scan, polling only the DN endpoint until it finishes, then syncs the other endpoints', async () => {
+    // Auto Refresh disabled before mount, so useAutoReload never starts its timer.
+    sessionStorage.setItem('autoReloadEnabled', 'false');
+
+    // Mount read is FINISHED (no scan running). The manual refresh kicks off a
+    // scan: the next reads are IN_PROGRESS, IN_PROGRESS, then FINISHED.
+    const counts = setupCountingHandlers([
+      'FINISHED',      // mount
+      'IN_PROGRESS',   // manual refresh
+      'IN_PROGRESS',   // poll #1
+      'FINISHED'       // poll #2
+    ]);
+
+    vi.useFakeTimers();
+    try {
+      render(<Capacity />);
+
+      // Flush the initial mount fetch: everything fetched exactly once.
+      await vi.advanceTimersByTimeAsync(50);
+      expect(counts).toEqual({ storage: 1, scm: 1, om: 1, dn: 1 });
+
+      // Scan is FINISHED, so nothing is polled while idle.
+      await vi.advanceTimersByTimeAsync(AUTO_RELOAD_INTERVAL * 2);
+      expect(counts).toEqual({ storage: 1, scm: 1, om: 1, dn: 1 });
+
+      // Manual reload -> full refresh of all four endpoints; DN comes back
+      // IN_PROGRESS, which starts the DN-only poll.
+      fireEvent.click(screen.getByTestId('manual-reload'));
+      await vi.advanceTimersByTimeAsync(50);
+      expect(counts).toEqual({ storage: 2, scm: 2, om: 2, dn: 2 });
+
+      // While IN_PROGRESS only the DN endpoint is polled; the others stay put.
+      await vi.advanceTimersByTimeAsync(PENDING_POLL_INTERVAL);
+      expect(counts).toEqual({ storage: 2, scm: 2, om: 2, dn: 3 });
+
+      // Next poll returns FINISHED -> DN polling stops and the other three
+      // endpoints are synced exactly once.
+      await vi.advanceTimersByTimeAsync(PENDING_POLL_INTERVAL);
+      expect(counts).toEqual({ storage: 3, scm: 3, om: 3, dn: 4 });
+
+      // No further polling once finished, and no periodic refresh while off.
+      await vi.advanceTimersByTimeAsync(AUTO_RELOAD_INTERVAL * 2);
+      expect(counts).toEqual({ storage: 3, scm: 3, om: 3, dn: 4 });
+    } finally {
+      vi.useRealTimers();
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
+  });
+
+  test('Auto Refresh on: refreshes all endpoints on the interval, polls only the DN endpoint while a scan runs, and syncs the others when it finishes', async () => {
+    // Auto Refresh enabled (default). useAutoReload runs a full refresh every 60s.
+    sessionStorage.setItem('autoReloadEnabled', 'true');
+
+    // A scan is already running at mount: IN_PROGRESS, IN_PROGRESS, then FINISHED.
+    const counts = setupCountingHandlers([
+      'IN_PROGRESS',   // mount
+      'IN_PROGRESS',   // poll #1
+      'FINISHED'       // poll #2
+    ]);
+
+    vi.useFakeTimers();
+    try {
+      render(<Capacity />);
+
+      // Flush the initial mount fetch: everything fetched once, scan IN_PROGRESS.
+      await vi.advanceTimersByTimeAsync(50);
+      expect(counts).toEqual({ storage: 1, scm: 1, om: 1, dn: 1 });
+
+      // While IN_PROGRESS only the DN endpoint is polled.
+      await vi.advanceTimersByTimeAsync(PENDING_POLL_INTERVAL);
+      expect(counts).toEqual({ storage: 1, scm: 1, om: 1, dn: 2 });
+
+      // Next poll returns FINISHED -> DN polling stops and the others sync once.
+      await vi.advanceTimersByTimeAsync(PENDING_POLL_INTERVAL);
+      expect(counts).toEqual({ storage: 2, scm: 2, om: 2, dn: 3 });
+
+      // No DN-only polling once finished.
+      await vi.advanceTimersByTimeAsync(PENDING_POLL_INTERVAL * 4);
+      expect(counts).toEqual({ storage: 2, scm: 2, om: 2, dn: 3 });
+
+      // At the auto-refresh interval, all four endpoints are refreshed together.
+      await vi.advanceTimersByTimeAsync(AUTO_RELOAD_INTERVAL);
+      expect(counts).toEqual({ storage: 3, scm: 3, om: 3, dn: 4 });
+    } finally {
+      vi.useRealTimers();
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
   });
 });

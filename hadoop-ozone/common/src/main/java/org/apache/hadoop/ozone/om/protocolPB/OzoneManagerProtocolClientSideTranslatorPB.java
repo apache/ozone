@@ -2768,48 +2768,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .build();
-
-    GetBucketTaggingRequest req =
-        GetBucketTaggingRequest.newBuilder()
-            .setBucketArgs(bucketArgs)
-            .build();
-
-    OMRequest omRequest = createOMRequest(Type.GetBucketTagging)
-        .setGetBucketTaggingRequest(req)
-        .build();
-
-    GetBucketTaggingResponse resp =
-        handleError(submitRequest(omRequest)).getGetBucketTaggingResponse();
-
-    return KeyValueUtil.getFromProtobuf(resp.getTagsList());
-  }
-
-  @Override
-  public void putBucketTagging(OmBucketArgs args) throws IOException {
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
-        .build();
-
-    PutBucketTaggingRequest req =
-        PutBucketTaggingRequest.newBuilder()
-            .setBucketArgs(bucketArgs)
-            .build();
-
-    OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
-        .setPutBucketTaggingRequest(req)
-        .build();
-
-    handleError(submitRequest(omRequest));
-  }
-
-  @Override
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
     GetLifecycleConfigurationRequest.Builder req =
@@ -2877,19 +2835,42 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void deleteBucketTagging(OmBucketArgs args) throws IOException {
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .build();
 
-    DeleteBucketTaggingRequest req =
-        DeleteBucketTaggingRequest.newBuilder()
+    GetBucketTaggingRequest req =
+        GetBucketTaggingRequest.newBuilder()
             .setBucketArgs(bucketArgs)
             .build();
 
-    OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
-        .setDeleteBucketTaggingRequest(req)
+    OMRequest omRequest = createOMRequest(Type.GetBucketTagging)
+        .setGetBucketTaggingRequest(req)
+        .build();
+
+    GetBucketTaggingResponse resp =
+        handleError(submitRequest(omRequest)).getGetBucketTaggingResponse();
+
+    return KeyValueUtil.getFromProtobuf(resp.getTagsList());
+  }
+
+  @Override
+  public void putBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
+        .build();
+
+    PutBucketTaggingRequest req =
+        PutBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
+        .setPutBucketTaggingRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -2918,6 +2899,25 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
         .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void deleteBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .build();
+
+    DeleteBucketTaggingRequest req =
+        DeleteBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
+        .setDeleteBucketTaggingRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));

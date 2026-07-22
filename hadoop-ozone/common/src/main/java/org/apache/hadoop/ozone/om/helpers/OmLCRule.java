@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateAndNormalizePrefix;
 import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validatePrefixLength;
 import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTrashPrefix;
@@ -28,7 +29,6 @@ import java.util.List;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
@@ -61,7 +61,7 @@ public final class OmLCRule {
   private OmLCRule(Builder builder) {
     this.prefix = builder.prefix;
     if (this.prefix != null) {
-      this.directoryStylePrefix = this.prefix.contains(OzoneConsts.OM_KEY_PREFIX);
+      this.directoryStylePrefix = this.prefix.contains(OM_KEY_PREFIX);
     } else {
       this.directoryStylePrefix = false;
     }
@@ -196,6 +196,14 @@ public final class OmLCRule {
             OMException.ResultCodes.INVALID_REQUEST);
       }
       action.valid(creationTime);
+
+      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        if (getEffectivePrefix() != null && !getEffectivePrefix().isEmpty() &&
+            !getEffectivePrefix().endsWith(OM_KEY_PREFIX)) {
+          throw new OMException("FILE_SYSTEM_OPTIMIZED bucket prefix must end with '/'.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+      }
     }
 
     if (prefix != null && filter != null) {
@@ -323,7 +331,6 @@ public final class OmLCRule {
     if (lifecycleRule.hasFilter()) {
       builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter(), layout));
     }
-
     return builder.build();
   }
 

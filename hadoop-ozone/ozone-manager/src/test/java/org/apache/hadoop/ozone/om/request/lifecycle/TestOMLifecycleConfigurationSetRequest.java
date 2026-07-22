@@ -24,7 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
@@ -44,7 +50,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -244,6 +253,103 @@ public class TestOMLifecycleConfigurationSetRequest extends
     assertEquals(original.getBucket(), updated.getBucket());
     assertNotEquals(original.getCreationTime(), updated.getCreationTime());
     assertEquals(original.getRulesList(), updated.getRulesList());
+  }
+
+  @Test
+  public void testPreExecuteNonNativeAuthorizerChecksWriteAcl() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(false);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+
+    OMRequest omRequest =
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+    OMLifecycleConfigurationSetRequest request =
+        spy(new OMLifecycleConfigurationSetRequest(omRequest));
+    // Stub the ACL check so the branch can be asserted without a real authorizer.
+    doNothing().when(request).checkAcls(eq(ozoneManager), eq(OzoneObj.ResourceType.BUCKET),
+        eq(OzoneObj.StoreType.OZONE), eq(IAccessAuthorizer.ACLType.WRITE),
+        eq(volumeName), eq(bucketName), isNull());
+
+    request.preExecute(ozoneManager);
+
+    verify(request).checkAcls(eq(ozoneManager), eq(OzoneObj.ResourceType.BUCKET),
+        eq(OzoneObj.StoreType.OZONE), eq(IAccessAuthorizer.ACLType.WRITE),
+        eq(volumeName), eq(bucketName), isNull());
+  }
+
+  @Test
+  public void testPreExecuteNativeAuthorizerDeniesNonAdminNonOwner() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(true);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+    when(ozoneManager.getBucketOwner(eq(volumeName), eq(bucketName),
+        any(IAccessAuthorizer.ACLType.class), any(OzoneObj.ResourceType.class)))
+        .thenReturn("bucketOwner");
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
+    when(ozoneManager.isOwner(any(UserGroupInformation.class), anyString())).thenReturn(false);
+
+    OMRequest omRequest =
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(omRequest);
+    request.setUGI(UserGroupInformation.createRemoteUser("regularUser"));
+
+    OMException ex = assertThrows(OMException.class,
+        () -> request.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteNativeAuthorizerAllowsAdmin() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(true);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
+
+    OMRequest omRequest =
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(omRequest);
+    request.setUGI(UserGroupInformation.createRemoteUser("adminUser"));
+
+    assertNotNull(request.preExecute(ozoneManager));
+  }
+
+  @Test
+  public void testPreExecuteNativeAuthorizerAllowsOwner() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(true);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+    when(ozoneManager.getBucketOwner(eq(volumeName), eq(bucketName),
+        any(IAccessAuthorizer.ACLType.class), any(OzoneObj.ResourceType.class)))
+        .thenReturn("bucketOwner");
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
+    when(ozoneManager.isOwner(any(UserGroupInformation.class), eq("bucketOwner")))
+        .thenReturn(true);
+
+    OMRequest omRequest =
+        setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(omRequest);
+    request.setUGI(UserGroupInformation.createRemoteUser("ownerUser"));
+
+    assertNotNull(request.preExecute(ozoneManager));
   }
 
   @Test
