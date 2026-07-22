@@ -807,11 +807,6 @@ public class TestS3MultipartUploadCommitPartRequest
 
   @Test
   public void testSplitSchemaCommitFailsWithoutETag() throws Exception {
-    // Behaviour change: an ETag is MANDATORY for every part committed in the
-    // split parts-table schema, enforced server-side for ALL clients (S3 and
-    // the native Ozone client alike), not just S3. A part committed without an
-    // ETag is now rejected with INVALID_REQUEST instead of being stored with a
-    // null ETag. Previously this path stored the part with a null ETag.
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();

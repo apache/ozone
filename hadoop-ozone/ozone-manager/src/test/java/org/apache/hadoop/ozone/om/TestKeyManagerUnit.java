@@ -160,11 +160,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   @Test
   public void listMultipartUploadPartsWithEtagField() throws IOException {
-    // Behaviour change: an ETag is now MANDATORY for every committed multipart
-    // part, enforced server-side for ALL clients (S3 and the native Ozone
-    // client alike), not just S3. Previously this test committed parts without
-    // an ETag ("for backward compatibility"); the OM now rejects such commits
-    // in the split parts-table schema, so each part must supply an ETag.
     final String volume = volumeName();
     final String bucket = "bucketForEtag";
     final String key = "dir/key1";
@@ -203,7 +198,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
               .setLocationInfoList(Collections.emptyList())
-              // ETag is mandatory for all clients; supply one per part.
               .addMetadata(OzoneConsts.ETAG, "etag-" + i)
               .build();
 

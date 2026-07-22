@@ -63,7 +63,6 @@ public class TestOmMultipartPartInfo {
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearPartName().build()));
     assertThrows(IllegalArgumentException.class,
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearPartNumber().build()));
-    // Behaviour change: eTag is now a mandatory field for all clients.
     assertThrows(IllegalArgumentException.class,
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearETag().build()));
     assertThrows(IllegalArgumentException.class,
@@ -88,10 +87,6 @@ public class TestOmMultipartPartInfo {
 
   @Test
   public void testFromOmKeyInfoRejectsMissingETag() {
-    // Behaviour change: an ETag is now MANDATORY for every multipart part, for
-    // ALL clients (S3 and the native Ozone client alike), not just S3. Building
-    // a part from an OmKeyInfo without an ETag now fails fast instead of being
-    // accepted with a null ETag as it was previously.
     OmKeyInfo keyInfo = createOmKeyInfoWithoutEtag();
     assertThrows(IllegalArgumentException.class,
         () -> OmMultipartPartInfo.from("part-name", 1, keyInfo));

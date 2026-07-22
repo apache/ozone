@@ -3258,9 +3258,6 @@ public abstract class OmSnapshotTests {
     String snap1 = "snap-before-parts-" + counter.incrementAndGet();
     createSnapshot(testVolumeName, testBucketName, snap1);
 
-    // Behaviour change: an ETag is now MANDATORY for every committed multipart
-    // part, enforced server-side for ALL clients (not just S3). The native
-    // client does not compute one automatically, so each part supplies its own.
     byte[] regularPart = "regular multipart key".getBytes(UTF_8);
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         regularPartsKey, regularPart.length, 1, regularMpuInfo.getUploadID())) {
@@ -3326,8 +3323,6 @@ public abstract class OmSnapshotTests {
     byte[] part2Data = "Part 2 - will be aborted".getBytes(UTF_8);
     byte[] part3Data = "Part 3 - stream part, will be aborted".getBytes(UTF_8);
 
-    // ETag is now mandatory for all clients (see behaviour-change note above);
-    // supply one per committed part.
     try (OzoneOutputStream part1Stream = bucket.createMultipartKey(
         partialAbortKey, part1Data.length, 1, partialInfo.getUploadID())) {
       part1Stream.write(part1Data);
@@ -3409,8 +3404,6 @@ public abstract class OmSnapshotTests {
     byte[] regularData1 = "Regular multipart data 1".getBytes(UTF_8);
     byte[] regularData2 = "Regular multipart data 2".getBytes(UTF_8);
 
-    // ETag is now mandatory for all clients (see behaviour-change note above);
-    // supply one per committed part.
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey1, regularData1.length, 1, mpuInfo1.getUploadID())) {
       stream.write(regularData1);
@@ -3492,7 +3485,6 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData(data, MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
-    // ETag is now mandatory for all clients; supply one before commit (close).
     partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 
@@ -3515,7 +3507,6 @@ public abstract class OmSnapshotTests {
       try (OzoneOutputStream partStream = bucket.createMultipartKey(
           keyName, partData.length, partNum, uploadId)) {
         partStream.write(partData);
-        // ETag is now mandatory for all clients; supply one per part.
         partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
       }
     }
@@ -3536,7 +3527,6 @@ public abstract class OmSnapshotTests {
     OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
     String uploadId = mpuInfo.getUploadID();
 
-    // ETag is now mandatory for all clients; supply one per committed part.
     byte[] part1Data = createLargePartData(regularData, MIN_PART_SIZE);
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, part1Data.length, 1, uploadId)) {
@@ -3576,7 +3566,6 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, partData.length, 1, uploadId)) {
       partStream.write(partData);
-      // ETag is now mandatory for all clients; supply one before commit.
       partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     }
 
@@ -3597,7 +3586,6 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData("MPU with metadata and tags", MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
-    // ETag is now mandatory for all clients; supply one before commit (close).
     partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 

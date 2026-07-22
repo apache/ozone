@@ -210,7 +210,6 @@ public abstract class AbstractTestStorageDistributionEndpoint {
             100L, 1, multipartInfo.getUploadID());
     byte[] partData = new byte[100];
     partStream.write(partData);
-    // ETag is now mandatory for all clients; supply one before commit (close).
     partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
   }

@@ -223,13 +223,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
       } else {
-        // Behaviour change: an ETag is MANDATORY for every committed part in
-        // the split parts-table schema, enforced server-side for ALL clients
-        // (S3 gateway and native Ozone client alike), not just S3. The S3
-        // gateway computes the MD5 ETag on upload; any other client must also
-        // supply one. Reject the commit early with a clear INVALID_REQUEST if
-        // it is missing, rather than failing later at
-        // CompleteMultipartUpload part validation.
+        // an ETag is MANDATORY for every committed part in the split parts-table schema,
+        // enforced server-side for ALL clients (S3 gateway and native Ozone client alike).
+        // The S3 gateway computes the MD5 ETag on upload; any other client must also supply one.
+        // Reject the commit early with a clear INVALID_REQUEST if it is missing,
         if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
           throw new OMException(
               "Missing ETag for multipart upload part " + partNumber,

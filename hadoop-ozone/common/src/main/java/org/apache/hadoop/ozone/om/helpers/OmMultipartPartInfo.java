@@ -70,10 +70,9 @@ public final class OmMultipartPartInfo {
       throw new IllegalArgumentException("partNumber is required and > 0");
     }
     // An ETag is MANDATORY for every multipart part stored in the split parts-table schema,
-    // for ALL clients (not just S3). The S3 gateway already computes the MD5 ETag;
-    // any other client (including the native Ozone client) must also supply one.
-    // This mirrors the AWS S3 contract where UploadPart always yields an ETag that
-    // CompleteMultipartUpload requires, and lets the ETag be used for part validation and returned by listParts.
+    // for ALL clients. The S3 gateway already computes the MD5 ETag, any other client must also supply one.
+    // This mirrors the AWS S3 contract where UploadPart always yields an ETag that CompleteMultipartUpload requires,
+    // and lets the ETag be used for part validation and returned by listParts.
     if (StringUtils.isBlank(b.eTag)) {
       throw new IllegalArgumentException("eTag is required");
     }
@@ -155,8 +154,6 @@ public final class OmMultipartPartInfo {
     }
 
     public Builder setETag(String eTagValue) {
-      // eTag is mandatory for all clients (see the OmMultipartPartInfo
-      // constructor for the rationale behind this behaviour change).
       if (StringUtils.isBlank(eTagValue)) {
         throw new IllegalArgumentException("eTag is required");
       }
@@ -359,7 +356,7 @@ public final class OmMultipartPartInfo {
     if (!partInfo.hasPartNumber()) {
       throw new IllegalArgumentException("MultipartPartInfo missing partNumber");
     }
-    // eTag is mandatory for all clients
+
     if (!partInfo.hasETag() || StringUtils.isBlank(partInfo.getETag())) {
       throw new IllegalArgumentException("MultipartPartInfo missing eTag");
     }
