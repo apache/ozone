@@ -43,6 +43,12 @@ run_test ha     non-rolling-upgrade 2.2.0 "$OZONE_CURRENT_VERSION"
 # run_test ha non-rolling-upgrade 1.2.1 "$OZONE_CURRENT_VERSION"
 # run_test om-ha non-rolling-upgrade 1.1.0 "$OZONE_CURRENT_VERSION"
 
+# Released-to-released upgrades that exercise version-specific callbacks
+# selected by OZONE_UPGRADE_TO. Run these from the release matrix once the
+# target release image is published.
+# run_test ha non-rolling-upgrade 2.0.0 2.1.0
+# run_test ha non-rolling-upgrade 2.1.0 2.2.0
+
 generate_report "upgrade" "$ALL_RESULT_DIR"
 
 exit "$RESULT"
