@@ -28,12 +28,14 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -62,8 +65,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /**
  * Tests OMAllocateBlockRequest class.
@@ -261,8 +266,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
 
     OMAllocateBlockRequest request =
-        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
-    request.preExecute(ozoneManager);
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort());
+    preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
@@ -283,8 +288,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
     OMAllocateBlockRequest request =
-        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
-    request.preExecute(ozoneManager);
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort());
+    preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
@@ -299,8 +304,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
 
     OMAllocateBlockRequest request =
-        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort("1.2.3.4"));
-    request.preExecute(ozoneManager);
+        getOmAllocateBlockRequest(createAllocateBlockRequestWithSort());
+    preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
@@ -470,9 +475,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         () -> keyManager.sortDatanodesForWrite(nodes, "", mock(NetworkTopology.class)));
   }
 
-  // Like createAllocateBlockRequest, but sets sortDatanodes and a UserInfo remote
-  // address for OM-side sort.
-  private OMRequest createAllocateBlockRequestWithSort(String clientAddress) {
+  // Like createAllocateBlockRequest, but sets sortDatanodes so preExecute
+  // resolves the client address from the RPC context.
+  private OMRequest createAllocateBlockRequestWithSort() {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)
         .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
@@ -484,8 +489,19 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     return OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
         .setClientId(UUID.randomUUID().toString())
-        .setUserInfo(UserInfo.newBuilder().setRemoteAddress(clientAddress).build())
         .setAllocateBlockRequest(allocateBlockRequest).build();
+  }
+
+  // Run preExecute with a mocked RPC context so UserInfo carries clientAddress,
+  // the way an OM RPC handler thread would see it.
+  private void preExecuteWithClient(OMAllocateBlockRequest request, String clientAddress) throws Exception {
+    InetAddress clientIp = InetAddress.getByAddress(clientAddress, InetAddress.getByName(clientAddress).getAddress());
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    try (MockedStatic<Server> mockedRpcServer = mockStatic(Server.class)) {
+      mockedRpcServer.when(Server::getRemoteUser).thenReturn(ugi);
+      mockedRpcServer.when(Server::getRemoteIp).thenReturn(clientIp);
+      request.preExecute(ozoneManager);
+    }
   }
 
   protected OMRequest createAllocateBlockRequest() {
