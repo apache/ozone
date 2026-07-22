@@ -326,11 +326,21 @@ final class TestSecureOzoneCluster {
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
   }
 
+  /**
+   * Exercises a secure SCM and OM sharing a single SCM instance to avoid paying
+   * the SCM startup cost twice. Covers SCM startup and cert trust chain, SCM
+   * security/admin access control, and secure OM initialization (the
+   * delegation-token/secret-key config-validation failure, the login success
+   * case, the Kerberos failure case, and re-initialization of an
+   * already-initialized OM).
+   */
   @Test
-  void testSecureScmStartupAndAccessControl() throws Exception {
+  void testSecureScmAndOmStartupAndAccessControl() throws Exception {
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
+
+    // ===== SCM startup and access control =====
 
     // Case 1: SCM starts up and exposes its cluster info and cert trust chain.
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
@@ -389,6 +399,83 @@ final class TestSecureOzoneCluster {
         scmRpcClient::forceExitSafeMode);
     assertThat(adminException)
         .hasMessageContaining(cannotAuthMessage);
+
+    // ===== Secure OM initialization against the shared SCM =====
+
+    // Case 6: Test the secure om Initialization Failure due to delegation token
+    // and secret key configuration don't meet requirement.
+    conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
+    conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class, () -> setupOm(conf));
+    assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
+        "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
+        "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
+    // Restore valid durations so the remaining cases can start OM.
+    conf.unset(HDDS_SECRET_KEY_EXPIRY_DURATION);
+    conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, DELEGATION_TOKEN_MAX_TIME_MS);
+
+    // Case 7: Test the secure om Initialization Success
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
+    setupOm(conf);
+    assertThrows(Exception.class, om::start);
+    assertThat(logs.getOutput()).contains("Ozone Manager login successful");
+    logs.clearOutput();
+    stopOm();
+
+    // Case 8: Test the secure om Initialization Failure. Storage is already
+    // initialized by Case 7, and createOm with a non-existent principal fails
+    // at Kerberos login before any storage check or RPC bind, so no additional
+    // setup is required.
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+        "non-existent-user@EXAMPLE.com");
+    testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
+
+    // Case 9: Test functionality to init secure OM when it is already initialized.
+    // The failure cases above left a non-existent principal and an invalid auth
+    // method on conf; restore the valid values before re-initializing. A fresh
+    // RPC port is also required: Case 7's start() failed before starting the RPC
+    // server, so its listener selector loop never ran and stop() cannot release
+    // the bound port.
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + host + "@" + realm);
+    conf.set(OZONE_OM_ADDRESS_KEY,
+        InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
+    omLogs.clearOutput();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
+    OMStorage omStore = new OMStorage(conf);
+    initializeOmStorage(omStore);
+    OzoneManager.setTestSecureOmFlag(true);
+    om = OzoneManager.createOm(conf);
+
+    assertNull(om.getCertificateClient());
+    String logOutput = omLogs.getOutput();
+    assertThat(logOutput)
+        .doesNotContain("Init response: GETCERT");
+    assertThat(logOutput)
+        .doesNotContain("Successfully stored SCM signed certificate");
+
+    stopOm();
+
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
+    conf.set(OZONE_OM_ADDRESS_KEY,
+        InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
+
+    OzoneManager.omInit(conf);
+    om = OzoneManager.createOm(conf);
+
+    assertNotNull(om.getCertificateClient());
+    assertNotNull(om.getCertificateClient().getPublicKey());
+    assertNotNull(om.getCertificateClient().getPrivateKey());
+    assertNotNull(om.getCertificateClient().getCertificate());
+    assertThat(omLogs.getOutput())
+        .contains("Init response: GETCERT")
+        .contains("Successfully stored OM signed certificate");
+    X509Certificate certificate = om.getCertificateClient().getCertificate();
+    validateCertificate(certificate);
   }
 
   private void initSCM() throws IOException {
@@ -457,94 +544,6 @@ final class TestSecureOzoneCluster {
         test::call);
     assertThat(authException)
         .hasMessageContaining("KERBEROS_SSL authentication method not");
-  }
-
-  /**
-   * Tests secure OM initialization against a shared SCM, covering the
-   * delegation-token/secret-key config-validation failure, the login success
-   * case, the Kerberos failure case, and re-initialization of an
-   * already-initialized OM.
-   */
-  @Test
-  void testSecureOMInitialization() throws Exception {
-    initSCM();
-    scm = HddsTestUtils.getScmSimple(conf);
-    scm.start();
-
-    // Case 1: Test the secure om Initialization Failure due to delegation token
-    // and secret key configuration don't meet requirement.
-    conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
-    conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
-    IllegalArgumentException exception = assertThrows(
-        IllegalArgumentException.class, () -> setupOm(conf));
-    assertThat(exception.getMessage()).contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
-        "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
-        "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration");
-    // Restore valid durations so the remaining cases can start OM.
-    conf.unset(HDDS_SECRET_KEY_EXPIRY_DURATION);
-    conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, DELEGATION_TOKEN_MAX_TIME_MS);
-
-    // Case 2: Test the secure om Initialization Success
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
-    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
-    setupOm(conf);
-    assertThrows(Exception.class, om::start);
-    assertThat(logs.getOutput()).contains("Ozone Manager login successful");
-    logs.clearOutput();
-    stopOm();
-
-    // Case 3: Test the secure om Initialization Failure. Storage is already
-    // initialized by Case 2, and createOm with a non-existent principal fails
-    // at Kerberos login before any storage check or RPC bind, so no additional
-    // setup is required.
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "non-existent-user@EXAMPLE.com");
-    testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
-
-    // Case 4: Test functionality to init secure OM when it is already initialized.
-    // The failure cases above left a non-existent principal and an invalid auth
-    // method on conf; restore the valid values before re-initializing. A fresh
-    // RPC port is also required: Case 2's start() failed before starting the RPC
-    // server, so its listener selector loop never ran and stop() cannot release
-    // the bound port.
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + host + "@" + realm);
-    conf.set(OZONE_OM_ADDRESS_KEY,
-        InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
-    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
-    omLogs.clearOutput();
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
-    OMStorage omStore = new OMStorage(conf);
-    initializeOmStorage(omStore);
-    OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(conf);
-
-    assertNull(om.getCertificateClient());
-    String logOutput = omLogs.getOutput();
-    assertThat(logOutput)
-        .doesNotContain("Init response: GETCERT");
-    assertThat(logOutput)
-        .doesNotContain("Successfully stored SCM signed certificate");
-
-    stopOm();
-
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
-    conf.set(OZONE_OM_ADDRESS_KEY,
-        InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
-
-    OzoneManager.omInit(conf);
-    om = OzoneManager.createOm(conf);
-
-    assertNotNull(om.getCertificateClient());
-    assertNotNull(om.getCertificateClient().getPublicKey());
-    assertNotNull(om.getCertificateClient().getPrivateKey());
-    assertNotNull(om.getCertificateClient().getCertificate());
-    assertThat(omLogs.getOutput())
-        .contains("Init response: GETCERT")
-        .contains("Successfully stored OM signed certificate");
-    X509Certificate certificate = om.getCertificateClient().getCertificate();
-    validateCertificate(certificate);
   }
 
   @Test
