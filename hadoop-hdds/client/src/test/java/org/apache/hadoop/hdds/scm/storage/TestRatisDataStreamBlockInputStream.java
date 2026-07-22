@@ -34,17 +34,17 @@ class TestRatisDataStreamBlockInputStream {
     final int smallRead = 4 << 10;
 
     assertEquals(smallRead,
-        RatisDataStreamBlockInputStream.computeReadLengthForTesting(
+        RatisDataStreamBlockInputStream.computeReadLength(
             ONE_GB, 0, smallRead, true, false, PRE_READ, READ_WINDOW));
     assertEquals(READ_WINDOW,
-        RatisDataStreamBlockInputStream.computeReadLengthForTesting(
+        RatisDataStreamBlockInputStream.computeReadLength(
             ONE_GB, PRE_READ + smallRead, smallRead, true, true, PRE_READ,
             READ_WINDOW));
     assertEquals(smallRead,
-        RatisDataStreamBlockInputStream.computeReadLengthForTesting(
+        RatisDataStreamBlockInputStream.computeReadLength(
             ONE_GB, 0, smallRead, false, true, PRE_READ, READ_WINDOW));
     assertEquals(1024,
-        RatisDataStreamBlockInputStream.computeReadLengthForTesting(
+        RatisDataStreamBlockInputStream.computeReadLength(
             ONE_GB, ONE_GB - 1024, smallRead, true, true, PRE_READ,
             READ_WINDOW));
   }

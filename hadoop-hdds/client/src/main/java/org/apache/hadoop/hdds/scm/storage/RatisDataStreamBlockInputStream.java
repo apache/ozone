@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,11 +28,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -51,7 +48,6 @@ import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto.Type;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,8 +59,6 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisDataStreamBlockInputStream.class);
   private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
-  private static final int RATIS_READ_BLOCK_STREAM_HEADER_BYTES =
-      Integer.BYTES;
 
   private final BlockID blockID;
   private final long blockLength;
@@ -90,10 +84,10 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   public RatisDataStreamBlockInputStream(BlockID blockID, long length,
       Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
-      OzoneClientConfig config) throws IOException {
+      OzoneClientConfig config) {
     this.blockID = Objects.requireNonNull(blockID, "blockID == null");
     this.blockLength = length;
-    pipelineRef.set(setRatisPipeline(pipeline));
+    pipelineRef.set(Objects.requireNonNull(pipeline, "pipeline == null"));
     tokenRef.set(token);
     this.xceiverClientFactory = Objects.requireNonNull(xceiverClientFactory,
         "xceiverClientFactory == null");
@@ -285,16 +279,17 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     final DataStreamReply reply = ref.get();
     boolean releaseReply = true;
     try {
-      final ReadBlockData readBlockData = parseReadBlockData(reply);
-      final ContainerCommandResponseProto response = readBlockData.response;
+      final ReadBlockData readBlockData = ReadBlockData.parse(reply);
+      final ContainerCommandResponseProto response =
+          readBlockData.getResponse();
       ContainerProtocolCalls.validateContainerResponse(response);
       if (!response.hasReadBlock()) {
         throw new IOException("Missing ReadBlock response: " + response);
       }
 
       final ReadBlockResponseProto readBlock = response.getReadBlock();
-      final ByteBuffer dataBuffer = readBlockData.data != null ?
-          readBlockData.data : readBlock.getData().asReadOnlyByteBuffer();
+      final ByteBuffer dataBuffer = readBlockData.getData() != null ?
+          readBlockData.getData() : readBlock.getData().asReadOnlyByteBuffer();
       if (verifyChecksum) {
         final ChecksumData checksumData =
             ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
@@ -313,6 +308,9 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
         releaseReply = false;
       }
       return dataBuffer;
+    } catch (InvalidProtocolBufferException e) {
+      releaseClient(true);
+      throw new IOException("Failed to parse ReadBlock response", e);
     } finally {
       if (releaseReply) {
         ref.release();
@@ -331,51 +329,6 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       }
     } finally {
       ref.release();
-    }
-  }
-
-  private ReadBlockData parseReadBlockData(DataStreamReply reply)
-      throws IOException {
-    try {
-      return parseReadBlockData(reply.nioBuffer());
-    } catch (InvalidProtocolBufferException e) {
-      releaseClient(true);
-      throw new IOException("Failed to parse ReadBlock response", e);
-    }
-  }
-
-  private ReadBlockData parseReadBlockData(ByteBuffer replyBuffer)
-      throws InvalidProtocolBufferException {
-    final ByteBuffer duplicate = replyBuffer.duplicate();
-    if (duplicate.remaining() < RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
-      throw new InvalidProtocolBufferException(
-          "Missing Ratis ReadBlock metadata length");
-    }
-    final int metadataLength = duplicate.getInt(duplicate.position());
-    if (metadataLength < 0
-        || metadataLength > duplicate.remaining()
-            - RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
-      throw new InvalidProtocolBufferException(
-          "Invalid Ratis ReadBlock metadata length " + metadataLength);
-    }
-    duplicate.position(
-        duplicate.position() + RATIS_READ_BLOCK_STREAM_HEADER_BYTES);
-    final ByteBuffer metadata = duplicate.slice();
-    metadata.limit(metadataLength);
-    duplicate.position(duplicate.position() + metadataLength);
-    final ByteBuffer data = duplicate.slice();
-    return new ReadBlockData(
-        ContainerCommandResponseProto.parseFrom(metadata), data);
-  }
-
-  private static final class ReadBlockData {
-    private final ContainerCommandResponseProto response;
-    private final ByteBuffer data;
-
-    private ReadBlockData(ContainerCommandResponseProto response,
-        ByteBuffer data) {
-      this.response = response;
-      this.data = data;
     }
   }
 
@@ -434,7 +387,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     return result < 0 ? Long.MAX_VALUE : result;
   }
 
-  private static long computeReadLength(long blockLength, long position,
+  static long computeReadLength(long blockLength, long position,
       int length, boolean preRead, boolean largeReadWindowEligible,
       long preReadSize, long readWindowSize) {
     final long requestedLength = Math.max(1L, (long) length);
@@ -446,31 +399,9 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     return Math.min(blockLength - position, wantedLength);
   }
 
-  @VisibleForTesting
-  static long computeReadLengthForTesting(long blockLength, long position,
-      int length, boolean preRead, boolean largeReadWindowEligible,
-      long preReadSize, long readWindowSize) {
-    return computeReadLength(blockLength, position, length, preRead,
-        largeReadWindowEligible, preReadSize, readWindowSize);
-  }
-
   private void checkOpen() throws IOException {
     if (closed) {
       throw new IOException("Stream is closed for block " + blockID);
     }
-  }
-
-  private static Pipeline setRatisPipeline(Pipeline pipeline) throws IOException {
-    Objects.requireNonNull(pipeline, "pipeline == null");
-    Preconditions.assertTrue(
-        pipeline.getType() == HddsProtos.ReplicationType.RATIS,
-        () -> "Expected RATIS pipeline but got " + pipeline);
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (!dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
-        throw new IOException("RATIS_DATASTREAM port is missing for datanode "
-            + dn + " in pipeline " + pipeline.getId());
-      }
-    }
-    return pipeline;
   }
 }

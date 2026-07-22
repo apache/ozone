@@ -94,8 +94,11 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           ecBlockStreamFactory, config);
     } else if (config.isRatisStreamReadBlock()
         && repConfig.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)
+        && pipeline.getType().equals(HddsProtos.ReplicationType.RATIS)
         && allDataNodesSupport(pipeline,
-            RATIS_DATASTREAM_READ_BLOCK_SUPPORT)) {
+            RATIS_DATASTREAM_READ_BLOCK_SUPPORT)
+        && pipeline.getNodes().stream().allMatch(dn ->
+            dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
       return new RatisDataStreamBlockInputStream(blockInfo.getBlockID(),
           blockInfo.getLength(), pipeline, token, xceiverFactory,
           config);

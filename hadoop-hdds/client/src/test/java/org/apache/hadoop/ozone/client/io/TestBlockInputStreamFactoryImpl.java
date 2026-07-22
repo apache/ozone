@@ -25,8 +25,10 @@ import static org.mockito.ArgumentMatchers.any;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -102,6 +104,30 @@ public class TestBlockInputStreamFactoryImpl {
         Mockito.mock(XceiverClientFactory.class), null, clientConfig);
 
     assertInstanceOf(RatisDataStreamBlockInputStream.class, stream);
+  }
+
+  @Test
+  public void testRatisStreamReadBlockUsesCompatibilityPathWithoutDataStreamPort()
+      throws IOException {
+    BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
+    ReplicationConfig repConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+    DatanodeDetails datanode = DatanodeDetails.newBuilder()
+        .setUuid(UUID.randomUUID())
+        .setCurrentVersion(
+            RATIS_DATASTREAM_READ_BLOCK_SUPPORT.toProtoValue())
+        .addPort(DatanodeDetails.newRatisPort(0))
+        .build();
+    BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig,
+        1024 * 1024 * 10, Collections.singletonMap(datanode, 1));
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setRatisStreamReadBlock(true);
+
+    BlockExtendedInputStream stream = factory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(), null, null,
+        clientConfig);
+
+    assertInstanceOf(BlockInputStream.class, stream);
   }
 
   @ParameterizedTest
