@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.ratis.util.SizeInBytes;
 import org.junit.jupiter.api.Test;
 
@@ -71,7 +71,8 @@ public class TestRatisDataStreamReadBlock {
       conf.setFromObject(clientConfig);
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
-        final TestBucket testBucket = TestBucket.newBuilder(client).build();
+        final BucketForTesting testBucket =
+            BucketForTesting.newBuilder(client).build();
         final String keyName = "ratis-datastream-read-block";
         final String expectedMd5 = createKey(testBucket.delegate(), keyName);
 
@@ -99,7 +100,8 @@ public class TestRatisDataStreamReadBlock {
       conf.setFromObject(clientConfig);
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
-        final TestBucket testBucket = TestBucket.newBuilder(client).build();
+        final BucketForTesting testBucket =
+            BucketForTesting.newBuilder(client).build();
         final String keyName = "ratis-datastream-read-closed-container";
         final String expectedMd5 = createKeyAndCloseContainersAndRemoveGroups(
             cluster, testBucket.delegate(), keyName);
@@ -120,7 +122,7 @@ public class TestRatisDataStreamReadBlock {
       streams.add(assertInstanceOf(RatisDataStreamBlockInputStream.class,
           stream, "Unexpected stream classes: " + in.getPartStreams()));
     }
-    assertTrue(!streams.isEmpty());
+    assertFalse(streams.isEmpty());
     return streams;
   }
 
@@ -187,7 +189,7 @@ public class TestRatisDataStreamReadBlock {
         containerIds.add(containerId);
       }
     }
-    assertTrue(!containerIds.isEmpty());
+    assertFalse(containerIds.isEmpty());
     return containerIds;
   }
 
