@@ -174,6 +174,7 @@ final class TestSecureOzoneCluster {
 
   private static final String COMPONENT = "om";
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
+  private static final String CANNOT_AUTHENTICATE_MESSAGE = "Client cannot authenticate via:[KERBEROS]";
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecureOzoneCluster.class);
   private static final int CERT_GRACE_TIME_MS = 10 * 1000; // 10s
@@ -340,15 +341,30 @@ final class TestSecureOzoneCluster {
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
 
-    // ===== SCM startup and access control =====
+    // SCM startup and access control.
+    assertScmExposesClusterInfoAndTrustChain();
+    assertScmSecurityProtocolAllowsKerberosUser();
+    assertScmSecurityProtocolRejectsNonKerberosUser();
+    assertScmAdminProtocolDeniesNonAdminUser();
+    assertScmAdminProtocolRejectsNonKerberosUser();
 
-    // Case 1: SCM starts up and exposes its cluster info and cert trust chain.
+    // Secure OM initialization against the shared SCM.
+    assertSecureOmInitFailsWithInvalidTokenAndSecretKeyConfig();
+    assertSecureOmInitSucceeds();
+    assertSecureOmInitFailsWithNonExistentPrincipal();
+    assertSecureOmInitWhenAlreadyInitialized();
+  }
+
+  /** SCM starts up and exposes its cluster info and cert trust chain. */
+  private void assertScmExposesClusterInfoAndTrustChain() throws IOException {
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
     assertEquals(scmId, scmInfo.getScmId());
     assertEquals(2, scm.getScmCertificateClient().getTrustChain().size());
+  }
 
-    // Case 2: SCM security protocol - user with Kerberos credentials succeeds.
+  /** SCM security protocol - user with Kerberos credentials succeeds. */
+  private void assertScmSecurityProtocolAllowsKerberosUser() throws Exception {
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
             testUserPrincipal, testUserKeytab.getCanonicalPath());
@@ -367,43 +383,51 @@ final class TestSecureOzoneCluster {
       assertThat(securityException)
           .hasMessageContaining("Certificate not found");
     }
+  }
 
-    // Case 3: SCM security protocol - user without Kerberos credentials fails.
-    ugi = UserGroupInformation.createRemoteUser("test");
+  /** SCM security protocol - user without Kerberos credentials fails. */
+  private void assertScmSecurityProtocolRejectsNonKerberosUser() throws Exception {
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser("test");
     ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-    String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
     try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
         getScmSecurityClient(conf, ugi)) {
       IOException ioException = assertThrows(IOException.class,
           securityClient::getCACertificate);
-      assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+      assertThat(ioException).hasMessageContaining(CANNOT_AUTHENTICATE_MESSAGE);
       ioException = assertThrows(IOException.class,
           () -> securityClient.getCertificate("1"));
-      assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+      assertThat(ioException).hasMessageContaining(CANNOT_AUTHENTICATE_MESSAGE);
     }
+  }
 
-    // Case 4: SCM admin protocol - authenticated non-admin user is denied.
-    ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+  /** SCM admin protocol - authenticated non-admin user is denied. */
+  private void assertScmAdminProtocolDeniesNonAdminUser() throws IOException {
+    UserGroupInformation ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
         testUserPrincipal, testUserKeytab.getCanonicalPath());
     StorageContainerLocationProtocol scmRpcClient =
         HAUtils.getScmContainerClient(conf, ugi);
     IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
     assertThat(adminException).hasMessageContaining("Access denied");
+  }
 
-    // Case 5: SCM admin protocol - user without Kerberos credentials fails.
-    ugi = UserGroupInformation.createRemoteUser("test");
+  /** SCM admin protocol - user without Kerberos credentials fails. */
+  private void assertScmAdminProtocolRejectsNonKerberosUser() throws IOException {
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser("test");
     ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-    scmRpcClient = HAUtils.getScmContainerClient(conf, ugi);
-    adminException = assertThrows(IOException.class,
+    StorageContainerLocationProtocol scmRpcClient =
+        HAUtils.getScmContainerClient(conf, ugi);
+    IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
     assertThat(adminException)
-        .hasMessageContaining(cannotAuthMessage);
+        .hasMessageContaining(CANNOT_AUTHENTICATE_MESSAGE);
+  }
 
-    // ===== Secure OM initialization against the shared SCM =====
-
-    // Case 6: Test the secure om Initialization Failure due to delegation token
-    // and secret key configuration don't meet requirement.
+  /**
+   * Secure OM initialization fails when the delegation token and secret key
+   * configuration don't meet requirement.
+   */
+  private void assertSecureOmInitFailsWithInvalidTokenAndSecretKeyConfig() {
     conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
     conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
     IllegalArgumentException exception = assertThrows(
@@ -414,8 +438,10 @@ final class TestSecureOzoneCluster {
     // Restore valid durations so the remaining cases can start OM.
     conf.unset(HDDS_SECRET_KEY_EXPIRY_DURATION);
     conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, DELEGATION_TOKEN_MAX_TIME_MS);
+  }
 
-    // Case 7: Test the secure om Initialization Success
+  /** Secure OM initialization succeeds. */
+  private void assertSecureOmInitSucceeds() throws Exception {
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
     GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
     setupOm(conf);
@@ -423,21 +449,30 @@ final class TestSecureOzoneCluster {
     assertThat(logs.getOutput()).contains("Ozone Manager login successful");
     logs.clearOutput();
     stopOm();
+  }
 
-    // Case 8: Test the secure om Initialization Failure. Storage is already
-    // initialized by Case 7, and createOm with a non-existent principal fails
-    // at Kerberos login before any storage check or RPC bind, so no additional
-    // setup is required.
+  /**
+   * Secure OM initialization fails at Kerberos login for a non-existent
+   * principal. Storage is already initialized by
+   * {@link #assertSecureOmInitSucceeds()}, and createOm with a non-existent
+   * principal fails at Kerberos login before any storage check or RPC bind, so
+   * no additional setup is required.
+   */
+  private void assertSecureOmInitFailsWithNonExistentPrincipal() {
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "non-existent-user@EXAMPLE.com");
     testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
+  }
 
-    // Case 9: Test functionality to init secure OM when it is already initialized.
-    // The failure cases above left a non-existent principal and an invalid auth
-    // method on conf; restore the valid values before re-initializing. A fresh
-    // RPC port is also required: Case 7's start() failed before starting the RPC
-    // server, so its listener selector loop never ran and stop() cannot release
-    // the bound port.
+  /**
+   * Secure OM can be re-initialized when it is already initialized.
+   * The failure cases above left a non-existent principal and an invalid auth
+   * method on conf; restore the valid values before re-initializing. A fresh
+   * RPC port is also required: {@link #assertSecureOmInitSucceeds()}'s start()
+   * failed before starting the RPC server, so its listener selector loop never
+   * ran and stop() cannot release the bound port.
+   */
+  private void assertSecureOmInitWhenAlreadyInitialized() throws Exception {
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + host + "@" + realm);
     conf.set(OZONE_OM_ADDRESS_KEY,
