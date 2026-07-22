@@ -491,6 +491,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
+      addCustomMetadataHeaders(responseBuilder, keyDetails);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);

@@ -55,6 +55,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
@@ -73,13 +74,18 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
@@ -106,8 +112,10 @@ import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.Bucket;
+import software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -122,7 +130,9 @@ import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.ExpirationStatus;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
+import software.amazon.awssdk.services.s3.model.GetBucketLifecycleConfigurationResponse;
 import software.amazon.awssdk.services.s3.model.GetBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketTaggingResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -132,11 +142,15 @@ import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.LifecycleRule;
+import software.amazon.awssdk.services.s3.model.LifecycleRuleAndOperator;
+import software.amazon.awssdk.services.s3.model.LifecycleRuleFilter;
 import software.amazon.awssdk.services.s3.model.ListBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsRequest;
+import software.amazon.awssdk.services.s3.model.ListMultipartUploadsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -2257,6 +2271,197 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(snapshotKey));
 
     assertEquals(content, snapshotResponse.asUtf8String());
+  }
+
+  @Test
+  public void testGetLifecycleWithAbortIncompleteMultipartUpload() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    LifecycleRule rule1 = LifecycleRule.builder()
+        .id("abort-incomplete-mpu-with-prefix")
+        .prefix("uploads/")
+        .status(ExpirationStatus.ENABLED)
+        .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
+            .daysAfterInitiation(7)
+            .build())
+        .build();
+
+    LifecycleRule rule2 = LifecycleRule.builder()
+        .id("abort-incomplete-mpu-with-tag")
+        .filter(LifecycleRuleFilter.builder()
+            .tag(Tag.builder().key("env").value("dev").build())
+            .build())
+        .status(ExpirationStatus.ENABLED)
+        .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
+            .daysAfterInitiation(14)
+            .build())
+        .build();
+
+    LifecycleRule rule3 = LifecycleRule.builder()
+        .id("abort-incomplete-mpu-with-and-operator")
+        .filter(LifecycleRuleFilter.builder()
+            .and(LifecycleRuleAndOperator.builder()
+                .prefix("temp/")
+                .tags(Tag.builder().key("type").value("temporary").build())
+                .build())
+            .build())
+        .status(ExpirationStatus.ENABLED)
+        .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
+            .daysAfterInitiation(3)
+            .build())
+        .build();
+
+    LifecycleRule rule4 = LifecycleRule.builder()
+        .id("abort-incomplete-mpu-no-filter")
+        .prefix("")
+        .status(ExpirationStatus.ENABLED)
+        .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
+            .daysAfterInitiation(30)
+            .build())
+        .build();
+
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule1, rule2, rule3, rule4)
+        .build();
+
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+
+    List<LifecycleRule> rules = response.rules();
+    assertEquals(4, rules.size());
+
+    LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("abort-incomplete-mpu-with-prefix", retrievedRule1.id());
+    assertEquals("uploads/", retrievedRule1.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(7, retrievedRule1.abortIncompleteMultipartUpload().daysAfterInitiation());
+
+    LifecycleRule retrievedRule2 = rules.get(1);
+    assertEquals("abort-incomplete-mpu-with-tag", retrievedRule2.id());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule2.status());
+    assertEquals(14, retrievedRule2.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals("env", retrievedRule2.filter().tag().key());
+    assertEquals("dev", retrievedRule2.filter().tag().value());
+
+    LifecycleRule retrievedRule3 = rules.get(2);
+    assertEquals("abort-incomplete-mpu-with-and-operator", retrievedRule3.id());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule3.status());
+    assertEquals(3, retrievedRule3.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals("temp/", retrievedRule3.filter().and().prefix());
+    assertEquals(1, retrievedRule3.filter().and().tags().size());
+    Tag andTag = retrievedRule3.filter().and().tags().get(0);
+    assertEquals("type", andTag.key());
+    assertEquals("temporary", andTag.value());
+
+    LifecycleRule retrievedRule4 = rules.get(3);
+    assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
+    assertEquals("", retrievedRule4.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule4.status());
+    assertEquals(30, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
+  }
+
+  /**
+   * End-to-end test verifying that KeyLifecycleService correctly aborts
+   * incomplete multipart uploads based on lifecycle configuration.
+   */
+  @Test
+  void testAbortIncompleteMultipartUploadE2E() throws Exception {
+    OzoneManager ozoneManager = cluster().getOzoneManager();
+    KeyLifecycleService lifecycleService = ozoneManager.getKeyManager().getKeyLifecycleService();
+    if (lifecycleService == null) {
+      return;
+    }
+
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    String s3VolumeName;
+    try (OzoneClient ozoneClient = cluster().newClient()) {
+      s3VolumeName = ozoneClient.getObjectStore().getS3Volume().getName();
+    }
+
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+
+    // Create 3 MPUs
+    String matchingOldKey = "temp/old-file.txt";
+    CreateMultipartUploadResponse mpu1 = s3Client.createMultipartUpload(
+        b -> b.bucket(bucketName).key(matchingOldKey));
+
+    String nonMatchingOldKey = "permanent/old-file.txt";
+    CreateMultipartUploadResponse mpu2 = s3Client.createMultipartUpload(
+        b -> b.bucket(bucketName).key(nonMatchingOldKey));
+
+    String matchingRecentKey = "temp/recent-file.txt";
+    s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(matchingRecentKey));
+
+    assertEquals(3, s3Client.listMultipartUploads(b -> b.bucket(bucketName)).uploads().size());
+
+    // Backdate 2 MPUs to 2 days ago
+    long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+    updateMpuCreationTime(metadataManager, s3VolumeName, bucketName,
+        matchingOldKey, mpu1.uploadId(), oldCreationTime);
+    updateMpuCreationTime(metadataManager, s3VolumeName, bucketName,
+        nonMatchingOldKey, mpu2.uploadId(), oldCreationTime);
+
+    // Set lifecycle rule: abort MPUs with prefix "temp/" after 1 day
+    LifecycleRule rule = LifecycleRule.builder()
+        .id("abort-temp-uploads")
+        .prefix("temp/")
+        .status(ExpirationStatus.ENABLED)
+        .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
+            .daysAfterInitiation(1)
+            .build())
+        .build();
+
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(BucketLifecycleConfiguration.builder()
+            .rules(rule)
+            .build()));
+
+    // Trigger lifecycle service
+    lifecycleService.runPeriodicalTaskNow();
+
+    // Wait for abort
+    GenericTestUtils.waitFor(() -> {
+      return s3Client.listMultipartUploads(b -> b.bucket(bucketName)).uploads().size() == 2;
+    }, 500, 30000);
+
+    // Verify results
+    ListMultipartUploadsResponse listAfter = s3Client.listMultipartUploads(b -> b.bucket(bucketName));
+    List<String> remainingKeys = listAfter.uploads().stream()
+        .map(u -> u.key())
+        .collect(Collectors.toList());
+
+    assertFalse(remainingKeys.contains(matchingOldKey), "Old MPU with matching prefix should be aborted");
+    assertTrue(remainingKeys.contains(nonMatchingOldKey), "Old MPU with non-matching prefix should remain");
+    assertTrue(remainingKeys.contains(matchingRecentKey), "Recent MPU should remain");
+  }
+
+  private void updateMpuCreationTime(OMMetadataManager metadataManager,
+      String volumeName, String bucketName, String keyName,
+      String uploadId, long newCreationTime) throws Exception {
+    String multipartKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(multipartKey);
+    if (existingInfo == null) {
+      throw new RuntimeException("Multipart key info not found: " + multipartKey);
+    }
+
+    OmMultipartKeyInfo updatedInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(existingInfo.getUploadID())
+        .setCreationTime(newCreationTime)
+        .setReplicationConfig(existingInfo.getReplicationConfig())
+        .setObjectID(existingInfo.getObjectID())
+        .setUpdateID(existingInfo.getUpdateID())
+        .setParentID(existingInfo.getParentID())
+        .build();
+
+    metadataManager.getMultipartInfoTable().put(multipartKey, updatedInfo);
   }
 
   private String getBucketName() {
