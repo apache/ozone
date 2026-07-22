@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -148,7 +148,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testCreateKey() throws Exception {
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String file = uniqueObjectName("key");
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -216,7 +216,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String testBucketName = testBucket.getName();
 
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String file = uniqueObjectName("key");
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -268,7 +268,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testLookupKey() throws Exception {
     String parent = "a/b/c/";
-    String fileName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String fileName = uniqueObjectName("key");
     String key = parent + fileName;
 
     ObjectStore objectStore = client.getObjectStore();

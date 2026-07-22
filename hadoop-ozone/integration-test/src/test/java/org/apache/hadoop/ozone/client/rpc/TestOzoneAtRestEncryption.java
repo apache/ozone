@@ -810,7 +810,7 @@ class TestOzoneAtRestEncryption {
 
   private static RepeatedOmKeyInfo getMatchedKeyInfo(
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, "/");
     for (Table.KeyValue<String, RepeatedOmKeyInfo> rangeKV : rangeKVs) {

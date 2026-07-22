@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigu
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.StatefulService;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,11 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
+
+  private static final String SERVICE_NAME = ContainerBalancer.class.getSimpleName();
+
+  public static final StatefulServiceDefinition<ContainerBalancerConfigurationProto> SERVICE_DEFINITION =
+      new StatefulServiceDefinition<>(SERVICE_NAME, ContainerBalancerConfigurationProto.parser());
 
   private StorageContainerManager scm;
   private final SCMContext scmContext;
@@ -65,8 +71,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
    * @param scm the storage container manager
    */
   public ContainerBalancer(StorageContainerManager scm) {
-    super(scm.getStatefulServiceStateManager(),
-        ContainerBalancerConfigurationProto.getDefaultInstance().getParserForType());
+    super(scm.getStatefulServiceStateManager(), SERVICE_DEFINITION);
     this.scm = scm;
     this.ozoneConfiguration = scm.getConfiguration();
     this.config = ozoneConfiguration.getObject(
@@ -186,11 +191,26 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
   public ContainerBalancerStatusInfo getBalancerStatusInfo() throws IOException {
     lock.lock();
     try {
-      if (isBalancerRunning()) {
+      if (task == null) {
+        return null;
+      }
+      ContainerBalancerTask.Status status = task.getBalancerStatus();
+      if (status == ContainerBalancerTask.Status.RUNNING
+          || status == ContainerBalancerTask.Status.STOPPING) {
         return new ContainerBalancerStatusInfo(
             this.startedAt,
             config.toProtobufBuilder().setShouldRun(true).build(),
             task.getCurrentIterationsStatistic()
+        );
+      }
+      if (status == ContainerBalancerTask.Status.STOPPED) {
+        return new ContainerBalancerStatusInfo(
+            this.startedAt,
+            config.toProtobufBuilder().setShouldRun(false).build(),
+            task.getCurrentIterationsStatistic(),
+            task.getStoppedAt(),
+            task.getStopReason(),
+            task.getStopMessage()
         );
       }
       return null;
@@ -357,6 +377,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
         return;
       }
       LOG.info("Trying to stop ContainerBalancer in this SCM.");
+      task.recordStopReason(ContainerBalancerStopReason.SCM_STATE_CHANGE);
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -397,6 +418,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
       saveConfiguration(config, false, 0);
       if (isBalancerRunning()) {
         LOG.info("Trying to stop ContainerBalancer service.");
+        task.recordStopReason(ContainerBalancerStopReason.USER_REQUESTED);
         task.stop();
         balancingThread = currentBalancingThread;
       }

@@ -64,7 +64,7 @@ import org.mockito.quality.Strictness;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestBackgroundContainerMetadataScanner extends
-    TestContainerScannersAbstract {
+    ContainerScannerTests {
 
   private BackgroundContainerMetadataScanner scanner;
 

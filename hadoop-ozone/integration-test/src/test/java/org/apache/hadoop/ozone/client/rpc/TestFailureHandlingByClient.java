@@ -394,13 +394,14 @@ public class TestFailureHandlingByClient {
 
       assertThat(keyOutputStream.getExcludeList().getContainerIds())
           .contains(ContainerID.valueOf(containerId));
-      // Datanodes are not asserted here. Under the default ALL_COMMITTED watch
-      // level a slow-but-healthy follower can be recorded in the exclude list, so
-      // an empty datanode set is not an invariant for this config (the watch
-      // level is configurable via RatisClientConfig watchType, HDDS-2887).
-      // Watch-level datanode exclusion is covered by
+      // The container-id assertion above is the actual property under test.
+      // Under the default ALL_COMMITTED watch level neither the datanode nor the
+      // pipeline set is an invariant: a slow-but-healthy follower can be recorded
+      // as a failed datanode, and a WATCH RaftRetryFailureException takes the
+      // else-branch in KeyOutputStream.handleException and excludes the pipeline.
+      // The watch level is configurable via RatisClientConfig watchType
+      // (HDDS-2887); watch-level exclusion is covered by
       // testDatanodeExclusionWithMajorityCommit.
-      assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
 
       // The close will just write to the buffer
     }

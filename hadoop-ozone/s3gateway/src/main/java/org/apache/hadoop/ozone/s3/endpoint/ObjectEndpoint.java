@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIREC
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
@@ -37,6 +38,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
@@ -57,6 +59,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -372,6 +375,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -484,6 +491,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
+      addCustomMetadataHeaders(responseBuilder, keyDetails);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -562,6 +570,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     OzoneKey key;
     try {
@@ -569,7 +582,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      key = getClientProtocol().headS3Object(bucketName, keyPath);
+      // A partNumber is validated against the object's parts and yields the
+      // metadata of that part; an out-of-range part throws InvalidPart.
+      key = (partNumber != 0) ?
+          getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
+          getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
@@ -759,17 +776,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     final String uploadID = queryParams().get(QueryParams.UPLOAD_ID, "");
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    OzoneVolume volume = getVolume();
-    // Using LinkedHashMap to preserve ordering of parts list.
-    Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
+    // Using LinkedHashMap to preserve ordering of parts list.
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
 
     S3ConditionalRequest.WriteConditions writeConditions =
         S3ConditionalRequest.parseWriteConditions(getHeaders(), key);
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      // Reject an empty part list before contacting OM.
+      if (partList == null || partList.isEmpty()) {
+        throw newError(MALFORMED_XML, key);
+      }
+
+      OzoneVolume volume = getVolume();
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
@@ -807,12 +829,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
-        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
-            "when calling the CompleteMultipartUpload operation: You must " +
-            "specify at least one part");
-        throw os3Exception;
       } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
@@ -891,11 +907,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_HEADER_RANGE);
         RangeHeader rangeHeader = null;
         if (range != null) {
-          rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 0);
+          Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(range);
+          if (!matcher.matches()
+              || matcher.group("start").isEmpty()
+              || matcher.group("end").isEmpty()) {
+            throw newError(S3ErrorTable.INVALID_ARGUMENT, range);
+          }
+          long startOffset = Long.parseLong(matcher.group("start"));
+          long endOffset = Long.parseLong(matcher.group("end"));
+          long sourceSize = sourceKeyDetails.getDataSize();
+          if (startOffset > endOffset || endOffset >= sourceSize) {
+            throw newError(S3ErrorTable.INVALID_RANGE, range);
+          }
+          rangeHeader = new RangeHeader(startOffset, endOffset, false, false);
           // When copy Range, the size of the target key is the
           // length specified by COPY_SOURCE_HEADER_RANGE.
-          length = rangeHeader.getEndOffset() -
-              rangeHeader.getStartOffset() + 1;
+          length = endOffset - startOffset + 1;
         } else {
           length = sourceKeyDetails.getDataSize();
         }

@@ -133,4 +133,44 @@ class TestArchiver {
     Files.deleteIfExists(tmpDir);
   }
 
+  @Test
+  void appendFileCreatesAndExtendsTar() throws IOException {
+    Path tmpDir = Files.createTempDirectory("archiver-append");
+    File tarFile = tmpDir.resolve("export.tar").toFile();
+    File part1 = tmpDir.resolve("part001.txt").toFile();
+    File part2 = tmpDir.resolve("part002.txt").toFile();
+    Files.write(part1.toPath(), "1\n2\n".getBytes(StandardCharsets.UTF_8));
+    Files.write(part2.toPath(), "3\n".getBytes(StandardCharsets.UTF_8));
+
+    try (Archiver.AppendableTar tar = Archiver.openForAppend(tarFile)) {
+      tar.appendFile(part1, "part001.txt");
+      tar.appendFile(part2, "part002.txt");
+    }
+
+    Path extractDir = tmpDir.resolve("extract");
+    Archiver.extract(tarFile, extractDir);
+    assertThat(extractDir.resolve("part001.txt")).hasSameBinaryContentAs(part1.toPath());
+    assertThat(extractDir.resolve("part002.txt")).hasSameBinaryContentAs(part2.toPath());
+  }
+
+  @Test
+  void appendFilePreservesZeroBlocksAtEndOfEntry() throws IOException {
+    Path tmpDir = Files.createTempDirectory("archiver-append-zero-block");
+    File tarFile = tmpDir.resolve("export.tar").toFile();
+    File part1 = tmpDir.resolve("part001.bin").toFile();
+    File part2 = tmpDir.resolve("part002.txt").toFile();
+    byte[] zeroBlockPayload = new byte[1024];
+    Files.write(part1.toPath(), zeroBlockPayload);
+    Files.write(part2.toPath(), "next\n".getBytes(StandardCharsets.UTF_8));
+
+    try (Archiver.AppendableTar tar = Archiver.openForAppend(tarFile)) {
+      tar.appendFile(part1, "part001.bin");
+      tar.appendFile(part2, "part002.txt");
+    }
+
+    Path extractDir = tmpDir.resolve("extract");
+    Archiver.extract(tarFile, extractDir);
+    assertThat(extractDir.resolve("part001.bin")).hasSameBinaryContentAs(part1.toPath());
+    assertThat(extractDir.resolve("part002.txt")).hasSameBinaryContentAs(part2.toPath());
+  }
 }
