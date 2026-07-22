@@ -204,7 +204,9 @@ public class TestS3Utils {
         Arguments.of("gzip, aws-chunked", "gzip"),
         Arguments.of("aws-chunked, gzip", "gzip"),
         Arguments.of("aws-chunked", null),
-        Arguments.of("aws-chunked, aws-chunked", null));
+        Arguments.of("aws-chunked, aws-chunked", null),
+        Arguments.of("gzip, AWS-CHUNKED", "gzip"),
+        Arguments.of("Aws-Chunked", null));
   }
 
 }

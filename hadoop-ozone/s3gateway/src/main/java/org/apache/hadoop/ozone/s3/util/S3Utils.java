@@ -85,7 +85,7 @@ public final class S3Utils {
     String normalized = Arrays.stream(contentEncoding.split(","))
         .map(String::trim)
         .filter(value -> !value.isEmpty())
-        .filter(value -> !AWS_CHUNKED.equals(value))
+        .filter(value -> !AWS_CHUNKED.equalsIgnoreCase(value))
         .collect(Collectors.joining(", "));
     return normalized.isEmpty() ? null : normalized;
   }
@@ -179,7 +179,7 @@ public final class S3Utils {
       // We are only interested on "aws-chunked"
       boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
           .map(String::trim)
-          .anyMatch(AWS_CHUNKED::equals);
+          .anyMatch(value -> AWS_CHUNKED.equalsIgnoreCase(value));
       if (!containsAwsChunked) {
         OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
         ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +

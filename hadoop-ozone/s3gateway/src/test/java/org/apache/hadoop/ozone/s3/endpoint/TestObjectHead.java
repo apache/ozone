@@ -285,6 +285,32 @@ public class TestObjectHead {
         response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase()));
   }
 
+  @Test
+  public void testUserMetadataSuffixDoesNotCollideWithInternalKey() throws Exception {
+    String keyName = "reserved-cache-control-suffix";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control", "user-cache");
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom", "suffix-value");
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
+
+    assertEquals("no-cache",
+        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        bucket.getKey(keyName).getMetadata().get(CACHE_CONTROL_CUSTOM));
+    assertEquals("suffix-value",
+        bucket.getKey(keyName).getMetadata().get("cache-control-custom"));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals("no-cache", response.getHeaderString(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control"));
+    assertEquals("suffix-value",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom"));
+  }
+
   private static Stream<Arguments> reservedMetadataCollisionCases() {
     return Stream.of(
         Arguments.of(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM, "image/jpeg", "user/custom-type"),

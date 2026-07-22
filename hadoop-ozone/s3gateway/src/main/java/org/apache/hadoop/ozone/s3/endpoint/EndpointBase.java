@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
@@ -118,13 +119,20 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class EndpointBase {
 
-  protected static final String ETAG_CUSTOM = "etag-custom";
-  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
-  protected static final String CACHE_CONTROL_CUSTOM = "cache-control-custom";
-  protected static final String EXPIRES_CUSTOM = "expires-custom";
-  protected static final String CONTENT_ENCODING_CUSTOM = "content-encoding-custom";
-  protected static final String CONTENT_LANGUAGE_CUSTOM = "content-language-custom";
-  protected static final String CONTENT_DISPOSITION_CUSTOM = "content-disposition-custom";
+  protected static final String ETAG_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "etag";
+  protected static final String CONTENT_TYPE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-type";
+  protected static final String CACHE_CONTROL_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "cache-control";
+  protected static final String EXPIRES_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "expires";
+  protected static final String CONTENT_ENCODING_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-encoding";
+  protected static final String CONTENT_LANGUAGE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-language";
+  protected static final String CONTENT_DISPOSITION_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-disposition";
 
   // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
   // collides with the system ETag / Content-Type stored under the same key, so
@@ -334,6 +342,10 @@ public abstract class EndpointBase {
       for (String key : customMetadataKeys) {
         String mapKey =
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
+        if (mapKey.regionMatches(true, 0, RESERVED_USER_METADATA_KEY_PREFIX, 0,
+            RESERVED_USER_METADATA_KEY_PREFIX.length())) {
+          throw newError(INVALID_ARGUMENT, key);
+        }
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");
         sizeInBytes += mapKey.getBytes(UTF_8).length;
@@ -380,7 +392,7 @@ public abstract class EndpointBase {
       if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
