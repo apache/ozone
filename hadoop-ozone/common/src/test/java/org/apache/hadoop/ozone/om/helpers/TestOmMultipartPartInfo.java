@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
@@ -64,6 +63,9 @@ public class TestOmMultipartPartInfo {
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearPartName().build()));
     assertThrows(IllegalArgumentException.class,
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearPartNumber().build()));
+    // Behaviour change: eTag is now a mandatory field for all clients.
+    assertThrows(IllegalArgumentException.class,
+        () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearETag().build()));
     assertThrows(IllegalArgumentException.class,
         () -> OmMultipartPartInfo.getFromProto(base.toBuilder().clearKeyLocationList().build()));
     assertThrows(IllegalArgumentException.class,
@@ -85,18 +87,14 @@ public class TestOmMultipartPartInfo {
   }
 
   @Test
-  public void testFromOmKeyInfoAllowsMissingETag() {
-    // eTag is optional; a part committed without an ETag (e.g. by the Ozone
-    // native client) must still be accepted, matching the legacy flow.
+  public void testFromOmKeyInfoRejectsMissingETag() {
+    // Behaviour change: an ETag is now MANDATORY for every multipart part, for
+    // ALL clients (S3 and the native Ozone client alike), not just S3. Building
+    // a part from an OmKeyInfo without an ETag now fails fast instead of being
+    // accepted with a null ETag as it was previously.
     OmKeyInfo keyInfo = createOmKeyInfoWithoutEtag();
-    OmMultipartPartInfo partInfo =
-        OmMultipartPartInfo.from("part-name", 1, keyInfo);
-    assertNull(partInfo.getETag());
-
-    // Round-trips through proto without an ETag.
-    OmMultipartPartInfo decoded =
-        OmMultipartPartInfo.getFromProto(partInfo.getProto());
-    assertNull(decoded.getETag());
+    assertThrows(IllegalArgumentException.class,
+        () -> OmMultipartPartInfo.from("part-name", 1, keyInfo));
   }
 
   private static MultipartPartInfo createValidProto() {

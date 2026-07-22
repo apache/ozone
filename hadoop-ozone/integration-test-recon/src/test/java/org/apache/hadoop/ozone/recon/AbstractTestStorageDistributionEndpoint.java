@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -206,7 +208,10 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     OzoneOutputStream partStream = objectStore.getClientProxy()
         .createMultipartKey(volumeName, bucketName, "mpukey1",
             100L, 1, multipartInfo.getUploadID());
-    partStream.write(new byte[100]);
+    byte[] partData = new byte[100];
+    partStream.write(partData);
+    // ETag is now mandatory for all clients; supply one before commit (close).
+    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
   }
 

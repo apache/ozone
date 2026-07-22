@@ -806,10 +806,12 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   @Test
-  public void testSplitSchemaCommitSucceedsWithoutETag() throws Exception {
-    // ETag is optional at commit time. A part committed without an ETag (e.g.
-    // by the Ozone native client) must be accepted and stored with a null
-    // ETag, matching the legacy inline flow.
+  public void testSplitSchemaCommitFailsWithoutETag() throws Exception {
+    // Behaviour change: an ETag is MANDATORY for every part committed in the
+    // split parts-table schema, enforced server-side for ALL clients (S3 and
+    // the native Ozone client alike), not just S3. A part committed without an
+    // ETag is now rejected with INVALID_REQUEST instead of being stored with a
+    // null ETag. Previously this path stored the part with a null ETag.
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
@@ -842,13 +844,13 @@ public class TestS3MultipartUploadCommitPartRequest
     S3MultipartUploadCommitPartRequest request = getS3MultipartUploadCommitReq(omRequest);
 
     OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 2L);
-    assertSame(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertSame(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        response.getOMResponse().getStatus());
 
-    // The part is stored in the split parts table with no ETag.
+    // No part row should have been written to the split parts table.
     SortedMap<Integer, OmMultipartPartInfo> parts =
         OMMultipartUploadUtils.scanParts(omMetadataManager, uploadId);
-    assertEquals(1, parts.size());
-    assertNull(parts.get(1).getETag());
+    assertEquals(0, parts.size());
   }
 
   @Test

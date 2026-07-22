@@ -551,6 +551,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * part-write paths stamp the MD5 of the part as its ETag. This pre-commit
    * check enforces that invariant so no S3 part can be committed without one
    * (e.g. an UploadPartCopy whose source key has no ETag).
+   *
+   * <p>Note: the Ozone Manager also enforces a mandatory ETag server-side for
+   * every committed part (in the split parts-table schema) for ALL clients,
+   * not just S3. This gateway-side check is an earlier, S3-native failure so
+   * the client gets a clean S3 error instead of an OM INVALID_REQUEST.
    */
   private static void requirePartETag(Map<String, String> metadata)
       throws IOException {

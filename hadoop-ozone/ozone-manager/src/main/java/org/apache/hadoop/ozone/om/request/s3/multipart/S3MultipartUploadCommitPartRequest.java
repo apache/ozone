@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -222,6 +223,18 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
       } else {
+        // Behaviour change: an ETag is MANDATORY for every committed part in
+        // the split parts-table schema, enforced server-side for ALL clients
+        // (S3 gateway and native Ozone client alike), not just S3. The S3
+        // gateway computes the MD5 ETag on upload; any other client must also
+        // supply one. Reject the commit early with a clear INVALID_REQUEST if
+        // it is missing, rather than failing later at
+        // CompleteMultipartUpload part validation.
+        if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
+          throw new OMException(
+              "Missing ETag for multipart upload part " + partNumber,
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
         multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
         omMetadataManager.getMultipartPartsTable().addCacheEntry(
             new CacheKey<>(multipartPartKey),
