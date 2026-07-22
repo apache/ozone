@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -208,9 +207,8 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     OzoneOutputStream partStream = objectStore.getClientProxy()
         .createMultipartKey(volumeName, bucketName, "mpukey1",
             100L, 1, multipartInfo.getUploadID());
-    byte[] partData = new byte[100];
-    partStream.write(partData);
-    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
+    partStream.write(new byte[100]);
+    partStream.getMetadata().put(OzoneConsts.ETAG, "mpukey1-part1-etag");
     partStream.close();
   }
 
