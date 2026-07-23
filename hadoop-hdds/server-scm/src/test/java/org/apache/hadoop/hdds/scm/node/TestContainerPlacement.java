@@ -231,7 +231,7 @@ public class TestContainerPlacement {
               ReplicationConfig.fromProtoTypeAndFactor(
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
-              OzoneConsts.OZONE);
+              OzoneConsts.OZONE, StorageTier.getDefaultTier());
       assertNotNull(container, "allocateContainer returned null (unexpected in this placement test)");
 
       int replicaCount = 0;

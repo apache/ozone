@@ -52,6 +52,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -370,7 +371,7 @@ class TestReplicationManagerIntegration {
    */
   @Test
   public void testEmptyQuasiClosedContainerDeletion() throws Exception {
-    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner");
+    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner", StorageTier.getDefaultTier());
     ContainerID cid = containerInfo.containerID();
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
@@ -437,7 +438,7 @@ class TestReplicationManagerIntegration {
    */
   @Test
   public void testEmptyQuasiClosedContainerDeletionWithMixedReplicaStates() throws Exception {
-    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner");
+    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner", StorageTier.getDefaultTier());
     ContainerID cid = containerInfo.containerID();
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.QUASI_CLOSE);

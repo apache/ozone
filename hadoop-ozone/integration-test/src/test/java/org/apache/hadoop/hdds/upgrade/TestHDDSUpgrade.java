@@ -230,7 +230,7 @@ public class TestHDDSUpgrade {
     assertEquals(0,
         scmPipelineManager.getNumberOfContainers(ratisPipeline1.getId()));
     PipelineID pid = scmContainerManager.allocateContainer(RATIS_THREE,
-        "Owner1").getPipelineID();
+        "Owner1", StorageTier.getDefaultTier()).getPipelineID();
     assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
     assertEquals(pid, ratisPipeline1.getId());
   }
@@ -252,7 +252,7 @@ public class TestHDDSUpgrade {
   private void createTestContainers() throws IOException, TimeoutException {
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     ContainerInfo ci1 = scmContainerManager.allocateContainer(
-        RATIS_THREE, "Owner1");
+        RATIS_THREE, "Owner1", StorageTier.getDefaultTier());
     Pipeline ratisPipeline1 =
         scmPipelineManager.getPipeline(ci1.getPipelineID());
     scmPipelineManager.openPipeline(ratisPipeline1.getId());

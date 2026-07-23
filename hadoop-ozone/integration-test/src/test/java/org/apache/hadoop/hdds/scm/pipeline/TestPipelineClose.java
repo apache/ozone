@@ -36,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -107,7 +108,7 @@ public class TestPipelineClose {
   void createContainer() throws IOException {
     ContainerInfo containerInfo = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "testOwner");
+            ReplicationFactor.THREE), "testOwner", StorageTier.getDefaultTier());
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     // At this stage, there should be 2 pipeline one with 1 open container each.
@@ -221,7 +222,7 @@ public class TestPipelineClose {
 
     ContainerInfo containerInfo = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "testOwner");
+            ReplicationFactor.THREE), "testOwner", StorageTier.getDefaultTier());
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo,
             pipelineManager.getPipeline(containerInfo.getPipelineID()));
@@ -259,7 +260,7 @@ public class TestPipelineClose {
   void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
     ContainerInfo allocateContainer = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "newTestOwner");
+            ReplicationFactor.THREE), "newTestOwner", StorageTier.getDefaultTier());
     ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(allocateContainer,
         pipelineManager.getPipeline(allocateContainer.getPipelineID()));
     

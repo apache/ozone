@@ -275,6 +275,7 @@ message ContainerInfoProto {
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
     optional bool suppressed = 13;
+    optional StorageTierProto storageTier = 14;
 }
 
 message ContainerWithPipeline {

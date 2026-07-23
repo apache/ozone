@@ -24,6 +24,8 @@ import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecr
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -59,6 +61,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -458,6 +461,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
     scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
+    StorageTier.setDefault(StorageTier.valueOf(conf.get(
+        OZONE_DEFAULT_STORAGE_TIER_KEY, OZONE_DEFAULT_STORAGE_TIER_DEFAULT)));
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);

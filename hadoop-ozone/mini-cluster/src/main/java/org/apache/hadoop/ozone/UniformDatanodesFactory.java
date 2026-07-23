@@ -41,10 +41,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,6 +65,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   private final Integer layoutVersion;
   private final DatanodeVersion initialVersion;
   private final DatanodeVersion currentVersion;
+  private final List<List<StorageType>> datanodeStorageType;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
@@ -70,6 +73,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     reservedSpace = builder.reservedSpace;
     currentVersion = builder.currentVersion;
     initialVersion = builder.initialVersion != null ? builder.initialVersion : builder.currentVersion;
+    datanodeStorageType = builder.datanodeStorageType;
   }
 
   @Override
@@ -85,12 +89,31 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     Files.createDirectories(metaDir);
     dnConf.set(OZONE_METADATA_DIRS, metaDir.toString());
 
+    // Look up this datanode's per-volume StorageType list, if configured. `i` is 1-based.
+    List<StorageType> volumeStorageTypes = Collections.emptyList();
+    if (datanodeStorageType != null && !datanodeStorageType.isEmpty()) {
+      if (i - 1 >= datanodeStorageType.size()) {
+        throw new IOException("Datanode index " + (i - 1)
+            + " has no entry in datanodeStorageType list (size="
+            + datanodeStorageType.size() + ").");
+      }
+      volumeStorageTypes = datanodeStorageType.get(i - 1);
+      if (!volumeStorageTypes.isEmpty() && volumeStorageTypes.size() != numDataVolumes) {
+        throw new IOException("Datanode " + (i - 1) + " storageType list size "
+            + volumeStorageTypes.size() + " must equal numDataVolumes " + numDataVolumes + ".");
+      }
+    }
+
     List<String> dataDirs = new ArrayList<>();
     List<String> reservedSpaceList = new ArrayList<>();
     for (int j = 0; j < numDataVolumes; j++) {
       Path dir = baseDir.resolve("data-" + j);
       Files.createDirectories(dir);
-      dataDirs.add(dir.toString());
+      if (!volumeStorageTypes.isEmpty()) {
+        dataDirs.add("[" + volumeStorageTypes.get(j) + "]" + dir);
+      } else {
+        dataDirs.add(dir.toString());
+      }
       if (reservedSpace != null) {
         reservedSpaceList.add(dir + ":" + reservedSpace);
       }
@@ -147,6 +170,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     private Integer layoutVersion;
     private DatanodeVersion initialVersion;
     private DatanodeVersion currentVersion;
+    private List<List<StorageType>> datanodeStorageType = Collections.emptyList();
 
     /**
      * Sets the number of data volumes per datanode.
@@ -181,6 +205,18 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     public Builder setCurrentVersion(DatanodeVersion version) {
       this.currentVersion = version;
+      return this;
+    }
+
+    /**
+     * Per-datanode storage type list. Outer list is indexed by datanode; inner list
+     * is indexed by volume within a datanode. Each inner list, when non-empty, must
+     * have size == numDataVolumes. When set, each data dir is prefixed with
+     * {@code "[StorageType]"} so the DN advertises the requested type.
+     */
+    public Builder setDatanodeStorageType(List<List<StorageType>> datanodeStorageType) {
+      this.datanodeStorageType = datanodeStorageType == null
+          ? Collections.emptyList() : datanodeStorageType;
       return this;
     }
 

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -204,9 +205,10 @@ public interface ContainerStateManager extends SCMHandler {
   /**
    *
    */
-  ContainerInfo getMatchingContainer(long size, String owner,
+  ContainerInfo getMatchingContainerAndStorageTier(long size, String owner,
                                      PipelineID pipelineID,
-                                     NavigableSet<ContainerID> containerIDs);
+                                     NavigableSet<ContainerID> containerIDs,
+                                     StorageTier storageTier);
 
   /**
    *

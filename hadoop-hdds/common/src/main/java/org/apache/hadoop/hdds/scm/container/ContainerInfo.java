@@ -27,8 +27,10 @@ import java.time.Instant;
 import java.util.Comparator;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -89,6 +91,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // Health state of the container (determined by ReplicationManager)
   private ContainerHealthState healthState;
   private boolean suppressed;
+  private StorageTier storageTier;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -105,6 +108,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     clock = b.clock;
     healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
     suppressed = b.suppressed;
+    storageTier = b.storageTier;
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -128,6 +132,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     if (info.hasSuppressed()) {
       builder.setSuppressed(info.getSuppressed());
+    }
+
+    if (info.hasStorageTier()) {
+      builder.setStorageTier(StorageTier.fromProto(info.getStorageTier()));
     }
 
     if (info.hasPipelineID()) {
@@ -290,6 +298,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     this.suppressed = suppressed;
   }
 
+  @Nullable
+  @JsonIgnore
+  public StorageTier getStorageTier() {
+    return storageTier;
+  }
+
+  public void setStorageTier(StorageTier storageTier) {
+    this.storageTier = storageTier;
+  }
+
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -319,6 +337,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       builder.setSuppressed(true);
     }
 
+    if (storageTier != null && storageTier != StorageTier.EMPTY) {
+      builder.setStorageTier(storageTier.toProto());
+    }
+
     return builder.build();
   }
 
@@ -338,6 +360,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         + ", stateEnterTime=" + stateEnterTime
         + ", pipelineID=" + pipelineID
         + ", owner=" + owner
+        + ", storageTier=" + storageTier
         + '}';
   }
 
@@ -422,6 +445,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private ReplicationConfig replicationConfig;
     private ContainerHealthState healthState;
     private boolean suppressed;
+    private StorageTier storageTier;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -481,6 +505,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setSuppressed(boolean suppressed) {
       this.suppressed = suppressed;
+      return this;
+    }
+
+    public Builder setStorageTier(StorageTier storageTier) {
+      this.storageTier = storageTier;
       return this;
     }
 

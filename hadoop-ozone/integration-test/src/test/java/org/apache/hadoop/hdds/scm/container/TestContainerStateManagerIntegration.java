@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -103,7 +105,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
     assertEquals(OzoneConsts.OZONE, info.getOwner());
@@ -131,13 +133,13 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotNull(info);
 
     String newContainerOwner = "OZONE_NEW";
     ContainerInfo info2 = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, newContainerOwner,
-            container1.getPipeline());
+            container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotNull(info2);
 
     assertNotEquals(info.containerID(), info2.containerID());
@@ -209,7 +211,7 @@ public class TestContainerStateManagerIntegration {
     for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
       ContainerInfo info = containerManager
           .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline());
+              container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
       assertThat(info.getContainerID()).isGreaterThan(cid);
       cid = info.getContainerID();
     }
@@ -218,7 +220,7 @@ public class TestContainerStateManagerIntegration {
     // next container should be the same as first container
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
     assertEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
   }
@@ -240,7 +242,7 @@ public class TestContainerStateManagerIntegration {
       CompletableFuture.supplyAsync(() -> {
         ContainerInfo info = containerManager
             .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-                container1.getPipeline());
+                container1.getPipeline(), Collections.emptySet(), StorageTier.getDefaultTier());
         container2MatchedCount
             .compute(info.getContainerID(), (k, v) -> v == null ? 1L : v + 1);
         return null;

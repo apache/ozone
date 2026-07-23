@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -525,7 +526,7 @@ public final class HddsTestUtils {
     return containerManager
         .allocateContainer(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            "root");
+            "root", StorageTier.getDefaultTier());
 
   }
 

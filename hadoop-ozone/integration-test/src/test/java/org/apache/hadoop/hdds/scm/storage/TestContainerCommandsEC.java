@@ -113,6 +113,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -445,6 +446,7 @@ public class TestContainerCommandsEC {
   }
 
   @Test
+  @Unhealthy("Need EC Pipeline to set supported StorageTier value")
   public void testCreateRecoveryContainer() throws Exception {
     try (XceiverClientManager xceiverClientManager =
         new XceiverClientManager(config)) {
@@ -453,7 +455,7 @@ public class TestContainerCommandsEC {
           scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(replicationConfig, "test");
+          .allocateContainer(replicationConfig, "test", StorageTier.getDefaultTier());
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
@@ -534,6 +536,7 @@ public class TestContainerCommandsEC {
   }
 
   @Test
+  @Unhealthy("Need EC Pipeline to set supported StorageTier value")
   public void testCreateRecoveryContainerAfterDNRestart() throws Exception {
     try (XceiverClientManager xceiverClientManager =
              new XceiverClientManager(config)) {
@@ -542,7 +545,7 @@ public class TestContainerCommandsEC {
           scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(replicationConfig, "test");
+          .allocateContainer(replicationConfig, "test", StorageTier.getDefaultTier());
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
