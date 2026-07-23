@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.net;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import org.apache.hadoop.net.NetUtils;
 
 /**
@@ -69,7 +70,7 @@ public class HostAndPort {
 
   /** Commits an address re-resolved via {@link #resolveLatest()}. */
   public void setAddress(InetSocketAddress newAddress) {
-    this.address = newAddress;
+    this.address = Objects.requireNonNull(newAddress, "newAddress == null");
   }
 
   @Override

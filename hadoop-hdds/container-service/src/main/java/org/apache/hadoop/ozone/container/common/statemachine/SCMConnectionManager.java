@@ -192,6 +192,7 @@ public class SCMConnectionManager
       return false;
     }
     final EndpointStateMachine stale;
+    final InetSocketAddress previous;
     writeLock();
     try {
       if (scmMachines.get(address) != current) {
@@ -199,13 +200,20 @@ public class SCMConnectionManager
       }
       EndpointStateMachine rebuilt = buildScmEndpoint(address, latest, threadNamePrefix);
       rebuilt.setPassive(false);
+      previous = address.getAddress();
       address.setAddress(latest);
       scmMachines.put(address, rebuilt);
       stale = current;
     } finally {
       writeUnlock();
     }
-    stale.close();
+    // The swap is committed; failing to close the stale proxy is cleanup-only, not a refresh failure.
+    try {
+      stale.close();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to close stale endpoint for {}", address, e);
+    }
+    LOG.info("SCM endpoint {} re-resolved: {} -> {}", address.getHostAndPortString(), previous, latest);
     return true;
   }
 
