@@ -22,8 +22,10 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -139,7 +141,7 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-      EndpointStateMachine endPoint = buildScmEndpoint(address, threadNamePrefix);
+      EndpointStateMachine endPoint = buildScmEndpoint(address, address.getAddress(), threadNamePrefix);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
@@ -147,8 +149,9 @@ public class SCMConnectionManager
     }
   }
 
-  private EndpointStateMachine buildScmEndpoint(HostAndPort address, String threadNamePrefix)
-      throws IOException {
+  @VisibleForTesting
+  EndpointStateMachine buildScmEndpoint(HostAndPort address, InetSocketAddress dialAddress,
+      String threadNamePrefix) throws IOException {
     Configuration hadoopConfig =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
     RPC.setProtocolEngine(hadoopConfig, StorageContainerDatanodeProtocolPB.class,
@@ -158,7 +161,7 @@ public class SCMConnectionManager
         getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf), TimeUnit.MILLISECONDS);
     StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
         StorageContainerDatanodeProtocolPB.class, version,
-        address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
+        dialAddress, UserGroupInformation.getCurrentUser(), hadoopConfig,
         NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
         retryPolicy).getProxy();
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
@@ -182,8 +185,10 @@ public class SCMConnectionManager
     } finally {
       readUnlock();
     }
-    // Resolve outside the lock; refresh() swaps the cached address only on a real IP change.
-    if (!address.refresh()) {
+    // Resolve outside the lock, but commit the new address only after the replacement is built,
+    // so a build failure or a lost race never leaves the cached address ahead of the live proxy.
+    final InetSocketAddress latest = address.resolveLatest();
+    if (latest == null) {
       return false;
     }
     final EndpointStateMachine stale;
@@ -192,8 +197,9 @@ public class SCMConnectionManager
       if (scmMachines.get(address) != current) {
         return false;
       }
-      EndpointStateMachine rebuilt = buildScmEndpoint(address, threadNamePrefix);
+      EndpointStateMachine rebuilt = buildScmEndpoint(address, latest, threadNamePrefix);
       rebuilt.setPassive(false);
+      address.setAddress(latest);
       scmMachines.put(address, rebuilt);
       stale = current;
     } finally {

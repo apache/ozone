@@ -57,15 +57,19 @@ public class HostAndPort {
     return address;
   }
 
-  /** Re-resolves host:port; on an IP change swaps the cached address and returns true. */
-  public boolean refresh() {
+  /** Re-resolves host:port and returns the new address if its IP changed, else null. No mutation. */
+  public InetSocketAddress resolveLatest() {
     final InetSocketAddress latest = NetUtils.createSocketAddr(hostAndPortString);
     final InetAddress latestIp = latest.getAddress();
     if (latestIp == null || latestIp.equals(address.getAddress())) {
-      return false;
+      return null;
     }
-    address = latest;
-    return true;
+    return latest;
+  }
+
+  /** Commits an address re-resolved via {@link #resolveLatest()}. */
+  public void setAddress(InetSocketAddress newAddress) {
+    this.address = newAddress;
   }
 
   @Override
