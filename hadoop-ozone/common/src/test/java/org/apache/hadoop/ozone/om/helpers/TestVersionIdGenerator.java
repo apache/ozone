@@ -43,7 +43,8 @@ public class TestVersionIdGenerator {
 
   /** Every generator shipped with Ozone; extended as generators are added. */
   static Stream<VersionIdGenerator> generators() {
-    return Stream.of(new TransactionIndexVersionIdGenerator());
+    return Stream.of(new TransactionIndexVersionIdGenerator(),
+        new PinnedFirstVersionIdGenerator());
   }
 
   @ParameterizedTest
@@ -66,6 +67,7 @@ public class TestVersionIdGenerator {
   void generatedIdsNeverCollideWithReservedIds(VersionIdGenerator generator) {
     for (long index = FIRST_USABLE_INDEX; index < 100; index++) {
       assertNotEquals(NULL_VERSION_ID, generator.generateVersionId(index, true));
+      assertNotEquals(NULL_VERSION_ID, generator.generateVersionId(index, false));
     }
     // A transaction index that lands on a reserved id is a misconfiguration of
     // the Ratis log rather than something to silently work around.
@@ -101,6 +103,41 @@ public class TestVersionIdGenerator {
 
     assertEquals(7, generator.generateVersionId(7, false));
     assertEquals(7, generator.generateVersionId(7, true));
+  }
+
+  @Test
+  void pinnedFirstPinsOnlyTheFirstVersionOfAKey() {
+    VersionIdGenerator generator = new PinnedFirstVersionIdGenerator();
+
+    assertEquals(FIRST_VERSION_ID, generator.generateVersionId(7, false));
+    assertEquals(7, generator.generateVersionId(7, true));
+  }
+
+  @Test
+  void pinnedFirstSentinelIsOlderThanEveryTransactionIndex() {
+    VersionIdGenerator generator = new PinnedFirstVersionIdGenerator();
+    long first = generator.generateVersionId(FIRST_USABLE_INDEX, false);
+
+    for (long index = FIRST_USABLE_INDEX; index < 100; index++) {
+      assertTrue(first < generator.generateVersionId(index, true),
+          "sentinel " + first + " is not older than the version at transaction " + index);
+    }
+  }
+
+  @Test
+  void pinnedFirstSentinelIsNotTheNullVersion() {
+    assertNotEquals(NULL_VERSION_ID,
+        new PinnedFirstVersionIdGenerator().generateVersionId(7, false));
+  }
+
+  @Test
+  void pinnedFirstGeneratorIsSelectableByConfiguration() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_VERSIONING_VERSION_ID_GENERATOR,
+        PinnedFirstVersionIdGenerator.class.getName());
+
+    assertInstanceOf(PinnedFirstVersionIdGenerator.class,
+        VersionIdGenerator.fromConfiguration(conf));
   }
 
   @Test

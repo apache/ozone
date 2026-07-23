@@ -5169,7 +5169,9 @@
     <tag>OZONE, OM</tag>
     <description>
       Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to assign the
-      versionId of an object version. The default uses the index of the committing transaction.
+      versionId of an object version. The default uses the index of the committing transaction;
+      PinnedFirstVersionIdGenerator additionally pins the first version of every key to a reserved
+      sentinel, so that it can be referenced without listing the key's versions first.
       The setting is cluster-wide and may be changed on a running cluster; a write whose generated
       versionId already exists on the key is rejected, and the existing version has to be deleted
       before that id can be written again.
