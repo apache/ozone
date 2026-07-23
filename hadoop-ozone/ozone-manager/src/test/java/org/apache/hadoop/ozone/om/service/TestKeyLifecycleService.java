@@ -3379,7 +3379,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       KeyLifecycleService.PartCountLimitedList list =
           new KeyLifecycleService.PartCountLimitedList(10);
-      for (String uploadId : List.of(uploadA, uploadB, uploadC)) {
+      for (String uploadId : Arrays.asList(uploadA, uploadB, uploadC)) {
         try {
           int partCount = OMMultipartUploadUtils.countParts(mockMM, uploadId);
           list.add(new OmMultipartUpload("v", "b", "k", uploadId), partCount);
@@ -3392,6 +3392,43 @@ class TestKeyLifecycleService extends OzoneTestBase {
     } finally {
       omMetadataManager.getStore().close();
     }
+  }
+
+  @Test
+  public void testPartCountLimitedListBoundaryBehavior() {
+    // Zero-parts upload is addable and does not fill the list
+    KeyLifecycleService.PartCountLimitedList list =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    list.add(new OmMultipartUpload("v", "b", "k", "id1"), 0);
+    assertEquals(1, list.size());
+    assertEquals(0, list.getPartCount());
+    assertFalse(list.isFull());
+    assertFalse(list.isEmpty());
+
+    // Exact boundary: partCount == maxPartCount triggers isFull
+    KeyLifecycleService.PartCountLimitedList exactList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    exactList.add(new OmMultipartUpload("v", "b", "k", "id2"), 5);
+    assertEquals(1, exactList.size());
+    assertEquals(5, exactList.getPartCount());
+    assertTrue(exactList.isFull());
+
+    // Over boundary: cumulative parts exceed max
+    KeyLifecycleService.PartCountLimitedList overList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    overList.add(new OmMultipartUpload("v", "b", "k", "id3"), 3);
+    assertFalse(overList.isFull());
+    overList.add(new OmMultipartUpload("v", "b", "k", "id4"), 3);
+    assertTrue(overList.isFull());
+    assertEquals(2, overList.size());
+    assertEquals(6, overList.getPartCount());
+
+    // clear() resets all state
+    overList.clear();
+    assertTrue(overList.isEmpty());
+    assertFalse(overList.isFull());
+    assertEquals(0, overList.size());
+    assertEquals(0, overList.getPartCount());
   }
 
   private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,

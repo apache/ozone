@@ -1114,6 +1114,143 @@ public class TestOmMetadataManager {
     assertThat(expiredMPUs).containsAll(names);
   }
 
+  @Test
+  public void testGetExpiredMPUsMixedSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numPartsPerMPU = 3;
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    Set<String> expiredLegacyKeys = new HashSet<>();
+    Set<String> expiredSplitKeys = new HashSet<>();
+
+    // Create 2 legacy-schema expired MPUs with embedded parts
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+      String keyName = "legacy" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        PartKeyInfo partKeyInfo = OMRequestTestUtils
+            .createPartKeyInfo(volumeName, bucketName, keyName, uploadId, j);
+        OMRequestTestUtils.addPart(partKeyInfo, mpuKeyInfo);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredLegacyKeys.add(mpuDbKey);
+    }
+
+    // Create 2 split-schema expired MPUs with parts in multipartPartsTable
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = new OmMultipartKeyInfo.Builder(
+          OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L))
+          .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+          .build();
+      String keyName = "split" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        addSplitSchemaPart(uploadId, j);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredSplitKeys.add(mpuDbKey);
+    }
+
+    // Budget of 9 parts fits exactly 3 MPUs (3 parts each)
+    List<ExpiredMultipartUploadsBucket> someExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 3);
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(3, names.size());
+
+    // Budget of 12 parts fits all 4 expired MPUs
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 4);
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(4, names.size());
+    assertThat(names).containsAll(expiredLegacyKeys);
+    assertThat(names).containsAll(expiredSplitKeys);
+  }
+
+  @Test
+  public void testGetExpiredMPUsZeroPartsSplitSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    // Zero-parts split-schema MPU (freshly initiated, no parts uploaded)
+    String uploadIdZero = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuZero = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdZero, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoZero = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "aaa-zero-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    String zeroKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoZero, mpuZero, 0L, omMetadataManager);
+
+    // Split-schema MPU with 3 parts
+    String uploadIdThree = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuThree = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdThree, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoThree = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "zzz-three-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    for (int j = 1; j <= 3; j++) {
+      addSplitSchemaPart(uploadIdThree, j);
+    }
+    String threeKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoThree, mpuThree, 0L, omMetadataManager);
+
+    // maxParts=0 returns nothing (loop pre-check 0 < 0 is false)
+    List<ExpiredMultipartUploadsBucket> noneExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 0);
+    assertTrue(getMultipartKeyNames(noneExpired).isEmpty());
+
+    // maxParts=3 should return both: zero-parts contributes 0, three-parts
+    // contributes 3, total = 3 which satisfies the loop exit condition
+    List<ExpiredMultipartUploadsBucket> allExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 3);
+    List<String> names = getMultipartKeyNames(allExpired);
+    assertEquals(2, names.size());
+    assertThat(names).contains(zeroKey);
+    assertThat(names).contains(threeKey);
+  }
+
   private void addSplitSchemaPart(String uploadId, int partNumber) throws IOException {
     OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(1L, partNumber))
