@@ -53,6 +53,8 @@ jobs:
       
       - name: Checkout ozone-site repository
         if: steps.check-site-repo.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
         run: |
           git config --global url."https://asf-ci-deploy:${{ secrets.OZONE_WEBSITE_BUILD }}@github.com/".insteadOf "https://github.com/"
           git config --global user.name 'github-actions[bot]'
@@ -60,7 +62,17 @@ jobs:
           
           git clone --depth=1 --branch=master https://github.com/$REPO_OWNER/ozone-site.git ozone-site
           cd ozone-site
-          echo "Using master as baseline for doc comparison and PR branch creation"
+
+          EXISTING_PR=$(gh pr list --repo "$REPO_OWNER/ozone-site" \
+            --head "$BRANCH_NAME" --base master --json number --jq '.[0].number' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Open PR #$EXISTING_PR exists, checking out branch for comparison"
+            git fetch --depth=1 origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" FETCH_HEAD
+          else
+            echo "No open PR, using master as baseline for doc comparison"
+          fi
 
       - name: Check if documentation changed
         if: steps.check-site-repo.outputs.exists == 'true'
@@ -120,30 +132,37 @@ jobs:
       
       - name: Commit and push changes
         if: steps.check-changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
         run: |
           cd ozone-site
-          
-          echo "Baseline branch: master"
-          echo "Baseline commit: $(git rev-parse master)"
-          
-          # Always recreate the PR branch from master so merged changes are not replayed.
-          git checkout master
-          git checkout -B "$BRANCH_NAME"
-          echo "Created branch $BRANCH_NAME from master"
-          
-          git add "$TARGET_FILE"
-          
-          # Build commit message with JIRA ID if available
+
+          EXISTING_PR=$(gh pr list --repo "$REPO_OWNER/ozone-site" \
+            --head "$BRANCH_NAME" --base master --json number --jq '.[0].number' || echo "")
+
           COMMIT_MSG="[Auto] Update configuration documentation from ozone $SHA"
           if [ -n "$JIRA_ID" ]; then
             COMMIT_MSG="$JIRA_ID. $COMMIT_MSG"
           fi
-          
-          git commit -m "$COMMIT_MSG"
-          
-          echo "Pushing $BRANCH_NAME to origin"
-          git push -f origin "$BRANCH_NAME"
-      
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Open PR #$EXISTING_PR exists, appending commit to preserve history"
+            git fetch --depth=1 origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" FETCH_HEAD
+            cp ../Configurations.md "$TARGET_FILE"
+            git add "$TARGET_FILE"
+            git commit -m "$COMMIT_MSG"
+            git push origin "$BRANCH_NAME"
+          else
+            echo "No open PR, recreating branch from master"
+            git checkout master
+            git checkout -B "$BRANCH_NAME"
+            cp ../Configurations.md "$TARGET_FILE"
+            git add "$TARGET_FILE"
+            git commit -m "$COMMIT_MSG"
+            git push -f origin "$BRANCH_NAME"
+          fi
+
       - name: Create or update Pull Request in ozone-site
         if: steps.check-changes.outputs.changed == 'true' && github.repository == 'apache/ozone'
         env:
