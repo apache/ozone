@@ -1138,18 +1138,23 @@ public class KeyLifecycleService extends BackgroundService {
                 abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
               }
 
-              // Get part count for this MPU (at least 1 even if no parts uploaded yet).
-              // Split-schema MPUs keep parts in the separate multipartPartsTable
-              // (the embedded map is empty), so count those rows; legacy MPUs use
-              // the embedded map.
-              int uploadedParts = mpuKeyInfo.getSchemaVersion()
-                  == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
-                  ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
-                  : mpuKeyInfo.getPartKeyInfoMap().size();
-              int partCount = Math.max(1, uploadedParts);
-              expiredUploads.add(upload, partCount);
+              // Split-schema MPUs keep parts in multipartPartsTable (the embedded map
+              // is empty); legacy MPUs use the embedded map. An MPU with no uploaded
+              // parts is valid (S3 allows aborting it with an empty parts list).
+              int uploadedParts;
+              try {
+                uploadedParts = mpuKeyInfo.getSchemaVersion()
+                    == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+                    ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
+                    : mpuKeyInfo.getPartKeyInfoMap().size();
+              } catch (IOException e) {
+                LOG.warn("Failed to count parts for MPU {}/{}/{} uploadId {}, skipping",
+                    volumeName, bucketName, keyName, upload.getUploadId(), e);
+                break;
+              }
+              expiredUploads.add(upload, uploadedParts);
               LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
-                  volumeName, bucketName, keyName, upload.getUploadId(), partCount);
+                  volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
               break;
             }
           }

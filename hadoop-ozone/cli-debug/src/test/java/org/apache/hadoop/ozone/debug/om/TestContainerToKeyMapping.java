@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -190,6 +192,18 @@ public class TestContainerToKeyMapping {
   }
 
   @Test
+  public void testContainerToKeyMappingWithSplitSchemaMPU() {
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_4), "--in-progress");
+    assertEquals(0, exitCode);
+
+    String output = outWriter.toString();
+
+    assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
+    assertThat(output).contains("\"openKeys\"");
+    assertThat(output).contains("/vol1/obs-bucket/splitMpuKey/split-upload-id");
+  }
+
+  @Test
 
   public void testNonExistentContainer() {
     long nonExistentContainerId = 999L;
@@ -292,6 +306,7 @@ public class TestContainerToKeyMapping {
 
     // Create MPU (multipart upload) for OBS bucket with parts in container 5
     createMultipartUpload();
+    createSplitSchemaMultipartUpload();
   }
 
   /**
@@ -334,6 +349,56 @@ public class TestContainerToKeyMapping {
         .build();
 
     // Put into multipartInfoTable
+    String mpuKey = omMetadataManager.getMultipartKey(
+        VOLUME_NAME, OBS_BUCKET_NAME, mpuKeyName, uploadId);
+    omMetadataManager.getMultipartInfoTable().put(mpuKey, mpuInfo);
+  }
+
+  /**
+   * Helper method to create a split-schema multipart upload with parts in
+   * multipartPartsTable.
+   */
+  private void createSplitSchemaMultipartUpload() throws Exception {
+    String mpuKeyName = "splitMpuKey";
+    String uploadId = "split-upload-id";
+
+    OmKeyInfo part1Info = createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_4);
+    OmMultipartPartInfo partInfo1 = new OmMultipartPartInfo.Builder()
+        .setPartName(mpuKeyName + "/" + uploadId + "/part-1")
+        .setPartNumber(1)
+        .setDataSize(part1Info.getDataSize())
+        .setObjectID(part1Info.getObjectID())
+        .setUpdateID(part1Info.getUpdateID())
+        .setETag("etag-1")
+        .setKeyLocationInfos(part1Info.getKeyLocationVersions())
+        .build();
+
+    OmKeyInfo part2Info = createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_4);
+    OmMultipartPartInfo partInfo2 = new OmMultipartPartInfo.Builder()
+        .setPartName(mpuKeyName + "/" + uploadId + "/part-2")
+        .setPartNumber(2)
+        .setDataSize(part2Info.getDataSize())
+        .setObjectID(part2Info.getObjectID())
+        .setUpdateID(part2Info.getUpdateID())
+        .setETag("etag-2")
+        .setKeyLocationInfos(part2Info.getKeyLocationVersions())
+        .build();
+
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 1), partInfo1);
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 2), partInfo2);
+
+    OmMultipartKeyInfo mpuInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadId)
+        .setCreationTime(System.currentTimeMillis())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .setObjectID(MPU_KEY_ID + 10)
+        .setParentID(0)
+        .setUpdateID(1)
+        .build();
+
     String mpuKey = omMetadataManager.getMultipartKey(
         VOLUME_NAME, OBS_BUCKET_NAME, mpuKeyName, uploadId);
     omMetadataManager.getMultipartInfoTable().put(mpuKey, mpuInfo);

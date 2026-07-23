@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED;
@@ -50,10 +51,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -77,6 +80,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -93,6 +97,7 @@ import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneTrash;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
@@ -115,12 +120,16 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -146,6 +155,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -3339,5 +3349,67 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   public static String uniqueObjectName(String prefix) {
     return prefix + OBJECT_COUNTER.getAndIncrement();
+  }
+
+  @Test
+  public void testPartCountIoExceptionSkipsUploadContinuesBucket(@TempDir File tempDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf, null);
+    try {
+      String uploadA = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadB = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadC = OMMultipartUploadUtils.getMultipartUploadId();
+
+      addSplitSchemaPart(omMetadataManager, uploadA, 1);
+      addSplitSchemaPart(omMetadataManager, uploadA, 2);
+      addSplitSchemaPart(omMetadataManager, uploadC, 1);
+
+      OMMetadataManager mockMM = Mockito.spy(omMetadataManager);
+      Table<OmMultipartPartKey, OmMultipartPartInfo> mockPartsTable =
+          Mockito.spy(omMetadataManager.getMultipartPartsTable());
+      when(mockMM.getMultipartPartsTable()).thenReturn(mockPartsTable);
+      when(mockPartsTable.iterator(eq(OmMultipartPartKey.prefix(uploadB))))
+          .thenThrow(new IOException("simulated corruption"));
+
+      assertEquals(2, OMMultipartUploadUtils.countParts(mockMM, uploadA));
+      assertThrows(IOException.class,
+          () -> OMMultipartUploadUtils.countParts(mockMM, uploadB));
+
+      KeyLifecycleService.PartCountLimitedList list =
+          new KeyLifecycleService.PartCountLimitedList(10);
+      for (String uploadId : List.of(uploadA, uploadB, uploadC)) {
+        try {
+          int partCount = OMMultipartUploadUtils.countParts(mockMM, uploadId);
+          list.add(new OmMultipartUpload("v", "b", "k", uploadId), partCount);
+        } catch (IOException e) {
+          // per-MPU skip — bucket loop continues
+        }
+      }
+      assertEquals(2, list.size());
+      assertEquals(3, list.getPartCount());
+    } finally {
+      omMetadataManager.getStore().close();
+    }
+  }
+
+  private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,
+      String uploadId, int partNumber) throws IOException {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1L, partNumber))
+        .setLength(100)
+        .build();
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+    OmMultipartPartInfo partInfo = new OmMultipartPartInfo.Builder()
+        .setPartName("part-" + partNumber)
+        .setPartNumber(partNumber)
+        .setDataSize(100L)
+        .setETag("etag-" + partNumber)
+        .setKeyLocationInfos(Collections.singletonList(locationGroup))
+        .build();
+    omMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadId, partNumber), partInfo);
   }
 }
