@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.TransactionIndexVersionIdGenerator;
+import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -714,6 +716,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_VERSIONING_VERSION_ID_GENERATOR =
+      "ozone.om.versioning.version-id-generator";
+  public static final Class<? extends VersionIdGenerator>
+      OZONE_OM_VERSIONING_VERSION_ID_GENERATOR_DEFAULT = TransactionIndexVersionIdGenerator.class;
 
   /**
    * Never constructed.

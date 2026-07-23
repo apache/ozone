@@ -5163,4 +5163,16 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
+  <property>
+    <name>ozone.om.versioning.version-id-generator</name>
+    <value>org.apache.hadoop.ozone.om.helpers.TransactionIndexVersionIdGenerator</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to assign the
+      versionId of an object version. The default uses the index of the committing transaction.
+      The setting is cluster-wide and may be changed on a running cluster; a write whose generated
+      versionId already exists on the key is rejected, and the existing version has to be deleted
+      before that id can be written again.
+    </description>
+  </property>
 </configuration>
