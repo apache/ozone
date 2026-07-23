@@ -289,7 +289,7 @@ Custos ships these providers:
 | Provider class | Credential type | Validation |
 |:---------------|:----------------|:-----------|
 | `OidcProvider` | OIDC JWT (bearer token) | Validate the JWT against a JWKS endpoint (RSA keys only, reject `alg=none`). Groups and roles come from the token claims. |
-| `KerberosProvider` | SPNEGO token | Establish a `GSSContext` with the service keytab. Returns an identity with groups from the resolved UGI. |
+| `KerberosProvider` | SPNEGO token | Accept the client SPNEGO token with the Custos service keytab (`ozone.custos.kerberos.keytab`). The service principal travels in the credential from the client; Custos does not read a principal config locally. Group resolution is handled by `KerberosIdentityProvider`. |
 | `S3SecretProvider` | SigV4 static key | Look up the secret with `S3SecretManager.getSecretString(accessId)` and verify the HMAC with `AWSV4AuthValidator.validateRequest()`. |
 | `DelegationTokenProvider` | `Token<OzoneTokenIdentifier>` | `OzoneDelegationTokenSecretManager.retrievePassword()`. Lets existing delegation-token holders work through the same contract. |
 
