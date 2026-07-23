@@ -31,7 +31,6 @@ import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
@@ -71,7 +70,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -119,26 +117,30 @@ class TestContainerReplication {
     setLogLevel(SCMContainerPlacementRandom.class, Level.DEBUG);
   }
 
+  /**
+   * Verifies that a closed RATIS THREE container which becomes under-replicated
+   * after a datanode shutdown is restored to three replicas by ReplicationManager,
+   * and that the configured placement policy records the datanode-choose metrics.
+   * Runs once per placement policy in {@link #containerReplicationArguments()}.
+   */
   @ParameterizedTest
   @MethodSource("containerReplicationArguments")
-  void testContainerReplication(String placementPolicyClass) throws Exception {
+  void testRatisContainerReReplicationAfterDatanodeShutdown(String placementPolicyClass) throws Exception {
 
     OzoneConfiguration conf = createConfiguration();
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
-    try (MiniOzoneCluster cluster = newCluster(conf)) {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build()) {
       cluster.waitForClusterToBeReady();
       SCMContainerPlacementMetrics metrics = cluster.getStorageContainerManager().getPlacementMetrics();
       try (OzoneClient client = cluster.newClient()) {
         createTestData(client);
 
-        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
-        assertThat(keyLocations).isNotEmpty();
         long datanodeChooseAttemptCount = metrics.getDatanodeChooseAttemptCount();
         long datanodeChooseSuccessCount = metrics.getDatanodeChooseSuccessCount();
         long datanodeChooseFallbackCount = metrics.getDatanodeChooseFallbackCount();
         long datanodeRequestCount = metrics.getDatanodeRequestCount();
 
-        OmKeyLocationInfo keyLocation = keyLocations.get(0);
+        OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
         long containerID = keyLocation.getContainerID();
         waitForContainerClose(cluster, containerID);
 
@@ -156,13 +158,6 @@ class TestContainerReplication {
     }
   }
 
-  private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
-      throws IOException {
-    return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
-        .build();
-  }
-
   private static OzoneConfiguration createConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
@@ -177,14 +172,8 @@ class TestContainerReplication {
     return conf;
   }
 
-  // TODO use common helper to create test data
   private void createTestData(OzoneClient client) throws IOException {
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(VOLUME);
-    OzoneVolume volume = objectStore.getVolume(VOLUME);
-    volume.createBucket(BUCKET);
-
-    OzoneBucket bucket = volume.getBucket(BUCKET);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
     TestDataUtil.createKey(bucket, KEY,
         RatisReplicationConfig.getInstance(THREE),
@@ -192,30 +181,12 @@ class TestContainerReplication {
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(VOLUME);
-    OzoneVolume volume = objectStore.getVolume(VOLUME);
-    volume.createBucket(BUCKET);
-    OzoneBucket bucket = volume.getBucket(BUCKET);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
-    byte[] b = new byte[size];
-    b = RandomUtils.secure().randomBytes(b.length);
+    byte[] b = RandomUtils.secure().randomBytes(size);
     TestDataUtil.createKey(bucket, KEY,
         new ECReplicationConfig("RS-3-2-1k"), b);
     return b;
-  }
-
-  private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster)
-      throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(VOLUME)
-        .setBucketName(BUCKET)
-        .setKeyName(KEY)
-        .build();
-    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-    assertNotNull(locations);
-    return locations.getLocationList();
   }
 
   private static OmKeyLocationInfo lookupKeyFirstLocation(MiniOzoneCluster cluster)
@@ -279,7 +250,7 @@ class TestContainerReplication {
     try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build()) {
       cluster.waitForClusterToBeReady();
 
-      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      try (OzoneClient client = cluster.newClient()) {
         List<DatanodeDetails> allNodes =
             cluster.getHddsDatanodes().stream()
                 .map(HddsDatanodeService::getDatanodeDetails)
@@ -323,7 +294,7 @@ class TestContainerReplication {
       // Creating Cluster with 5 Nodes
       try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build()) {
         cluster.waitForClusterToBeReady();
-        try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+        try (OzoneClient client = cluster.newClient()) {
           Set<DatanodeDetails> allNodes =
               cluster.getHddsDatanodes().stream().map(HddsDatanodeService::getDatanodeDetails).collect(
                   Collectors.toSet());
