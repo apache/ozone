@@ -101,7 +101,7 @@ describe('Capacity Page', () => {
     expect(datanodeCard).toHaveTextContent(/FREE SPACE\s*3\s*KB/i);
   });
 
-  test('clamps pendingBlockSize to 0 when selected datanode reports -1 (offline/unreachable)', async () => {
+  test('defaults to the first available datanode when the first datanode reports -1 (offline/unreachable)', async () => {
     capacityServer.use(
       rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
         const component = req.url.searchParams.get('component');
@@ -136,13 +136,70 @@ describe('Capacity Page', () => {
     if (!datanodeCard) {
       return;
     }
-    // dn-1 is selected by default; its pendingBlockSize is -1 (offline sentinel).
-    // PENDING DELETION should show 0 B, not a negative value.
+    // dn-1 is unavailable (pendingBlockSize -1), but dn-2 is healthy, so the page should
+    // default to dn-2 and show its capacity instead of landing on the error card.
+    // USED SPACE = used (2048) + pendingBlockSize (2048) = 4 KB, FREE SPACE = remaining
+    // (2048) + committed (1024) = 3 KB.
     await waitFor(() =>
-      expect(datanodeCard).toHaveTextContent(/PENDING DELETION\s*0\s*B/i)
+      expect(datanodeCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i)
     );
-    // USED SPACE = used (4096) + clamped pendingBlockSize (0) = 4 KB
-    expect(datanodeCard).toHaveTextContent(/USED SPACE\s*4\s*KB/i);
+    expect(datanodeCard).toHaveTextContent(/FREE SPACE\s*3\s*KB/i);
+    expect(screen.queryByTestId('dn-used-space-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dn-free-space-error')).not.toBeInTheDocument();
+    // The dropdown label must reflect the actually-selected DN (dn-2), not the first
+    // (unavailable) option.
+    const selectionItem = datanodeCard.querySelector('.ant-select-selection-item');
+    expect(selectionItem).toHaveTextContent('dn-2');
+    expect(selectionItem).not.toHaveTextContent('dn-1');
+  });
+
+  test('shows error card instead of outdated data when every datanode reports -1 (offline/unreachable)', async () => {
+    capacityServer.use(
+      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+        const component = req.url.searchParams.get('component');
+        if (component === 'dn') {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              ...mockResponses.DnPendingDeletion,
+              pendingDeletionPerDataNode: [
+                { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
+                { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: -1 }
+              ]
+            })
+          );
+        }
+        const map: Record<string, object> = {
+          scm: mockResponses.ScmPendingDeletion,
+          om: mockResponses.OmPendingDeletion
+        };
+        const body = component ? map[component] : undefined;
+        return body
+          ? res(ctx.status(200), ctx.json(body))
+          : res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+      })
+    );
+
+    render(<Capacity />);
+
+    const downloadLink = await screen.findByText('Download Insights');
+    const datanodeCard = downloadLink.closest('.ant-card');
+    expect(datanodeCard).not.toBeNull();
+    if (!datanodeCard) {
+      return;
+    }
+    // No DN is available, so we fall back to dn-1; its pendingBlockSize is -1 (offline
+    // sentinel), so the datanode is unavailable and its capacity data may be outdated.
+    // Show an error card for USED SPACE and FREE SPACE instead of the stale
+    // storage-report values.
+    expect(await screen.findByTestId('dn-used-space-error')).toBeInTheDocument();
+    expect(await screen.findByTestId('dn-free-space-error')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(datanodeCard).toHaveTextContent(/USED SPACE\s*N\/A/i)
+    );
+    expect(datanodeCard).toHaveTextContent(/FREE SPACE\s*N\/A/i);
+    // With every DN unavailable, the dropdown falls back to the first DN (dn-1).
+    expect(datanodeCard.querySelector('.ant-select-selection-item')).toHaveTextContent('dn-1');
   });
 
   test('shows scm-only error state when SCM pending deletion returns sentinel failure values', async () => {
