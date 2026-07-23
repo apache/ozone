@@ -419,6 +419,17 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
+//    if (close && !putBlockFutures.isEmpty()) {
+//      try {
+//        CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+//      } catch (ExecutionException e) {
+//        throw new IOException(EXCEPTION_MSG + e.toString(), e);
+//      } catch (InterruptedException ex) {
+//        Thread.currentThread().interrupt();
+//        handleInterruptedException(ex, false);
+//      }
+//    }
+    containerBlockData.setBlockID(blockID.get().getDatanodeBlockIDProtobuf());
     final BlockData blockData = containerBlockData.build();
     if (close) {
       // HDDS-12007 changed datanodes to ignore the following PutBlock request.
@@ -441,17 +452,18 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           }
         }
       });
+      // PutBlock is supposed to be committed after the data stream close so there
+      // is no need to continue.
+      if (config.isDatastreamPutBlockOnCloseEnabled()) {
+//        BlockID committed = new BlockID(blockID.get());
+//        // The committed sequence id should be the one that PutBlock was just commited
+//        // through data stream close. So the next sequence id should be at least +1.
+//        committed.setBlockCommitSequenceId(
+//            containerBlockData.getBlockID().getBlockCommitSequenceId() + 1);
+//        blockID.set(committed);
+        return;
+      }
     }
-//      if (config.isDatastreamPutBlockOnCloseEnabled()) {
-//        return;
-//      }
-//    }
-//
-//    submitPutBlockAsync(blockData, close, force, flushPos, byteBufferList);
-//  }
-//
-//  private void submitPutBlockAsync(BlockData blockData, boolean close, boolean force,
-//      long flushPos, List<StreamBuffer> byteBufferList) throws IOException {
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);

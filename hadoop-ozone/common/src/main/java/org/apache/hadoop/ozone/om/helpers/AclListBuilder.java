@@ -91,6 +91,14 @@ public final class AclListBuilder {
     return added;
   }
 
+  /**
+   * Overload accepting List instead of Collection for binary compatibility
+   * with callers compiled against {@code set(List)}.
+   */
+  public boolean set(@Nonnull List<OzoneAcl> acls) {
+    return set((Collection<OzoneAcl>) acls);
+  }
+
   /** Set the list being built to {@code acls}.  For further mutations to work, it must be modifiable. */
   public boolean set(@Nonnull Collection<OzoneAcl> acls) {
     Objects.requireNonNull(acls, "acls == null");
