@@ -682,12 +682,20 @@ public abstract class ConfigurationFieldsTests {
   /**
    * Verifies no default value in the XML embeds a line break, which would
    * corrupt the runtime string (see HDDS-8046). Legitimate cases opt out via
-   * {@link #xmlPropsAllowedToContainNewline}.
+   * {@link #xmlPropsAllowedToContainNewline}. Unlike the comparison tests, this
+   * reads the raw XML directly so it is not narrowed by
+   * {@code xmlPropsToSkipCompare}/{@code xmlPrefixToSkipCompare}: every property
+   * is checked, and the only exemption is {@link #xmlPropsAllowedToContainNewline}.
    */
   @Test
   public void testXmlValuesHaveNoEmbeddedNewlines() {
-    Set<String> xmlValuesWithNewlines = new HashSet<>();
-    for (Map.Entry<String, String> entry : xmlKeyValueMap.entrySet()) {
+    assertNotNull(xmlFilename);
+    Configuration conf = new Configuration(false);
+    conf.setAllowNullValueProperties(true);
+    conf.addResource(xmlFilename);
+
+    Set<String> xmlValuesWithNewlines = new TreeSet<>();
+    for (Map.Entry<String, String> entry : conf) {
       String value = entry.getValue();
       if (value == null) {
         continue;
@@ -703,7 +711,7 @@ public abstract class ConfigurationFieldsTests {
 
     assertTrue(xmlValuesWithNewlines.isEmpty(),
         "These properties in " + xmlFilename + " have an embedded line break in "
-            + "their <value>, which corrupts the runtime string:  " + xmlValuesWithNewlines
+            + "their <value>, which corrupts the runtime string: " + xmlValuesWithNewlines
             + " Put the value on a single line. If the newline is genuinely required, "
             + "add the property to xmlPropsAllowedToContainNewline (in "
             + "initializeMemberVariables) with a reason + Jira. See HDDS-8082.");
