@@ -48,7 +48,9 @@ public class TestVersionIdGenerator {
 
   @ParameterizedTest
   @MethodSource("generators")
-  void generatedIdsIncreaseWithTheTransactionIndex(VersionIdGenerator generator) {
+  void generatedIdsStrictlyIncreaseWithinAKey(VersionIdGenerator generator) {
+    // The contract every generator owes VersionIdAllocator: over the life of a
+    // key, ids only ever go up, starting from the key's first version.
     long previous = generator.generateVersionId(FIRST_USABLE_INDEX, false);
     for (long index = FIRST_USABLE_INDEX + 1; index < 100; index++) {
       long current = generator.generateVersionId(index, true);

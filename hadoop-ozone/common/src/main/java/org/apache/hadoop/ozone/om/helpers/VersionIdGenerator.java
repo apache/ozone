@@ -32,16 +32,22 @@ import org.apache.hadoop.util.ReflectionUtils;
  * promotion rely on:
  *
  * <ul>
- *   <li>ids increase within a key: a version created later has a larger id;</li>
+ *   <li>ids strictly increase within a key: for one generator, the id of a
+ *       version created later is always greater than the id of every version of
+ *       that key created before it, never equal and never smaller. The
+ *       versionedKeyTable ordering and version promotion depend on this;</li>
  *   <li>an id is assigned once when the version is created and never changes
  *       afterwards, so that external references stay valid;</li>
  *   <li>{@link #NULL_VERSION_ID} is reserved and is never generated.</li>
  * </ul>
  *
- * <p>The generator is cluster-wide and may be changed on a running cluster, so
- * these constraints hold per generator but not necessarily across a change of
- * generator. Colliding ids are rejected at commit time rather than prevented
- * here; see {@code VersionIdAllocator}.
+ * <p>The first constraint binds one generator, not a sequence of them: the
+ * generator is cluster-wide and may be changed on a running cluster, and the
+ * new one knows nothing of the ids the old one handed out.
+ * {@code VersionIdAllocator} enforces the constraint at commit time and refuses
+ * a write whose id does not come after the key's current version, so a change
+ * of generator fails loudly on affected keys instead of corrupting their
+ * version order.
  */
 public interface VersionIdGenerator {
 
