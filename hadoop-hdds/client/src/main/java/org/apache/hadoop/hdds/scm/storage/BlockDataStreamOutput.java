@@ -427,29 +427,31 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // Then, old datanodes will fail since they expect a PutBlock.
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
-              xceiverClient.getPipeline(), blockData, true, tokenString);
+          xceiverClient.getPipeline(), blockData, true, tokenString);
       dataStreamCloseReply = executePutBlockClose(putBlockRequest,
           PUT_BLOCK_REQUEST_LENGTH_MAX, out);
       dataStreamCloseReply.whenComplete((reply, e) -> {
         if (e != null || reply == null || !reply.isSuccess()) {
           LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
           try {
-            submitPutBlockAsync(blockData, true, force, flushPos, byteBufferList);
+            executePutBlock(true, false);
+            // submitPutBlockAsync(blockData, true, force, flushPos, byteBufferList);
           } catch (IOException ex) {
             throw new CompletionException(ex);
           }
         }
       });
-      if (config.isDatastreamPutBlockOnCloseEnabled()) {
-        return;
-      }
     }
-
-    submitPutBlockAsync(blockData, close, force, flushPos, byteBufferList);
-  }
-
-  private void submitPutBlockAsync(BlockData blockData, boolean close, boolean force,
-      long flushPos, List<StreamBuffer> byteBufferList) throws IOException {
+//      if (config.isDatastreamPutBlockOnCloseEnabled()) {
+//        return;
+//      }
+//    }
+//
+//    submitPutBlockAsync(blockData, close, force, flushPos, byteBufferList);
+//  }
+//
+//  private void submitPutBlockAsync(BlockData blockData, boolean close, boolean force,
+//      long flushPos, List<StreamBuffer> byteBufferList) throws IOException {
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);
