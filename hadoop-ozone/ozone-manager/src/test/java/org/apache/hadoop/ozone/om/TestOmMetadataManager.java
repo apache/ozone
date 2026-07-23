@@ -1121,13 +1121,16 @@ public class TestOmMetadataManager {
         .build();
     OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
         Collections.singletonList(locationInfo));
-    OmMultipartPartInfo partInfo = new OmMultipartPartInfo.Builder()
-        .setPartName("part-" + partNumber)
-        .setPartNumber(partNumber)
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo("vol", "bucket", "key",
+            RatisReplicationConfig.getInstance(ONE))
         .setDataSize(100L)
-        .setETag("etag-" + partNumber)
-        .setKeyLocationInfos(Collections.singletonList(locationGroup))
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(org.apache.hadoop.ozone.OzoneConsts.ETAG, "etag-" + partNumber)
         .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
     omMetadataManager.getMultipartPartsTable().put(
         OmMultipartPartKey.of(uploadId, partNumber), partInfo);
   }

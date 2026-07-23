@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -362,29 +362,19 @@ public class TestContainerToKeyMapping {
     String mpuKeyName = "splitMpuKey";
     String uploadId = "split-upload-id";
 
-    OmKeyInfo part1Info = createOBSKeyInfo(
-        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_4);
-    OmMultipartPartInfo partInfo1 = new OmMultipartPartInfo.Builder()
-        .setPartName(mpuKeyName + "/" + uploadId + "/part-1")
-        .setPartNumber(1)
-        .setDataSize(part1Info.getDataSize())
-        .setObjectID(part1Info.getObjectID())
-        .setUpdateID(part1Info.getUpdateID())
-        .setETag("etag-1")
-        .setKeyLocationInfos(part1Info.getKeyLocationVersions())
+    OmKeyInfo part1Info = new OmKeyInfo.Builder(createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_4))
+        .addMetadata(OzoneConsts.ETAG, "etag-1")
         .build();
+    OmMultipartPartInfo partInfo1 = OmMultipartPartInfo.from(
+        mpuKeyName + "/" + uploadId + "/part-1", 1, part1Info);
 
-    OmKeyInfo part2Info = createOBSKeyInfo(
-        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_4);
-    OmMultipartPartInfo partInfo2 = new OmMultipartPartInfo.Builder()
-        .setPartName(mpuKeyName + "/" + uploadId + "/part-2")
-        .setPartNumber(2)
-        .setDataSize(part2Info.getDataSize())
-        .setObjectID(part2Info.getObjectID())
-        .setUpdateID(part2Info.getUpdateID())
-        .setETag("etag-2")
-        .setKeyLocationInfos(part2Info.getKeyLocationVersions())
+    OmKeyInfo part2Info = new OmKeyInfo.Builder(createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_4))
+        .addMetadata(OzoneConsts.ETAG, "etag-2")
         .build();
+    OmMultipartPartInfo partInfo2 = OmMultipartPartInfo.from(
+        mpuKeyName + "/" + uploadId + "/part-2", 2, part2Info);
 
     omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 1), partInfo1);
     omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 2), partInfo2);

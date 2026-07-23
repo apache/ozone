@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
@@ -3402,13 +3403,19 @@ class TestKeyLifecycleService extends OzoneTestBase {
         .build();
     OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
         Collections.singletonList(locationInfo));
-    OmMultipartPartInfo partInfo = new OmMultipartPartInfo.Builder()
-        .setPartName("part-" + partNumber)
-        .setPartNumber(partNumber)
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("v")
+        .setBucketName("b")
+        .setKeyName("k")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(100L)
-        .setETag("etag-" + partNumber)
-        .setKeyLocationInfos(Collections.singletonList(locationGroup))
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(ETAG, "etag-" + partNumber)
         .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
     omMetadataManager.getMultipartPartsTable().put(
         OmMultipartPartKey.of(uploadId, partNumber), partInfo);
   }
