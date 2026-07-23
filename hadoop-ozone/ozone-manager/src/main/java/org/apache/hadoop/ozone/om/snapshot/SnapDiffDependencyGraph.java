@@ -41,6 +41,8 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  *   <li>Non-delete entry before DELETE of its parent object.</li>
  *   <li>DELETE before CREATE/RENAME that targets the same path.</li>
  *   <li>RENAME before CREATE that reuses the rename source path.</li>
+ *   <li>For the same object, an entry at the RENAME source path before the
+ *       RENAME, and the RENAME before an entry at its target path.</li>
  * </ul>
  *
  * <p>A RENAME target path cannot match a CREATE path in the same diff report.
@@ -184,6 +186,47 @@ public final class SnapDiffDependencyGraph {
     addPathConflictEdges(deleteNodesByPath, createNodesByPath,
         renameNodesByTargetPath);
     addRenameBeforeCreateEdges(renameNodesBySourcePath, createNodesByPath);
+    addIntraObjectRenameEdges(nonDeleteNodesByObjectId);
+  }
+
+  /**
+   * Orders the non-delete entries of a single object relative to its RENAME.
+   * An entry reported at the RENAME source (from-snapshot) path must be applied
+   * before the path is renamed away; an entry reported at the RENAME target
+   * (to-snapshot) path must be applied after the rename creates that path.
+   */
+  private void addIntraObjectRenameEdges(
+      Map<Long, List<Integer>> nonDeleteNodesByObjectId) {
+    for (List<Integer> objectNodes : nonDeleteNodesByObjectId.values()) {
+      if (objectNodes.size() < 2) {
+        continue;
+      }
+      Integer renameNodeId = null;
+      for (int nodeId : objectNodes) {
+        if (nodes.get(nodeId).getDiffType() == DiffType.RENAME) {
+          renameNodeId = nodeId;
+          break;
+        }
+      }
+      if (renameNodeId == null) {
+        continue;
+      }
+      SnapDiffDependencyEntry rename = nodes.get(renameNodeId);
+      for (int nodeId : objectNodes) {
+        if (nodeId == renameNodeId) {
+          continue;
+        }
+        String path = nodes.get(nodeId).getSourcePath();
+        if (path == null) {
+          continue;
+        }
+        if (path.equals(rename.getSourcePath())) {
+          addEdge(nodeId, renameNodeId);
+        } else if (path.equals(rename.getTargetPath())) {
+          addEdge(renameNodeId, nodeId);
+        }
+      }
+    }
   }
 
   private static void addToPathIndex(Map<String, List<Integer>> pathIndex,
