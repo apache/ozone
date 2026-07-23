@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.HEARTBEAT;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 
@@ -87,6 +88,26 @@ public class TestSCMConnectionManager {
       // new IP -- the "stuck until restart" state this feature removes.
       Assertions.assertThrows(IOException.class, () -> cm.refreshSCMServer(address, ""));
       Assertions.assertSame(original, cm.getValues().iterator().next());
+      Assertions.assertEquals(before, address.getAddress());
+    }
+  }
+
+  @Test
+  public void refreshAbandonedWhenEndpointRemovedDuringResolve() throws Exception {
+    try (SCMConnectionManager cm =
+             new SCMConnectionManager(new OzoneConfiguration())) {
+      final HostAndPort address = spy(new HostAndPort("127.0.0.1", 9861));
+      cm.addSCMServer(address, "");
+      final InetSocketAddress before = address.getAddress();
+      // resolveLatest runs in the unlocked window between the endpoint snapshot and the write lock;
+      // removing the endpoint right there exercises the lost-race guard deterministically.
+      doAnswer(inv -> {
+        cm.removeSCMServer(address);
+        return NEW_IP;
+      }).when(address).resolveLatest();
+
+      Assertions.assertFalse(cm.refreshSCMServer(address, ""));
+      Assertions.assertTrue(cm.getValues().isEmpty());
       Assertions.assertEquals(before, address.getAddress());
     }
   }
