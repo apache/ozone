@@ -53,7 +53,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestContainerStateMachineStream implements NonHATests.TestCase {
   private OzoneClient client;
-  private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
   private int chunkSize;
@@ -63,7 +62,7 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     chunkSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
 
     client = cluster().newClient();
-    objectStore = client.getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
 
     volumeName = "vol-" + UUID.randomUUID();
     bucketName = "teststreambucket";
