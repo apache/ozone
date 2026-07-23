@@ -42,6 +42,7 @@ import { otherUsedSpaceDesc, totalCapacityDesc } from '@/v2/pages/capacity/const
 
 import './overview.less';
 import { Link } from 'react-router-dom';
+import { DEFAULT_CLUSTER_STATE } from "@/v2/constants/overview.constants";
 
 // ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
@@ -172,7 +173,7 @@ const Overview: React.FC<{}> = () => {
     openContainers,
     omServiceId,
     scmServiceId
-  } = clusterState.data ?? {};
+  } = clusterState.data ?? DEFAULT_CLUSTER_STATE;
   const {
     totalReplicatedDataSize: openSummarytotalRepSize,
     totalUnreplicatedDataSize: openSummarytotalUnrepSize,
@@ -232,10 +233,10 @@ const Overview: React.FC<{}> = () => {
                     <WrappedInfoIcon title={totalCapacityDesc} />
                   </span>
                 ),
-                value: storageReport?.capacity ?? 0,
+                value: storageReport.capacity,
               }, {
                 title: 'OZONE USED SPACE',
-                value: storageReport?.used ?? 0,
+                value: storageReport.used,
                 color: '#f4a233'
               }, {
                 title: (
@@ -245,15 +246,14 @@ const Overview: React.FC<{}> = () => {
                   </span>
                 ),
                 value: (
-                  storageReport ? (
-                    storageReport.capacity
-                    - storageReport.remaining
-                    - storageReport.used) : 0
+                  storageReport.capacity
+                  - storageReport.remaining
+                  - storageReport.used
                 ),
                 color: '#11073a'
               }, {
                 title: 'CONTAINER PRE-ALLOCATED',
-                value: storageReport?.committed ?? 0,
+                value: storageReport.committed,
                 color: '#f47b2d'
               }]}
               error={clusterState.error}

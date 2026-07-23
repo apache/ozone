@@ -96,13 +96,13 @@ describe.each([
   it('Datanode row has the correct count of Datanodes', () => {
     const datanodeRow = screen.getByTestId(overviewLocators.datanodeRow);
     expect(datanodeRow).toBeVisible();
-    expect(datanodeRow).toHaveTextContent((scenario) ? '3/5' : 'N/A');
+    expect(datanodeRow).toHaveTextContent((scenario) ? '3/5' : '0/0');
   });
 
   it('Containers row has the correct count of containers', () => {
     const containerRow = screen.getByTestId(overviewLocators.containersRow);
     expect(containerRow).toBeVisible();
-    expect(containerRow).toHaveTextContent((scenario) ? '20' : 'N/A');
+    expect(containerRow).toHaveTextContent((scenario) ? '20' : '0/0');
   });
 
   it('Capacity card has the correct capacity data', () => {
