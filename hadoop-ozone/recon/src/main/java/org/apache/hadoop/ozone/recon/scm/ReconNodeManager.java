@@ -309,6 +309,10 @@ public class ReconNodeManager extends SCMNodeManager {
    */
   @Override
   protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+    if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
+      LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
+      return true;
+    }
     ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
         versionReport.getSoftwareVersion());
     ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(

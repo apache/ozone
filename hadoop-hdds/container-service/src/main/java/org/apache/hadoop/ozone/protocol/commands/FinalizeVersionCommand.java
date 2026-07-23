@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewDatanodeVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
@@ -28,22 +27,16 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 public class FinalizeVersionCommand
     extends SCMCommand<FinalizeNewDatanodeVersionCommandProto> {
 
-  private boolean finalizeUpgrade = false;
-  private DatanodeVersionProto versionInfo;
+  private final int expectedSoftwareVersion;
 
-  public FinalizeVersionCommand(boolean finalizeNewDatanodeVersion,
-                                DatanodeVersionProto versionInfo,
-                                long id) {
+  public FinalizeVersionCommand(int expectedSoftwareVersion, long id) {
     super(id);
-    finalizeUpgrade = finalizeNewDatanodeVersion;
-    this.versionInfo = versionInfo;
+    this.expectedSoftwareVersion = expectedSoftwareVersion;
   }
 
-  public FinalizeVersionCommand(boolean finalizeNewDatanodeVersion,
-                                DatanodeVersionProto versionInfo) {
+  public FinalizeVersionCommand(int expectedSoftwareVersion) {
     super();
-    finalizeUpgrade = finalizeNewDatanodeVersion;
-    this.versionInfo = versionInfo;
+    this.expectedSoftwareVersion = expectedSoftwareVersion;
   }
 
   /**
@@ -59,9 +52,8 @@ public class FinalizeVersionCommand
   @Override
   public FinalizeNewDatanodeVersionCommandProto getProto() {
     return FinalizeNewDatanodeVersionCommandProto.newBuilder()
-        .setFinalizeNewDatanodeVersion(finalizeUpgrade)
+        .setExpectedSoftwareVersion(expectedSoftwareVersion)
         .setCmdId(getId())
-        .setDatanodeVersion(versionInfo)
         .build();
   }
 
@@ -69,8 +61,7 @@ public class FinalizeVersionCommand
       FinalizeNewDatanodeVersionCommandProto finalizeProto) {
     Objects.requireNonNull(finalizeProto, "finalizeProto == null");
     return new FinalizeVersionCommand(
-        finalizeProto.getFinalizeNewDatanodeVersion(),
-        finalizeProto.getDatanodeVersion(), finalizeProto.getCmdId());
+        finalizeProto.getExpectedSoftwareVersion(), finalizeProto.getCmdId());
   }
 
   @Override
@@ -81,8 +72,7 @@ public class FinalizeVersionCommand
         .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
-        .append(", finalizeUpgrade: ").append(finalizeUpgrade)
-        .append(", versionInfo: ").append(versionInfo);
+        .append(", expectedSoftwareVersion: ").append(expectedSoftwareVersion);
     return sb.toString();
   }
 }

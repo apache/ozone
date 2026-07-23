@@ -297,7 +297,7 @@ public class TestNodeStateManager {
     String ipAddress = "1.2.3.4";
     String hostName = "test-host";
     StorageContainerDatanodeProtocolProtos.DatanodeVersionProto
-            layoutVersionProto =
+            datanodeVersionProto =
             UpgradeUtils.toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION);
     DatanodeDetails dn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
@@ -305,19 +305,19 @@ public class TestNodeStateManager {
             .setHostName(hostName)
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_MAINTENANCE)
             .build();
-    nsm.addNode(dn, layoutVersionProto);
+    nsm.addNode(dn, datanodeVersionProto);
 
     String newIpAddress = "2.3.4.5";
     String newHostName = "new-host";
     StorageContainerDatanodeProtocolProtos.DatanodeVersionProto
-            newLayoutVersionProto = UpgradeUtils.defaultVersionProto();
+            newDatanodeVersionProto = UpgradeUtils.defaultVersionProto();
     DatanodeDetails newDn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
             .setIpAddress(newIpAddress)
             .setHostName(newHostName)
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
             .build();
-    nsm.updateNode(newDn, newLayoutVersionProto);
+    nsm.updateNode(newDn, newDatanodeVersionProto);
 
     DatanodeInfo updatedDn = nsm.getNode(dn);
     assertEquals(newIpAddress, updatedDn.getIpAddress());

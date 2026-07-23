@@ -795,10 +795,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         "apparent version {}", datanodeDetails, dnApparentVersion, scmApparentVersion);
 
     FinalizeVersionCommand finalizeCmd =
-        new FinalizeVersionCommand(true,
-            DatanodeVersionProto.newBuilder()
-                .setSoftwareVersion(dnSoftwareVersion.serialize())
-                .setApparentVersion(dnSoftwareVersion.serialize()).build());
+        new FinalizeVersionCommand(scmSoftwareVersion.serialize());
     try {
       finalizeCmd.setTerm(scmContext.getTermOfLeader());
       // Send Finalize command to the data node. It's OK to send Finalize command multiple times.
@@ -2042,6 +2039,10 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+    if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
+      LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
+      return true;
+    }
     ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
         versionReport.getSoftwareVersion());
     ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(

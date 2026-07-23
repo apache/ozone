@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,11 +73,19 @@ public class FinalizeVersionCommandHandler implements CommandHandler {
     final FinalizeNewDatanodeVersionCommandProto finalizeCommand =
         ((FinalizeVersionCommand) command).getProto();
     try {
-      if (finalizeCommand.getFinalizeNewDatanodeVersion()) {
-        if (dsm.getVersionManager().needsFinalization()) {
-          LOG.info("Finalize upgrade called.");
-          dsm.getVersionManager().finalizeUpgrade();
-        }
+      int dnSoftwareVersion = dsm.getVersionManager().getSoftwareVersion().serialize();
+      int expectedSoftwareVersion = finalizeCommand.getExpectedSoftwareVersion();
+      if (dnSoftwareVersion != expectedSoftwareVersion) {
+        // Version mismatch should not happen here: the datanode is rejected
+        // at registration and SCM only finalizes after its own version checks.
+        // Crash defensively rather than finalize on an unexpected version.
+        String msg = String.format("Datanode software version %d does not match the software version %d expected by " +
+            "SCM. Terminating the datanode.", dnSoftwareVersion, expectedSoftwareVersion);
+        ExitUtils.terminate(1, msg, LOG);
+      }
+      if (dsm.getVersionManager().needsFinalization()) {
+        LOG.info("Finalize upgrade called.");
+        dsm.getVersionManager().finalizeUpgrade();
       }
     } catch (UpgradeException e) {
       LOG.error("Exception during finalization.", e);

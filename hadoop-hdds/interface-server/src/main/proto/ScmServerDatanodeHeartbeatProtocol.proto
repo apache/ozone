@@ -75,12 +75,12 @@ enum Status {
 }
 
 /**
- * DataNode will advertise its current layout version through
- * heartbeat as well as registration mechanism.
- *
  * Deprecated, please use DatanodeVersionProto instead. The field names
  * metadataLayoutVersion and softwareLayoutVersion have been replaced by
  * apparentVersion and softwareVersion respectively.
+ *
+ * DataNode will advertise its current layout version through
+ * heartbeat as well as registration mechanism.
  */
 message LayoutVersionProto {
    required uint32 metadataLayoutVersion = 1;
@@ -88,8 +88,7 @@ message LayoutVersionProto {
 }
 
 /**
- * Replaces LayoutVersionProto, using the versioning terminology of
- * ComponentVersionManager: apparentVersion and softwareVersion.
+ * Used by Datanodes to report their versions to SCM.
  */
 message DatanodeVersionProto {
    optional uint32 apparentVersion = 1;
@@ -514,10 +513,9 @@ message ProcessCRLCommandProto {
 }
 
 /**
- * This command asks the DataNode to finalize a new layout version.
+ * Deprecated, please use FinalizeNewDatanodeVersionCommandProto instead.
  *
- * Deprecated, please use FinalizeNewDatanodeVersionCommandProto instead, which
- * carries a DatanodeVersionProto instead of the deprecated LayoutVersionProto.
+ * This command asks the DataNode to finalize a new layout version.
  */
 message FinalizeNewLayoutVersionCommandProto {
   required bool finalizeNewLayoutVersion = 1 [default = false];
@@ -526,13 +524,11 @@ message FinalizeNewLayoutVersionCommandProto {
 }
 
 /**
- * This command asks the DataNode to finalize a new datanode version.
- * Replaces FinalizeNewLayoutVersionCommandProto.
+ * This command asks the Datanode to finalize a new datanode version.
  */
 message FinalizeNewDatanodeVersionCommandProto {
-  required bool finalizeNewDatanodeVersion = 1 [default = false];
-  optional DatanodeVersionProto datanodeVersion = 2;
-  required int64 cmdId = 3;
+  optional uint32 expectedSoftwareVersion = 1;
+  optional int64 cmdId = 2;
 }
 
 /**

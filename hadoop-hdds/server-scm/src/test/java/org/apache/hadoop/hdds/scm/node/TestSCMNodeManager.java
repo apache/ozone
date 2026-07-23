@@ -714,6 +714,13 @@ public class TestSCMNodeManager {
                 .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
                 .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
             errorNodeNotPermitted, false),
+        // DN that does not report any version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION, null, errorNodeNotPermitted, false),
+        // DN that reports an incomplete version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            DatanodeVersionProto.newBuilder()
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build(),
+            errorNodeNotPermitted, false),
 
         /* SCM FINALIZED */
 
