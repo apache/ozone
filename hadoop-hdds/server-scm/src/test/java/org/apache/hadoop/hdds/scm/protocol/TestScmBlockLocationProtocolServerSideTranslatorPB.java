@@ -71,7 +71,6 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
       HDDSVersion.ZDU.serialize();
 
   private ScmBlockLocationProtocol impl;
-  private StorageContainerManager scm;
   private NodeManager nodeManager;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private List<DatanodeDetails> nodes;
@@ -79,7 +78,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   @BeforeEach
   void setUp() throws Exception {
     impl = mock(ScmBlockLocationProtocol.class);
-    scm = mock(StorageContainerManager.class);
+    StorageContainerManager scm = mock(StorageContainerManager.class);
     nodeManager = mock(NodeManager.class);
 
     nodes = new ArrayList<>();
