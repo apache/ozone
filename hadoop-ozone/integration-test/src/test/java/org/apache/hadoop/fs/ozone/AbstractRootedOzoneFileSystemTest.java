@@ -1868,10 +1868,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     fs.mkdirs(volume);
-    assertThrows(OMException.class,
-        () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
-    // Cleanup
-    fs.delete(volume, false);
+    try {
+      FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+          () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
+      assertThat(exception.getMessage()).contains("Bucket doesn't exist");
+    } finally {
+      fs.delete(volume, false);
+    }
   }
 
   @Test
