@@ -119,27 +119,44 @@ cross-table consistency problem. The new column family is introduced under the O
 layout feature / finalization framework (`OMLayoutFeature.OBJECT_VERSIONING`):
 before finalization, requests carrying a versioning status are rejected.
 
-## VersionId: a configurable generation strategy
+## VersionId: a pluggable generator
 
 `versionId` generation is abstracted behind a `VersionIdGenerator` interface,
-selected by `ozone.om.versioning.version-id-strategy` and **pinned into the
-bucket metadata when versioning is first enabled** (mixing strategies on one key
-would break monotonicity). Every strategy must satisfy: monotonically increasing
-within a key; frozen once assigned; `0` reserved for the null slot.
+chosen per cluster by class name (`ozone.om.versioning.version-id-generator`), so
+a deployment can plug in its own. The generator is cluster-wide and may be changed
+on a running cluster; it is not recorded in bucket metadata. Every generator must
+satisfy, **for itself**: strictly increasing within a key (a later version's id is
+always greater than every earlier version's id of that key); frozen once assigned;
+`0` reserved for the null slot and `1` for the first-version sentinel.
 
-- **TRANSACTION_INDEX (default)** — the OM Ratis transaction index of the
-  committing transaction, following objectID's existing derivation (epoch packed
-  into the high bits for uniqueness across restarts). No allocator state of any
-  kind. Externally encoded as an opaque URL-safe string.
-- **PINNED_FIRST (opt-in)** — only the first version is special: it takes a
-  reserved sentinel (below any transaction index, so it sorts oldest), rendered
-  externally as a fixed literal (default `"0"`) or a keyName-derived string, so
-  external systems can reference a key's first version without listing. All later
-  versions are identical to TRANSACTION_INDEX; no persistent allocator. First
-  versions are detected by "no current version in keyTable", reusing the lookup
-  the write path performs anyway. Known trade-off: if every version of a key is
-  permanently deleted and the key is recreated, the new first version takes the
-  sentinel again; only deployments that accept this should enable the strategy.
+That guarantee binds one generator, not a sequence of them, so the write path
+enforces it at commit: a commit whose id does not come after the key's current
+version is rejected (`INVALID_REQUEST`), and the operator deletes the key's
+versions before writing under the new generator. The check costs no read in the
+steady state — the current version holds the key's largest id, so an id above it
+cannot be taken; only a record predating versioning, which carries no id to order
+against, falls back to a versionedKeyTable lookup.
+
+- **`TransactionIndexVersionIdGenerator` (default)** — the OM Ratis transaction
+  index of the committing transaction, used directly. No allocator state of any
+  kind. Externally encoded as an opaque URL-safe string. objectID's epoch bits are
+  deliberately not applied: dropping them keeps versionIds small positive longs, so
+  the versionedKeyTable ordering stays plain signed arithmetic, and uniqueness
+  rests on the monotonicity of the Ratis log index — a log that was reset or rolled
+  back is caught by the commit-time check rather than silently accepted.
+- **`PinnedFirstVersionIdGenerator` (opt-in)** — only the first version is
+  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any usable
+  transaction index, so it sorts oldest and can be referenced without listing the
+  key's versions first. All later versions are the commit transaction's index; no
+  persistent allocator. First versions are detected by "no current version in
+  keyTable", reusing the lookup the write path performs anyway. Known trade-off: if
+  every version of a key is permanently deleted and the key is recreated, the new
+  first version takes the sentinel again; only deployments that accept this should
+  configure this generator.
+
+How a versionId is rendered on the wire — the opaque encoding, and whether the
+pinned first version is presented as a fixed literal or derived from the keyName —
+is part of the `?versionId=` read path (T4), not of generation.
 
 The null version is not a special ID value but the `isNullVersion` attribute;
 `versionId=null` requests resolve to "locate this key's null slot".
@@ -233,10 +250,16 @@ without versioning behave exactly as today (verified by benchmarks).
   degrade from one seek to a scan-and-sort (with mtime tiebreak problems), and
   `GET ?versionId=` from a point lookup to a prefix scan. Unpredictability, the
   only remaining benefit, is provided by the external encoding layer instead.
-- **A per-key sequential counter** (SEQUENTIAL) for readable first versions:
-  requires a persistent allocator and reuses IDs after full deletion of a key.
-  Replaced by PINNED_FIRST, which special-cases only the first version and needs
-  no allocator.
+- **A per-key sequential counter** for readable first versions: requires a
+  persistent allocator and reuses IDs after full deletion of a key. Replaced by the
+  pinned-first generator, which special-cases only the first version and needs no
+  allocator.
+- **Pinning the generator into bucket metadata** (so a bucket keeps the generator
+  it was created with): removes the risk of a mid-life generator change, but adds a
+  proto field, a write path in both bucket create and set-property, and leaves the
+  generator un-changeable even when an operator legitimately wants to switch.
+  Replaced by the commit-time ordering check, which turns the risk into a loud,
+  per-key failure with a clear remedy and costs no persistent state.
 
 # Plan
 
@@ -246,7 +269,7 @@ PR), in dependency order `T1 → T2 → T3 → T4 → T5 → (T6 ∥ T7) → (T8
 | Task | Scope |
 |---|---|
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
-| T2 VersionId strategy framework | `VersionIdGenerator` interface, TRANSACTION_INDEX default, bucket strategy pinning, PINNED_FIRST |
+| T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, transaction-index default, commit-time ordering check, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads, permanent delete, version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
@@ -263,11 +286,14 @@ the versioning subset of ceph/s3-tests; performance benchmarks asserting no
 regression with versioning off and O(1) write latency with it on.
 
 Open questions tracked for implementation: the `maxVersions` default and cluster
-cap; obfuscation of the TRANSACTION_INDEX external encoding; `PutBucketVersioning
-(Suspended)` on a never-versioned bucket (align via s3-tests); the snapshot diff
-change surface; interaction with hsync/append writes (appends apply to the
-current version and create no new one); multipart uploads (the version is created
-at `CompleteMultipartUpload` commit; parts are invisible).
+cap; obfuscation of the external versionId encoding, and how a pinned first version
+is rendered; whether changing `ozone.om.versioning.version-id-generator` should take
+effect without an OM restart, and the operational procedure for keys already written
+under the previous generator; `PutBucketVersioning(Suspended)` on a never-versioned
+bucket (align via s3-tests); the snapshot diff change surface; interaction with
+hsync/append writes (appends apply to the current version and create no new one);
+multipart uploads (the version is created at `CompleteMultipartUpload` commit; parts
+are invisible).
 
 # References
 
