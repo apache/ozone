@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -150,9 +151,9 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
   public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
-    // [0] = unreplicated size, [1] = replicated size. An array is used so the
-    // running totals can be mutated from the part-iteration lambda below.
-    final long[] sizes = {0L, 0L};
+    // left = unreplicated size, right = replicated size. A mutable pair is used
+    // so the running totals can be updated from the part-iteration lambda below.
+    final MutablePair<Long, Long> sizes = MutablePair.of(0L, 0L);
 
     // uploadId -> parent replication config, for split-schema MPUs. Their parts
     // live in multipartPartsTable but do not carry a replication config, so the
@@ -169,8 +170,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
           OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
           if (isLegacySchema(multipartKeyInfo)) {
             forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
-              sizes[0] += dataSize;
-              sizes[1] += replicatedSize;
+              sizes.setLeft(sizes.getLeft() + dataSize);
+              sizes.setRight(sizes.getRight() + replicatedSize);
             });
           } else {
             // Split schema: parts are stored in multipartPartsTable. Remember
@@ -200,14 +201,15 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
               continue;
             }
             long partDataSize = kv.getValue().getDataSize();
-            sizes[0] += partDataSize;
-            sizes[1] += QuotaUtil.getReplicatedSize(partDataSize, replicationConfig);
+            sizes.setLeft(sizes.getLeft() + partDataSize);
+            sizes.setRight(sizes.getRight()
+                + QuotaUtil.getReplicatedSize(partDataSize, replicationConfig));
           }
         }
       }
     }
 
-    return Triple.of(count, sizes[0], sizes[1]);
+    return Triple.of(count, sizes.getLeft(), sizes.getRight());
   }
 
   /**
@@ -221,8 +223,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
   private void applyLegacyPartSizes(OmMultipartKeyInfo multipartKeyInfo, String tableName,
       Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap, boolean add) {
     forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
-      updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(tableName), dataSize, add);
-      updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(tableName), replicatedSize, add);
+      updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(tableName), dataSize, add, "unreplicated");
+      updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(tableName), replicatedSize, add, "replicated");
     });
   }
 
@@ -243,15 +245,20 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
   /**
    * Adds or subtracts {@code delta} from the value stored under {@code key} in
    * {@code sizeMap} (only if the key is already present). Subtraction is clamped
-   * at zero to guard against underflow.
+   * at zero, and an underflow is logged (as it indicates an accounting anomaly,
+   * e.g. a delete/update for a part whose size was never added).
+   *
+   * @param sizeType a human-readable label ("unreplicated"/"replicated") used
+   *                 only in the underflow warning message.
    */
-  private static void updateSize(Map<String, Long> sizeMap, String key, long delta, boolean add) {
+  private static void updateSize(Map<String, Long> sizeMap, String key, long delta, boolean add, String sizeType) {
     sizeMap.computeIfPresent(key, (k, size) -> {
       if (add) {
         return size + delta;
       }
       if (size < delta) {
-        LOG.warn("Attempted to subtract {} from current size {} for {}; clamping to 0.", delta, size, k);
+        LOG.warn("Negative {} size for key: {}. Current: {}, Part: {}. Clamping to 0.",
+            sizeType, k, size, delta);
         return 0L;
       }
       return size - delta;
