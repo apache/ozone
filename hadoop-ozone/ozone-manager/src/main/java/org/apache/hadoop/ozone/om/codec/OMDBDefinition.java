@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -65,17 +67,18 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * <pre>
  * {@code
  * Volume, Bucket, Prefix and Transaction Tables:
- * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
- * |------------------------------------------------------------------------|
- * |          volumeTable |           /volume :- VolumeInfo                 |
- * |          bucketTable |    /volume/bucket :- BucketInfo                 |
- * |------------------------------------------------------------------------|
- * |          prefixTable |            prefix :- PrefixInfo                 |
- * |------------------------------------------------------------------------|
- * | transactionInfoTable |  #TRANSACTIONINFO :- OMTransactionInfo          |
- * |            metaTable |       metaDataKey :- metaDataValue              |
- * |------------------------------------------------------------------------|
+ * |-------------------------------------------------------------------------|
+ * |        Column Family |                 Mapping                          |
+ * |-------------------------------------------------------------------------|
+ * |          volumeTable |           /volume :- VolumeInfo                  |
+ * |          bucketTable |    /volume/bucket :- BucketInfo                  |
+ * |-------------------------------------------------------------------------|
+ * |          prefixTable |            prefix :- PrefixInfo                  |
+ * |-------------------------------------------------------------------------|
+ * | transactionInfoTable |  #TRANSACTIONINFO :- OMTransactionInfo           |
+ * |            metaTable |       metaDataKey :- metaDataValue               |
+ * | lifecycleConfigurationTable | /volume/bucket :- OmLifecycleConfiguration|
+ * |-------------------------------------------------------------------------|
  * }
  * </pre>
  *
@@ -325,8 +328,22 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   /** compactionLogTable: dbTrxId-compactionTime :- compactionLogEntry. */
   public static final DBColumnFamilyDefinition<String, CompactionLogEntry> COMPACTION_LOG_TABLE_DEF
       = new DBColumnFamilyDefinition<>(COMPACTION_LOG_TABLE,
-          StringCodec.get(),
-          CompactionLogEntry.getCodec());
+      StringCodec.get(),
+      CompactionLogEntry.getCodec());
+
+  public static final String LIFECYCLE_CONFIGURATION_TABLE =
+      "lifecycleConfigurationTable";
+  public static final DBColumnFamilyDefinition<String, OmLifecycleConfiguration> LIFECYCLE_CONFIGURATION_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(LIFECYCLE_CONFIGURATION_TABLE,
+      StringCodec.get(),
+      OmLifecycleConfiguration.getCodec());
+
+  public static final String LIFECYCLE_SCAN_STATE_TABLE =
+      "lifecycleScanStateTable";
+  public static final DBColumnFamilyDefinition<String, OmLifecycleScanState> LIFECYCLE_SCAN_STATE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(LIFECYCLE_SCAN_STATE_TABLE,
+      StringCodec.get(),
+      OmLifecycleScanState.getCodec());
 
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
@@ -353,7 +370,9 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          LIFECYCLE_CONFIGURATION_TABLE_DEF,
+          LIFECYCLE_SCAN_STATE_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

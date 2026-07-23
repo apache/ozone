@@ -160,6 +160,9 @@ public enum S3ErrorTable {
       "Access Denied", "User doesn't have permission to access this resource due to a " +
       "bucket ownership mismatch.", HTTP_FORBIDDEN),
 
+  NO_SUCH_LIFECYCLE_CONFIGURATION("NoSuchLifecycleConfiguration",
+      "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND),
+
   X_AMZ_CONTENT_SHA256_MISMATCH(
       "XAmzContentSHA256Mismatch", "The provided 'x-amz-content-sha256' header does " +
       "not match the computed hash.", HTTP_BAD_REQUEST),

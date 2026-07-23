@@ -63,6 +63,10 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDeleteRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSaveScanStateRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
@@ -344,6 +348,14 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetLifecycleConfiguration:
+      return new OMLifecycleConfigurationSetRequest(omRequest);
+    case DeleteLifecycleConfiguration:
+      return new OMLifecycleConfigurationDeleteRequest(omRequest);
+    case SetLifecycleServiceStatus:
+      return new OMLifecycleSetServiceStatusRequest(omRequest);
+    case SaveLifecycleScanState:
+      return new OMLifecycleSaveScanStateRequest(omRequest);
     case PutBucketTagging:
       return new S3PutBucketTaggingRequest(omRequest);
     case DeleteBucketTagging:

@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
@@ -45,6 +46,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -203,6 +205,21 @@ public class TestObjectGet {
 
     Response response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void getKeyWithCustomMetadata() throws IOException, OS3Exception {
+    final String keyName = "key-with-meta";
+    final String metaValue = "mymeta";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", metaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(metaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
   }
 
   @Test

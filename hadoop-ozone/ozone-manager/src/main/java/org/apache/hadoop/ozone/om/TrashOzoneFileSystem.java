@@ -584,6 +584,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       OzoneManagerProtocolProtos.DeleteKeysRequest deleteKeysRequest =
           OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
               .setDeleteKeys(deleteKeyArgs)
+              .setSourceType(OzoneManagerProtocolProtos.RequestSource.TRASH)
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           null;
