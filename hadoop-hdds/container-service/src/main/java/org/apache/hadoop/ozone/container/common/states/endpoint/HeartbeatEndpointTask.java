@@ -19,8 +19,12 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.base.Preconditions;
@@ -44,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -77,6 +82,8 @@ public class HeartbeatEndpointTask
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private HDDSLayoutVersionManager layoutVersionManager;
+  private final boolean resolveOnFailureEnabled;
+  private final int refreshThreshold;
 
   /**
    * Constructs a SCM heart beat.
@@ -100,6 +107,10 @@ public class HeartbeatEndpointTask
     } else {
       this.layoutVersionManager = context.getParent().getLayoutVersionManager();
     }
+    this.resolveOnFailureEnabled = conf.getBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
+    this.refreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD,
+        HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD_DEFAULT));
   }
 
   /**
@@ -157,10 +168,31 @@ public class HeartbeatEndpointTask
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
+      maybeRefreshScmAddress(ex);
     } finally {
       rpcEndpoint.unlock();
     }
     return rpcEndpoint.getState();
+  }
+
+  /**
+   * On a connection-class heartbeat failure past the threshold (and when resolve-needed is on),
+   * asks the connection manager to re-resolve this SCM peer and rebuild the endpoint.
+   */
+  private void maybeRefreshScmAddress(IOException heartbeatFailure) {
+    if (!resolveOnFailureEnabled
+        || rpcEndpoint.isPassive()
+        || rpcEndpoint.getMissedCount() < refreshThreshold
+        || !ConnectionFailureUtils.isConnectionFailure(heartbeatFailure)) {
+      return;
+    }
+    try {
+      context.getParent().getConnectionManager()
+          .refreshSCMServer(rpcEndpoint.getAddress(), context.getThreadNamePrefix());
+    } catch (IOException ex) {
+      LOG.warn("Failed to refresh SCM address {} after {} missed heartbeats",
+          rpcEndpoint.getAddress(), rpcEndpoint.getMissedCount(), ex);
+    }
   }
 
   // TODO: Make it generic.

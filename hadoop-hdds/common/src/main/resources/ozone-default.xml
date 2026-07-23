@@ -4007,6 +4007,16 @@
   </property>
 
   <property>
+    <name>hdds.heartbeat.address.refresh.threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before re-resolving its hostname. Only
+      consulted when ozone.client.failover.resolve-needed is true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>

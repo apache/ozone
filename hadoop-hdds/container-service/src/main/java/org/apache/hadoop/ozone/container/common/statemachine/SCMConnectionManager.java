@@ -139,38 +139,68 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-
-      Configuration hadoopConfig =
-          LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
-      RPC.setProtocolEngine(
-          hadoopConfig,
-          StorageContainerDatanodeProtocolPB.class,
-          ProtobufRpcEngine.class);
-      long version =
-          RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
-
-      RetryPolicy retryPolicy =
-          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-              getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf),
-              TimeUnit.MILLISECONDS);
-
-      StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
-          StorageContainerDatanodeProtocolPB.class, version,
-          address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
-          NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
-          retryPolicy).getProxy();
-
-      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
-          new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-              rpcProxy);
-
-      EndpointStateMachine endPoint = new EndpointStateMachine(address,
-          rpcClient, this.conf, threadNamePrefix);
+      EndpointStateMachine endPoint = buildScmEndpoint(address, threadNamePrefix);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();
     }
+  }
+
+  private EndpointStateMachine buildScmEndpoint(HostAndPort address, String threadNamePrefix)
+      throws IOException {
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
+    RPC.setProtocolEngine(hadoopConfig, StorageContainerDatanodeProtocolPB.class,
+        ProtobufRpcEngine.class);
+    long version = RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
+    RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+        getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf), TimeUnit.MILLISECONDS);
+    StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+        StorageContainerDatanodeProtocolPB.class, version,
+        address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
+        NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
+        retryPolicy).getProxy();
+    StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
+        new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
+    return new EndpointStateMachine(address, rpcClient, this.conf, threadNamePrefix);
+  }
+
+  /**
+   * Re-resolves the active SCM endpoint at {@code address}; on an IP change, rebuilds it under the
+   * same key and closes the stale proxy. Returns true if rebuilt.
+   */
+  public boolean refreshSCMServer(HostAndPort address, String threadNamePrefix)
+      throws IOException {
+    final EndpointStateMachine current;
+    readLock();
+    try {
+      current = scmMachines.get(address);
+      if (current == null || current.isPassive()) {
+        return false;
+      }
+    } finally {
+      readUnlock();
+    }
+    // Resolve outside the lock; refresh() swaps the cached address only on a real IP change.
+    if (!address.refresh()) {
+      return false;
+    }
+    final EndpointStateMachine stale;
+    writeLock();
+    try {
+      if (scmMachines.get(address) != current) {
+        return false;
+      }
+      EndpointStateMachine rebuilt = buildScmEndpoint(address, threadNamePrefix);
+      rebuilt.setPassive(false);
+      scmMachines.put(address, rebuilt);
+      stale = current;
+    } finally {
+      writeUnlock();
+    }
+    stale.close();
+    return true;
   }
 
   /**
