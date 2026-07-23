@@ -85,7 +85,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -105,12 +104,10 @@ class TestContainerReplication {
       SCMContainerPlacementRandom.class
   );
 
-  static List<Arguments> containerReplicationArguments() {
-    List<Arguments> arguments = new LinkedList<>();
+  static List<String> containerReplicationArguments() {
+    List<String> arguments = new LinkedList<>();
     for (Class<? extends PlacementPolicy> policyClass : POLICIES) {
-      String canonicalName = policyClass.getCanonicalName();
-      arguments.add(Arguments.arguments(canonicalName, true));
-      arguments.add(Arguments.arguments(canonicalName, false));
+      arguments.add(policyClass.getCanonicalName());
     }
     return arguments;
   }
@@ -124,10 +121,9 @@ class TestContainerReplication {
 
   @ParameterizedTest
   @MethodSource("containerReplicationArguments")
-  void testContainerReplication(
-      String placementPolicyClass, boolean legacyEnabled) throws Exception {
+  void testContainerReplication(String placementPolicyClass) throws Exception {
 
-    OzoneConfiguration conf = createConfiguration(legacyEnabled);
+    OzoneConfiguration conf = createConfiguration();
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
     try (MiniOzoneCluster cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
@@ -151,7 +147,7 @@ class TestContainerReplication {
 
         waitForReplicaCount(containerID, 3, cluster);
 
-        Supplier<String> messageSupplier = () -> "policy=" + placementPolicyClass + " legacy=" + legacyEnabled;
+        Supplier<String> messageSupplier = () -> "policy=" + placementPolicyClass;
         assertEquals(datanodeRequestCount + 1, metrics.getDatanodeRequestCount(), messageSupplier);
         assertThat(metrics.getDatanodeChooseAttemptCount()).isGreaterThan(datanodeChooseAttemptCount);
         assertEquals(datanodeChooseSuccessCount + 1, metrics.getDatanodeChooseSuccessCount(), messageSupplier);
@@ -167,7 +163,7 @@ class TestContainerReplication {
         .build();
   }
 
-  private static OzoneConfiguration createConfiguration(boolean enableLegacy) {
+  private static OzoneConfiguration createConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
@@ -278,7 +274,7 @@ class TestContainerReplication {
 
   @Test
   public void testImportedContainerIsClosed() throws Exception {
-    OzoneConfiguration conf = createConfiguration(false);
+    OzoneConfiguration conf = createConfiguration();
     // create a 4 node cluster
     try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build()) {
       cluster.waitForClusterToBeReady();
@@ -315,7 +311,7 @@ class TestContainerReplication {
   @Test
   @Flaky("HDDS-11087")
   public void testECContainerReplication() throws Exception {
-    OzoneConfiguration conf = createConfiguration(false);
+    OzoneConfiguration conf = createConfiguration();
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
     // Overiding Config to support 1k Chunk size
     conf.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
