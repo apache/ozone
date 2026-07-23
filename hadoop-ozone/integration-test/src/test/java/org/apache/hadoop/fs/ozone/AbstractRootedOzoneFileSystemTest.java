@@ -1835,6 +1835,33 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     assertEquals(ReplicationType.EC.name(), key.getReplicationConfig().getReplicationType().name());
   }
 
+  /**
+   * HDDS-15925: rooted OFS getFileStatus on a key path must not issue InfoBucket
+   * before GetFileStatus.
+   */
+  @Test
+  void testGetFileStatusUsesSingleOmRpc() throws Exception {
+    String keyName = "single-rpc-" + RandomStringUtils.secure().nextAlphabetic(5);
+    Path filePath = new Path(bucketPath, keyName);
+    ContractTestUtils.touch(fs, filePath);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+    long getFileStatusBefore = metrics.getNumGetFileStatus();
+
+    FileStatus status = fs.getFileStatus(filePath);
+    assertTrue(status.isFile());
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileStatus must not trigger InfoBucket");
+    assertEquals(getFileStatusBefore + 1, metrics.getNumGetFileStatus());
+
+    long getFileStatusAfterFirst = metrics.getNumGetFileStatus();
+    fs.getFileStatus(filePath);
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos());
+    assertEquals(getFileStatusAfterFirst + 1, metrics.getNumGetFileStatus());
+  }
+
   @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
@@ -1845,49 +1872,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
         () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
     fs.delete(volume, false);
-  }
-
-  @Test
-  void testGetFileStatusUsesSingleOmRpcAfterCacheWarm() throws Exception {
-    Path path = new Path(bucketPath, "single-rpc-stat-test");
-    fs.mkdirs(path);
-    // Warm the bucket layout cache; ignore metrics from the first stat.
-    fs.getFileStatus(path);
-
-    long getFileStatusBefore = getOMMetrics().getNumGetFileStatus();
-    long bucketInfoBefore = getOMMetrics().getNumBucketInfos();
-
-    FileStatus status = fs.getFileStatus(path);
-    assertTrue(status.isDirectory());
-
-    assertEquals(getFileStatusBefore + 1, getOMMetrics().getNumGetFileStatus());
-    assertEquals(bucketInfoBefore, getOMMetrics().getNumBucketInfos());
-  }
-
-  @Test
-  void testGetFileStatusOnBucketRoot() throws Exception {
-    FileStatus status = fs.getFileStatus(bucketPath);
-    assertTrue(status.isDirectory());
-  }
-
-  @Test
-  void testGetFileStatusOnObjectStoreBucketRejectsInvalidLayout()
-      throws Exception {
-    OzoneBucket obsBucket =
-        TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
-    Path obsBucketPath = new Path(
-        new Path(OZONE_URI_DELIMITER + obsBucket.getVolumeName()),
-        obsBucket.getName());
-    try {
-      IllegalArgumentException exception = assertThrows(
-          IllegalArgumentException.class, () -> fs.getFileStatus(obsBucketPath));
-      assertThat(exception.getMessage())
-          .contains(BucketLayout.OBJECT_STORE.name());
-    } finally {
-      objectStore.getVolume(obsBucket.getVolumeName())
-          .deleteBucket(obsBucket.getName());
-      objectStore.deleteVolume(obsBucket.getVolumeName());
-    }
   }
 
   @Test

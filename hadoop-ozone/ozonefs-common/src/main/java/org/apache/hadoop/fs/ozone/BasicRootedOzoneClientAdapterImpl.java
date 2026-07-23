@@ -41,7 +41,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -133,11 +132,6 @@ public class BasicRootedOzoneClientAdapterImpl
   private BucketLayout defaultOFSBucketLayout;
   private final OzoneConfiguration config;
   private final OzoneClientConfig clientConfig;
-  /**
-   * Cache of successfully validated bucket layouts for read paths.
-   */
-  private final ConcurrentHashMap<String, BucketLayout> validatedBucketLayouts =
-      new ConcurrentHashMap<>();
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -280,47 +274,6 @@ public class BasicRootedOzoneClientAdapterImpl
         createIfNotExist);
   }
 
-  private static String bucketLayoutCacheKey(String volumeStr, String bucketStr) {
-    return volumeStr + OZONE_URI_DELIMITER + bucketStr;
-  }
-
-  private BucketLayout validateBucketLayoutForBucket(OzoneBucket bucket)
-      throws IOException {
-    BucketLayout resolvedBucketLayout =
-        OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-            new HashSet<>());
-    OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
-    return resolvedBucketLayout;
-  }
-
-  private void cacheValidatedBucketLayout(String volumeStr, String bucketStr,
-      BucketLayout layout) {
-    validatedBucketLayouts.putIfAbsent(
-        bucketLayoutCacheKey(volumeStr, bucketStr), layout);
-  }
-
-  private void validateAndCacheBucketLayout(String volumeStr, String bucketStr,
-      OzoneBucket bucket) throws IOException {
-    BucketLayout layout = validateBucketLayoutForBucket(bucket);
-    cacheValidatedBucketLayout(volumeStr, bucketStr, layout);
-  }
-
-  private void resolveAndValidateBucketLayout(String volumeStr, String bucketStr)
-      throws IOException {
-    OzoneBucket bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-    validateAndCacheBucketLayout(volumeStr, bucketStr, bucket);
-  }
-
-  private void ensureBucketLayoutValid(OFSPath ofsPath) throws IOException {
-    String volumeStr = ofsPath.getVolumeName();
-    String bucketStr = ofsPath.getBucketName();
-    if (validatedBucketLayouts.containsKey(
-        bucketLayoutCacheKey(volumeStr, bucketStr))) {
-      return;
-    }
-    resolveAndValidateBucketLayout(volumeStr, bucketStr);
-  }
-
   /**
    * Get OzoneBucket object to operate in.
    * Optionally create volume and bucket if not found.
@@ -344,7 +297,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-      validateAndCacheBucketLayout(volumeStr, bucketStr, bucket);
+
+      // resolve the bucket layout in case of Link Bucket
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+              new HashSet<>());
+
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
@@ -386,7 +345,12 @@ public class BasicRootedOzoneClientAdapterImpl
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-        validateAndCacheBucketLayout(volumeStr, bucketStr, bucket);
+
+        BucketLayout resolvedBucketLayout =
+            OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+                new HashSet<>());
+
+        OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
       } else {
         throw ex;
       }
@@ -732,6 +696,10 @@ public class BasicRootedOzoneClientAdapterImpl
    * Return FileStatusAdapter based on OFSPath being a
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
+   *
+   * <p>Non-snapshot paths call OM GetFileStatus directly (HDDS-15925) without a
+   * prior InfoBucket RPC. OBJECT_STORE buckets are not rejected on this path;
+   * mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName,
@@ -743,12 +711,12 @@ public class BasicRootedOzoneClientAdapterImpl
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
+      } else {
+        OzoneFileStatus status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), key, headOp);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+            ofsPath.getNonKeyPath());
       }
-      ensureBucketLayoutValid(ofsPath);
-      OzoneFileStatus status = proxy.getOzoneFileStatus(
-          ofsPath.getVolumeName(), ofsPath.getBucketName(), key, headOp);
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath,
-          ofsPath.getNonKeyPath());
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(key + ": No such file or directory!");
