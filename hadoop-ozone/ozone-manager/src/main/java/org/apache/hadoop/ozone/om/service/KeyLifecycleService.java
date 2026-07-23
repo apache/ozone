@@ -1138,8 +1138,15 @@ public class KeyLifecycleService extends BackgroundService {
                 abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
               }
 
-              // Get part count for this MPU (at least 1 even if no parts uploaded yet)
-              int partCount = Math.max(1, mpuKeyInfo.getPartKeyInfoMap().size());
+              // Get part count for this MPU (at least 1 even if no parts uploaded yet).
+              // Split-schema MPUs keep parts in the separate multipartPartsTable
+              // (the embedded map is empty), so count those rows; legacy MPUs use
+              // the embedded map.
+              int uploadedParts = mpuKeyInfo.getSchemaVersion()
+                  == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+                  ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
+                  : mpuKeyInfo.getPartKeyInfoMap().size();
+              int partCount = Math.max(1, uploadedParts);
               expiredUploads.add(upload, partCount);
               LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
                   volumeName, bucketName, keyName, upload.getUploadId(), partCount);

@@ -1559,8 +1559,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           expiredMPUs.get(mapKey)
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
-          numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          // TODO: Add the expired part handling from the new table when the complete flow is done
+
+          if (omMultipartKeyInfo.getSchemaVersion()
+              == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+            numParts += OMMultipartUploadUtils.countParts(this, expiredMultipartUpload.getUploadId());
+          } else {
+            numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          }
         }
 
       }
