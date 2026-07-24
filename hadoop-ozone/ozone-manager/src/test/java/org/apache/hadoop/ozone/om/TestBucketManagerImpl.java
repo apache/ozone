@@ -556,7 +556,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   @Test
-  void testGetBucketInfoFailsWithoutSourceReadAccess() throws Exception {
+  void testGetBucketInfoReturnsLinkWithoutSourceReadAccess() throws Exception {
     String linkVolume = volumeName();
     String sourceVolume = volumeName();
     OmBucketInfo link = createLinkBucketInfo(linkVolume, sourceVolume);
@@ -568,10 +568,11 @@ class TestBucketManagerImpl extends OzoneTestBase {
     denySourceRead(metadataReader, sourceVolume);
     OzoneManager omSpy = createAclEnabledOmSpy(bucketManager, metadataReader);
 
-    OMException exception = assertThrows(OMException.class,
-        () -> omSpy.getBucketInfo(linkVolume, "link"));
+    OmBucketInfo result = omSpy.getBucketInfo(linkVolume, "link");
 
-    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(result.getMetadata())
+        .containsEntry("linkKey", "linkValue")
+        .doesNotContainKey("sourceKey");
     verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
     verify(bucketManager, times(1)).getBucketInfo(sourceVolume, "source");
   }
