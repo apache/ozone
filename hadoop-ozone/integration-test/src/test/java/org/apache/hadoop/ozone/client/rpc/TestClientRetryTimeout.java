@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Timeout(600)
+@Timeout(900)
 public class TestClientRetryTimeout {
 
   private static final Logger LOG =
@@ -181,9 +181,9 @@ public class TestClientRetryTimeout {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .build();
-    // Seven datanodes plus multiple pipelines can exceed the 120s default on
-    // a loaded CI runner.
-    cluster.setWaitForClusterToBeReadyTimeout(180000);
+    // waitForClusterToBeReady runs waitForSCMToBeReady and then waits for all
+    // datanodes and safe mode; each step can use the full budget.
+    cluster.setWaitForClusterToBeReadyTimeout(300000);
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
         180000);
