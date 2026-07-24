@@ -34,6 +34,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -596,6 +597,34 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertSame(link, result.get(0));
     assertSame(regular, result.get(1));
     verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
+  }
+
+  @Test
+  void testListBucketsChecksSourceReadAccessOncePerSource() throws Exception {
+    String linkVolume = volumeName();
+    String sourceVolume = volumeName();
+    OmBucketInfo firstLink = createLinkBucketInfo(linkVolume, sourceVolume)
+        .toBuilder()
+        .setBucketName("link1")
+        .build();
+    OmBucketInfo secondLink = createLinkBucketInfo(linkVolume, sourceVolume)
+        .toBuilder()
+        .setBucketName("link2")
+        .build();
+    OmBucketInfo source = createSourceBucketInfo(sourceVolume);
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.listBuckets(linkVolume, "", "", 100, false))
+        .thenReturn(new ArrayList<>(Arrays.asList(firstLink, secondLink)));
+    when(bucketManager.getBucketInfo(sourceVolume, "source")).thenReturn(source);
+    OmMetadataReader metadataReader = mock(OmMetadataReader.class);
+    OzoneManager omSpy = createAclEnabledOmSpy(bucketManager, metadataReader);
+
+    List<OmBucketInfo> result = omSpy.listBuckets(linkVolume, "", "", 100, false);
+
+    assertEquals("sourceValue", result.get(0).getMetadata().get("sourceKey"));
+    assertEquals("sourceValue", result.get(1).getMetadata().get("sourceKey"));
+    verify(metadataReader, times(1))
+        .checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
   }
 
   private static OmBucketInfo createLinkBucketInfo(String linkVolume, String sourceVolume) {
