@@ -570,8 +570,11 @@ class TestBucketManagerImpl extends OzoneTestBase {
 
     OmBucketInfo result = omSpy.getBucketInfo(linkVolume, "link");
 
-    assertSame(link, result);
+    assertThat(result.getMetadata())
+        .containsEntry("linkKey", "linkValue")
+        .doesNotContainKey("sourceKey");
     verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
+    verify(bucketManager, times(1)).getBucketInfo(sourceVolume, "source");
   }
 
   @Test
@@ -594,9 +597,12 @@ class TestBucketManagerImpl extends OzoneTestBase {
 
     List<OmBucketInfo> result = omSpy.listBuckets(linkVolume, "", "", 100, false);
 
-    assertSame(link, result.get(0));
+    assertThat(result.get(0).getMetadata())
+        .containsEntry("linkKey", "linkValue")
+        .doesNotContainKey("sourceKey");
     assertSame(regular, result.get(1));
     verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
+    verify(bucketManager, times(1)).getBucketInfo(sourceVolume, "source");
   }
 
   @Test
@@ -658,7 +664,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     OzoneManager omSpy = spy(omTestManagers.getOzoneManager());
     HddsWhiteboxTestUtils.setInternalState(omSpy, "bucketManager", bucketManager);
     HddsWhiteboxTestUtils.setInternalState(omSpy, "omMetadataReader", metadataReader);
-    doReturn(true).when(omSpy).getAclsEnabled();
+    when(omSpy.getAclsEnabled()).thenReturn(true);
     AuditMessage auditMessage = mock(AuditMessage.class);
     when(auditMessage.getOp()).thenReturn("READ_BUCKET");
     doReturn(auditMessage).when(omSpy).buildAuditMessageForSuccess(any(), anyMap());
