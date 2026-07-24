@@ -17,6 +17,8 @@
 # limitations under the License.
 """Parse Maven Surefire/Failsafe JUnit XML reports and print a Markdown test summary.
 
+Adapted from Apache Kafka's .github/scripts/junit.py (summary format), reworked for Maven Surefire XML.
+
 Intended for GitHub Actions: junit_summary.py [--path DIR] [--quarantine] >> "$GITHUB_STEP_SUMMARY"
 Optional env: JUNIT_REPORT_URL (link to the archived test report artifact).
 Prints nothing and exits 0 when no reports are found. Always exits 0.
