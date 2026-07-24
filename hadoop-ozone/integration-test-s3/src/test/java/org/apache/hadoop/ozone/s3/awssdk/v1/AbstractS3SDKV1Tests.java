@@ -1338,6 +1338,26 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
   }
 
+  /**
+   * Adapted from ceph s3-tests test_object_read_unreadable.
+   */
+  @Test
+  public void testGetObjectUnreadableKey() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'},
+        StandardCharsets.ISO_8859_1);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(bucketName, unreadableKey));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getCode(), ase.getErrorCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), ase.getErrorMessage());
+  }
+
   static Stream<Arguments> onlyTagKeyCasesV1() {
     Map<String, String> fooBarEmptyBar = new HashMap<>();
     fooBarEmptyBar.put("foo", "bar");

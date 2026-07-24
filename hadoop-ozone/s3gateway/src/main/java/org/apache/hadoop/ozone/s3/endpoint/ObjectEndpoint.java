@@ -364,6 +364,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   ) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
+      validateObjectKeyUri(keyPath);
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
       throw newError(bucketName, keyPath, ex);
