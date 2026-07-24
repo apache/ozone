@@ -372,7 +372,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                          NodeReportProto nodeReport);
 
   /**
-   * Process Node LayoutVersion report.
+   * Process Node version report.
    *
    * @param datanodeDetails
    * @param versionReport

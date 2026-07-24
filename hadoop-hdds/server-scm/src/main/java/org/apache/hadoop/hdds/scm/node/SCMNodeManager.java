@@ -726,7 +726,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   /**
-   * Process Layout Version report.
+   * Process version report.
    *
    * @param datanodeDetails
    * @param versionReport

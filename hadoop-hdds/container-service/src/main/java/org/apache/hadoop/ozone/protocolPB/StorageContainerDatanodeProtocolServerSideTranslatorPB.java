@@ -68,7 +68,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    // Datanode version will be fenced during registration.
+    // Datanodes which do not report a version will not be allowed to register.
     DatanodeVersionProto versionInfo = request.hasDatanodeVersion() ? request.getDatanodeVersion() : null;
     return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport, versionInfo);

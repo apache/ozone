@@ -318,7 +318,7 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Updates the last known layout version of the node.
+   * Updates the last known version of the node.
    * @param datanodeDetails DataNode Details
    * @param versionInfo DataNode Version Information
    *

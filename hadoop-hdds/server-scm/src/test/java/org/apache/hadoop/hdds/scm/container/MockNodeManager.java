@@ -650,7 +650,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
-   * Empty implementation for processLayoutVersionReport.
+   * Empty implementation for processVersionReport.
    *
    * @param dnUuid
    * @param versionReport
