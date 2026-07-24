@@ -17,60 +17,40 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.ozone.AbstractKerberosTest;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify that symmetric secret keys are correctly
  * synchronized from leader to follower during snapshot installation.
  */
-public final class TestSecretKeySnapshot {
+public class TestSecretKeySnapshot extends AbstractKerberosTest {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeySnapshot.class);
   private static final long SNAPSHOT_THRESHOLD = 100;
@@ -87,38 +67,41 @@ public final class TestSecretKeySnapshot {
   public static final int ROTATE_DURATION_MS = 30_000;
   public static final int EXPIRY_DURATION_MS = 61_000;
 
-  private MiniKdc miniKdc;
-  private OzoneConfiguration conf;
-  @TempDir
-  private File workDir;
-  private File ozoneKeytab;
-  private File spnegoKeytab;
   private MiniOzoneHAClusterImpl cluster;
+
+  @Override
+  protected boolean createTestUserPrincipal() {
+    return false;
+  }
+
+  @Override
+  protected boolean enableSecurityAuthorizationByDefault() {
+    return false;
+  }
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+    setConf(new OzoneConfiguration());
+    getConf().set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
 
-    startMiniKdc();
-    setSecureConfig();
-    createCredentialsInKDC();
+    initKerberos();
+    getConf().setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
 
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+    getConf().setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    getConf().setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    getConf().setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
-    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
+    getConf().set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
         ROTATE_CHECK_DURATION_MS + "ms");
-    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
-    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
-    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_MS + "ms");
-    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATE_CHECK_DURATION_MS + "ms");
+    getConf().set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
+    getConf().set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
+    getConf().set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_MS + "ms");
+    getConf().set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATE_CHECK_DURATION_MS + "ms");
 
-    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(getConf());
     builder
         .setSCMServiceId("TestSecretKeySnapshot")
         .setSCMServiceId("SCMServiceId")
@@ -133,62 +116,8 @@ public final class TestSecretKeySnapshot {
 
   @AfterEach
   public void stop() {
-    miniKdc.stop();
+    stopMiniKdc();
     IOUtils.closeQuietly(cluster);
-  }
-
-  private void createCredentialsInKDC() throws Exception {
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    SCMHTTPServerConfig httpServerConfig =
-        conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(ozoneKeytab, scmConfig.getKerberosPrincipal());
-    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
-  }
-
-  private void createPrincipal(File keytab, String... principal)
-      throws Exception {
-    miniKdc.createPrincipal(keytab, principal);
-  }
-
-  private void startMiniKdc() throws Exception {
-    Properties securityProperties = MiniKdc.createConf();
-    miniKdc = new MiniKdc(securityProperties, workDir);
-    miniKdc.start();
-  }
-
-  private void setSecureConfig() throws IOException {
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    String host = InetAddress.getLocalHost().getCanonicalHostName()
-                      .toLowerCase();
-
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-
-    String curUser = UserGroupInformation.getCurrentUser().getUserName();
-    conf.set(OZONE_ADMINISTRATORS, curUser);
-
-    String realm = miniKdc.getRealm();
-    String hostAndRealm = host + "@" + realm;
-    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
-    conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
-    conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-    conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
-
-    ozoneKeytab = new File(workDir, "scm.keytab");
-    spnegoKeytab = new File(workDir, "http.keytab");
-
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        ozoneKeytab.getAbsolutePath());
-    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
-        spnegoKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        ozoneKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
-        spnegoKeytab.getAbsolutePath());
-    conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
-        ozoneKeytab.getAbsolutePath());
-
-    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
   }
 
   @Test

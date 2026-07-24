@@ -35,18 +35,13 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
@@ -83,7 +78,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -125,7 +119,6 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.Client;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage;
@@ -163,6 +156,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,7 +164,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-final class TestSecureOzoneCluster {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestSecureOzoneCluster extends AbstractKerberosTest {
 
   private static final String COMPONENT = "om";
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
@@ -179,18 +174,6 @@ final class TestSecureOzoneCluster {
       .getLogger(TestSecureOzoneCluster.class);
   private static final int CERT_GRACE_TIME_MS = 10 * 1000; // 10s
   private static final int DELEGATION_TOKEN_MAX_TIME_MS = 9 * 1000; // 9s
-
-  @TempDir
-  private static File workDir;
-  private static MiniKdc miniKdc;
-  private static OzoneConfiguration kdcConf;
-  private static File scmKeytab;
-  private static File spnegoKeytab;
-  private static File omKeytab;
-  private static File testUserKeytab;
-  private static String testUserPrincipal;
-  private static String host;
-  private static String realm;
 
   @TempDir
   private File tempDir;
@@ -206,32 +189,38 @@ final class TestSecureOzoneCluster {
   private KeyPair keyPair;
   private Path omMetaDirPath;
 
+  @Override
+  protected boolean useSharedServicePrincipal() {
+    return false;
+  }
+
+  @Override
+  protected boolean enableSecurityAuthorizationByDefault() {
+    return false;
+  }
+
+  @Override
+  protected String kerberosAuthenticationValue() {
+    return "kerberos";
+  }
+
   @BeforeAll
-  static void setupKdc() throws Exception {
+  void setupKdc() throws Exception {
     ExitUtils.disableSystemExit();
     DefaultMetricsSystem.setMiniClusterMode(true);
-    host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
-    startMiniKdc();
-    realm = miniKdc.getRealm();
-    testUserPrincipal = "test@" + realm;
-    scmKeytab = new File(workDir, "scm.keytab");
-    spnegoKeytab = new File(workDir, "http.keytab");
-    omKeytab = new File(workDir, "om.keytab");
-    testUserKeytab = new File(workDir, "testuser.keytab");
-    kdcConf = new OzoneConfiguration();
-    setSecureConfig(kdcConf);
-    createCredentialsInKDC(kdcConf);
+    setConf(new OzoneConfiguration());
+    initKerberos();
   }
 
   @AfterAll
-  static void tearDownKdc() {
+  void tearDownKdc() {
     stopMiniKdc();
   }
 
   @BeforeEach
   void init() {
     try {
-      conf = new OzoneConfiguration(kdcConf);
+      conf = new OzoneConfiguration(getConf());
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY, getFreePort());
@@ -284,49 +273,6 @@ final class TestSecureOzoneCluster {
     }
   }
 
-  private static void createCredentialsInKDC(OzoneConfiguration conf) throws Exception {
-    createPrincipal(scmKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
-    createPrincipal(spnegoKeytab, conf.get(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY));
-    createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
-    createPrincipal(testUserKeytab, testUserPrincipal);
-  }
-
-  private static void createPrincipal(File keytab, String... principal)
-      throws Exception {
-    miniKdc.createPrincipal(keytab, principal);
-  }
-
-  private static void startMiniKdc() throws Exception {
-    Properties securityProperties = MiniKdc.createConf();
-    miniKdc = new MiniKdc(securityProperties, workDir);
-    miniKdc.start();
-  }
-
-  private static void stopMiniKdc() {
-    if (miniKdc != null) {
-      miniKdc.stop();
-    }
-  }
-
-  private static void setSecureConfig(OzoneConfiguration conf) throws IOException {
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-
-    String curUser = UserGroupInformation.getCurrentUser().getUserName();
-    conf.set(OZONE_ADMINISTRATORS, curUser);
-
-    String hostAndRealm = host + "@" + realm;
-    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
-    conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + hostAndRealm);
-    conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, scmKeytab.getAbsolutePath());
-    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
-  }
-
   /**
    * Exercises a secure SCM and OM sharing a single SCM instance to avoid paying
    * the SCM startup cost twice. Covers SCM startup and cert trust chain, SCM
@@ -367,7 +313,7 @@ final class TestSecureOzoneCluster {
   private void assertScmSecurityProtocolAllowsKerberosUser() throws Exception {
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-            testUserPrincipal, testUserKeytab.getCanonicalPath());
+            getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
     ugi.setAuthenticationMethod(KERBEROS);
     try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
         getScmSecurityClient(conf, ugi)) {
@@ -403,7 +349,7 @@ final class TestSecureOzoneCluster {
   /** SCM admin protocol - authenticated non-admin user is denied. */
   private void assertScmAdminProtocolDeniesNonAdminUser() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-        testUserPrincipal, testUserKeytab.getCanonicalPath());
+        getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
     StorageContainerLocationProtocol scmRpcClient =
         HAUtils.getScmContainerClient(conf, ugi);
     IOException adminException = assertThrows(IOException.class,
@@ -474,7 +420,8 @@ final class TestSecureOzoneCluster {
    */
   private void assertSecureOmInitWhenAlreadyInitialized() throws Exception {
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + host + "@" + realm);
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+        getConf().get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
     conf.set(OZONE_OM_ADDRESS_KEY,
         InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
     LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
@@ -534,9 +481,9 @@ final class TestSecureOzoneCluster {
      *
      */
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
-        "om/" + host + "@" + miniKdc.getRealm());
-    File keyTab = new File(workDir, "om.keytab");
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, keyTab.getAbsolutePath());
+        conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+        conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
   }
 
   @Test
@@ -596,7 +543,7 @@ final class TestSecureOzoneCluster {
     // positive case (happy-path)
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-            testUserPrincipal, testUserKeytab.getCanonicalPath());
+            getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
     ugi.setAuthenticationMethod(KERBEROS);
     OzoneManagerProtocolClientSideTranslatorPB secureClient =
         new OzoneManagerProtocolClientSideTranslatorPB(
@@ -725,7 +672,7 @@ final class TestSecureOzoneCluster {
     // testUser is not an admin
     final UserGroupInformation ugiNonAdmin =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-            testUserPrincipal, testUserKeytab.getCanonicalPath());
+            getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
     final OzoneManagerProtocolClientSideTranslatorPB omClientNonAdmin =
         new OzoneManagerProtocolClientSideTranslatorPB(
         OmTransportFactory.create(conf, ugiNonAdmin, null),
