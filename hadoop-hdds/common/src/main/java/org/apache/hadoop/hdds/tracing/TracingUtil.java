@@ -195,9 +195,9 @@ public final class TracingUtil {
             .setTracerProvider(tracerProvider)
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .build();
-        // GlobalOpenTelemetry.set is one-shot
-        GlobalOpenTelemetry.resetForTest();
-        GlobalOpenTelemetry.set(sdk);
+        if (!GlobalOpenTelemetry.isSet() || !isRealGlobal(GlobalOpenTelemetry.get())) {
+          GlobalOpenTelemetry.set(sdk);
+        }
         tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
       } else {
         sdk = OpenTelemetrySdk.builder()
@@ -579,7 +579,7 @@ public final class TracingUtil {
 
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
-    if (conf == null || !isTracingActive(conf) || !hasUsableTracer()) {
+    if (conf == null || !isTracingActive(conf)) {
       return () -> { };
     }
 
