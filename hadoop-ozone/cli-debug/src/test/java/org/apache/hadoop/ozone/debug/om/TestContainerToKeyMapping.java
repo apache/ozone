@@ -442,6 +442,8 @@ public class TestContainerToKeyMapping {
         .setDataSize(1024)
         .setObjectID(objectId)
         .setUpdateID(1)
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
         .addOmKeyLocationInfoGroup(locationGroup)
         .build();
   }

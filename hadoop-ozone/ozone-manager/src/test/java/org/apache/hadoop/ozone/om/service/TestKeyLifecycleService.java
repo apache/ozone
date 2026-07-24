@@ -3446,6 +3446,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
         .setKeyName("k")
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(100L)
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
         .setObjectID(partNumber)
         .setUpdateID(partNumber)
         .addOmKeyLocationInfoGroup(locationGroup)
