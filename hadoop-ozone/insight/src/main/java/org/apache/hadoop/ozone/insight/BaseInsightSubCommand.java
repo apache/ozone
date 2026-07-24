@@ -77,11 +77,11 @@ public class BaseInsightSubCommand {
   public String getHost(OzoneConfiguration conf, Component component) {
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
     String protocol = policy.isHttpsEnabled() ? HTTPS_SCHEME : HTTP_SCHEME;
-    
+
     if (component.getHostname() != null) {
       return protocol + "://" + component.getHostname() + ":" + component.getPort();
     }
-    
+
     String address = getComponentAddress(conf, component.getName(), policy);
     return protocol + "://" + address;
   }
@@ -110,7 +110,8 @@ public class BaseInsightSubCommand {
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
         if (scmHost.isPresent()) {
-          return scmHost.get() + ":" + getPort(address);
+          return HddsUtils.getHostPortString(scmHost.get(),
+              Integer.parseInt(getPort(address)));
         }
       }
       return address;
@@ -129,7 +130,8 @@ public class BaseInsightSubCommand {
         Optional<String> omHost = HddsUtils.getHostNameFromConfigKeys(conf,
             OMConfigKeys.OZONE_OM_ADDRESS_KEY);
         if (omHost.isPresent()) {
-          return omHost.get() + ":" + getPort(address);
+          return HddsUtils.getHostPortString(omHost.get(),
+              Integer.parseInt(getPort(address)));
         }
       }
       return address;
@@ -145,7 +147,7 @@ public class BaseInsightSubCommand {
    * e.g. Input: "0.0.0.0:9876" -> Output: "0.0.0.0"
    */
   private String getHostOnly(String address) {
-    return address.split(":", 2)[0];
+    return HddsUtils.getHostOnly(address);
   }
 
   /**
@@ -153,7 +155,7 @@ public class BaseInsightSubCommand {
    * e.g. Input: "0.0.0.0:9876" -> Output: "9876"
    */
   private String getPort(String address) {
-    return address.split(":", 2)[1];
+    return HddsUtils.getPort(address);
   }
 
   public Map<String, InsightPoint> createInsightPoints(

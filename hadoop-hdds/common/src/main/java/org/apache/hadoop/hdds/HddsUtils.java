@@ -229,6 +229,28 @@ public final class HddsUtils {
   }
 
   /**
+   * Extract the host from a host:port address string.
+   * IPv6-aware; accepts bracketed literals such as {@code [2001:db8::1]:9862}.
+   *
+   * @param address address in host:port format
+   * @return the host component without brackets
+   */
+  public static String getHostOnly(String address) {
+    return NetUtils.createSocketAddr(address).getHostString();
+  }
+
+  /**
+   * Extract the port from a host:port address string.
+   * IPv6-aware; accepts bracketed literals such as {@code [2001:db8::1]:9862}.
+   *
+   * @param address address in host:port format
+   * @return the port component as a decimal string
+   */
+  public static String getPort(String address) {
+    return String.valueOf(NetUtils.createSocketAddr(address).getPort());
+  }
+
+  /**
    * Combine a host and port into a "host:port" string, wrapping the host in
    * square brackets when it is an IPv6 literal (for example
    * {@code [2001:db8::1]:9858}). A bare IPv6 literal joined to a port with a

@@ -74,6 +74,18 @@ public class TestHddsUtils {
     assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
   }
 
+  @Test
+  void testGetHostOnlyAndGetPort() {
+    assertEquals("0.0.0.0", HddsUtils.getHostOnly("0.0.0.0:9876"));
+    assertEquals("9876", HddsUtils.getPort("0.0.0.0:9876"));
+
+    assertEquals("localhost", HddsUtils.getHostOnly("localhost:9862"));
+    assertEquals("9862", HddsUtils.getPort("localhost:9862"));
+
+    assertEquals("2001:db8:0:0:0:0:0:1", HddsUtils.getHostOnly("[2001:db8::1]:9862"));
+    assertEquals("9862", HddsUtils.getPort("[2001:db8::1]:9862"));
+  }
+
   static List<Arguments> validPaths() {
     return Arrays.asList(
         Arguments.of("/", "/"),

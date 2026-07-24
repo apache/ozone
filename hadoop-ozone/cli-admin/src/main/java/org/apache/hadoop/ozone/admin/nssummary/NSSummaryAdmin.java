@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDR
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
 import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
-
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,14 +59,14 @@ public class NSSummaryAdmin implements AdminSubcommand {
    * e.g. Input: "0.0.0.0:9891" -> Output: "0.0.0.0"
    */
   private String getHostOnly(String host) {
-    return host.split(":", 2)[0];
+    return HddsUtils.getHostOnly(host);
   }
 
   /**
    * e.g. Input: "0.0.0.0:9891" -> Output: "9891"
    */
   private String getPort(String host) {
-    return host.split(":", 2)[1];
+    return HddsUtils.getPort(host);
   }
 
   public String getReconWebAddress() {
@@ -95,7 +95,8 @@ public class NSSummaryAdmin implements AdminSubcommand {
       // Fallback to <Recon RPC host name>:<Recon http(s) address port>
       final String rpcHost =
           conf.get(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
-      host = getHostOnly(rpcHost) + ":" + getPort(host);
+      host = HddsUtils.getHostPortString(getHostOnly(rpcHost),
+          Integer.parseInt(getPort(host)));
     }
 
     return protocol + "://" + host;
