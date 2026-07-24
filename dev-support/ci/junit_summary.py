@@ -141,3 +141,47 @@ def render_summary(cases, quarantine=False):
     lines.extend(render_table(QUARANTINED, ["Module", "Test"],
                               [[c.module, full_name(c)] for c in ran]))
   return "\n".join(lines) + "\n"
+
+
+REPORT_PATTERNS = (
+    os.path.join("**", "surefire-reports", "TEST-*.xml"),
+    os.path.join("**", "failsafe-reports", "TEST-*.xml"),
+    os.path.join("target", "*", "**", "TEST-*.xml"),
+)
+
+
+def find_reports(base):
+  found = set()
+  for pattern in REPORT_PATTERNS:
+    found.update(glob(os.path.join(base, pattern), recursive=True))
+  # junit.sh keeps per-iteration copies under target/<check>/iterationN/ when ITERATIONS>1;
+  # exclude them like _mvn_unit_report.sh does, so reruns are not counted multiple times.
+  return sorted(path for path in found if "/iteration" not in path.replace(os.sep, "/"))
+
+
+def main(argv=None):
+  parser = argparse.ArgumentParser(description="Print a Markdown summary of JUnit XML test reports.")
+  parser.add_argument("--path", default=".", help="directory to scan for TEST-*.xml reports")
+  parser.add_argument("--quarantine", action="store_true",
+                      help="label all tests in this run as quarantined (flaky split)")
+  try:
+    args = parser.parse_args(argv)
+  except SystemExit:
+    return 0
+  # This script only decorates the step summary; it must NEVER fail the check, so exit 0 no matter what.
+  try:
+    cases = []
+    for report in find_reports(args.path):
+      try:
+        cases.extend(parse_report(report))
+      except Exception as e:
+        print("Skipping unreadable report %s: %s" % (report, e), file=sys.stderr)
+    if cases:
+      print(render_summary(cases, args.quarantine), end="")
+  except Exception as e:
+    print("junit_summary failed: %s" % e, file=sys.stderr)
+  return 0
+
+
+if __name__ == "__main__":
+  sys.exit(main())

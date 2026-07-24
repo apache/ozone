@@ -17,6 +17,8 @@
 # limitations under the License.
 """Tests for junit_summary.py. Run: cd dev-support/ci && python3 -m unittest test_junit_summary -v"""
 
+import contextlib
+import io
 import os
 import tempfile
 import unittest
@@ -124,6 +126,70 @@ class TestRender(unittest.TestCase):
   def test_render_quarantine(self):
     md = junit_summary.render_summary(self.make_cases(), quarantine=True)
     self.assertIn("QUARANTINED 😷 (3)", md)
+
+
+class TestMain(unittest.TestCase):
+
+  write_report = TestParseReport.write_report
+
+  def run_main(self, argv):
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+      code = junit_summary.main(argv)
+    return code, out.getvalue()
+
+  def test_find_reports_dedupes_both_trees(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      self.write_report(tmp, "hadoop-hdds/common/target/surefire-reports/TEST-a.xml")
+      self.write_report(tmp, "target/unit/surefire-reports/TEST-b.xml")
+      reports = junit_summary.find_reports(tmp)
+    self.assertEqual(len(reports), 2)
+
+  def test_find_reports_skips_iteration_dirs(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      self.write_report(tmp, "target/unit/TEST-a.xml")
+      self.write_report(tmp, "target/unit/iteration2/TEST-a.xml")
+      reports = junit_summary.find_reports(tmp)
+    self.assertEqual(len(reports), 1)
+
+  def test_main_no_reports_is_silent_noop(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      code, out = self.run_main(["--path", tmp])
+    self.assertEqual(code, 0)
+    self.assertEqual(out, "")
+
+  def test_main_prints_summary(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      self.write_report(tmp, "m/target/surefire-reports/TEST-a.xml")
+      code, out = self.run_main(["--path", tmp])
+    self.assertEqual(code, 0)
+    self.assertIn("## Test Summary", out)
+    self.assertIn("4 tests run", out)
+
+  def test_main_survives_malformed_xml(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      self.write_report(tmp, "m/target/surefire-reports/TEST-a.xml")
+      self.write_report(tmp, "m/target/surefire-reports/TEST-bad.xml", content="<not-xml")
+      with contextlib.redirect_stderr(io.StringIO()):
+        code, out = self.run_main(["--path", tmp])
+    self.assertEqual(code, 0)
+    self.assertIn("4 tests run", out)
+
+  def test_main_survives_non_parse_errors(self):
+    # a ValueError (bad time attribute), not an ET.ParseError, must not break the exit-0 guarantee
+    bad_time = '<testsuite><testcase name="t" classname="C" time="not-a-number"/></testsuite>'
+    with tempfile.TemporaryDirectory() as tmp:
+      self.write_report(tmp, "m/target/surefire-reports/TEST-a.xml")
+      self.write_report(tmp, "m/target/surefire-reports/TEST-badtime.xml", content=bad_time)
+      with contextlib.redirect_stderr(io.StringIO()):
+        code, out = self.run_main(["--path", tmp])
+    self.assertEqual(code, 0)
+    self.assertIn("4 tests run", out)
+
+  def test_main_bad_args_still_exit_zero(self):
+    with contextlib.redirect_stderr(io.StringIO()):
+      code = junit_summary.main(["--no-such-flag"])
+    self.assertEqual(code, 0)
 
 
 if __name__ == "__main__":
