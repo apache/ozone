@@ -282,13 +282,14 @@ public class TestOMSnapshotDeleteRequest extends SnapshotRequestAndResponseTests
   }
 
   /**
-   * Repro for the flush-lag reclamation window (companion to
-   * TestReclaimableKeyFilter#testKeyNotReclaimableWhenChainEmptyingPurgeIsUnflushed): snapshot deletion
-   * updates only status and deletionTime and never stamps lastTransactionInfo (unlike create, moveTableKeys,
-   * purge and key/dir purge), so areSnapshotChangesFlushedToDB() keys off the stale create-time stamp and
-   * reports an applied-but-unflushed deletion as flushed. SnapshotDeletingService#shouldIgnoreSnapshot relies
-   * on that method to defer processing until a snapshot's latest change is durable; the missing stamp lets
-   * the deletion be processed (moveTableKeys + purge submitted) before the double buffer has flushed it.
+   * Regression test for the flush-lag reclamation window. This is a companion to
+   * TestReclaimableKeyFilter#testKeyReclaimableWhenChainEmptyingPurgeUnflushedButDeleteFlushed.
+   *
+   * <p>Before OMSnapshotDeleteRequest stamped lastTransactionInfo, snapshot deletion updated only status and
+   * deletionTime. areSnapshotChangesFlushedToDB() therefore used the stale create-time stamp and reported an
+   * applied-but-unflushed deletion as flushed. SnapshotDeletingService#shouldIgnoreSnapshot relies on that method
+   * to defer processing until a snapshot's latest change is durable; the missing stamp allowed moveTableKeys and
+   * purge to be submitted before the double buffer flushed the deletion.
    */
   @Test
   public void testSnapshotDeleteIsNotReportedFlushedUntilFlushed() throws Exception {
@@ -319,12 +320,10 @@ public class TestOMSnapshotDeleteRequest extends SnapshotRequestAndResponseTests
     snapshotInfo = getOmMetadataManager().getSnapshotInfoTable().get(key);
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
 
-    // Correct behavior: the deletion (index 2) is not durable yet, so the snapshot's changes must not be
-    // reported as flushed. Current behavior: the deletion never stamps lastTransactionInfo, the check
-    // compares the stale create-time stamp against the flushed marker and returns true.
+    // The deletion (index 2) is not durable yet, so the snapshot's changes must not be reported as flushed.
+    // This verifies that lastTransactionInfo advanced from the create transaction to the delete transaction.
     assertFalse(OmSnapshotManager.areSnapshotChangesFlushedToDB(getOmMetadataManager(), key),
-        "snapshot deletion applied at index 2 is unflushed (marker at the create transaction) but is"
-            + " reported flushed because OMSnapshotDeleteRequest does not stamp lastTransactionInfo");
+        "snapshot deletion at index 2 must remain unflushed while the marker is at the create transaction");
   }
 
   private OMSnapshotDeleteRequest doPreExecute(

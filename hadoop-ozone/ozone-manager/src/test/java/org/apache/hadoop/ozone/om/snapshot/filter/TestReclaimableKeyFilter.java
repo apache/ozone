@@ -341,8 +341,9 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     // SnapshotPurge has been applied: the in-memory chain no longer has the snapshot...
     getSnapshotInfos().get(getKey(volume, bucket)).clear();
 
-    // ...but the purge is not flushed: the applied/cache view of snapshotInfoTable has no row while the
-    // on-disk (skip-cache) view still holds the row -- as DELETED, guaranteed by the SDS flush gate.
+    // ReclaimableKeyFilter determines that the chain is empty without consulting snapshotInfoTable. These stubs
+    // document the invariant guaranteed by the SnapshotDeletingService flush gate: after the applied purge removes
+    // the snapshot from the in-memory chain, the unflushed on-disk row can only be DELETED.
     Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
     OMMetadataManager metadataManager = getOzoneManager().getMetadataManager();
     when(metadataManager.getSnapshotInfoTable()).thenReturn(snapshotInfoTable);
@@ -371,6 +372,7 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
 
     getSnapshotInfos().get(getKey(volume, bucket)).clear();
 
+    // As above, these stubs document the durable-empty invariant but do not affect the filter result.
     Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
     OMMetadataManager metadataManager = getOzoneManager().getMetadataManager();
     when(metadataManager.getSnapshotInfoTable()).thenReturn(snapshotInfoTable);
