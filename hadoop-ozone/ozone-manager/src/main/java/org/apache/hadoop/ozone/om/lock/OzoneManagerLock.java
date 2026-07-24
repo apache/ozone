@@ -143,7 +143,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     OMLockDetails acquire(Resource resource, boolean isRead,
         Function<Striped<ReentrantReadWriteLock>, Iterable<ReentrantReadWriteLock>> getLocks) {
       final R r = assertAcquire(resource);
-      final long startWaitingTimeNanos = Time.monotonicNow();
+      final long startWaitingTimeNanos = Time.monotonicNowNanos();
       for (ReentrantReadWriteLock lock : getLocks.apply(lockMap.get(r))) {
         acquireLock(r, isRead, lock, startWaitingTimeNanos);
       }
@@ -152,7 +152,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     OMLockDetails acquire(Resource resource, boolean isRead, String... keys) {
       final R r = assertAcquire(resource);
-      final long startWaitingTimeNanos = Time.monotonicNow();
+      final long startWaitingTimeNanos = Time.monotonicNowNanos();
       acquireLock(r, isRead, getLock(r, keys), startWaitingTimeNanos);
       return tracker.lockResource(r);
     }
