@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,6 +29,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.slf4j.Logger;
@@ -53,11 +52,9 @@ final class VolumeReplicationThreadPools {
     currentPoolSize = poolSize;
     List<String> volumeRoots = new ArrayList<>();
     for (StorageVolume volume : volumes) {
-      File storageDir = volume.getStorageDir();
-      String volumeRoot = storageDir.getPath();
+      String volumeRoot = volume.getStorageDir().getPath();
       volumeRoots.add(volumeRoot);
-      pools.put(volumeRoot,
-          createPool(poolSize, threadNamePrefix, storageDir.getName()));
+      pools.put(volumeRoot, createPool(poolSize, threadNamePrefix, volumeRoot));
     }
     LOG.info("Initialized {} per-volume replication thread pools "
             + "(threads per volume = {}): {}",
@@ -65,12 +62,15 @@ final class VolumeReplicationThreadPools {
   }
 
   private static ThreadPoolExecutor createPool(int poolSize,
-      String threadNamePrefix, String volumeLabel) {
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat(threadNamePrefix + "ContainerReplicationThread-"
-            + volumeLabel + "-%d")
-        .build();
+      String threadNamePrefix, String volumeRoot) {
+    AtomicInteger threadId = new AtomicInteger();
+    ThreadFactory threadFactory = runnable -> {
+      Thread thread = new Thread(runnable, threadNamePrefix
+          + "ContainerReplicationThread-" + volumeRoot + "-"
+          + threadId.getAndIncrement());
+      thread.setDaemon(true);
+      return thread;
+    };
     return new ThreadPoolExecutor(
         poolSize,
         poolSize,

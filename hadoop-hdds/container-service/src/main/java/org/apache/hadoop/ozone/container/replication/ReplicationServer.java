@@ -187,18 +187,23 @@ public class ReplicationServer {
         PREFIX + ".per.volume.enabled";
     public static final String PER_VOLUME_STREAMS_LIMIT_KEY =
         PREFIX + ".per.volume.streams.limit";
-    public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 1;
+    public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 2;
 
     /**
-     * The maximum number of replication commands a single datanode can execute
-     * simultaneously.
+     * Maximum concurrent tasks on the global replication handler thread pool.
      */
     @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
-        description = "The maximum number of replication commands a single " +
-            "datanode can execute simultaneously"
+        description = "Maximum concurrent replication tasks on the global "
+            + "replication handler thread pool (before "
+            + "outofservice.limit.factor scaling). When "
+            + "hdds.datanode.replication.per.volume.enabled is false (default), "
+            + "all replication tasks use this pool. When per.volume.enabled is "
+            + "true, this pool handles non-push replication and push tasks "
+            + "that fall back from a missing per-volume pool; push concurrency "
+            + "per disk is governed by per.volume.streams.limit instead."
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
@@ -244,12 +249,17 @@ public class ReplicationServer {
 
     @Config(key = PER_VOLUME_STREAMS_LIMIT_KEY,
         type = ConfigType.INT,
-        defaultValue = "1",
+        defaultValue = "2",
         reconfigurable = true,
         tags = {DATANODE},
-        description = "The maximum number of concurrent push replication " +
-            "commands per data volume when per-volume replication thread " +
-            "pools are enabled."
+        description = "When hdds.datanode.replication.per.volume.enabled is "
+            + "true, maximum concurrent push replication commands per data "
+            + "volume (each volume has its own handler thread pool; effective "
+            + "push parallelism on the datanode is roughly the number of "
+            + "volumes times this limit, with outofservice.limit.factor "
+            + "applied per pool on decommissioning or maintenance nodes). "
+            + "Push replication is usually disk-bound, so one or two "
+            + "concurrent transfers per volume often saturates the disk."
     )
     private int perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
 

@@ -1344,7 +1344,12 @@ public class TestReplicationSupervisor {
       HddsVolume volume = container.getContainerData().getVolume();
       if (volume == vol1) {
         vol1Started.countDown();
-        assertDoesNotThrow(() -> vol1Release.await(10, TimeUnit.SECONDS));
+        try {
+          assertTrue(vol1Release.await(10, TimeUnit.SECONDS));
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(ie);
+        }
       }
       task.setStatus(DONE);
     };
@@ -1393,7 +1398,12 @@ public class TestReplicationSupervisor {
     replicatorRef.set(task -> {
       if (task.getContainerId() == 1L) {
         task1Started.countDown();
-        assertDoesNotThrow(() -> task1Block.await(30, TimeUnit.SECONDS));
+        try {
+          assertTrue(task1Block.await(30, TimeUnit.SECONDS));
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(ie);
+        }
       }
       task.setStatus(DONE);
     });
