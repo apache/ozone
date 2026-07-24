@@ -126,6 +126,21 @@ class TestSnapDiffDependencyGraph {
   }
 
   @Test
+  void testModifyAtSourcePathOrderedBeforeRename() {
+    // Object 2 is both modified and renamed. MODIFY is reported at the
+    // from-snapshot (pre-rename) path "parent/a.txt", and RENAME moves that
+    // same path to "parent/b.txt". The content change must be applied while
+    // the path is still "parent/a.txt", so MODIFY must precede RENAME.
+    // RENAME is listed first to expose the missing intra-object edge.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(2L, 1L, RENAME, "parent/a.txt", "parent/b.txt"),
+        entry(2L, 1L, MODIFY, "parent/a.txt"));
+
+    List<DiffType> orderedTypes = toDiffTypes(sort(entries));
+    assertEquals(Arrays.asList(MODIFY, RENAME), orderedTypes);
+  }
+
+  @Test
   void testTopologicalSortDetectsCycle() {
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 2L, CREATE, "a"),
