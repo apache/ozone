@@ -629,7 +629,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
           "Container Balancer requires at least 2 eligible datanodes but only "
               + "%d is available.", eligibleCount));
     }
-    int maxDatanodesToInvolve = (int) (conf.getMaxDatanodesRatioToInvolvePerIteration() * eligibleCount);
+    int maxDatanodesToInvolve = conf.computeMaxDatanodesToInvolvePerIteration(eligibleCount);
     if (maxDatanodesToInvolve < 2) {
       throw new InvalidContainerBalancerConfigurationException(String.format(
           "max-datanodes-percentage-to-involve-per-iteration=%d allows at most "
@@ -645,7 +645,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
    * Counts healthy, in-service datanodes that can participate in balancing after
    * applying include/exclude datanode configuration.
    */
-  int countEligibleDatanodes(ContainerBalancerConfiguration conf) {
+  private int countEligibleDatanodes(ContainerBalancerConfiguration conf) {
     Set<String> excludeNodes = conf.getExcludeNodes();
     Set<String> includeNodes = conf.getIncludeNodes();
     List<DatanodeInfo> healthyNodes = scm.getScmNodeManager().getNodes(IN_SERVICE, HEALTHY);

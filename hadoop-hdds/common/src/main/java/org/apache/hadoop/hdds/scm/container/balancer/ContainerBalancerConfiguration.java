@@ -254,6 +254,17 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
+   * Computes the maximum number of datanodes that may be involved in an
+   * iteration for the given eligible datanode count.
+   *
+   * @param eligibleDatanodeCount number of healthy, in-service datanodes.
+   * @return maximum datanodes that may be involved in one iteration
+   */
+  public int computeMaxDatanodesToInvolvePerIteration(int eligibleDatanodeCount) {
+    return (int) (getMaxDatanodesRatioToInvolvePerIteration() * eligibleDatanodeCount);
+  }
+
+  /**
    * Sets the maximum percentage of healthy, in-service datanodes that will be
    * involved in balancing in one iteration.
    *
