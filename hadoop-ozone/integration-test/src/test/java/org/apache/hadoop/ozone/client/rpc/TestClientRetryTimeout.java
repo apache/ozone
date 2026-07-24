@@ -62,6 +62,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Timeout(600)
 public class TestClientRetryTimeout {
 
   private static final Logger LOG =
@@ -150,6 +152,7 @@ public class TestClientRetryTimeout {
     ratisClient.setExponentialPolicyBaseSleep(Duration.ofMillis(500));
     ratisClient.setExponentialPolicyMaxSleep(Duration.ofSeconds(1));
     ratisClient.setExponentialPolicyMaxRetries(1);
+    ratisClient.setMultilinearPolicy("500ms, 2");
     conf.setFromObject(ratisClient);
 
     RatisClientConfig.RaftConfig raftClient =
@@ -178,6 +181,9 @@ public class TestClientRetryTimeout {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .build();
+    // Seven datanodes plus multiple pipelines can exceed the 120s default on
+    // a loaded CI runner.
+    cluster.setWaitForClusterToBeReadyTimeout(180000);
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
         180000);
