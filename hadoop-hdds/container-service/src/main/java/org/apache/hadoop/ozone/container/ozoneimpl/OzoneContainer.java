@@ -92,6 +92,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.DatanodeStorageMetrics;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -156,6 +157,7 @@ public class OzoneContainer {
 
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
+  private DatanodeStorageMetrics datanodeStorageMetrics;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -329,6 +331,8 @@ public class OzoneContainer {
     } else {
       tlsClientConfig = null;
     }
+
+    datanodeStorageMetrics = DatanodeStorageMetrics.create(volumeSet);
 
     initializingStatus = new AtomicReference<>(InitializingStatus.UNINITIALIZED);
   }
@@ -646,6 +650,9 @@ public class OzoneContainer {
       diskBalancerService.shutdown();
     }
     recoveringContainerScrubbingService.shutdown();
+    if (datanodeStorageMetrics != null) {
+      datanodeStorageMetrics.unregister();
+    }
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
     checksumTreeManager.stop();
