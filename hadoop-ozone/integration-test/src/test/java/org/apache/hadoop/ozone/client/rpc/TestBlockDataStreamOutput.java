@@ -135,6 +135,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(DN_OLD_VERSION.serialize())
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
