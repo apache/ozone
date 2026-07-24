@@ -85,3 +85,59 @@ def parse_report(xml_path):
     cases.append(TestCase(module, testcase.get("classname") or "", testcase.get("name") or "",
                           float(testcase.get("time") or 0), status, message))
   return cases
+
+
+def format_time(seconds):
+  minutes, secs = divmod(int(seconds), 60)
+  hours, minutes = divmod(minutes, 60)
+  if hours:
+    return "%dh%dm%ds" % (hours, minutes, secs)
+  if minutes:
+    return "%dm%ds" % (minutes, secs)
+  return "%ds" % secs
+
+
+def cell(text):
+  return html.escape(" ".join(str(text).split())).replace("|", "\\|")
+
+
+def render_table(title, header, rows):
+  lines = ["<details><summary><b>%s (%d)</b></summary>" % (title, len(rows)), ""]
+  lines.append("|" + "|".join(header) + "|")
+  lines.append("|" + "|".join("---" for _ in header) + "|")
+  lines.extend("|" + "|".join(cell(value) for value in row) + "|" for row in rows)
+  lines.extend(["", "</details>", ""])
+  return lines
+
+
+def render_summary(cases, quarantine=False):
+  def select(status):
+    return [c for c in cases if c.status == status]
+
+  def full_name(case):
+    return "%s.%s" % (case.class_name, case.test_name)
+
+  passed, failed, flaky, skipped = select("passed"), select("failed"), select("flaky"), select("skipped")
+  lines = ["## Test Summary", ""]
+  # sum of per-test times, not wall clock (parallel forks make wall clock much shorter)
+  lines.append("%d tests run in %s (total test time): %d %s, %d %s, %d %s, %d %s." % (
+      len(cases), format_time(sum(c.time for c in cases)),
+      len(passed), PASSED, len(failed), FAILED, len(flaky), FLAKY, len(skipped), SKIPPED))
+  lines.append("")
+  report_url = os.environ.get("JUNIT_REPORT_URL")
+  if report_url:
+    lines.extend(["[Download test artifacts](%s)" % report_url, ""])
+  if failed:
+    lines.extend(render_table(FAILED, ["Module", "Test", "Message", "Time"],
+                              [[c.module, full_name(c), c.message, format_time(c.time)] for c in failed]))
+  if flaky:
+    lines.extend(render_table(FLAKY, ["Module", "Test", "Message", "Time"],
+                              [[c.module, full_name(c), c.message, format_time(c.time)] for c in flaky]))
+  if skipped:
+    lines.extend(render_table(SKIPPED, ["Module", "Test"],
+                              [[c.module, full_name(c)] for c in skipped]))
+  if quarantine:
+    ran = [c for c in cases if c.status != "skipped"]
+    lines.extend(render_table(QUARANTINED, ["Module", "Test"],
+                              [[c.module, full_name(c)] for c in ran]))
+  return "\n".join(lines) + "\n"

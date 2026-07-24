@@ -78,5 +78,53 @@ class TestParseReport(unittest.TestCase):
     self.assertEqual(junit_summary.module_name("TEST-a.xml"), "-")
 
 
+class TestRender(unittest.TestCase):
+
+  def make_cases(self):
+    tc = junit_summary.TestCase
+    return [
+        tc("common", "org.X", "ok", 1.0, "passed"),
+        tc("common", "org.X", "bad", 2.0, "failed", "boom"),
+        tc("common", "org.X", "shaky", 3.0, "flaky", "flap"),
+        tc("common", "org.X", "skip", 0.0, "skipped"),
+    ]
+
+  def test_format_time(self):
+    self.assertEqual(junit_summary.format_time(59), "59s")
+    self.assertEqual(junit_summary.format_time(779), "12m59s")
+    self.assertEqual(junit_summary.format_time(3725), "1h2m5s")
+
+  def test_render_counts_line(self):
+    md = junit_summary.render_summary(self.make_cases())
+    self.assertIn("## Test Summary", md)
+    self.assertIn("4 tests run in 6s (total test time): 1 PASSED ✅, 1 FAILED ❌, 1 FLAKY ⚠️, 1 SKIPPED 🙈.", md)
+
+  def test_render_tables(self):
+    md = junit_summary.render_summary(self.make_cases())
+    self.assertIn("FAILED ❌ (1)", md)
+    self.assertIn("|common|org.X.bad|boom|2s|", md)
+    self.assertIn("FLAKY ⚠️ (1)", md)
+    self.assertIn("|common|org.X.shaky|flap|3s|", md)
+    self.assertIn("SKIPPED 🙈 (1)", md)
+
+  def test_render_escapes_every_cell(self):
+    # parameterized test names can contain pipes and HTML-significant chars
+    cases = [junit_summary.TestCase("common", "org.X", "test[a|b]<c>", 1.0, "failed", "got |x| <y>")]
+    md = junit_summary.render_summary(cases)
+    self.assertIn("|common|org.X.test[a\\|b]&lt;c&gt;|got \\|x\\| &lt;y&gt;|1s|", md)
+
+  def test_render_report_url(self):
+    os.environ["JUNIT_REPORT_URL"] = "https://example.com/artifact"
+    try:
+      md = junit_summary.render_summary(self.make_cases())
+    finally:
+      del os.environ["JUNIT_REPORT_URL"]
+    self.assertIn("[Download test artifacts](https://example.com/artifact)", md)
+
+  def test_render_quarantine(self):
+    md = junit_summary.render_summary(self.make_cases(), quarantine=True)
+    self.assertIn("QUARANTINED 😷 (3)", md)
+
+
 if __name__ == "__main__":
   unittest.main()
