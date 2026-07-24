@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
@@ -84,7 +84,7 @@ public class TestContainerReplicaPendingOps {
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
 
-    addCmd = ReplicateContainerCommand.forTest(1, dn3);
+    addCmd = ContainerTestUtils.getReplicateContainerCommand(1, dn3);
     deleteCmd =  new DeleteContainerCommand(1, false);
   }
 

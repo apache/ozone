@@ -65,6 +65,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -98,6 +99,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -1219,7 +1222,7 @@ public class TestReplicationManager {
     // command will be pushed from source to target
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
-    ReplicateContainerCommand command = ReplicateContainerCommand.forTest(
+    ReplicateContainerCommand command = ContainerTestUtils.getReplicateContainerCommand(
         containerInfo.getContainerID(), target);
     command.setReplicaIndex(1);
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
@@ -1763,7 +1766,7 @@ public class TestReplicationManager {
   }
 
   private DatanodeInfo mockDatanodeWithApparentVersion(
-      DatanodeDetails dn, HDDSVersion version) {
+      DatanodeDetails dn, ComponentVersion version) {
     DatanodeInfo info = mock(DatanodeInfo.class);
     when(info.getLastKnownApparentVersion()).thenReturn(version);
     when(nodeManager.getNode(dn.getID())).thenReturn(info);
@@ -1792,8 +1795,8 @@ public class TestReplicationManager {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
 
-    HDDSVersion lower = HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
-    HDDSVersion higher = HDDSVersion.STREAM_BLOCK_SUPPORT;
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    ComponentVersion higher = HDDSVersion.ZDU;
     mockDatanodeWithApparentVersion(source, sourceNewer ? higher : lower);
     mockDatanodeWithApparentVersion(target, sourceNewer ? lower : higher);
     when(nodeManager.getLowestApparentVersion(source, target))

@@ -28,7 +28,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,6 +73,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -800,8 +800,7 @@ public class TestReplicationSupervisor {
   }
 
   private ReplicateContainerCommand createCommand(long containerId) {
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(containerId, datanode);
+    ReplicateContainerCommand cmd = ContainerTestUtils.getReplicateContainerCommand(containerId, datanode);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }
@@ -1049,7 +1048,7 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
     for (int i = 0; i < 10; i++) {
       DatanodeDetails target = datanodes.get(i % datanodes.size());
-      rs.addTask(new ReplicationTask(forTest(i, target), noopReplicator));
+      rs.addTask(new ReplicationTask(ContainerTestUtils.getReplicateContainerCommand(i, target), noopReplicator));
     }
   }
 }

@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -114,7 +115,7 @@ class TestContainerReplication {
     long containerID = createNewClosedContainer(source);
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(containerID, target);
+        ContainerTestUtils.getReplicateContainerCommand(containerID, target);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
@@ -136,7 +137,7 @@ class TestContainerReplication {
     poisonBytesUsed(source, containerID, containerSize);
 
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(containerID, target);
+        ContainerTestUtils.getReplicateContainerCommand(containerID, target);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
@@ -177,8 +178,7 @@ class TestContainerReplication {
         .getDatanodeDetails();
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(CONTAINER_ID.incrementAndGet(),
-            target);
+        ContainerTestUtils.getReplicateContainerCommand(CONTAINER_ID.incrementAndGet(), target);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationFailureCount);
@@ -223,8 +223,7 @@ class TestContainerReplication {
     assertEquals(originalSize, containerSize);
     
     // Create replication command to push container to target
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(containerID, target);
+    ReplicateContainerCommand cmd = ContainerTestUtils.getReplicateContainerCommand(containerID, target);
 
     // Execute push replication
     queueAndWaitForCompletion(cmd, source,

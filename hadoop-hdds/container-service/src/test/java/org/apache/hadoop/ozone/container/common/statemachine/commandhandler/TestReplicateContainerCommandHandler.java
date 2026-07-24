@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -84,22 +85,22 @@ public class TestReplicateContainerCommandHandler {
       DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
       ReplicateContainerCommand command =
-          ReplicateContainerCommand.forTest(1, target);
+          ContainerTestUtils.getReplicateContainerCommand(1, target);
       commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
       String metricsName = ReplicationTask.METRIC_NAME;
       assertEquals(commandHandler.getMetricsName(), metricsName);
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 1);
 
-      commandHandler.handle(ReplicateContainerCommand.forTest(2, target),
+      commandHandler.handle(ContainerTestUtils.getReplicateContainerCommand(2, target),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.forTest(3, target),
-          ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(
-          ReplicateContainerCommand.forTest(4, target),
+      commandHandler.handle(ContainerTestUtils.getReplicateContainerCommand(3, target),
           ozoneContainer, stateContext, connectionManager);
       commandHandler.handle(
-          ReplicateContainerCommand.forTest(5, target),
+          ContainerTestUtils.getReplicateContainerCommand(4, target),
+          ozoneContainer, stateContext, connectionManager);
+      commandHandler.handle(
+          ContainerTestUtils.getReplicateContainerCommand(5, target),
           ozoneContainer, stateContext, connectionManager);
 
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(5L);

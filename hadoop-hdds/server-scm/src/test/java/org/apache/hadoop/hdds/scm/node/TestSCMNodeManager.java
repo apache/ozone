@@ -100,13 +100,13 @@ import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -903,8 +903,8 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
-          .forTest(1, MockDatanodeDetails.randomDatanodeDetails()));
+      nodeManager.addDatanodeCommand(node1.getID(), ContainerTestUtils
+          .getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
       nodeManager.addDatanodeCommand(node1.getID(),

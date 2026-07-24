@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
@@ -68,7 +69,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
@@ -703,13 +703,10 @@ public class TestStateContext {
   @Test
   public void testCommandQueueSummary() throws IOException {
     StateContext ctx = createSubject();
-    ctx.addCommand(ReplicateContainerCommand
-        .forTest(1, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(ReplicateContainerCommand
-        .forTest(2, MockDatanodeDetails.randomDatanodeDetails()));
-    ctx.addCommand(ReplicateContainerCommand
-        .forTest(3, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(2, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ContainerTestUtils.getReplicateContainerCommand(3, MockDatanodeDetails.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
     ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
@@ -776,8 +773,7 @@ public class TestStateContext {
   }
 
   private static SCMCommand<?> someCommand() {
-    return ReplicateContainerCommand
-        .forTest(1, MockDatanodeDetails.randomDatanodeDetails());
+    return ContainerTestUtils.getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails());
   }
 
 }

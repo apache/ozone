@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -49,11 +50,11 @@ public class TestCommandQueue {
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
-    SCMCommand<?> replicationCommand = ReplicateContainerCommand.forTest(
-        containerID, MockDatanodeDetails.randomDatanodeDetails());
+    SCMCommand<?> replicationCommand = ContainerTestUtils
+        .getReplicateContainerCommand(containerID, MockDatanodeDetails.randomDatanodeDetails());
 
-    ReplicateContainerCommand lowReplicationCommand = ReplicateContainerCommand
-        .forTest(containerID, MockDatanodeDetails.randomDatanodeDetails());
+    ReplicateContainerCommand lowReplicationCommand = ContainerTestUtils
+        .getReplicateContainerCommand(containerID, MockDatanodeDetails.randomDatanodeDetails());
     lowReplicationCommand.setPriority(StorageContainerDatanodeProtocolProtos
         .ReplicationCommandPriority.LOW);
 
