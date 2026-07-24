@@ -20,6 +20,8 @@ author: Sammi Chen
   limitations under the License. See accompanying LICENSE file.
 -->
 
+# Design for Resumable Lifecycle Scans(HDDS-15447)
+
 ## Problem Statement
 
 The `HDDS-8342` branch introduces the `KeyLifecycleService`, a background service running on the Ozone Manager (OM) Leader to enforce bucket lifecycle rules (expiration, moving to trash, and aborting incomplete multipart uploads).
