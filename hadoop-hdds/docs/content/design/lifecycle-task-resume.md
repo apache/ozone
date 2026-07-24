@@ -3,7 +3,7 @@ title: Resumable Lifecycle Scans
 summary: Persist lifecycle scan pointers so OM leader failover can resume bucket scans
 date: 2026-07-13
 jira: HDDS-15447
-status: design
+status: implemented
 author: Sammi Chen
 ---
 <!--
