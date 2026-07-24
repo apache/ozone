@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.transport.server.GrpcXceiverService;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -44,7 +44,7 @@ import org.slf4j.event.Level;
 /**
  * Tests {@link StreamBlockInputStream}.
  */
-public class TestStreamBlockInputStream extends TestInputStreamBase {
+public class TestStreamBlockInputStream extends InputStreamTests {
   private static final Logger LOG = LoggerFactory.getLogger(TestStreamBlockInputStream.class);
 
   {
@@ -72,7 +72,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    */
   private static final int DATA_LENGTH = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
   private byte[] inputData;
-  private TestBucket bucket;
+  private BucketForTesting bucket;
 
   @Test
   void testReadKey() throws Exception {
@@ -96,7 +96,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     copy.setFromObject(clientConfig);
     String keyName = getNewKeyName();
     try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-      bucket = TestBucket.newBuilder(client).build();
+      bucket = BucketForTesting.newBuilder(client).build();
       inputData = bucket.writeRandomBytes(keyName, keyLength);
       LOG.info("---------------------------------------------------------");
       LOG.info("writeRandomBytes {} bytes", inputData.length);
@@ -209,7 +209,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       copy.setFromObject(clientConfig);
       String keyName = getNewKeyName();
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        bucket = TestBucket.newBuilder(client).build();
+        bucket = BucketForTesting.newBuilder(client).build();
         inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
         testReadKeyFully(keyName);
         testSeek(keyName);
@@ -219,7 +219,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
       copy.setFromObject(clientConfig);
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        bucket = TestBucket.newBuilder(client).build();
+        bucket = BucketForTesting.newBuilder(client).build();
         inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
         testReadKeyFully(keyName);
         testSeek(keyName);

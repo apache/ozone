@@ -103,7 +103,6 @@ public class TestMultiBlockWritesWithDnFailures {
         .setNumDatanodes(datanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();

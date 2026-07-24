@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
+import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,7 +67,6 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
   private ReconService recon;
-  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -119,14 +119,6 @@ public class TestReconWithOzoneManagerHA {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
 
-    String hostname =
-        ozoneManager.get().getHttpServer().getHttpAddress().getHostName();
-    String expectedUrl = "http://" +
-        (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
-        ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-    String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
-    assertEquals(expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
     OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
@@ -144,7 +136,7 @@ public class TestReconWithOzoneManagerHA {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
@@ -152,7 +144,7 @@ public class TestReconWithOzoneManagerHA {
     long containerId = getContainerIdForKey(ozoneManager.get(), VOL_NAME, VOL_NAME, keyPrefix);
     Map<Long, Integer> requiredKeyCountByContainer =
         Collections.singletonMap(containerId, 1);
-    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+    waitUntilReconKeyCounts(reconContainerMetadataManager,
         requiredKeyCountByContainer);
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {

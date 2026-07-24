@@ -964,8 +964,7 @@ public class ReconStorageContainerManagerFacade
       if (oldStore != null) {
         final Table<DatanodeID, DatanodeDetails> nodeTable =
             ReconSCMDBDefinition.NODES.getTable(oldStore);
-        try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID,
-            DatanodeDetails>> iterator = nodeTable.iterator()) {
+        try (TableIterator<DatanodeID, Table.KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeTable.iterator()) {
           while (iterator.hasNext()) {
             final KeyValue<DatanodeID, DatanodeDetails> keyValue =
                 iterator.next();

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -123,8 +123,8 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-      String file1 = "a/" + "file" + RandomStringUtils.secure().nextNumeric(5);
-      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.secure().nextNumeric(5);
+      String file1 = "a/" + uniqueObjectName("file");
+      String file2 = "a/b2/d2/" + uniqueObjectName("file");
 
       keys.add(keyf1);
       keys.add(keyf2);

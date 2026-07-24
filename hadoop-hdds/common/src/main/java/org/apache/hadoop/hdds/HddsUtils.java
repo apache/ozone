@@ -165,7 +165,7 @@ public final class HddsUtils {
       }
 
       return Collections.singletonList(
-          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
+          NetUtils.createSocketAddr(getHostPortString(getHostName(address).get(), port)));
     }
   }
 
@@ -203,7 +203,7 @@ public final class HddsUtils {
     if ((value == null) || value.isEmpty()) {
       return Optional.empty();
     }
-    String hostname = value.replaceAll("\\:[0-9]+$", "");
+    String hostname = HostAndPort.fromString(value).getHost();
     if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
@@ -226,6 +226,21 @@ public final class HddsUtils {
     } else {
       return OptionalInt.of(port);
     }
+  }
+
+  /**
+   * Combine a host and port into a "host:port" string, wrapping the host in
+   * square brackets when it is an IPv6 literal (for example
+   * {@code [2001:db8::1]:9858}). A bare IPv6 literal joined to a port with a
+   * plain colon is ambiguous and cannot be parsed by Ratis/gRPC targets or
+   * URI-based address parsers.
+   *
+   * @param host a hostname, IPv4 literal, or (bracketed or bare) IPv6 literal
+   * @param port the port number
+   * @return the combined address, bracketed for IPv6 literals
+   */
+  public static String getHostPortString(String host, int port) {
+    return HostAndPort.fromParts(host, port).toString();
   }
 
   /**
@@ -568,23 +583,6 @@ public final class HddsUtils {
       throw new IllegalArgumentException("Unable to create path: " + dirFile);
     }
     return dirFile;
-  }
-
-  /**
-   * Utility string formatter method to display SCM roles.
-   *
-   * @param nodes
-   * @return String
-   */
-  public static String format(List<String> nodes) {
-    StringBuilder sb = new StringBuilder();
-    for (String node : nodes) {
-      String[] x = node.split(":");
-      sb.append(String
-          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
-              x[2]));
-    }
-    return sb.toString();
   }
 
   /**

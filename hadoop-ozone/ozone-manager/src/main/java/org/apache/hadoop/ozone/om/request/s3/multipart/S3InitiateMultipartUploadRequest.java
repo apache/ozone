@@ -100,10 +100,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, ACLType.CREATE);
+    int schemaVersion = resolveMultipartSchemaVersion(ozoneManager);
+    MultipartInfoInitiateRequest.Builder requestBuilder =
+        multipartInfoInitiateRequest.toBuilder()
+            .setKeyArgs(resolvedArgs)
+            .setSchemaVersion(schemaVersion);
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
-        .setInitiateMultiPartUploadRequest(
-            multipartInfoInitiateRequest.toBuilder().setKeyArgs(resolvedArgs))
+        .setInitiateMultiPartUploadRequest(requestBuilder)
         .build();
   }
 
@@ -195,6 +199,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          // Source of truth is the value stamped onto the proto in preExecute
+          // (before Ratis). Never re-check MLV here in the replicated apply path.
+          .setSchemaVersion(multipartInfoInitiateRequest.getSchemaVersion())
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -282,6 +289,34 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
+  }
+
+  /**
+   * Resolve the schema version stamped onto a newly initiated multipart upload.
+   * <p>
+   * This is a server-authoritative decision made once, in {@code preExecute}
+   * (i.e. on the leader, before the request is submitted to Ratis). Any
+   * client-supplied {@code schemaVersion} on the request is intentionally
+   * ignored so that a client can never force the OM to persist an on-disk
+   * format the cluster is not ready for.
+   * <p>
+   * The split parts-table on-disk format is gated on the
+   * {@link OMLayoutFeature#MPU_PARTS_TABLE_SPLIT} layout feature:
+   * <ul>
+   *   <li>pre-finalized (or mixed-binary rolling upgrade) &rarr; legacy schema,
+   *   so no split-table rows are written on a cluster that may still be
+   *   downgraded;</li>
+   *   <li>finalized &rarr; split parts-table schema.</li>
+   * </ul>
+   * Because finalization is replicated through Ratis, the leader's view here is
+   * consistent across the quorum, and the stamped value (not the live layout
+   * version) is what all subsequent processing obeys.
+   */
+  protected int resolveMultipartSchemaVersion(OzoneManager ozoneManager) {
+    return ozoneManager.getVersionManager()
+        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
+        ? OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+        : OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION;
   }
 
   @RequestFeatureValidator(

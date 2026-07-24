@@ -26,10 +26,13 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,18 +45,33 @@ public class ContainerLogFileParser {
 
   private static final int MAX_OBJ_IN_LIST = 5000;
 
-  private static final String LOG_FILE_MARKER = ".log.";
+  /**
+   * Matches {@code dn-container.log.<datanodeId>} and
+   * {@code dn-container-<roll>.log.<datanodeId>}.
+   */
+  private static final Pattern CONTAINER_LOG_FILE_PATTERN =
+      Pattern.compile("^dn-container(?:-(.+))?\\.log\\.(.+)$");
   private static final String LOG_LINE_SPLIT_REGEX = " \\| ";
   private static final String KEY_VALUE_SPLIT_REGEX = "=";
   private static final String KEY_ID = "ID";
   private static final String KEY_BCSID = "BCSID";
   private static final String KEY_STATE = "State";
   private static final String KEY_INDEX = "Index";
-  private final AtomicBoolean hasErrorOccurred = new AtomicBoolean(false);
+  private final AtomicInteger parseSuccessCount = new AtomicInteger(0);
+  private final AtomicInteger parseFailureCount = new AtomicInteger(0);
+
+  public int getParseSuccessCount() {
+    return parseSuccessCount.get();
+  }
+
+  public int getParseFailureCount() {
+    return parseFailureCount.get();
+  }
   
   /**
    * Scans the specified log directory, processes each file in a separate thread.
-   * Expects each log filename to follow the format: dn-container-<roll over number>.log.<datanodeId>
+   * Expects each log filename to follow the format: dn-container.log.<datanodeId> or
+   * dn-container-<roll over number>.log.<datanodeId>
    *
    * @param logDirectoryPath Path to the directory containing container log files.
    * @param dbstore Database object used to persist parsed container data.
@@ -61,7 +79,7 @@ public class ContainerLogFileParser {
    */
 
   public void processLogEntries(String logDirectoryPath, ContainerDatanodeDatabase dbstore, int threadCount)
-      throws SQLException, IOException, InterruptedException {
+      throws IOException, InterruptedException {
     try (Stream<Path> paths = Files.walk(Paths.get(logDirectoryPath))) {
 
       List<Path> files = paths.filter(Files::isRegularFile).collect(Collectors.toList());
@@ -73,18 +91,14 @@ public class ContainerLogFileParser {
         Path fileNamePath = file.getFileName();
         String fileName = (fileNamePath != null) ? fileNamePath.toString() : "";
         
-        int pos = fileName.indexOf(LOG_FILE_MARKER);
-        if (pos == -1) {
-          System.out.println("Filename format is incorrect (missing .log.): " + fileName);
+        Optional<String> datanodeIdOpt = extractDatanodeId(fileName);
+        if (!datanodeIdOpt.isPresent()) {
+          System.out.println("Skipping non-container log file (expected dn-container[...].log.<datanodeId>): "
+              + fileName);
+          latch.countDown();
           continue;
         }
-        
-        String datanodeId = fileName.substring(pos + 5);
-        
-        if (datanodeId.isEmpty()) {
-          System.out.println("Filename format is incorrect, datanodeId is missing or empty: " + fileName);
-          continue;
-        }
+        String datanodeId = datanodeIdOpt.get();
         
         executorService.submit(() -> {
 
@@ -92,10 +106,11 @@ public class ContainerLogFileParser {
           try {
             System.out.println(threadName + " is starting to process file: " + file.toString());
             processFile(file.toString(), dbstore, datanodeId);
+            parseSuccessCount.incrementAndGet();
           } catch (Exception e) {
+            parseFailureCount.incrementAndGet();
             System.err.println("Thread " + threadName + " is stopping to process the file: " + file.toString() +
-                " due to SQLException: " + e.getMessage());
-            hasErrorOccurred.set(true);
+                " due to : " + e.getMessage());
           } finally {
             try {
               latch.countDown();
@@ -110,12 +125,16 @@ public class ContainerLogFileParser {
       latch.await();
 
       executorService.shutdown();
-      
-      if (hasErrorOccurred.get()) {
-        throw new SQLException("Log file processing failed.");
-      }
-
     }
+  }
+
+  static Optional<String> extractDatanodeId(String fileName) {
+    Matcher matcher = CONTAINER_LOG_FILE_PATTERN.matcher(fileName);
+    if (!matcher.matches()) {
+      return Optional.empty();
+    }
+    String datanodeId = matcher.group(2);
+    return datanodeId.isEmpty() ? Optional.empty() : Optional.of(datanodeId);
   }
 
   /**
@@ -135,6 +154,10 @@ public class ContainerLogFileParser {
       String line;
       while ((line = reader.readLine()) != null) {
         String[] parts = line.split(LOG_LINE_SPLIT_REGEX);
+        if (parts.length < 2) {
+          System.err.println("Skipping malformed log line: " + line);
+          continue;
+        }
         String timestamp = parts[0].trim();
         String logLevel = parts[1].trim();
         String id = null, index = null;

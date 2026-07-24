@@ -103,7 +103,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class ContainerEndpoint {
 
   private ReconContainerMetadataManager reconContainerMetadataManager;

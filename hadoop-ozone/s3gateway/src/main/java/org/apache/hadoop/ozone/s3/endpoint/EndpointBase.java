@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
@@ -48,6 +50,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -106,6 +109,7 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -118,6 +122,22 @@ import org.slf4j.LoggerFactory;
 public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
+  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+
+  // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
+  // collides with the system ETag / Content-Type stored under the same key, so
+  // it is remapped on write and rebuilt on read; the system value is returned
+  // via its own ETag / Content-Type response header.
+  private static final Map<String, String> RESERVED_METADATA_KEYS =
+      ImmutableMap.of(
+          ETAG, ETAG_CUSTOM,
+          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+
+  // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
+  private static final Map<String, String> REBUILT_RESERVED_KEYS =
+      RESERVED_METADATA_KEYS.entrySet().stream()
+          .collect(ImmutableMap.toImmutableMap(
+              Map.Entry::getValue, e -> e.getKey().toLowerCase()));
 
   private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
@@ -227,6 +247,35 @@ public abstract class EndpointBase {
   }
 
   /**
+   * Maps a duplicate bucket create to the S3 error expected by AWS when the
+   * requester already owns the bucket name.
+   */
+  protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
+    try {
+      OzoneBucket existingBucket = getVolume().getBucket(bucketName);
+      if (isSameBucketOwner(existingBucket.getOwner())) {
+        return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
+      }
+    } catch (IOException ex) {
+      LOG.debug("Could not resolve duplicate bucket owner for {}", bucketName, ex);
+    }
+    return newError(BUCKET_ALREADY_EXISTS, bucketName, cause);
+  }
+
+  private boolean isSameBucketOwner(String bucketOwner) {
+    String requestOwner = getRequestOwner();
+    return requestOwner != null && requestOwner.equals(bucketOwner);
+  }
+
+  private String getRequestOwner() {
+    if (s3Auth == null || s3Auth.getUserPrincipal() == null) {
+      return null;
+    }
+    return UserGroupInformation.createRemoteUser(s3Auth.getUserPrincipal())
+        .getShortUserName();
+  }
+
+  /**
    * Returns Iterator to iterate over all buckets for a specific user.
    * The result can be restricted using bucket prefix, will return all
    * buckets if bucket prefix is null.
@@ -319,20 +368,27 @@ public abstract class EndpointBase {
       }
     }
 
-    // If the request contains a custom metadata header "x-amz-meta-ETag",
-    // replace the metadata key to "etag-custom" to prevent key metadata collision with
-    // the ETag calculated by hashing the object when storing the key in OM table.
-    // The custom ETag metadata header will be rebuilt during the headObject operation.
-    if (customMetadata.containsKey(HttpHeaders.ETAG)
-        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
-      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
-          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.remove(HttpHeaders.ETAG);
-      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.put(ETAG_CUSTOM, customETag);
-    }
+    // Remap user values that collide with a reserved system key.
+    RESERVED_METADATA_KEYS.forEach((headerName, customKey) ->
+        remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
+  }
+
+  /**
+   * Move a user value under {@code headerName} (canonical or lower-case) to
+   * {@code customKey} so it does not collide with the system value.
+   */
+  private static void remapReservedMetadataKey(Map<String, String> metadata,
+      String headerName, String customKey) {
+    String lowerName = headerName.toLowerCase();
+    if (metadata.containsKey(headerName) || metadata.containsKey(lowerName)) {
+      String value = metadata.get(headerName) != null
+          ? metadata.get(headerName) : metadata.get(lowerName);
+      metadata.remove(headerName);
+      metadata.remove(lowerName);
+      metadata.put(customKey, value);
+    }
   }
 
   protected void addCustomMetadataHeaders(
@@ -340,14 +396,13 @@ public abstract class EndpointBase {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
-      if (entry.getKey().equals(ETAG)) {
+      String metadataKey = entry.getKey();
+      // System ETag / Content-Type are returned via their own response header.
+      if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      String metadataKey = entry.getKey();
-      if (metadataKey.equals(ETAG_CUSTOM)) {
-        // Rebuild the ETag custom metadata header
-        metadataKey = ETAG.toLowerCase();
-      }
+      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
@@ -380,6 +435,15 @@ public abstract class EndpointBase {
       List<KV> tagList,
       Function<KV, String> getTagKey,
       Function<KV, String> getTagValue
+  ) throws OS3Exception {
+    return validateAndGetTagging(tagList, getTagKey, getTagValue, TAG_NUM_LIMIT);
+  }
+
+  protected static <KV> Map<String, String> validateAndGetTagging(
+      List<KV> tagList,
+      Function<KV, String> getTagKey,
+      Function<KV, String> getTagValue,
+      int maxTagCount
   ) throws OS3Exception {
     final Map<String, String> tags = new HashMap<>();
     for (KV tagPair : tagList) {
@@ -432,19 +496,18 @@ public abstract class EndpointBase {
 
       final String previous = tags.put(tagKey, tagValue);
       if (previous != null) {
-        // Tags that are associated with an object must have unique tag keys
-        // Reject request if the same key is used twice on the same resource
+        // Tags must have unique keys on the same resource (object or bucket).
         OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("There are tags with duplicate tag keys, tag keys should be unique");
         throw ex;
       }
     }
 
-    if (tags.size() > TAG_NUM_LIMIT) {
-      // You can associate up to 10 tags with an object.
+    if (tags.size() > maxTagCount) {
+      // You can associate up to 10 tags with an object and up to 50 tags with a bucket.
       OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, TAG_HEADER);
       ex.setErrorMessage("The number of tags " + tags.size() +
-          " exceeded the maximum number of tags of " + TAG_NUM_LIMIT);
+          " exceeded the maximum number of tags of " + maxTagCount);
       throw ex;
     }
 
