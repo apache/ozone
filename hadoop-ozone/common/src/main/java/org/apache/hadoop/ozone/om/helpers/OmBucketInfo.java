@@ -406,19 +406,19 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   public OmBucketInfo withOperationalPropertiesFrom(OmBucketInfo source) {
     return toBuilder()
-        .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
-        .setBucketEncryptionKey(source.getEncryptionKeyInfo())
-        .setIsVersionEnabled(source.getIsVersionEnabled())
         .setStorageType(source.getStorageType())
-        .setQuotaInBytes(source.getQuotaInBytes())
-        .setQuotaInNamespace(source.getQuotaInNamespace())
+        .setIsVersionEnabled(source.getIsVersionEnabled())
+        .setBucketEncryptionKey(source.getEncryptionKeyInfo())
         .setUsedBytes(source.getUsedBytes())
         .setUsedNamespace(source.getUsedNamespace())
+        .setQuotaInBytes(source.getQuotaInBytes())
+        .setQuotaInNamespace(source.getQuotaInNamespace())
         .setSnapshotUsedBytes(source.getSnapshotUsedBytes())
         .setSnapshotUsedNamespace(source.getSnapshotUsedNamespace())
-        .addAllMetadata(source.getMetadata())
         .setBucketLayout(source.getBucketLayout())
+        .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
         .setTags(source.getTags())
+        .addAllMetadata(source.getMetadata())
         .build();
   }
 

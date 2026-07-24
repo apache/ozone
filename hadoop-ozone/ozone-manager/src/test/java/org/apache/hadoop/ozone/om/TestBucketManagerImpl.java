@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -556,7 +556,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   @Test
-  void testGetBucketInfoDoesNotCopySourcePropertiesWithoutReadAccess() throws Exception {
+  void testGetBucketInfoFailsWithoutSourceReadAccess() throws Exception {
     String linkVolume = volumeName();
     String sourceVolume = volumeName();
     OmBucketInfo link = createLinkBucketInfo(linkVolume, sourceVolume);
@@ -568,11 +568,10 @@ class TestBucketManagerImpl extends OzoneTestBase {
     denySourceRead(metadataReader, sourceVolume);
     OzoneManager omSpy = createAclEnabledOmSpy(bucketManager, metadataReader);
 
-    OmBucketInfo result = omSpy.getBucketInfo(linkVolume, "link");
+    OMException exception = assertThrows(OMException.class,
+        () -> omSpy.getBucketInfo(linkVolume, "link"));
 
-    assertThat(result.getMetadata())
-        .containsEntry("linkKey", "linkValue")
-        .doesNotContainKey("sourceKey");
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
     verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
     verify(bucketManager, times(1)).getBucketInfo(sourceVolume, "source");
   }
@@ -666,8 +665,10 @@ class TestBucketManagerImpl extends OzoneTestBase {
     HddsWhiteboxTestUtils.setInternalState(omSpy, "omMetadataReader", metadataReader);
     when(omSpy.getAclsEnabled()).thenReturn(true);
     AuditMessage auditMessage = mock(AuditMessage.class);
-    when(auditMessage.getOp()).thenReturn("READ_BUCKET");
-    doReturn(auditMessage).when(omSpy).buildAuditMessageForSuccess(any(), anyMap());
+    lenient().when(auditMessage.getOp()).thenReturn("READ_BUCKET");
+    lenient().doReturn(auditMessage).when(omSpy).buildAuditMessageForSuccess(any(), anyMap());
+    lenient().doReturn(auditMessage).when(omSpy)
+        .buildAuditMessageForFailure(any(), anyMap(), any(Throwable.class));
     return omSpy;
   }
 }
