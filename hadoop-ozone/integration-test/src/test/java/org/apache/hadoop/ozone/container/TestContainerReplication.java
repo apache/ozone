@@ -39,12 +39,10 @@ import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -284,7 +282,7 @@ class TestContainerReplication {
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration();
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
-    // Overiding Config to support 1k Chunk size
+    // Overriding Config to support 1k Chunk size
     conf.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
         "(512|1024|2048|4096|1)k)$)");
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY, SCMContainerPlacementRackScatter.class.getCanonicalName());
@@ -295,19 +293,6 @@ class TestContainerReplication {
       try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build()) {
         cluster.waitForClusterToBeReady();
         try (OzoneClient client = cluster.newClient()) {
-          Set<DatanodeDetails> allNodes =
-              cluster.getHddsDatanodes().stream().map(HddsDatanodeService::getDatanodeDetails).collect(
-                  Collectors.toSet());
-          List<DatanodeDetails> initialNodesWithData = new ArrayList<>();
-          // Keeping 5 DNs and stopping the 6th Node here it is kept in the var extraNodes
-          for (DatanodeDetails dn : allNodes) {
-            if (initialNodesWithData.size() < 5) {
-              initialNodesWithData.add(dn);
-            } else {
-              cluster.shutdownHddsDatanode(dn);
-            }
-          }
-
           // Creating 2 stripes with Chunk Size 1k
           int size = 6 * 1024;
           byte[] originalData = createTestData(client, size);
@@ -316,6 +301,12 @@ class TestContainerReplication {
           final OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
           long containerID = keyLocation.getContainerID();
           waitForContainerClose(cluster, containerID);
+
+          // The cluster has 5 datanodes and the key is written as EC RS-3-2 (3 data + 2 parity = 5
+          // replica indices), so every datanode now holds exactly one replica index.
+          List<DatanodeDetails> initialNodesWithData =
+              cluster.getHddsDatanodes().stream().map(HddsDatanodeService::getDatanodeDetails)
+                  .collect(Collectors.toList());
 
           // Forming Replica Index Map
           Map<Integer, DatanodeDetails> replicaIndexMap =
