@@ -18,18 +18,29 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.util.Collections.singletonMap;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -41,7 +52,9 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -539,5 +552,87 @@ class TestBucketManagerImpl extends OzoneTestBase {
         listedObsLink.getDefaultReplicationConfig().getReplicationConfig());
     assertEquals(volume, listedObsLink.getSourceVolume());
     assertEquals("obs-source", listedObsLink.getSourceBucket());
+  }
+
+  @Test
+  void testGetBucketInfoDoesNotCopySourcePropertiesWithoutReadAccess() throws Exception {
+    String linkVolume = volumeName();
+    String sourceVolume = volumeName();
+    OmBucketInfo link = createLinkBucketInfo(linkVolume, sourceVolume);
+    OmBucketInfo source = createSourceBucketInfo(sourceVolume);
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.getBucketInfo(linkVolume, "link")).thenReturn(link);
+    when(bucketManager.getBucketInfo(sourceVolume, "source")).thenReturn(source);
+    OmMetadataReader metadataReader = mock(OmMetadataReader.class);
+    denySourceRead(metadataReader, sourceVolume);
+    OzoneManager omSpy = createAclEnabledOmSpy(bucketManager, metadataReader);
+
+    OmBucketInfo result = omSpy.getBucketInfo(linkVolume, "link");
+
+    assertSame(link, result);
+    verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
+  }
+
+  @Test
+  void testListBucketsDoesNotCopySourcePropertiesWithoutReadAccess() throws Exception {
+    String linkVolume = volumeName();
+    String sourceVolume = volumeName();
+    OmBucketInfo link = createLinkBucketInfo(linkVolume, sourceVolume);
+    OmBucketInfo source = createSourceBucketInfo(sourceVolume);
+    OmBucketInfo regular = OmBucketInfo.newBuilder()
+        .setVolumeName(linkVolume)
+        .setBucketName("regular")
+        .build();
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.listBuckets(linkVolume, "", "", 100, false))
+        .thenReturn(new ArrayList<>(Arrays.asList(link, regular)));
+    when(bucketManager.getBucketInfo(sourceVolume, "source")).thenReturn(source);
+    OmMetadataReader metadataReader = mock(OmMetadataReader.class);
+    denySourceRead(metadataReader, sourceVolume);
+    OzoneManager omSpy = createAclEnabledOmSpy(bucketManager, metadataReader);
+
+    List<OmBucketInfo> result = omSpy.listBuckets(linkVolume, "", "", 100, false);
+
+    assertSame(link, result.get(0));
+    assertSame(regular, result.get(1));
+    verify(metadataReader).checkAcls(BUCKET, OZONE, READ, sourceVolume, "source", null);
+  }
+
+  private static OmBucketInfo createLinkBucketInfo(String linkVolume, String sourceVolume) {
+    return OmBucketInfo.newBuilder()
+        .setVolumeName(linkVolume)
+        .setBucketName("link")
+        .setSourceVolume(sourceVolume)
+        .setSourceBucket("source")
+        .addAllMetadata(singletonMap("linkKey", "linkValue"))
+        .build();
+  }
+
+  private static OmBucketInfo createSourceBucketInfo(String sourceVolume) {
+    return OmBucketInfo.newBuilder()
+        .setVolumeName(sourceVolume)
+        .setBucketName("source")
+        .addAllMetadata(singletonMap("sourceKey", "sourceValue"))
+        .build();
+  }
+
+  private static void denySourceRead(OmMetadataReader metadataReader, String sourceVolume) throws IOException {
+    doAnswer(invocation -> {
+      if (sourceVolume.equals(invocation.getArgument(3)) && "source".equals(invocation.getArgument(4))) {
+        throw new OMException("denied", ResultCodes.PERMISSION_DENIED);
+      }
+      return null;
+    }).when(metadataReader).checkAcls(any(), any(), any(), any(), any(), any());
+  }
+
+  private OzoneManager createAclEnabledOmSpy(BucketManager bucketManager, OmMetadataReader metadataReader) {
+    OzoneManager omSpy = spy(omTestManagers.getOzoneManager());
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "bucketManager", bucketManager);
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "omMetadataReader", metadataReader);
+    doReturn(true).when(omSpy).getAclsEnabled();
+    AuditMessage auditMessage = mock(AuditMessage.class);
+    when(auditMessage.getOp()).thenReturn("READ_BUCKET");
+    doReturn(auditMessage).when(omSpy).buildAuditMessageForSuccess(any(), anyMap());
+    return omSpy;
   }
 }

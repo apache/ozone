@@ -407,6 +407,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public OmBucketInfo withOperationalPropertiesFrom(OmBucketInfo source) {
     return toBuilder()
         .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
+        .setBucketEncryptionKey(source.getEncryptionKeyInfo())
         .setIsVersionEnabled(source.getIsVersionEnabled())
         .setStorageType(source.getStorageType())
         .setQuotaInBytes(source.getQuotaInBytes())

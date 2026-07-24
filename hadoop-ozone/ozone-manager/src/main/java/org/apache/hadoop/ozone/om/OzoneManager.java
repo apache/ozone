@@ -3061,6 +3061,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (resolvedBucket.isDangling()) {
       return bucketInfo;
     }
+    if (getAclsEnabled()) {
+      try {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(),
+            resolvedBucket.realBucket(), null);
+      } catch (OMException e) {
+        if (e.getResult() == PERMISSION_DENIED) {
+          return bucketInfo;
+        }
+        throw e;
+      }
+    }
     OmBucketInfo realBucket = getResolvedSourceBucket(resolvedBucket, resolvedSourceCache);
     return bucketInfo.withOperationalPropertiesFrom(realBucket);
   }
