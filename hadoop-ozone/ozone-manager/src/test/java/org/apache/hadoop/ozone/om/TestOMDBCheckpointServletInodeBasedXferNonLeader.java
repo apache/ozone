@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,9 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,7 +47,7 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
     OMDBCheckpointServletInodeBasedXfer servlet =
         spy(new OMDBCheckpointServletInodeBasedXfer());
     OzoneManager om = mock(OzoneManager.class);
-    when(om.isLeaderReady()).thenReturn(false);
+    when(om.isLeader()).thenReturn(false);
 
     ServletContext ctx = mock(ServletContext.class);
     when(ctx.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE)).thenReturn(om);
@@ -62,7 +66,7 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
     OMDBCheckpointServletInodeBasedXfer servlet =
         spy(new OMDBCheckpointServletInodeBasedXfer());
     OzoneManager om = mock(OzoneManager.class);
-    when(om.isLeaderReady()).thenReturn(false);
+    when(om.isLeader()).thenReturn(false);
 
     ServletContext ctx = mock(ServletContext.class);
     when(ctx.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE)).thenReturn(om);
@@ -76,5 +80,36 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
     servlet.processMetadataSnapshotRequest(request, response, false, true);
 
     verify(response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void processMetadataSnapshotRequestDoesNotReturn503WhenLeader(boolean isLeaderReady) throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet =
+        spy(new OMDBCheckpointServletInodeBasedXfer());
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.isLeader()).thenReturn(true);
+    when(om.isLeaderReady()).thenReturn(isLeaderReady);
+
+    ServletContext ctx = mock(ServletContext.class);
+    when(ctx.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE)).thenReturn(om);
+    doReturn(ctx).when(servlet).getServletContext();
+    BootstrapStateHandler.Lock lock = mock(BootstrapStateHandler.Lock.class);
+    // Force a failure after leader check so this unit test can stay lightweight
+    // (no full servlet/bootstrap setup) while still proving that leader requests
+    // are not rejected with 503.
+    doThrow(new InterruptedException("test lock failure"))
+        .when(lock).acquireWriteLock();
+    doReturn(lock).when(servlet).getBootstrapStateLock();
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+
+    servlet.processMetadataSnapshotRequest(request, response, false, true);
+
+    verify(response, never())
+        .sendError(eq(HttpServletResponse.SC_SERVICE_UNAVAILABLE), anyString());
+    // Internal error comes from the forced lock failure above.
+    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
   }
 }
