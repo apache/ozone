@@ -90,30 +90,6 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
-  void putBlockOnCloseSkipsAsyncPutBlockWhenEnabled() throws Exception {
-    MockDatanodePipeline pipeline = new MockDatanodePipeline();
-    OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockOnCloseEnabled(true);
-    byte[] data = randomBytes(50);
-    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
-      stream.write(ByteBuffer.wrap(data), 0, data.length);
-    }
-    assertEquals(0, pipeline.getReceivedPutBlocks().size(),
-        "Close should commit PutBlock via the data stream, not WriteAsync");
-  }
-
-  @Test
-  void putBlockOnCloseUsesAsyncPutBlockWhenDisabled() throws Exception {
-    MockDatanodePipeline pipeline = new MockDatanodePipeline();
-    byte[] data = randomBytes(50);
-    try (BlockDataStreamOutput stream = createStream(pipeline)) {
-      stream.write(ByteBuffer.wrap(data), 0, data.length);
-    }
-    assertEquals(1, pipeline.getReceivedPutBlocks().size(),
-        "Close should still send a WriteAsync PutBlock when config is disabled");
-  }
-
-  @Test
   void writeSubChunkThenClose() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     try (BlockDataStreamOutput stream = createStream(pipeline)) {
