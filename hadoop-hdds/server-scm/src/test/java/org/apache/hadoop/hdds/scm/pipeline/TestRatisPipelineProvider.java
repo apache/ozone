@@ -278,7 +278,7 @@ public class TestRatisPipelineProvider {
     }
 
     // Initialize mock node manager with these nodes
-    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 0);
+    MockNodeManager nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 3);
     nodeManager.setNumPipelinePerDatanode(1);
     
     // We must rebuild the provider with our custom nodeManager
@@ -313,7 +313,7 @@ public class TestRatisPipelineProvider {
     nodes.add(createDatanodeDetails(false));
 
     // Initialize mock node manager with these nodes
-    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 0);
+    MockNodeManager nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 3);
     nodeManager.setNumPipelinePerDatanode(1);
 
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
