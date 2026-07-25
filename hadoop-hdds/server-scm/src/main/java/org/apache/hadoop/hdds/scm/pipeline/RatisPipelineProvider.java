@@ -243,7 +243,7 @@ public class RatisPipelineProvider
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
       if (count >= nodeManager.pipelineLimit(d) ||
-          (filterRatisStreaming && !d.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
+          (filterRatisStreaming && !d.hasPort(RATIS_DATASTREAM))) {
         excluded.add(d);
       }
     }
