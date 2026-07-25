@@ -94,6 +94,31 @@ public class TestRatisPipelineProvider {
     init(maxPipelinePerNode, conf, testDir);
   }
 
+  public void initWithNodes(int maxPipelinePerNode, List<DatanodeDetails> nodes, int nodeCount)
+      throws Exception {
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, nodeCount);
+    nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
+    long containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    nodeManager.setPendingContainerMaxSize(containerSize);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        maxPipelinePerNode);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+    provider = new MockRatisPipelineProvider(nodeManager,
+        stateManager, conf);
+  }
+
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
@@ -266,7 +291,6 @@ public class TestRatisPipelineProvider {
 
   @Test
   public void testCreatePipelinePrioritizesRatisStreamingNodes() throws Exception {
-    init(1);
     List<DatanodeDetails> nodes = new ArrayList<>();
     // Add 3 nodes WITH RATIS_DATASTREAM
     for (int i = 0; i < 3; i++) {
@@ -277,22 +301,7 @@ public class TestRatisPipelineProvider {
       nodes.add(createDatanodeDetails(false));
     }
 
-    // Initialize mock node manager with these nodes
-    MockNodeManager nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 3);
-    nodeManager.setNumPipelinePerDatanode(1);
-    
-    // We must rebuild the provider with our custom nodeManager
-    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    stateManager = PipelineStateManagerImpl.newBuilder()
-        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
-        .setRatisServer(scmhaManager.getRatisServer())
-        .setNodeManager(nodeManager)
-        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-        .build();
-    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
-
+    initWithNodes(1, nodes, 3);
     Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     assertEquals(3, pipeline.getNodes().size());
     for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -303,7 +312,6 @@ public class TestRatisPipelineProvider {
 
   @Test
   public void testCreatePipelineFallsBackWhenNotEnoughRatisStreamingNodes() throws Exception {
-    init(1);
     List<DatanodeDetails> nodes = new ArrayList<>();
     // Add 2 nodes WITH RATIS_DATASTREAM
     for (int i = 0; i < 2; i++) {
@@ -312,21 +320,7 @@ public class TestRatisPipelineProvider {
     // Add 1 node WITHOUT RATIS_DATASTREAM
     nodes.add(createDatanodeDetails(false));
 
-    // Initialize mock node manager with these nodes
-    MockNodeManager nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 3);
-    nodeManager.setNumPipelinePerDatanode(1);
-
-    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    stateManager = PipelineStateManagerImpl.newBuilder()
-        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
-        .setRatisServer(scmhaManager.getRatisServer())
-        .setNodeManager(nodeManager)
-        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-        .build();
-    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
-
+    initWithNodes(1, nodes, 3);
     Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     assertEquals(3, pipeline.getNodes().size());
     
