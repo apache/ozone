@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_DATASTREAM;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -155,7 +157,7 @@ public class RatisPipelineProvider
       );
     }
 
-    final List<DatanodeDetails> dns;
+    List<DatanodeDetails> dns;
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
     switch (factor) {
@@ -163,17 +165,22 @@ public class RatisPipelineProvider
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes);
       break;
     case THREE:
-      List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
-      if (!excludeDueToEngagement.isEmpty()) {
-        if (excludedNodes.isEmpty()) {
-          excludedNodes = excludeDueToEngagement;
-        } else {
-          excludedNodes.addAll(excludeDueToEngagement);
-        }
+        List<DatanodeDetails> excludeDueToEngagement = filterNodes(true);
+        List<DatanodeDetails> currentExcluded = new ArrayList<>(excludedNodes);
+        currentExcluded.addAll(excludeDueToEngagement);
+      try {
+        dns = placementPolicy.chooseDatanodes(currentExcluded,
+            favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
+            containerSizeBytes);
+      } catch (SCMException scmException) {
+        excludeDueToEngagement = filterNodes(false);
+        currentExcluded = new ArrayList<>(excludedNodes);
+        currentExcluded.addAll(excludeDueToEngagement);
+        dns = placementPolicy.chooseDatanodes(currentExcluded,
+            favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
+            containerSizeBytes);
       }
-      dns = placementPolicy.chooseDatanodes(excludedNodes,
-          favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSizeBytes);
+
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());
@@ -224,14 +231,18 @@ public class RatisPipelineProvider
         .build();
   }
 
-  private List<DatanodeDetails> filterPipelineEngagement() {
+  /**
+   *
+   * @return
+   */
+  private List<DatanodeDetails> filterNodes(boolean filterRatisStreaming) {
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     final List<DatanodeDetails> excluded = new ArrayList<>();
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
-      if (count >= nodeManager.pipelineLimit(d)) {
+      if (count >= nodeManager.pipelineLimit(d) || (filterRatisStreaming && !d.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
         excluded.add(d);
       }
     }

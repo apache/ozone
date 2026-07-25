@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -244,6 +245,97 @@ public class TestRatisPipelineProvider {
 
     assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
     assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
+  }
+
+  private DatanodeDetails createDatanodeDetails(boolean supportRatisStreaming) {
+    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
+        .setID(DatanodeID.randomID())
+        .setHostName("localhost")
+        .setIpAddress("127.0.0.1")
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0);
+
+    for (DatanodeDetails.Port.Name name : DatanodeDetails.Port.Name.values()) {
+      if (!supportRatisStreaming && name == DatanodeDetails.Port.Name.RATIS_DATASTREAM) {
+        continue;
+      }
+      dn.addPort(DatanodeDetails.newPort(name, 0));
+    }
+    return dn.build();
+  }
+
+  @Test
+  public void testCreatePipelinePrioritizesRatisStreamingNodes() throws Exception {
+    init(1);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    // Add 3 nodes WITH RATIS_DATASTREAM
+    for (int i = 0; i < 3; i++) {
+      nodes.add(createDatanodeDetails(true));
+    }
+    // Add 3 nodes WITHOUT RATIS_DATASTREAM
+    for (int i = 0; i < 3; i++) {
+      nodes.add(createDatanodeDetails(false));
+    }
+
+    // Initialize mock node manager with these nodes
+    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 0);
+    nodeManager.setNumPipelinePerDatanode(1);
+    
+    // We must rebuild the provider with our custom nodeManager
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
+
+    Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertEquals(3, pipeline.getNodes().size());
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      assertTrue(dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM), 
+          "Pipeline should only contain datanodes with RATIS_DATASTREAM when available");
+    }
+  }
+
+  @Test
+  public void testCreatePipelineFallsBackWhenNotEnoughRatisStreamingNodes() throws Exception {
+    init(1);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    // Add 2 nodes WITH RATIS_DATASTREAM
+    for (int i = 0; i < 2; i++) {
+      nodes.add(createDatanodeDetails(true));
+    }
+    // Add 1 node WITHOUT RATIS_DATASTREAM
+    nodes.add(createDatanodeDetails(false));
+
+    // Initialize mock node manager with these nodes
+    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, 0);
+    nodeManager.setNumPipelinePerDatanode(1);
+
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
+
+    Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertEquals(3, pipeline.getNodes().size());
+    
+    long streamingNodeCount = pipeline.getNodes().stream()
+        .filter(dn -> dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))
+        .count();
+    
+    assertEquals(2, streamingNodeCount, 
+        "Pipeline should contain exactly 2 nodes with RATIS_DATASTREAM as fallback was required");
   }
 
   @Test
