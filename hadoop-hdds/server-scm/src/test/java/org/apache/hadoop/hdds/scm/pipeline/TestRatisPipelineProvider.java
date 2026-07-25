@@ -96,11 +96,11 @@ public class TestRatisPipelineProvider {
     init(maxPipelinePerNode, conf, testDir);
   }
 
-  public void initWithNodes(int maxPipelinePerNode, List<DatanodeDetails> nodes, int nodeCount)
+  public void initWithNodes(int maxPipelinePerNode, List<DatanodeDetails> nodes, int count)
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, nodeCount);
+    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, count);
     initializeCommonState(maxPipelinePerNode, conf);
   }
 
