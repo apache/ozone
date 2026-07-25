@@ -893,22 +893,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getBucketTagging(String volumeName, String bucketName) throws IOException {
-    return getBucket(volumeName, bucketName).getBucketTagging();
-  }
-
-  @Override
-  public void putBucketTagging(String volumeName, String bucketName, Map<String, String> tags)
-      throws IOException {
-    getBucket(volumeName, bucketName).putBucketTagging(tags);
-  }
-
-  @Override
-  public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
-    getBucket(volumeName, bucketName).deleteBucketTagging();
-  }
-
-  @Override
   public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException {
     return getBucket(volumeName, bucketName).getLifecycleConfiguration();
@@ -923,5 +907,21 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
 
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName) throws IOException {
+    return getBucket(volumeName, bucketName).getBucketTagging();
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putBucketTagging(tags);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName) throws IOException {
+    getBucket(volumeName, bucketName).deleteBucketTagging();
   }
 }

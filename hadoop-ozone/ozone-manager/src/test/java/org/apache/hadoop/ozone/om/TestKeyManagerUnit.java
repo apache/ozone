@@ -159,8 +159,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @Test
-  public void listMultipartUploadPartsWithoutEtagField() throws IOException {
-    // For backward compatibility reasons
+  public void listMultipartUploadPartsWithEtagField() throws IOException {
     final String volume = volumeName();
     final String bucket = "bucketForEtag";
     final String key = "dir/key1";
@@ -169,7 +168,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         initMultipartUpload(writeClient, volume, bucket, key);
 
 
-    // Commit some MPU parts without eTag field
+    // Commit some MPU parts, each carrying its (now mandatory) eTag.
     for (int i = 1; i <= 5; i++) {
       OmKeyArgs partKeyArgs =
           new OmKeyArgs.Builder()
@@ -199,6 +198,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
               .setLocationInfoList(Collections.emptyList())
+              .addMetadata(OzoneConsts.ETAG, "etag-" + i)
               .build();
 
       writeClient.commitMultipartUploadPart(commitPartKeyArgs, openKey.getId());
