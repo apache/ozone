@@ -165,9 +165,9 @@ public class RatisPipelineProvider
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes);
       break;
     case THREE:
-        List<DatanodeDetails> excludeDueToEngagement = filterNodes(true);
-        List<DatanodeDetails> currentExcluded = new ArrayList<>(excludedNodes);
-        currentExcluded.addAll(excludeDueToEngagement);
+      List<DatanodeDetails> excludeDueToEngagement = filterNodes(true);
+      List<DatanodeDetails> currentExcluded = new ArrayList<>(excludedNodes);
+      currentExcluded.addAll(excludeDueToEngagement);
       try {
         dns = placementPolicy.chooseDatanodes(currentExcluded,
             favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
@@ -242,7 +242,8 @@ public class RatisPipelineProvider
     final List<DatanodeDetails> excluded = new ArrayList<>();
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
-      if (count >= nodeManager.pipelineLimit(d) || (filterRatisStreaming && !d.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
+      if (count >= nodeManager.pipelineLimit(d) ||
+          (filterRatisStreaming && !d.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
         excluded.add(d);
       }
     }
