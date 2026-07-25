@@ -100,8 +100,7 @@ public class S3KeyGenerator extends S3EntityGenerator
 
     timer = getMetrics().timer("key-create");
 
-    System.setProperty(
-        "com.amazonaws.services.s3.disablePutObjectMD5Validation", "true");
+    System.setProperty("com.amazonaws.services.s3.disablePutObjectMD5Validation", "true");
     runTests(this::createKey);
 
     return null;
