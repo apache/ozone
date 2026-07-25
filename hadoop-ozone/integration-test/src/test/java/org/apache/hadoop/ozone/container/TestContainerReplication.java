@@ -62,9 +62,9 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -171,18 +171,18 @@ class TestContainerReplication {
   }
 
   private void createTestData(OzoneClient client) throws IOException {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         RatisReplicationConfig.getInstance(THREE),
         "Hello".getBytes(UTF_8));
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
     byte[] b = RandomUtils.secure().randomBytes(size);
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         new ECReplicationConfig("RS-3-2-1k"), b);
     return b;
   }

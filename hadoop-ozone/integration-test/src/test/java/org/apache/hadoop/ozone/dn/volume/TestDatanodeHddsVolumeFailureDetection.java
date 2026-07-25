@@ -45,10 +45,10 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -77,7 +77,7 @@ class TestDatanodeHddsVolumeFailureDetection {
   void corruptChunkFile(boolean schemaV3) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
       try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+        OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
         // write a file
         String keyName = UUID.randomUUID().toString();
@@ -175,7 +175,7 @@ class TestDatanodeHddsVolumeFailureDetection {
   void corruptDbFile(boolean schemaV3) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
       try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+        OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
         // write a file, will create container1
         String keyName = UUID.randomUUID().toString();
@@ -248,7 +248,7 @@ class TestDatanodeHddsVolumeFailureDetection {
   void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
       try (OzoneClient client = cluster.newClient()) {
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+        OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
         // write a file, will create container1
         String keyName = UUID.randomUUID().toString();
@@ -343,7 +343,7 @@ class TestDatanodeHddsVolumeFailureDetection {
     byte[] bytes = RandomUtils.secure().randomBytes(KEY_SIZE);
     RatisReplicationConfig replication =
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
-    TestDataUtil.createKey(bucket, key, replication, bytes);
+    DataTestUtil.createKey(bucket, key, replication, bytes);
     OzoneKeyDetails keyDetails = bucket.getKey(key);
     assertEquals(key, keyDetails.getName());
     return keyDetails.getOzoneKeyLocations().get(0).getContainerID();
