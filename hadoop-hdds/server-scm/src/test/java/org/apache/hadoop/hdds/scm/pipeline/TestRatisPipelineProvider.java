@@ -96,33 +96,20 @@ public class TestRatisPipelineProvider {
 
   public void initWithNodes(int maxPipelinePerNode, List<DatanodeDetails> nodes, int nodeCount)
       throws Exception {
-
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, nodeCount);
-    nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
-    long containerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    nodeManager.setPendingContainerMaxSize(containerSize);
-    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
-        maxPipelinePerNode);
-    stateManager = PipelineStateManagerImpl.newBuilder()
-        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
-        .setRatisServer(scmhaManager.getRatisServer())
-        .setNodeManager(nodeManager)
-        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-        .build();
-    provider = new MockRatisPipelineProvider(nodeManager,
-        stateManager, conf);
+    initializeCommonState(maxPipelinePerNode, conf);
   }
 
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(true, nodeCount);
+    initializeCommonState(maxPipelinePerNode, conf);
+  }
+
+  private void initializeCommonState(int maxPipelinePerNode, OzoneConfiguration conf) throws Exception {
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     long containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
