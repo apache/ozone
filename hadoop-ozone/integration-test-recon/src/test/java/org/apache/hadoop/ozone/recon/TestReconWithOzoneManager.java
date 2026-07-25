@@ -407,18 +407,24 @@ public class TestReconWithOzoneManager {
     // 3. Stop OM (flush to disk)
     cluster.getOzoneManager().stop();
 
-    // 4. Copy OM DB into Recon's OM snapshot dir
-    java.io.File configuredReconDbDir = new java.io.File(
-        cluster.getConf().get(ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR));
-    java.io.File actualReconDbDir = new java.io.File(configuredReconDbDir.getParentFile(), "Recon");
-    java.io.File reconOmDbDir = new java.io.File(actualReconDbDir, "om.db_" + System.currentTimeMillis());
-    System.out.println("Test copying to: " + reconOmDbDir.getAbsolutePath());
+    // 4. Copy OM DB into Recon's OM snapshot dir. The dir and the "om.snapshot.db_" prefix must
+    // match what ReconOmMetadataManagerImpl#start looks up via ReconUtils#getLastKnownDB, otherwise
+    // Recon will not load the copied DB on restart.
+    java.io.File reconOmSnapshotDir = new ReconUtils()
+        .getReconDbDir(cluster.getConf(), ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    java.io.File reconOmDbDir = new java.io.File(reconOmSnapshotDir,
+        ReconConstants.RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis());
     org.apache.commons.io.FileUtils.deleteDirectory(reconOmDbDir);
     org.apache.commons.io.FileUtils.copyDirectory(omDbDir, reconOmDbDir);
 
-    // 5. Restart Recon
+    // 5. Restart Recon and confirm it loaded the OM DB copy we placed above.
     recon.start(cluster.getConf());
-    
+    OzoneManagerServiceProviderImpl reconImpl = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    long reconLoadedSeqNumber = ((RDBStore) reconImpl.getOMMetadataManagerInstance().getStore())
+        .getDb().getLatestSequenceNumber();
+    assertEquals(omLatestSeqNumber, reconLoadedSeqNumber);
+
     // 6. POST reinit
     String triggerUrl = "http://" + cluster.getConf().get(OZONE_RECON_HTTP_ADDRESS_KEY) +
         "/api/v1/triggerdbsync/om/reinit";
@@ -442,12 +448,14 @@ public class TestReconWithOzoneManager {
 
     // 8. Start OM
     cluster.getOzoneManager().restart();
+    // restart() rebuilds the OM metadata manager, so re-fetch the live handle.
+    metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     // 9. Write more keys and verify delta resumes
     addKeys(25, 30);
     long newOmLatestSeqNumber = ((RDBStore) cluster.getOzoneManager().getMetadataManager().getStore())
         .getDb().getLatestSequenceNumber();
-    
+
     OzoneManagerServiceProviderImpl newImpl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     newImpl.syncDataFromOM();
