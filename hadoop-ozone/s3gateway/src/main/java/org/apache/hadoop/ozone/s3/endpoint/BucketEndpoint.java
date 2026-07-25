@@ -272,6 +272,9 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handlePutRequest(context, bucketName, body);
     } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
+        throw newDuplicateBucketError(bucketName, ex);
+      }
       throw newError(bucketName, ex);
     }
   }

@@ -1770,6 +1770,7 @@ message ServiceInfo {
 
 message MultipartInfoInitiateRequest {
     required KeyArgs keyArgs = 1;
+    optional uint32 schemaVersion = 2;
 
 }
 
