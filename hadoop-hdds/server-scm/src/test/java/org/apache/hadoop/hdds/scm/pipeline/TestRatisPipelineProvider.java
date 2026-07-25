@@ -34,7 +34,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -260,10 +262,17 @@ public class TestRatisPipelineProvider {
   }
 
   private DatanodeDetails createDatanodeDetails(boolean supportRatisStreaming) {
+    Random random = ThreadLocalRandom.current();
+    String ipAddress = random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256);
+
     DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
         .setID(DatanodeID.randomID())
-        .setHostName("localhost")
-        .setIpAddress("127.0.0.1")
+        .setHostName("localhost" + "-" + ipAddress)
+        .setIpAddress(ipAddress)
+        .setNetworkLocation(null)
         .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
         .setPersistedOpStateExpiry(0);
 
