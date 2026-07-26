@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import picocli.CommandLine;
@@ -355,8 +356,13 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
    */
   private Set<Long> getSplitPartContainers(String multipartInfoDbKey, Set<Long> targetContainerIds) {
     Set<Long> matchedContainers = new HashSet<>();
-    String uploadId = multipartInfoDbKey.substring(
-        multipartInfoDbKey.lastIndexOf(OM_KEY_PREFIX) + OM_KEY_PREFIX.length());
+    String uploadId;
+    try {
+      uploadId = OmMultipartUpload.from(multipartInfoDbKey).getUploadId();
+    } catch (IllegalArgumentException e) {
+      err().println("Invalid multipartInfoTable key " + multipartInfoDbKey + ", " + e);
+      return matchedContainers;
+    }
     OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
     try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
              partIterator = multipartPartsTable.iterator(prefix)) {

@@ -3371,7 +3371,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           Mockito.spy(omMetadataManager.getMultipartPartsTable());
       when(mockMM.getMultipartPartsTable()).thenReturn(mockPartsTable);
       when(mockPartsTable.iterator(eq(OmMultipartPartKey.prefix(uploadB))))
-          .thenThrow(new IOException("simulated corruption"));
+          .thenThrow(new RocksDatabaseException("simulated corruption"));
 
       assertEquals(2, OMMultipartUploadUtils.countParts(mockMM, uploadA));
       assertThrows(IOException.class,
@@ -3387,8 +3387,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
           // per-MPU skip — bucket loop continues
         }
       }
-      assertEquals(2, list.size());
-      assertEquals(3, list.getPartCount());
+      // A (2 parts) and C (1 part) are added; B is skipped due to IOException
+      assertEquals(2, list.size()); // uploadA and uploadC only
+      assertEquals(3, list.getPartCount()); // 2 (uploadA) + 1 (uploadC)
     } finally {
       omMetadataManager.getStore().close();
     }

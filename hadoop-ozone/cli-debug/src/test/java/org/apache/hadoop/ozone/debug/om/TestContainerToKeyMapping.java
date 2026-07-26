@@ -79,6 +79,7 @@ public class TestContainerToKeyMapping {
   private static final long CONTAINER_ID_2 = 2L;
   private static final long CONTAINER_ID_3 = 3L;
   private static final long CONTAINER_ID_4 = 4L;
+  private static final long CONTAINER_ID_5 = 5L;
   private static final long UNREFERENCED_FILE_ID = 500L;
   private static final long MISSING_DIR_ID = 999L;  // Non-existent parent
   private static final long OPEN_FILE_ID = 600L;
@@ -194,12 +195,12 @@ public class TestContainerToKeyMapping {
 
   @Test
   public void testContainerToKeyMappingWithSplitSchemaMPU() {
-    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_4), "--in-progress");
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_5), "--in-progress");
     assertEquals(0, exitCode);
 
     String output = outWriter.toString();
 
-    assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
+    assertThat(output).contains("\"" + CONTAINER_ID_5 + "\"");
     assertThat(output).contains("\"openKeys\"");
     assertThat(output).contains("/vol1/obs-bucket/splitMpuKey/split-upload-id");
   }
@@ -364,14 +365,14 @@ public class TestContainerToKeyMapping {
     String uploadId = "split-upload-id";
 
     OmKeyInfo part1Info = new OmKeyInfo.Builder(createOBSKeyInfo(
-        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_4))
+        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_5))
         .addMetadata(OzoneConsts.ETAG, "etag-1")
         .build();
     OmMultipartPartInfo partInfo1 = OmMultipartPartInfo.from(
         mpuKeyName + "/" + uploadId + "/part-1", 1, part1Info);
 
     OmKeyInfo part2Info = new OmKeyInfo.Builder(createOBSKeyInfo(
-        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_4))
+        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_5))
         .addMetadata(OzoneConsts.ETAG, "etag-2")
         .build();
     OmMultipartPartInfo partInfo2 = OmMultipartPartInfo.from(
