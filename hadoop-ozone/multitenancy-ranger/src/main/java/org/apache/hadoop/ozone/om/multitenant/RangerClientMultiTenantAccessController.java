@@ -1,4 +1,5 @@
-/* Licensed to the Apache Software Foundation (ASF) under one or more
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
@@ -48,7 +49,10 @@ import org.apache.ranger.plugin.model.RangerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * Implementation of {@link MultiTenantAccessController} using the
+ * {@link RangerClient} to communicate with Ranger.
+ */
 public class RangerClientMultiTenantAccessController implements
     MultiTenantAccessController {
 
@@ -209,7 +213,7 @@ public class RangerClientMultiTenantAccessController implements
     try {
       rangerPolicy = client.createPolicy(toRangerPolicy(policy));
     } catch (RangerServiceException e) {
-      // Fix 2: if the policy already exists, fetch and return it
+      // If the policy already exists, fetch and return it
       // instead of failing. This makes tenant creation idempotent.
       if (isDuplicateException(e)) {
         LOG.warn("Policy {} already exists in Ranger, fetching existing policy.",
@@ -289,11 +293,10 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deletePolicy(rangerServiceName, policyName);
     } catch (RangerServiceException e) {
-      // Fix 4: if the policy does not exist, silently return.
+      // If the policy does not exist, silently return.
       // This makes tenant deletion tolerant of partial previous state.
       if (isNotFoundException(e)) {
-        LOG.warn("Policy {} not found in Ranger during delete — "
-            + "assuming already deleted.", policyName);
+        LOG.warn("Policy {} not found in Ranger during delete - assuming already deleted.", policyName);
         return;
       }
       decodeRSEStatusCodes(e);
@@ -316,7 +319,7 @@ public class RangerClientMultiTenantAccessController implements
       rangerRole = client.createRole(rangerServiceName,
           toRangerRole(role, shortName));
     } catch (RangerServiceException e) {
-      // Fix 1: if the role already exists (HTTP 400 duplicate), fetch
+      // If the role already exists (HTTP 400 duplicate), fetch
       // and return the existing role instead of throwing IOException.
       // This makes tenant creation idempotent — safe to retry after a
       // partial failure from a previous ozone tenant create attempt.
@@ -381,12 +384,11 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deleteRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
-      // Fix 3: if the role does not exist, silently return.
+      // If the role does not exist, silently return.
       // This makes tenant deletion tolerant of partial previous state,
       // e.g. when one role was deleted but another was not.
       if (isNotFoundException(e)) {
-        LOG.warn("Role {} not found in Ranger during delete — "
-            + "assuming already deleted.", roleName);
+        LOG.warn("Role {} not found in Ranger during delete - assuming already deleted.", roleName);
         return;
       }
       decodeRSEStatusCodes(e);
@@ -494,8 +496,8 @@ public class RangerClientMultiTenantAccessController implements
         policyBuilder.addKeys(resourceNames);
         break;
       default:
-        LOG.warn("Pulled Ranger policy with unknown resource type '{}' with"
-            + " names '{}'", resourceType, String.join(",", resourceNames));
+        LOG.warn("Pulled Ranger policy with unknown resource type '{}' with" +
+            " names '{}'", resourceType, String.join(",", resourceNames));
       }
     }
 
@@ -539,7 +541,7 @@ public class RangerClientMultiTenantAccessController implements
       rangerPolicy.setDescription(policy.getDescription().get());
     }
 
-    // Fix 5: use an explicit mutable ArrayList for policy items to prevent
+    // Use an explicit mutable ArrayList for policy items to prevent
     // UnsupportedOperationException when Ranger model returns unmodifiable list.
     List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
 
@@ -549,7 +551,7 @@ public class RangerClientMultiTenantAccessController implements
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
       item.setUsers(Collections.singletonList(userAcls.getKey()));
 
-      // Fix 5 (continued): use mutable ArrayList for accesses.
+      // Use mutable ArrayList for accesses.
       List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
       for (Acl acl: userAcls.getValue()) {
         RangerPolicy.RangerPolicyItemAccess access =
@@ -568,7 +570,7 @@ public class RangerClientMultiTenantAccessController implements
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
       item.setRoles(Collections.singletonList(roleAcls.getKey()));
 
-      // Fix 5 (continued): use mutable ArrayList for accesses.
+      // Use mutable ArrayList for accesses.
       List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
       for (Acl acl: roleAcls.getValue()) {
         RangerPolicy.RangerPolicyItemAccess access =
