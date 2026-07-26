@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.local;
 
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.Callable;
@@ -109,8 +110,57 @@ public class OzoneLocal extends GenericCli {
     super(factory);
   }
 
+  @Override
+  public void setConfigurationPath(String configPath) {
+    // LocalOzoneCluster.userConfiguredSource() tells a --conf file from a shipped classpath
+    // default by exact source-name comparison, and Configuration records a classpath resource by
+    // its bare name, so a scheme-less path is absolutized before GenericCli records it. A value
+    // carrying a scheme (file:, hdfs:) already cannot collide with a bare resource name and
+    // java.nio would misparse it into a CWD-relative literal path, so it passes through; the
+    // fs.Path parse also keeps rejecting an empty value at option parse time.
+    if (new org.apache.hadoop.fs.Path(configPath).toUri().getScheme() == null) {
+      configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
+    }
+    super.setConfigurationPath(configPath);
+  }
+
+  @Override
+  public void printError(Throwable error) {
+    if (!(error instanceof StartupFailureException)) {
+      super.printError(error);
+      return;
+    }
+
+    super.printError(error.getCause());
+    String hint = startupFailureHint(LOG.isInfoEnabled(), isVerbose());
+    if (hint != null) {
+      err().println(hint);
+    }
+  }
+
+  static String startupFailureHint(boolean infoEnabled, boolean verbose) {
+    if (infoEnabled && verbose) {
+      return null;
+    }
+    if (!infoEnabled && !verbose) {
+      return "For more detail, re-run with `ozone --loglevel INFO local run` for service logs,"
+          + " or add --verbose for the full stack trace.";
+    }
+    if (!infoEnabled) {
+      return "For service logs, re-run with `ozone --loglevel INFO local run`.";
+    }
+    return "For the full stack trace, add --verbose.";
+  }
+
   public static void main(String[] args) {
     new OzoneLocal().run(args);
+  }
+
+  private static final class StartupFailureException extends Exception {
+
+    private StartupFailureException(Throwable cause) {
+      super(cause);
+    }
   }
 
   @Command(name = "run",
@@ -197,11 +247,20 @@ public class OzoneLocal extends GenericCli {
     public Void call() throws Exception {
       LocalOzoneClusterConfig config = resolveConfig();
       try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
-        runtime.start();
+        start(runtime);
         printSummary(runtime, config);
         awaitShutdown(runtime);
       }
       return null;
+    }
+
+    /** Marks startup failures so the root command can print the cause before any useful hints. */
+    private void start(LocalOzoneRuntime runtime) throws Exception {
+      try {
+        runtime.start();
+      } catch (Exception ex) {
+        throw new StartupFailureException(ex);
+      }
     }
 
     LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
@@ -293,8 +352,11 @@ public class OzoneLocal extends GenericCli {
         try {
           return LocalOzoneClusterConfig.FormatMode.fromString(value);
         } catch (IllegalArgumentException ex) {
-          throw new CommandLine.TypeConversionException(
-              "Expected one of: if-needed, always, never.");
+          // The value can come from OZONE_LOCAL_FORMAT, so name it: the user may not realize the
+          // environment supplied it. picocli's conversion-error line names the option but not the
+          // value, so the message has to carry it.
+          throw new CommandLine.TypeConversionException("Invalid format mode '" + value
+              + "'. Expected one of: if-needed, always, never.");
         }
       }
     }
@@ -304,19 +366,27 @@ public class OzoneLocal extends GenericCli {
 
       @Override
       public Duration convert(String value) {
+        String trimmed = value.trim();
         try {
-          return Duration.parse(value.trim());
+          return Duration.parse(trimmed);
         } catch (DateTimeParseException ignored) {
-          return parseHadoopStyleDuration(value);
+          return parseHadoopStyleDuration(trimmed);
         }
       }
 
       private static Duration parseHadoopStyleDuration(String value) {
+        // Rejected instead of silently interpreting the value a thousand times smaller than the
+        // user meant; the rationale lives on LocalOzoneCluster#lacksTimeUnit.
+        if (LocalOzoneCluster.lacksTimeUnit(value)) {
+          throw new CommandLine.TypeConversionException("Missing time unit in '" + value
+              + "'. " + durationMessage());
+        }
         try {
           return TimeDurationUtil.getDuration("--startup-timeout", value,
               TimeUnit.MILLISECONDS);
         } catch (RuntimeException ex) {
-          throw new CommandLine.TypeConversionException(durationMessage());
+          throw new CommandLine.TypeConversionException("Invalid duration '" + value
+              + "'. " + durationMessage());
         }
       }
 
