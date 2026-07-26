@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.inject.AbstractModule;
@@ -28,6 +30,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -62,6 +66,38 @@ public class TestReconDBProvider {
     ReconDBProvider reconDBProvider = injector.getInstance(
         ReconDBProvider.class);
     assertNotNull(reconDBProvider.getDbStore());
+  }
+
+  @Test
+  public void testTruncateTable() throws Exception {
+    ReconDBProvider.truncateTable(null);
+
+    ReconDBProvider reconDBProvider = injector.getInstance(
+        ReconDBProvider.class);
+    Table<Long, Long> table = ReconDBDefinition.CONTAINER_KEY_COUNT.getTable(
+        reconDBProvider.getDbStore());
+
+    ReconDBProvider.truncateTable(table);
+    assertTableIsEmpty(table);
+
+    table.put(1L, 10L);
+    ReconDBProvider.truncateTable(table);
+    assertTableIsEmpty(table);
+
+    for (long i = 0; i < 100; i++) {
+      table.put(i, i);
+    }
+    ReconDBProvider.truncateTable(table);
+    assertTableIsEmpty(table);
+
+    table.put(7L, 70L);
+    assertEquals(70L, table.get(7L));
+  }
+
+  private static void assertTableIsEmpty(Table<?, ?> table) throws Exception {
+    try (TableIterator<?, ?> keyIterator = table.keyIterator()) {
+      assertThat(keyIterator).isExhausted();
+    }
   }
 
 }

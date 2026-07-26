@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.slf4j.Logger;
@@ -111,17 +110,22 @@ public class ReconDBProvider {
     return dbStore;
   }
 
-  static void truncateTable(Table table) throws IOException {
+  static <K> void truncateTable(Table<K, ?> table) throws IOException {
     if (table == null) {
       return;
     }
-    try (TableIterator<Object, ? extends KeyValue<Object, Object>>
-            tableIterator = table.iterator()) {
-      while (tableIterator.hasNext()) {
-        KeyValue<Object, Object> entry = tableIterator.next();
-        table.delete(entry.getKey());
+    final K firstKey;
+    final K lastKey;
+    try (TableIterator<K, K> keyIterator = table.keyIterator()) {
+      if (!keyIterator.hasNext()) {
+        return;
       }
+      firstKey = keyIterator.next();
+      keyIterator.seekToLast();
+      lastKey = keyIterator.next();
     }
+    table.deleteRange(firstKey, lastKey);
+    table.delete(lastKey);
   }
 
   private static DBStore initializeDBStore(OzoneConfiguration configuration,
