@@ -194,7 +194,7 @@ Key paths:
 - [`hadoop-ozone/dev-support/checks/README.md`](./hadoop-ozone/dev-support/checks/README.md)
 - [`hadoop-hdds/dev-support/checkstyle/checkstyle.xml`](./hadoop-hdds/dev-support/checkstyle/checkstyle.xml)
 - [`dev-support/rat/rat-exclusions.txt`](./dev-support/rat/rat-exclusions.txt)
-- [Ozone Enhancement Proposals](https://github.com/apache/ozone/blob/master/hadoop-hdds/docs/content/design/ozone-enhancement-proposals.md)
+- [Ozone Enhancement Proposals](https://ozone.apache.org/docs/next/developer-guide/project/enhancement-proposal)
 
 ## Security
 
