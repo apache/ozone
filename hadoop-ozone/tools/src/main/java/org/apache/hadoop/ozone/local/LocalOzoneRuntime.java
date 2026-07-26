@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.local;
 
+import java.util.List;
+
 /**
  * Runtime contract for local Ozone cluster commands.
  */
@@ -70,6 +72,16 @@ public interface LocalOzoneRuntime extends AutoCloseable {
    * @return S3 Gateway endpoint, including scheme, host, and port
    */
   String getS3Endpoint();
+
+  /**
+   * Returns the configuration keys whose user-supplied value the local runtime had to replace.
+   *
+   * <p>Callers report these: {@code ozone local} runs with service logging off, so a warning that
+   * only reaches the log is invisible by default.</p>
+   *
+   * @return overridden keys, empty if the user configured none of them
+   */
+  List<String> getDiscardedUserConfigKeys();
 
   /**
    * Stops the local runtime and releases resources created during startup.
