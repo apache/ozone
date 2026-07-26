@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.conf;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -709,11 +709,12 @@ public abstract class ConfigurationFieldsTests {
       }
     }
 
-    assertTrue(xmlValuesWithNewlines.isEmpty(),
+    assertThat(xmlValuesWithNewlines).withFailMessage(
         "These properties in " + xmlFilename + " have an embedded line break in "
             + "their <value>, which corrupts the runtime string: " + xmlValuesWithNewlines
             + " Put the value on a single line. If the newline is genuinely required, "
             + "add the property to xmlPropsAllowedToContainNewline (in "
-            + "initializeMemberVariables) with a reason + Jira. See HDDS-8082.");
+            + "initializeMemberVariables) with a reason + Jira. See HDDS-8082.")
+        .isEmpty();
   }
 }
