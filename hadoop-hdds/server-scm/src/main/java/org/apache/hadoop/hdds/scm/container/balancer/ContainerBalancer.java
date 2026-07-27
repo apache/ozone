@@ -626,8 +626,8 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
     int eligibleCount = countEligibleDatanodes(conf);
     if (eligibleCount < 2) {
       throw new InvalidContainerBalancerConfigurationException(String.format(
-          "Container Balancer requires at least 2 eligible datanodes but only "
-              + "%d is available.", eligibleCount));
+          "Container Balancer found %d eligible datanode(s) but requires at least 2.",
+          eligibleCount));
     }
     int maxDatanodesToInvolve = conf.computeMaxDatanodesToInvolvePerIteration(eligibleCount);
     if (maxDatanodesToInvolve < 2) {

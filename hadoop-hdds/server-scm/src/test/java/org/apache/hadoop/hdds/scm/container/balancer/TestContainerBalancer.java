@@ -448,6 +448,15 @@ public class TestContainerBalancer {
         "hdds.container.balancer.size.entering.target.max should be less than or "
             + "equal to hdds.container.balancer.size.moved.max.per.iteration");
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    balancerConfiguration.setMaxSizeEnteringTarget(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeLeavingSource(200 * OzoneConsts.GB);
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(
+        "hdds.container.balancer.size.leaving.source.max should be less than or "
+            + "equal to hdds.container.balancer.size.moved.max.per.iteration");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   private static List<DatanodeInfo> createEligibleDatanodes(int count) {
