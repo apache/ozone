@@ -160,6 +160,7 @@ public final class S3Consts {
     public static final String UPLOAD_ID = "uploadId";
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
+    public static final String LIFECYCLE = "lifecycle";
 
     private QueryParams() {
       // no instances

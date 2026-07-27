@@ -47,8 +47,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -149,7 +149,7 @@ public class TestContainerReportHandling {
         ReplicationInput replicationInput = testCase.getRight();
         // create a container and close it
         String key = "key" + keyCount;
-        TestDataUtil.createKey(bucket, key, replicationInput.getReplicationConfig(), "Hello".getBytes(UTF_8));
+        DataTestUtil.createKey(bucket, key, replicationInput.getReplicationConfig(), "Hello".getBytes(UTF_8));
         List<OmKeyLocationInfo> keyLocations = lookupKey(cluster, key);
         assertThat(keyLocations).isNotEmpty();
         OmKeyLocationInfo keyLocation = keyLocations.get(0);

@@ -375,6 +375,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -487,6 +491,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
+      addCustomMetadataHeaders(responseBuilder, keyDetails);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -539,6 +544,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  /**
+   * Guarantees that an S3-originated multipart upload part carries an ETag
+   * before it is committed. S3 requires every uploaded part to have an ETag
+   * (see UploadPart and CompleteMultipartUpload), and all S3 gateway
+   * part-write paths stamp the MD5 of the part as its ETag. This pre-commit
+   * check enforces that invariant so no S3 part can be committed without one
+   * (e.g. an UploadPartCopy whose source key has no ETag).
+   *
+   * <p>Note: the Ozone Manager also enforces a mandatory ETag server-side for
+   * every committed part (in the split parts-table schema) for ALL clients,
+   * not just S3. This gateway-side check is an earlier, S3-native failure so
+   * the client gets a clean S3 error instead of an OM INVALID_REQUEST.
+   */
+  private static void requirePartETag(Map<String, String> metadata)
+      throws IOException {
+    if (metadata == null
+        || StringUtils.isBlank(metadata.get(OzoneConsts.ETAG))) {
+      throw new IOException(
+          "S3 multipart upload part cannot be committed without an ETag");
+    }
+  }
+
   static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
     String eTag = key.getMetadata().get(OzoneConsts.ETAG);
     if (eTag != null) {
@@ -565,6 +592,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     OzoneKey key;
     try {
@@ -572,7 +604,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      key = getClientProtocol().headS3Object(bucketName, keyPath);
+      // A partNumber is validated against the object's parts and yields the
+      // metadata of that part; an out-of-range part throws InvalidPart.
+      key = (partNumber != 0) ?
+          getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
+          getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
@@ -949,6 +985,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             if (raw != null) {
               writeGuard.getMetadata().put(OzoneConsts.ETAG, stripQuotes(raw));
             }
+            writeGuard.addPreCommit(
+                () -> requirePartETag(writeGuard.getMetadata()));
             outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -973,6 +1011,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
+          writeGuard.addPreCommit(
+              () -> requirePartETag(writeGuard.getMetadata()));
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
