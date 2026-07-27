@@ -80,6 +80,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -1357,45 +1358,96 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
   /**
    * Returns whether any ancestor of the given parent is a deleted directory.
+   * The walk stops at renamed directories because their descendant deletes are
+   * not subsumed by a deleted ancestor above them.
+   *
+   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
+   *     objectId; must not be the to-snapshot graph
+   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
+   *     snapshot objectIds, not destination paths)
    */
   @VisibleForTesting
   boolean hasDeletedAncestor(long parentObjectId, Set<Long> deletedDirectoryIds,
-      Map<Long, Long> objectIdToParentId, long bucketObjectId) {
-    long currentParent = parentObjectId;
-    while (currentParent != bucketObjectId) {
-      if (deletedDirectoryIds.contains(currentParent)) {
-        return true;
-      }
-      Long nextParent = objectIdToParentId.get(currentParent);
-      if (nextParent == null) {
-        throw new IllegalStateException(
-            "Missing parent for object ID: " + currentParent);
-      }
-      currentParent = nextParent;
+      Set<Long> renamedDirectoryIds, Map<Long, Long> objectIdToParentId,
+      long bucketObjectId, Map<Long, Boolean> ancestorMemo) {
+    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
+
+    if (parentObjectId == bucketObjectId) {
+      return false;
     }
-    return false;
+    Boolean cached = ancestorMemo.get(parentObjectId);
+    if (cached != null) {
+      return cached;
+    }
+
+    List<Long> path = new ArrayList<>();
+    long current = parentObjectId;
+    boolean result;
+    while (true) {
+      if (current == bucketObjectId) {
+        result = false;
+        break;
+      }
+      cached = ancestorMemo.get(current);
+      if (cached != null) {
+        result = cached;
+        break;
+      }
+      if (renamedDirectoryIds.contains(current)) {
+        result = false;
+        ancestorMemo.put(current, false);
+        break;
+      }
+      if (deletedDirectoryIds.contains(current)) {
+        result = true;
+        ancestorMemo.put(current, true);
+        break;
+      }
+      Long nextParent = objectIdToParentId.get(current);
+      if (nextParent == null) {
+        result = false;
+        ancestorMemo.put(current, false);
+        break;
+      }
+      path.add(current);
+      current = nextParent;
+    }
+    for (Long node : path) {
+      ancestorMemo.put(node, result);
+    }
+    return result;
   }
 
   /**
    * Filters mixed directory and file delete entries, retaining only those without
    * a deleted directory ancestor. FSO buckets only.
+   *
+   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
+   *     objectId, built from a full fromSnapshot directoryTable scan
+   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
+   *     snapshot objectIds); pass an empty set when there are no renames
    */
   @VisibleForTesting
   <T extends WithParentObjectId> List<T> filterTopLevelDeletedEntries(
       Collection<T> deletedEntries,
       Predicate<T> isDirectory,
       Map<Long, Long> objectIdToParentId,
+      Set<Long> renamedDirectoryIds,
       long bucketObjectId) {
+    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
     Set<Long> deletedDirectoryIds = new HashSet<>();
     for (T deletedEntry : deletedEntries) {
       if (isDirectory.test(deletedEntry)) {
         deletedDirectoryIds.add(deletedEntry.getObjectID());
       }
     }
+    Map<Long, Boolean> ancestorMemo = new HashMap<>();
     List<T> filteredDeletes = new ArrayList<>();
     for (T deletedEntry : deletedEntries) {
       if (!hasDeletedAncestor(deletedEntry.getParentObjectID(), deletedDirectoryIds,
-          objectIdToParentId, bucketObjectId)) {
+          renamedDirectoryIds, objectIdToParentId, bucketObjectId, ancestorMemo)) {
         filteredDeletes.add(deletedEntry);
       }
     }
