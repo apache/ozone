@@ -52,7 +52,9 @@ import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -61,6 +63,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -82,9 +85,11 @@ import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
@@ -122,6 +127,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
@@ -130,6 +136,7 @@ import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.rocksdb.LiveFileMetaData;
 
 /**
  * Unit tests for SnapshotDefragService.
@@ -169,6 +176,11 @@ public class TestSnapshotDefragService {
   private AutoCloseable mocks;
   private Map<String, CodecBuffer> dummyTableValues;
   private Set<CodecBuffer> closeSet = new HashSet<>();
+
+  private enum LiveSstType {
+    DB_GENERATED,
+    PREVIOUSLY_INGESTED
+  }
 
   @BeforeEach
   public void setup() throws IOException {
@@ -222,6 +234,83 @@ public class TestSnapshotDefragService {
 
   private String getFromCodecBuffer(CodecBuffer buffer) {
     return StringCodec.get().fromCodecBuffer(buffer);
+  }
+
+  private void putString(Table<String, CodecBuffer> table, String key,
+      String value) throws RocksDatabaseException, CodecException {
+    table.put(key, StringCodec.get().toDirectCodecBuffer(value));
+  }
+
+  private DBStore createDBStore(String name, String tableName)
+      throws RocksDatabaseException {
+    return DBStoreBuilder.newBuilder(configuration)
+        .setName(name)
+        .setPath(tempDir)
+        .addTable(tableName)
+        .build();
+  }
+
+  private Path createLiveSstDelta(DBStore sourceStore, String tableName,
+      String key, LiveSstType liveSstType) throws Exception {
+    Table<String, CodecBuffer> sourceTable = sourceStore.getTable(
+        tableName, StringCodec.get(), CodecBufferCodec.get(true));
+    putString(sourceTable, key, "source-value");
+    sourceStore.flushDB();
+    Set<String> liveFilesBeforeIngestion = ((RDBStore) sourceStore).getDb()
+        .getLiveFilesMetaData().stream()
+        .map(LiveFileMetaData::fileName)
+        .collect(Collectors.toSet());
+
+    if (liveSstType == LiveSstType.PREVIOUSLY_INGESTED) {
+      File externalFile = tempDir.resolve("external-" + UUID.randomUUID()
+          + ".sst").toFile();
+      try (RDBSstFileWriter writer = new RDBSstFileWriter(externalFile);
+           CodecBuffer keyBuffer = StringCodec.get().toDirectCodecBuffer(key);
+           CodecBuffer valueBuffer = StringCodec.get()
+               .toDirectCodecBuffer("ingested-value")) {
+        writer.put(keyBuffer, valueBuffer);
+      }
+      sourceTable.loadFromFile(externalFile);
+    }
+
+    List<LiveFileMetaData> candidateFiles = ((RDBStore) sourceStore).getDb()
+        .getLiveFilesMetaData().stream()
+        .filter(file -> tableName.equals(
+            StringUtils.bytes2String(file.columnFamilyName())))
+        .filter(file -> liveSstType != LiveSstType.PREVIOUSLY_INGESTED ||
+            !liveFilesBeforeIngestion.contains(file.fileName()))
+        .collect(Collectors.toList());
+    if (candidateFiles.size() != 1) {
+      throw new IllegalStateException("Expected one live SST file, found " +
+          candidateFiles.size());
+    }
+    LiveFileMetaData liveFile = candidateFiles.get(0);
+    Path sourceFile = Paths.get(liveFile.path(), liveFile.fileName());
+    Path deltaFile = tempDir.resolve("delta-" + UUID.randomUUID() + ".sst");
+    Files.createLink(deltaFile, sourceFile);
+    return deltaFile;
+  }
+
+  private void createMockSnapshot(SnapshotInfo snapshotInfo,
+      DBStore snapshotStore) throws IOException {
+    OmSnapshot snapshot = mock(OmSnapshot.class);
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapshotSupplier =
+        new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+          @Override
+          public void close() {
+          }
+
+          @Override
+          public OmSnapshot get() {
+            return snapshot;
+          }
+        };
+    OMMetadataManager snapshotMetadataManager = mock(OMMetadataManager.class);
+    when(snapshot.getMetadataManager()).thenReturn(snapshotMetadataManager);
+    when(snapshotMetadataManager.getStore()).thenReturn(snapshotStore);
+    when(omSnapshotManager.getActiveSnapshot(
+        eq(snapshotInfo.getVolumeName()), eq(snapshotInfo.getBucketName()),
+        eq(snapshotInfo.getName()))).thenReturn(snapshotSupplier);
   }
 
   @AfterEach
@@ -639,12 +728,87 @@ public class TestSnapshotDefragService {
         eq(snapshotInfo.getName()))).thenReturn(snapshotSupplier);
   }
 
+  @ParameterizedTest
+  @EnumSource(LiveSstType.class)
+  public void testRewritesSingleLiveSstBeforeIngestion(
+      LiveSstType liveSstType) throws Exception {
+    String tableName = "cf1";
+    String key = "ab001";
+    String previousValue = "previous-value";
+    String currentValue = "current-value";
+    SnapshotInfo previousSnapshotInfo = createMockSnapshotInfo(
+        UUID.randomUUID(), "vol1", "bucket1", "snap1");
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(
+        UUID.randomUUID(), "vol1", "bucket1", "snap2");
+    TablePrefixInfo prefixInfo = new TablePrefixInfo(
+        ImmutableMap.of(tableName, "ab"));
+
+    try (DBStore sourceStore = createDBStore(
+             "source-" + liveSstType + "-" + UUID.randomUUID(), tableName);
+         DBStore previousStore = createDBStore(
+             "previous-" + liveSstType + "-" + UUID.randomUUID(), tableName);
+         DBStore snapshotStore = createDBStore(
+             "snapshot-" + liveSstType + "-" + UUID.randomUUID(), tableName);
+         DBStore checkpointStore = createDBStore(
+             "checkpoint-" + liveSstType + "-" + UUID.randomUUID(),
+             tableName)) {
+      putString(previousStore.getTable(
+          tableName, StringCodec.get(), CodecBufferCodec.get(true)),
+          key, previousValue);
+      previousStore.flushDB();
+      putString(snapshotStore.getTable(
+          tableName, StringCodec.get(), CodecBufferCodec.get(true)),
+          key, currentValue);
+      snapshotStore.flushDB();
+      createMockSnapshot(previousSnapshotInfo, previousStore);
+      createMockSnapshot(snapshotInfo, snapshotStore);
+      Path deltaFile = createLiveSstDelta(
+          sourceStore, tableName, key, liveSstType);
+      when(deltaFileComputer.getDeltaFiles(eq(previousSnapshotInfo),
+          eq(snapshotInfo), eq(ImmutableSet.of(tableName))))
+          .thenReturn(ImmutableList.of(Pair.of(deltaFile,
+              new SstFileInfo(deltaFile.toFile().getName(), key, key,
+                  tableName))));
+
+      try (MockedConstruction<SstFileSetReader> ignored = mockConstruction(
+          SstFileSetReader.class, (mock, context) -> when(mock
+              .getKeyStreamWithTombstone(anyString(), anyString()))
+              .thenReturn(new ClosableIterator<String>() {
+                private boolean hasNext = true;
+
+                @Override
+                public void close() {
+                }
+
+                @Override
+                public boolean hasNext() {
+                  return hasNext;
+                }
+
+                @Override
+                public String next() {
+                  if (!hasNext) {
+                    throw new NoSuchElementException();
+                  }
+                  hasNext = false;
+                  return key;
+                }
+              }))) {
+        defragService.performIncrementalDefragmentation(previousSnapshotInfo,
+            snapshotInfo, checkpointStore, prefixInfo,
+            ImmutableSet.of(tableName));
+      }
+
+      assertEquals(currentValue, checkpointStore.getTable(
+          tableName, StringCodec.get(), StringCodec.get()).get(key));
+    }
+  }
+
   /**
    * Tests the incremental defragmentation process between two snapshots.
    *
-   * <p>This parameterized test validates the {@code performIncrementalDefragmentation} method
-   * across different version scenarios (0, 1, 2, 10) to ensure proper handling of snapshot
-   * delta files and version-specific optimizations.</p>
+   * <p>This test validates that all snapshot delta files are rewritten into
+   * fresh external SST files before ingestion.</p>
    *
    * <h3>Test Data Generation:</h3>
    * Creates 67,600 synthetic key-value pairs (26×26×100) distributed across two snapshots
@@ -667,38 +831,26 @@ public class TestSnapshotDefragService {
    *   <li>SstFileSetReader mock returns keys with indices 0-4 (i % 6 < 5)</li>
    * </ul>
    *
-   * <h3>Version-Specific Behavior:</h3>
+   * <h3>Expected Behavior:</h3>
    * <ul>
-   *   <li><b>currentVersion == 0 (initial version):</b>
-   *     <ul>
-   *       <li>All incremental tables are dumped to new SST files</li>
-   *       <li>All dumped files are ingested into the checkpoint database</li>
-   *     </ul>
-   *   </li>
-   *   <li><b>currentVersion > 0 (subsequent versions):</b>
-   *     <ul>
-   *       <li>Single delta file tables (cf1) are ingested directly without merging</li>
-   *       <li>Multiple delta file tables (cf2) are merged and dumped before ingestion</li>
-   *       <li>Optimization: avoids unnecessary file I/O for single delta files</li>
-   *     </ul>
-   *   </li>
+   *   <li>Every incremental table is dumped to a fresh external SST file</li>
+   *   <li>All dumped files are ingested into the checkpoint database</li>
+   *   <li>Behavior is independent of snapshot version and delta-file count</li>
    * </ul>
    *
    * <h3>Assertions:</h3>
    * <ul>
-   *   <li>Verifies correct tables are dumped and ingested based on version</li>
+   *   <li>Verifies all incremental tables are dumped and ingested</li>
    *   <li>Validates that only modified keys (i % 6 < 3) appear in delta files</li>
    *   <li>Confirms written values match snap2's values or null for deletions</li>
    *   <li>Ensures all incremental tables are ultimately ingested</li>
    * </ul>
    *
-   * @param currentVersion the snapshot version being defragmented (0 for initial, >0 for subsequent)
    * @throws Exception if any error occurs during the test execution
    */
   @SuppressWarnings("checkstyle:MethodLength")
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 10})
-  public void testPerformIncrementalDefragmentation(int currentVersion) throws Exception {
+  @Test
+  public void testPerformIncrementalDefragmentation() throws Exception {
     DBStore checkpointDBStore = mock(DBStore.class);
     String samePrefix = "samePrefix";
     String snap1Prefix = "snap1Prefix";
@@ -839,18 +991,10 @@ public class TestSnapshotDefragService {
         String tableName = i.getArgument(0, String.class);
         return checkpointTables.get(tableName);
       }).when(checkpointDBStore).getTable(anyString());
-      defragService.performIncrementalDefragmentation(snap1Info, snap2Info, currentVersion, checkpointDBStore,
+      defragService.performIncrementalDefragmentation(snap1Info, snap2Info, checkpointDBStore,
           prefixInfo, incrementalTables);
-      if (currentVersion == 0) {
-        assertEquals(incrementalTables, new HashSet<>(dumpedFileName.values()));
-        assertEquals(ingestedFiles, dumpedFileName);
-      } else {
-        assertEquals(ImmutableSet.of("cf2"), new HashSet<>(dumpedFileName.values()));
-        assertEquals("cf1", ingestedFiles.get(deltaFiles.get(0).getLeft().toAbsolutePath().toString()));
-        assertEquals(ingestedFiles.entrySet().stream().filter(e -> e.getValue().equals(
-            "cf2")).collect(Collectors.toSet()), dumpedFileName.entrySet().stream().filter(e -> e.getValue().equals(
-            "cf2")).collect(Collectors.toSet()));
-      }
+      assertEquals(incrementalTables, new HashSet<>(dumpedFileName.values()));
+      assertEquals(ingestedFiles, dumpedFileName);
       assertEquals(incrementalTables, new HashSet<>(ingestedFiles.values()));
       for (Map.Entry<Path, List<Pair<String, String>>> deltaFileContent : deltaFileContents.entrySet()) {
         int idx = 0;
@@ -938,7 +1082,7 @@ public class TestSnapshotDefragService {
       IOException defragException = new IOException("Defrag failed");
       if (previousSnapshotExists) {
         Mockito.doThrow(defragException).when(spyDefragService).performIncrementalDefragmentation(
-            eq(previousSnapshotInfo), eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+            eq(previousSnapshotInfo), eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
             eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       } else {
         Mockito.doThrow(defragException).when(spyDefragService).performFullDefragmentation(
@@ -1045,7 +1189,7 @@ public class TestSnapshotDefragService {
       doNothing().when(spyDefragService).performFullDefragmentation(eq(checkpointDBStore), eq(prefixInfo),
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       doNothing().when(spyDefragService).performIncrementalDefragmentation(eq(previousSnapshotInfo),
-          eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+          eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       AtomicInteger lockAcquired = new AtomicInteger(0);
       AtomicInteger lockReleased = new AtomicInteger(0);
@@ -1094,7 +1238,7 @@ public class TestSnapshotDefragService {
           eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       if (previousSnapshotExists) {
         verifier.verify(spyDefragService).performIncrementalDefragmentation(eq(previousSnapshotInfo),
-            eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+            eq(snapshotInfo), eq(checkpointDBStore), eq(prefixInfo),
             eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
       } else {
         verifier.verify(spyDefragService).performFullDefragmentation(eq(checkpointDBStore), eq(prefixInfo),
