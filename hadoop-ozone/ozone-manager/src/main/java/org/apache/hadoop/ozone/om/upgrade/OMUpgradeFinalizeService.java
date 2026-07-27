@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -116,7 +117,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
           }
 
           HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
-          if (upgradeStatus.getShouldFinalize()) {
+          if (upgradeStatus.getHddsFinalized()) {
             LOG.info("The SCM Upgrade has been finalized. OM will now finalize. Run count {}", run);
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
@@ -133,8 +134,13 @@ public class OMUpgradeFinalizeService extends BackgroundService {
             LOG.debug("The SCM Upgrade has not been finalized. Run count {}", run);
           }
         } catch (Exception e) {
-          LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM. Run count {}",
-              run, e);
+          if (e instanceof SCMException
+              && ((SCMException) e).getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
+            LOG.info("SCM is in safe mode; will retry checking the upgrade status on the next run. Run count {}", run);
+          } else {
+            LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM. Run count {}",
+                run, e);
+          }
         }
       } else {
         LOG.debug("Finalization is not in progress. Run count {}", run);

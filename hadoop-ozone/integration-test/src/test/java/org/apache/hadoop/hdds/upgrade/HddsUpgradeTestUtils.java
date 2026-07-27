@@ -51,7 +51,7 @@ public final class HddsUpgradeTestUtils {
     LambdaTestUtils.await(60_000, 1_000, () -> {
       HddsProtos.UpgradeStatus status = scmClient.queryUpgradeStatus();
       LOG.info("Waiting for upgrade finalization to complete from client. Current status is:\n{}", status);
-      return status.getShouldFinalize();
+      return status.getHddsFinalized();
     });
   }
 
