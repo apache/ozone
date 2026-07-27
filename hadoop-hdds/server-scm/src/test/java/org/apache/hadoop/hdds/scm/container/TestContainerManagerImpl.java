@@ -156,7 +156,8 @@ public class TestContainerManagerImpl {
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
     pipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = pipelineManager.getPipelines(ecReplicationConfig).iterator().next();
-    container = containerManager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
+    container = containerManager.getMatchingContainer(sizeRequired, "test",
+        pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
     assertNull(container);
   }
 
@@ -186,7 +187,8 @@ public class TestContainerManagerImpl {
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
     spyPipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
-    container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
+    container = manager.getMatchingContainer(sizeRequired, "test", pipeline,
+        Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotNull(container);
   }
 
@@ -217,7 +219,9 @@ public class TestContainerManagerImpl {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
-    ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin", StorageTier.getDefaultTier());
+    ContainerInfo ecContainer = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     final ContainerID cid = container.containerID();
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
@@ -272,7 +276,9 @@ public class TestContainerManagerImpl {
             containerManager.transitionDeletingOrDeletedToTargetState(cid, LifeCycleState.CLOSED));
 
     // test for EC container
-    final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin", StorageTier.getDefaultTier());
+    final ContainerInfo ecContainer = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
     assertThrows(IOException.class, () ->

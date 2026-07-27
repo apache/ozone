@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
@@ -251,7 +252,7 @@ public class ContainerManagerImpl implements ContainerManager {
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
-    Preconditions.checkNotNull(storageTier,
+    Objects.requireNonNull(storageTier,
         "Cannot allocate container, StorageTier cannot be null.");
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
     final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto

@@ -371,7 +371,9 @@ class TestReplicationManagerIntegration {
    */
   @Test
   public void testEmptyQuasiClosedContainerDeletion() throws Exception {
-    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner", StorageTier.getDefaultTier());
+    ContainerInfo containerInfo = containerManager.allocateContainer(
+        RATIS_REPLICATION_CONFIG, "TestOwner",
+        StorageTier.getDefaultTier());
     ContainerID cid = containerInfo.containerID();
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
@@ -438,7 +440,9 @@ class TestReplicationManagerIntegration {
    */
   @Test
   public void testEmptyQuasiClosedContainerDeletionWithMixedReplicaStates() throws Exception {
-    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner", StorageTier.getDefaultTier());
+    ContainerInfo containerInfo = containerManager.allocateContainer(
+        RATIS_REPLICATION_CONFIG, "TestOwner",
+        StorageTier.getDefaultTier());
     ContainerID cid = containerInfo.containerID();
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
