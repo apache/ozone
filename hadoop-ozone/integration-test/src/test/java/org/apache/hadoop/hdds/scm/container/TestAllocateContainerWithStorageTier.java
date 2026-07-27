@@ -56,7 +56,6 @@ public class TestAllocateContainerWithStorageTier {
 
   @TempDir
   private File dir;
-  private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
   private ContainerManager containerManager;
@@ -66,7 +65,7 @@ public class TestAllocateContainerWithStorageTier {
       StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE);
 
   private void createCluster(List<List<StorageType>> storageTypeList) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(storageTypeList.size())
