@@ -417,6 +417,7 @@ message BlockID {
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
 
+// Deprecated, please use UpgradeStatus instead; kept for compatibility with old clients.
 message UpgradeFinalizationStatus {
     enum Status {
         ALREADY_FINALIZED = 1;
@@ -430,10 +431,13 @@ message UpgradeFinalizationStatus {
 }
 
 message UpgradeStatus {
-  optional bool scmFinalized = 1;
-  optional int32 numDatanodesFinalized = 2;
-  optional int32 numDatanodesTotal = 3;
-  optional bool shouldFinalize = 4;
+  optional bool hddsFinalized = 1;
+  optional bool scmFinalized = 2;
+  optional int32 numDatanodesFinalized = 3;
+  optional int32 numDatanodesTotal = 4;
+  optional uint32 scmApparentVersion = 5;
+  optional uint32 minDatanodeApparentVersion = 6;
+  optional uint32 maxDatanodeApparentVersion = 7;
 }
 
 /**

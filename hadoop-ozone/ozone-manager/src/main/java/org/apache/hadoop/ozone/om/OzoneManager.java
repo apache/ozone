@@ -194,6 +194,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -3664,11 +3665,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
-    HddsProtos.UpgradeStatus scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+    HddsProtos.UpgradeStatus scmStatus;
+    try {
+      scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+    } catch (SCMException e) {
+      // SCM refuses the query while in safe mode
+      if (e.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
+        throw new OMException(e.getMessage(), e, NOT_SUPPORTED_OPERATION);
+      }
+      throw e;
+    }
+
+    boolean omFinalized = !versionManager.needsFinalization();
+    boolean hddsFinalized = scmStatus.getHddsFinalized();
+    boolean clusterFinalized = omFinalized && hddsFinalized;
 
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(!versionManager.needsFinalization())
+        .setOmFinalized(omFinalized)
         .setHddsStatus(scmStatus)
+        .setOmApparentVersion(versionManager.getApparentVersion().serialize())
+        .setClusterFinalized(clusterFinalized)
         .build();
   }
 

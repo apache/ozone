@@ -684,6 +684,36 @@ public class TestSCMNodeManager {
     }
   }
 
+  @Test
+  public void testDatanodeFinalizationCountsTracksApparentVersionRange()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      // Two healthy datanodes reporting different apparent versions.
+      registerWithCapacity(nodeManager,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION), success);
+      registerWithCapacity(nodeManager, defaultVersionProto(), success);
+
+      NodeManager.DatanodeFinalizationCounts counts = nodeManager.getDatanodeFinalizationCounts();
+      assertEquals(2, counts.getTotalHealthyDatanodes());
+      assertEquals(HDDSLayoutFeature.INITIAL_VERSION.serialize(), counts.getMinApparentVersion(),
+          "Min apparent version should reflect the least-finalized datanode");
+      assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), counts.getMaxApparentVersion(),
+          "Max apparent version should reflect the most-finalized datanode");
+    }
+  }
+
+  @Test
+  public void testDatanodeFinalizationCountsWithNoHealthyDatanodes()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      NodeManager.DatanodeFinalizationCounts counts = nodeManager.getDatanodeFinalizationCounts();
+      assertEquals(0, counts.getTotalHealthyDatanodes());
+      // The MAX_VALUE sentinel used to find the min must be normalized to 0 when there is nothing to count.
+      assertEquals(0, counts.getMinApparentVersion());
+      assertEquals(0, counts.getMaxApparentVersion());
+    }
+  }
+
   private static Stream<Arguments> ineligibleHealthStates() {
     return Stream.of(
         Arguments.of(NodeStatus.inServiceStale()),

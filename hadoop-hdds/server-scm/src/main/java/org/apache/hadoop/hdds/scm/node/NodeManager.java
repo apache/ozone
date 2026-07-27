@@ -152,6 +152,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default DatanodeFinalizationCounts getDatanodeFinalizationCounts() {
     int finalizedNodes = 0;
     int totalHealthyNodes = 0;
+    int minApparentVersion = Integer.MAX_VALUE;
+    int maxApparentVersion = 0;
 
     for (DatanodeInfo dn : getAllNodes()) {
       try {
@@ -173,6 +175,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
         ComponentVersion dnApparentVersion = dn.getLastKnownApparentVersion();
         ComponentVersion dnSoftwareVersion = dn.getLastKnownSoftwareVersion();
 
+        int dnApparentVersionInt = dnApparentVersion.serialize();
+        minApparentVersion = Math.min(minApparentVersion, dnApparentVersionInt);
+        maxApparentVersion = Math.max(maxApparentVersion, dnApparentVersionInt);
+
         if (!dnApparentVersion.equals(dnSoftwareVersion)) {
           // Datanode has not yet finalized
           LOG.debug("Datanode {} has not yet finalized: apparent version={}, software version={}",
@@ -187,7 +193,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       }
     }
 
-    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes);
+    if (minApparentVersion == Integer.MAX_VALUE) {
+      // No healthy datanode with version info was found
+      minApparentVersion = 0;
+    }
+
+    return DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(finalizedNodes)
+        .setTotalHealthyDatanodes(totalHealthyNodes)
+        .setMinApparentVersion(minApparentVersion)
+        .setMaxApparentVersion(maxApparentVersion)
+        .build();
   }
 
   /**
@@ -498,11 +514,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   final class DatanodeFinalizationCounts {
     private final int numFinalizedDatanodes;
     private final int totalHealthyDatanodes;
+    private final int minApparentVersion;
+    private final int maxApparentVersion;
 
-    public DatanodeFinalizationCounts(int numFinalizedDatanodes,
-                                      int totalHealthyDatanodes) {
-      this.numFinalizedDatanodes = numFinalizedDatanodes;
-      this.totalHealthyDatanodes = totalHealthyDatanodes;
+    private DatanodeFinalizationCounts(Builder b) {
+      this.numFinalizedDatanodes = b.numFinalizedDatanodes;
+      this.totalHealthyDatanodes = b.totalHealthyDatanodes;
+      this.minApparentVersion = b.minApparentVersion;
+      this.maxApparentVersion = b.maxApparentVersion;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
     }
 
     public int getNumFinalizedDatanodes() {
@@ -515,6 +538,48 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
     public boolean allNodesFinalized() {
       return numFinalizedDatanodes == totalHealthyDatanodes;
+    }
+
+    public int getMinApparentVersion() {
+      return minApparentVersion;
+    }
+
+    public int getMaxApparentVersion() {
+      return maxApparentVersion;
+    }
+
+    /**
+     * Builder for {@link DatanodeFinalizationCounts}.
+     */
+    public static final class Builder {
+      private int numFinalizedDatanodes;
+      private int totalHealthyDatanodes;
+      private int minApparentVersion;
+      private int maxApparentVersion;
+
+      public Builder setNumFinalizedDatanodes(int value) {
+        this.numFinalizedDatanodes = value;
+        return this;
+      }
+
+      public Builder setTotalHealthyDatanodes(int value) {
+        this.totalHealthyDatanodes = value;
+        return this;
+      }
+
+      public Builder setMinApparentVersion(int value) {
+        this.minApparentVersion = value;
+        return this;
+      }
+
+      public Builder setMaxApparentVersion(int value) {
+        this.maxApparentVersion = value;
+        return this;
+      }
+
+      public DatanodeFinalizationCounts build() {
+        return new DatanodeFinalizationCounts(this);
+      }
     }
   }
 }

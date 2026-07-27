@@ -17,14 +17,18 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
+import java.io.PrintWriter;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QueryUpgradeStatusResponse;
 import picocli.CommandLine;
 
 /**
@@ -42,6 +46,11 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
+  @CommandLine.Option(names = {"--json"},
+      defaultValue = "false",
+      description = "Format output as JSON.")
+  private boolean json;
+
   @Override
   public Integer call() throws Exception {
     try (OzoneManagerProtocol client = getClient()) {
@@ -51,20 +60,109 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
             "`ozone admin scm finalizationstatus` and `ozone admin om finalizationstatus`");
         return 1;
       }
-      OzoneManagerProtocolProtos.QueryUpgradeStatusResponse status = client.queryUpgradeStatus();
+      QueryUpgradeStatusResponse status = client.queryUpgradeStatus();
 
-
-      out().println("Upgrade status:");
-      out().println("    OM Finalized? " + status.getOmFinalized());
-      out().println("    SCM Finalized? " + status.getHddsStatus().getScmFinalized());
-      out().println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized()
-          + "/" + status.getHddsStatus().getNumDatanodesTotal());
+      if (json) {
+        out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(UpgradeStatusDto.from(status)));
+      } else if (isVerbose()) {
+        printVerbose(status, out());
+      } else {
+        printBasic(status, out());
+      }
     }
     return 0;
   }
 
+  /** Basic, non-verbose human-readable status. */
+  static void printBasic(QueryUpgradeStatusResponse status, PrintWriter out) {
+    out.println("Upgrade status:");
+    out.println("    OM Finalized? " + status.getOmFinalized());
+    out.println("    SCM Finalized? " + status.getHddsStatus().getScmFinalized());
+    out.println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized()
+        + "/" + status.getHddsStatus().getNumDatanodesTotal());
+  }
+
+  /**
+   * Verbose human-readable status that includes the apparent versions reported by OM and SCM, and the
+   * range of apparent versions across healthy datanodes.
+   */
+  static void printVerbose(QueryUpgradeStatusResponse status, PrintWriter out) {
+    HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
+    out.println("Upgrade status:");
+    out.println("    OM Finalized?            " + status.getOmFinalized());
+    out.println("    OM Apparent Version:     "
+        + OzoneManagerVersion.deserialize(status.getOmApparentVersion()).toString());
+    out.println("    SCM Finalized?           " + hdds.getScmFinalized());
+    out.println("    SCM Apparent Version:    " + HDDSVersion.deserialize(hdds.getScmApparentVersion()).toString());
+    out.println("    Datanodes finalized:     " + hdds.getNumDatanodesFinalized() + "/" + hdds.getNumDatanodesTotal());
+    out.println("    Min Datanode Apparent Version: "
+        + HDDSVersion.deserialize(hdds.getMinDatanodeApparentVersion()).toString());
+    out.println("    Max Datanode Apparent Version: "
+        + HDDSVersion.deserialize(hdds.getMaxDatanodeApparentVersion()).toString());
+  }
+
   protected OzoneManagerProtocol getClient() throws Exception {
     return omAddressOptions.newClient();
+  }
+
+  /**
+   * JSON-friendly DTO mirroring {@link QueryUpgradeStatusResponse}.
+   */
+  public static final class UpgradeStatusDto {
+    private boolean omFinalized;
+    private String omApparentVersion;
+    private boolean scmFinalized;
+    private String scmApparentVersion;
+    private int datanodesFinalized;
+    private int datanodesTotal;
+    private String minDatanodeApparentVersion;
+    private String maxDatanodeApparentVersion;
+
+    public static UpgradeStatusDto from(QueryUpgradeStatusResponse status) {
+      HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
+      UpgradeStatusDto dto = new UpgradeStatusDto();
+      dto.omFinalized = status.getOmFinalized();
+      dto.scmFinalized = hdds.getScmFinalized();
+      dto.datanodesFinalized = hdds.getNumDatanodesFinalized();
+      dto.datanodesTotal = hdds.getNumDatanodesTotal();
+      dto.omApparentVersion = OzoneManagerVersion.deserialize(status.getOmApparentVersion()).toString();
+      dto.scmApparentVersion = HDDSVersion.deserialize(hdds.getScmApparentVersion()).toString();
+      dto.minDatanodeApparentVersion = HDDSVersion.deserialize(hdds.getMinDatanodeApparentVersion()).toString();
+      dto.maxDatanodeApparentVersion = HDDSVersion.deserialize(hdds.getMaxDatanodeApparentVersion()).toString();
+      return dto;
+    }
+
+    public boolean isOmFinalized() {
+      return omFinalized;
+    }
+
+    public String getOmApparentVersion() {
+      return omApparentVersion;
+    }
+
+    public boolean isScmFinalized() {
+      return scmFinalized;
+    }
+
+    public String getScmApparentVersion() {
+      return scmApparentVersion;
+    }
+
+    public int getDatanodesFinalized() {
+      return datanodesFinalized;
+    }
+
+    public int getDatanodesTotal() {
+      return datanodesTotal;
+    }
+
+    public String getMinDatanodeApparentVersion() {
+      return minDatanodeApparentVersion;
+    }
+
+    public String getMaxDatanodeApparentVersion() {
+      return maxDatanodeApparentVersion;
+    }
   }
 
 }

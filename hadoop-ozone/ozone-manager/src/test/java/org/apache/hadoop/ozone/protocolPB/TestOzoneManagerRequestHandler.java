@@ -476,7 +476,7 @@ public class TestOzoneManagerRequestHandler {
 
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(true)
-        .setShouldFinalize(false)
+        .setHddsFinalized(false)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
