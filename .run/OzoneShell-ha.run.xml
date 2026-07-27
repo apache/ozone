@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="OzoneShell-ha" type="Application" factoryName="Application">
+  <configuration default="false" name="OzoneShell-ha" type="Application" factoryName="Application" folderName="ozone-ha">
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.ozone.shell.OzoneShell" />
     <module name="ozone-cli-shell" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site-ha.xml volume create /vol1" />
