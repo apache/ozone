@@ -340,6 +340,19 @@
                   </compilerArgs>
                 </configuration>
               </execution>
+              <execution>
+                <id>default-testCompile</id>
+                <goals>
+                  <goal>testCompile</goal>
+                </goals>
+                <phase>test-compile</phase>
+                <configuration>
+                  <compilerArgs>
+                    <arg>-h</arg>
+                    <arg>${project.build.directory}/native/javah</arg>
+                  </compilerArgs>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
           <plugin>
