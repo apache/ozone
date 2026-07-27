@@ -160,6 +160,7 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
+      // TODO Support create Container Command with StorageTier
       ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.
               allocateContainer(replicationType, replicationFactor, owner);

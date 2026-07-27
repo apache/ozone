@@ -104,15 +104,18 @@ public class RatisPipelineProvider
     }
   }
 
-  private boolean exceedPipelineNumberLimit(RatisReplicationConfig replicationConfig) {
+  private boolean exceedPipelineNumberLimit(
+      RatisReplicationConfig replicationConfig, StorageTier storageTier) {
     // Apply limits only for replication factor THREE
     if (replicationConfig.getReplicationFactor() != ReplicationFactor.THREE) {
       return false;
     }
 
     PipelineStateManager pipelineStateManager = getPipelineStateManager();
-    int totalActivePipelines = pipelineStateManager.getPipelines(replicationConfig).size();
-    int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
+    int totalActivePipelines = pipelineStateManager
+        .getPipelines(replicationConfig, storageTier).size();
+    int closedPipelines = pipelineStateManager
+        .getPipelines(replicationConfig, PipelineState.CLOSED, storageTier).size();
     int openPipelines = totalActivePipelines - closedPipelines;
     // Check per-datanode pipeline limit
     if (datanodePipelineLimit > 0) {
@@ -125,7 +128,8 @@ public class RatisPipelineProvider
     // Check global pipeline limit
     if (pipelineNumberLimit > 0) {
       int factorOnePipelineCount = pipelineStateManager
-          .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE)).size();
+          .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
+              storageTier).size();
       int allowedOpenPipelines = pipelineNumberLimit - factorOnePipelineCount;
       return openPipelines >= allowedOpenPipelines;
     }
@@ -150,7 +154,7 @@ public class RatisPipelineProvider
   public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
-    if (exceedPipelineNumberLimit(replicationConfig)) {
+    if (exceedPipelineNumberLimit(replicationConfig, storageTier)) {
       String limitInfo = (datanodePipelineLimit > 0)
           ? String.format("per datanode: %d", datanodePipelineLimit)
           : String.format(": %d", pipelineNumberLimit);

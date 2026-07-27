@@ -52,6 +52,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -861,7 +862,7 @@ public class TestContainerReportHandler {
         NodeStatus.inServiceHealthy()).iterator();
 
     Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
     final DatanodeDetails datanodeOne = nodeIterator.next();
     final DatanodeDetails datanodeTwo = nodeIterator.next();
@@ -1017,7 +1018,7 @@ public class TestContainerReportHandler {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
 
-    Pipeline pipeline = pipelineManager.createPipeline(repConfig);
+    Pipeline pipeline = pipelineManager.createPipeline(repConfig, StorageTier.getDefaultTier());
     Map<Integer, DatanodeDetails> dns = new HashMap<>();
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
@@ -1092,7 +1093,7 @@ public class TestContainerReportHandler {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
         nodeManager, containerManager);
 
-    Pipeline pipeline = pipelineManager.createPipeline(repConfig);
+    Pipeline pipeline = pipelineManager.createPipeline(repConfig, StorageTier.getDefaultTier());
     Map<Integer, DatanodeDetails> dns = new HashMap<>();
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();

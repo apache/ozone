@@ -71,6 +71,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -464,7 +465,7 @@ public class TestSCMNodeManager {
           ReplicationConfig.fromProtoTypeAndFactor(
               HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
-      scm.getPipelineManager().createPipeline(ratisThree);
+      scm.getPipelineManager().createPipeline(ratisThree, StorageTier.getDefaultTier());
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
@@ -477,7 +478,7 @@ public class TestSCMNodeManager {
         HddsProtos.ReplicationFactor.THREE);
     SCMException ex = assertThrows(
         SCMException.class,
-        () -> scm.getPipelineManager().createPipeline(config),
+        () -> scm.getPipelineManager().createPipeline(config, StorageTier.getDefaultTier()),
         "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage())
         .contains("Cannot create pipeline for StorageTier DISK as it would exceed the limit per datanode: " + limit);

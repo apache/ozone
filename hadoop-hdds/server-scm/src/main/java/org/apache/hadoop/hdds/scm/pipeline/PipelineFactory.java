@@ -81,11 +81,10 @@ public class PipelineFactory {
 
   public Pipeline create(
       ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
-    // TODO StoragePolicy replace this StorageTier with the passed StorageTier
     Pipeline pipeline = providers.get(replicationConfig.getReplicationType())
-        .create(replicationConfig, excludedNodes, favoredNodes, StorageTier.getDefaultTier());
+        .create(replicationConfig, excludedNodes, favoredNodes, storageTier);
     checkPipeline(pipeline);
     return pipeline;
   }

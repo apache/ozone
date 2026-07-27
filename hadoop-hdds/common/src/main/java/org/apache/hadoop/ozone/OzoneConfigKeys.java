@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.ratis.util.TimeDuration;
@@ -711,6 +712,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
       "ozone.client.elastic.byte.buffer.pool.max.size";
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
+
+  public static final String OZONE_DEFAULT_STORAGE_TIER_KEY =
+      "ozone.default.storageTier";
+  public static final String OZONE_DEFAULT_STORAGE_TIER_DEFAULT =
+      StorageTier.DISK.toString();
 
   /**
    * There is no need to instantiate this class.

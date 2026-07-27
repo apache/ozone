@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -242,7 +243,9 @@ public class BackgroundPipelineCreator implements SCMService {
           (ReplicationConfig) it.next();
 
       try {
-        Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+        // Only create default StorageTier Pipeline
+        Pipeline pipeline = pipelineManager.createPipeline(replicationConfig,
+            StorageTier.getDefaultTier());
         LOG.info("Created new pipeline {}", pipeline);
       } catch (IOException ioe) {
         it.remove();

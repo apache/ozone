@@ -58,6 +58,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -466,7 +467,7 @@ public class TestIncrementalContainerReportHandler {
 
     RatisReplicationConfig replicationConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
-    Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+    Pipeline pipeline = pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
     final DatanodeDetails datanodeOne = nodes.get(0);

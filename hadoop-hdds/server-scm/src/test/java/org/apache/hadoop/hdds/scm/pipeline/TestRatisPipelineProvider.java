@@ -223,10 +223,16 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testGlobalPipelineNumberLimitIsNotStorageTierAware() throws Exception {
+  public void testGlobalPipelineNumberLimitIsStorageTierAware() throws Exception {
     OzoneConfiguration pipelineLimitConf = new OzoneConfiguration();
     pipelineLimitConf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 1);
     init(0, pipelineLimitConf, StorageTier.DISK);
+    // init(0, ...) sets numPipelinePerDatanode=0 which would cause
+    // filterPipelineEngagement to exclude every datanode. Bump it here
+    // before creating the spy so filterPipelineEngagement sees a positive
+    // limit. The provider's datanodePipelineLimit config is still 0, so
+    // the *global* branch of exceedPipelineNumberLimit is what runs.
+    nodeManager.setNumPipelinePerDatanode(5);
     List<DatanodeDetails> diskAndSsdNodes = datanodeList.stream()
         .map(TestRatisPipelineProvider::datanodeInfoWithDiskAndSsd)
         .collect(Collectors.toList());
@@ -238,6 +244,7 @@ public class TestRatisPipelineProvider {
     RatisPipelineProvider localProvider = new RatisPipelineProvider(
         nodeManagerSpy, stateManager, pipelineLimitConf, new EventQueue(),
         SCMContext.emptyContext());
+    // Fill the DISK tier up to the global limit.
     for (int i = 0; i < 2; i++) {
       addPipeline(diskAndSsdNodes.subList(i * 3, i * 3 + 3),
           Pipeline.PipelineState.OPEN,
@@ -245,11 +252,11 @@ public class TestRatisPipelineProvider {
           StorageTier.DISK);
     }
 
-    SCMException exception = assertThrows(SCMException.class, () ->
-        localProvider.create(
-            RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.SSD));
-
-    assertThat(exception.getMessage()).contains("would exceed the limit");
+    // SSD is a distinct tier, so the global limit should not block creation.
+    Pipeline pipeline = localProvider.create(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.SSD);
+    assertPipelineProperties(pipeline, ReplicationFactor.THREE,
+        REPLICATION_TYPE, Pipeline.PipelineState.ALLOCATED, StorageTier.SSD);
   }
 
   private List<DatanodeDetails> createListOfNodes(int count) {

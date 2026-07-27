@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -105,7 +106,7 @@ public class TestContainerManagerImpl {
     doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-        ReplicationFactor.THREE));
+        ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
@@ -152,7 +153,7 @@ public class TestContainerManagerImpl {
 
     // create an EC pipeline to test for EC containers
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    pipelineManager.createPipeline(ecReplicationConfig);
+    pipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = pipelineManager.getPipelines(ecReplicationConfig).iterator().next();
     container = containerManager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNull(container);
@@ -182,7 +183,7 @@ public class TestContainerManagerImpl {
 
     // create an EC pipeline to test for EC containers
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    spyPipelineManager.createPipeline(ecReplicationConfig);
+    spyPipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
     container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNotNull(container);

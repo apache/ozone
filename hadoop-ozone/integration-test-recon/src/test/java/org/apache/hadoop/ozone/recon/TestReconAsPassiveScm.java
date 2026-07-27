@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -107,7 +108,8 @@ public class TestReconAsPassiveScm {
     UnsupportedOperationException exception = assertThrows(
         UnsupportedOperationException.class,
         () -> reconPipelineManager
-            .createPipeline(RatisReplicationConfig.getInstance(ONE)));
+            .createPipeline(RatisReplicationConfig.getInstance(ONE),
+                StorageTier.getDefaultTier()));
     assertTrue(exception.getMessage()
         .contains("Trying to create pipeline in Recon, which is prohibited!"));
 

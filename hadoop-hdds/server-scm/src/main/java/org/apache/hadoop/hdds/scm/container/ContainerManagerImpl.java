@@ -33,6 +33,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -194,7 +195,8 @@ public class ContainerManagerImpl implements ContainerManager {
 
     if (pipelines.isEmpty()) {
       try {
-        pipeline = pipelineManager.createPipeline(replicationConfig);
+        pipeline = pipelineManager.createPipeline(replicationConfig,
+            StorageTier.getDefaultTier());
         if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
           pipelineManager.openPipeline(pipeline.getId());
         }

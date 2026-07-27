@@ -65,15 +65,17 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationConfig replicationConfig)
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      StorageTier storageTier)
       throws IOException {
     return createPipeline(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+      StorageTier storageTier)
       throws IOException {
     Pipeline pipeline;
     if (replicationConfig.getReplicationType()
@@ -85,7 +87,7 @@ public class MockPipelineManager implements PipelineManager {
           ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
               MockDatanodeDetails.randomDatanodeDetails(),
               MockDatanodeDetails.randomDatanodeDetails()),
-          StorageTier.getDefaultTier());
+          storageTier);
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -182,11 +184,17 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state, StorageTier storageTier) {
+    return stateManager.getPipelines(replicationConfig, state, storageTier);
+  }
+
+  @Override
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       final Pipeline.PipelineState state,
       final Collection<DatanodeDetails> excludeDns,
-      final Collection<PipelineID> excludePipelines) {
+      final Collection<PipelineID> excludePipelines, StorageTier storageTier) {
     return stateManager.getPipelines(replicationConfig, state,
-        excludeDns, excludePipelines);
+        excludeDns, excludePipelines, storageTier);
   }
 
   @Override

@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -449,7 +450,7 @@ public class TestContainerCommandsEC {
         new XceiverClientManager(config)) {
       ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
       Pipeline newPipeline =
-          scm.getPipelineManager().createPipeline(replicationConfig);
+          scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, "test");
@@ -538,7 +539,7 @@ public class TestContainerCommandsEC {
              new XceiverClientManager(config)) {
       ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
       Pipeline newPipeline =
-          scm.getPipelineManager().createPipeline(replicationConfig);
+          scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, "test");

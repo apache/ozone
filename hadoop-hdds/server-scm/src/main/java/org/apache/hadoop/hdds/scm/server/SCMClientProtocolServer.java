@@ -52,6 +52,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -860,8 +861,10 @@ public class SCMClientProtocolServer implements
     }
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
+      // TODO: Support Allocate Pipeline Command with StorageTier
       Pipeline result = scm.getPipelineManager().createPipeline(
-          ReplicationConfig.fromProtoTypeAndFactor(type, factor));
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor),
+          StorageTier.getDefaultTier());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CREATE_PIPELINE, auditMap));
       return result;

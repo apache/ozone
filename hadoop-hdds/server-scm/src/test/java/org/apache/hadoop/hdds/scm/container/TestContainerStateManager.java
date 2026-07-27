@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -103,7 +104,7 @@ public class TestContainerStateManager {
                 ReplicationFactor.THREE))
             .setNodes(new ArrayList<>()).build();
     when(pipelineManager.createPipeline(StandaloneReplicationConfig.getInstance(
-        ReplicationFactor.THREE))).thenReturn(pipeline);
+        ReplicationFactor.THREE), StorageTier.getDefaultTier())).thenReturn(pipeline);
     when(pipelineManager.containsPipeline(any(PipelineID.class))).thenReturn(true);
 
 

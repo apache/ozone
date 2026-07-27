@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -154,15 +155,15 @@ public class TestHealthyPipelineSafeModeRule {
       // Create 3 pipelines
       Pipeline pipeline1 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline3.getId());
 
       // Mark pipeline healthy
@@ -247,15 +248,15 @@ public class TestHealthyPipelineSafeModeRule {
       // Create 3 pipelines
       Pipeline pipeline1 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.ONE));
+              ReplicationFactor.ONE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline3.getId());
 
       // Mark pipelines healthy
@@ -338,13 +339,13 @@ public class TestHealthyPipelineSafeModeRule {
       // blocked once safe mode prechecks have not passed.
       Pipeline pipeline1 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       Pipeline pipeline2 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       Pipeline pipeline3 =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
       // Start with one healthy open pipeline. Threshold is small at this point.
       pipelineManager.openPipeline(pipeline1.getId());
@@ -446,7 +447,7 @@ public class TestHealthyPipelineSafeModeRule {
       // Create a Ratis pipeline with 3 replicas
       Pipeline pipeline =
           pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline.getId());
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);

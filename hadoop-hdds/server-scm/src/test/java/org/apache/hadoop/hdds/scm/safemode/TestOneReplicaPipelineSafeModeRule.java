@@ -32,6 +32,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -239,7 +240,7 @@ public class TestOneReplicaPipelineSafeModeRule {
       HddsProtos.ReplicationFactor factor) throws Exception {
     for (int i = 0; i < count; i++) {
       Pipeline pipeline = pipelineManager.createPipeline(
-              RatisReplicationConfig.getInstance(factor));
+              RatisReplicationConfig.getInstance(factor), StorageTier.getDefaultTier());
       pipelineManager.openPipeline(pipeline.getId());
 
     }

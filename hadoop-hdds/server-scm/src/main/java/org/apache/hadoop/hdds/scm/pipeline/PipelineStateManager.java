@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
@@ -90,9 +91,21 @@ public interface PipelineStateManager extends SCMHandler {
 
   List<Pipeline> getPipelines(
       ReplicationConfig replicationConfig,
+      StorageTier storageTier
+  );
+
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state,
+      StorageTier storageTier
+  );
+
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
       Pipeline.PipelineState state,
       Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines
+      Collection<PipelineID> excludePipelines,
+      StorageTier storageTier
   );
 
   int getPipelineCount(

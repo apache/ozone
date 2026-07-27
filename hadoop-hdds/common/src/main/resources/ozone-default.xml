@@ -4287,6 +4287,20 @@
   </property>
 
   <property>
+    <name>ozone.default.storageTier</name>
+    <value>DISK</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default StorageTier used for pipeline creation and block allocation
+      when a client does not specify a StorageTier (StoragePolicy).
+      For old-version clients that do not carry a StoragePolicy the
+      StorageTier is null; this value is used as the fallback so their
+      write path is unchanged. Supported values are DISK, SSD, ARCHIVE,
+      RAM_DISK.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.ec.grpc.retries.enabled</name>
     <value>true</value>
     <tag>CLIENT</tag>

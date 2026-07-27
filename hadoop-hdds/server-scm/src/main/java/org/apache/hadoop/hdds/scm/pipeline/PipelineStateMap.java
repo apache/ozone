@@ -32,7 +32,9 @@ import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
@@ -211,6 +213,55 @@ class PipelineStateMap {
   }
 
   /**
+   * Get list of pipelines corresponding to specified replication type
+   * and storageTier.
+   *
+   * @param replicationConfig - ReplicationConfig
+   * @param storageTier       - Required storageTier
+   * @return List of pipelines with specified replication type and storageTier
+   */
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      StorageTier storageTier) {
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(storageTier, "Pipeline storageTier cannot be null");
+    return getPipelines(replicationConfig).stream()
+        .filter(pipeline -> matchesStorageTier(pipeline, storageTier))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Get list of pipeline corresponding to specified replication type,
+   * replication factor, pipeline state and storageTier.
+   *
+   * @param replicationConfig - ReplicationConfig
+   * @param state             - Required PipelineState
+   * @param storageTier       - Required storageTier
+   * @return List of pipelines with specified replication type,
+   * replication factor, pipeline state and storageTier
+   */
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      PipelineState state, StorageTier storageTier) {
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(state, "Pipeline state cannot be null");
+    Objects.requireNonNull(storageTier, "Pipeline storageTier cannot be null");
+    return getPipelines(replicationConfig, state).stream()
+        .filter(pipeline -> matchesStorageTier(pipeline, storageTier))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * A pipeline with no supportedStorageTier (e.g. one created by an older
+   * SCM before this field was introduced, or restored from a legacy DB
+   * snapshot) is treated as matching any tier. This preserves backward
+   * compatibility during rolling upgrade: legacy pipelines remain usable
+   * until they are scrubbed and replaced by tier-tagged ones.
+   */
+  static boolean matchesStorageTier(Pipeline pipeline, StorageTier storageTier) {
+    final StorageTier pipelineTier = pipeline.getSupportedStorageTier();
+    return pipelineTier == null || Objects.equals(pipelineTier, storageTier);
+  }
+
+  /**
    * Get a count of pipelines with the given replicationConfig and state.
    * This method is most efficient when getting a count for OPEN pipeline
    * as the result can be obtained directly from the cached open list.
@@ -247,23 +298,27 @@ class PipelineStateMap {
    * @param state             - Required PipelineState
    * @param excludeDns        dns to exclude
    * @param excludePipelines  pipelines to exclude
+   * @param storageTier       - Required storageTier
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines) {
+      Collection<PipelineID> excludePipelines, StorageTier storageTier) {
     Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
     Objects.requireNonNull(state, "Pipeline state cannot be null");
     Objects.requireNonNull(excludeDns, "Datanode exclude list cannot be null");
     Objects.requireNonNull(excludePipelines, "Pipeline exclude list cannot be null");
+    Objects.requireNonNull(storageTier, "Pipeline storageTier cannot be null");
 
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {
       pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
           replicationConfig, Collections.emptyList()));
       if (excludeDns.isEmpty() && excludePipelines.isEmpty()) {
-        return pipelines;
+        return pipelines.stream()
+            .filter(pipeline -> matchesStorageTier(pipeline, storageTier))
+            .collect(Collectors.toList());
       }
     } else {
       pipelines = new ArrayList<>(pipelineMap.values());
@@ -272,6 +327,10 @@ class PipelineStateMap {
     Iterator<Pipeline> iter = pipelines.iterator();
     while (iter.hasNext()) {
       Pipeline pipeline = iter.next();
+      if (!matchesStorageTier(pipeline, storageTier)) {
+        iter.remove();
+        continue;
+      }
       if (!pipeline.getReplicationConfig().equals(replicationConfig) ||
           pipeline.getPipelineState() != state ||
           excludePipelines.contains(pipeline.getId())) {

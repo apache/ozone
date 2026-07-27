@@ -21,9 +21,11 @@ import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -62,17 +64,19 @@ public class WritableContainerFactory {
   }
 
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      @Nonnull StorageTier storageTier)
       throws IOException {
     switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider
-          .getContainer(size, repConfig, owner, excludeList);
+          .getContainer(size, repConfig, owner, excludeList, storageTier);
     case RATIS:
-      return ratisProvider.getContainer(size, repConfig, owner, excludeList);
+      return ratisProvider.getContainer(size, repConfig, owner, excludeList,
+          storageTier);
     case EC:
-      return ecProvider.getContainer(size, (ECReplicationConfig)repConfig,
-          owner, excludeList);
+      return ecProvider.getContainer(size, (ECReplicationConfig) repConfig,
+          owner, excludeList, storageTier);
     default:
       throw new IOException(repConfig.getReplicationType()
           + " is an invalid replication type");

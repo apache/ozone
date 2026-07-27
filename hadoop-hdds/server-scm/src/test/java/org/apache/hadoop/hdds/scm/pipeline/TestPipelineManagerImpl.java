@@ -209,12 +209,12 @@ public class TestPipelineManagerImpl {
         createPipelineManager(true, buffer1);
     assertTrue(pipelineManager.getPipelines().isEmpty());
     Pipeline pipeline1 = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
     assertEquals(1, pipelineManager.getPipelines().size());
     assertTrue(pipelineManager.containsPipeline(pipeline1.getId()));
 
     Pipeline pipeline2 = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.ONE));
+        RatisReplicationConfig.getInstance(ReplicationFactor.ONE), StorageTier.getDefaultTier());
     assertEquals(2, pipelineManager.getPipelines().size());
     assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
 
@@ -238,7 +238,7 @@ public class TestPipelineManagerImpl {
     assertThat(pipelineManager2.getPipelines()).isNotEmpty();
     assertEquals(3, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
     buffer2.close();
     assertEquals(4, pipelineManager2.getPipelines().size());
     assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
@@ -251,7 +251,8 @@ public class TestPipelineManagerImpl {
     try (PipelineManager pipelineManager = createPipelineManager(false)) {
       assertTrue(pipelineManager.getPipelines().isEmpty());
       assertFailsNotLeader(() -> pipelineManager.createPipeline(
-              RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+              StorageTier.getDefaultTier()));
     }
   }
 
@@ -382,7 +383,7 @@ public class TestPipelineManagerImpl {
           serviceManager, new EventQueue(), scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
+              .getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
       // pipeline is not healthy until all dns report
       List<DatanodeDetails> nodes = pipeline.getNodes();
@@ -436,7 +437,7 @@ public class TestPipelineManagerImpl {
     List<DatanodeDetails> nodes = localNodeManager.getNodes(NodeStatus.inServiceHealthy());
     assertEquals(nodeCount, nodes.size());
     Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig
-        .getInstance(ReplicationFactor.THREE));
+        .getInstance(ReplicationFactor.THREE), StorageTier.DISK);
     assertEquals(StorageTier.DISK, pipeline.getSupportedStorageTier());
 
     assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
@@ -490,7 +491,7 @@ public class TestPipelineManagerImpl {
     for (int i = 0; i < maxPipelineCount; i++) {
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
+              .getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
       assertNotNull(pipeline);
     }
 
@@ -506,7 +507,9 @@ public class TestPipelineManagerImpl {
     //This should fail...
     SCMException e =
         assertThrows(SCMException.class,
-            () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+            () -> pipelineManager.createPipeline(
+                RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+                StorageTier.getDefaultTier()));
     // pipeline creation failed this time.
     assertEquals(ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, e.getResult());
 
@@ -532,7 +535,7 @@ public class TestPipelineManagerImpl {
 
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+            .getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
     // close manager
     buffer1.close();
     pipelineManager.close();
@@ -580,7 +583,7 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline allocatedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+            .getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
     // At this point, pipeline is not at OPEN stage.
     assertEquals(Pipeline.PipelineState.ALLOCATED,
         allocatedPipeline.getPipelineState());
@@ -593,7 +596,7 @@ public class TestPipelineManagerImpl {
 
     Pipeline closedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+            .getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
     pipelineManager.openPipeline(closedPipeline.getId());
     pipelineManager.closePipeline(closedPipeline.getId());
 
@@ -645,7 +648,7 @@ public class TestPipelineManagerImpl {
   public void testScrubOpenWithUnregisteredNodes() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager
-        .createPipeline(new ECReplicationConfig(3, 2));
+        .createPipeline(new ECReplicationConfig(3, 2), StorageTier.getDefaultTier());
     pipelineManager.openPipeline(pipeline.getId());
 
     // Scrubbing the pipelines should not affect this pipeline
@@ -689,7 +692,8 @@ public class TestPipelineManagerImpl {
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     assertThrows(IOException.class,
-        () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)),
+        () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            StorageTier.getDefaultTier()),
         "Pipelines should not have been created");
     // No pipeline is created.
     assertTrue(pipelineManager.getPipelines().isEmpty());
@@ -698,7 +702,7 @@ public class TestPipelineManagerImpl {
     // raised.
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE));
+            .getInstance(ReplicationFactor.ONE), StorageTier.getDefaultTier());
     assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.ONE))
@@ -747,7 +751,8 @@ public class TestPipelineManagerImpl {
             SCMDBDefinition.PIPELINES.getTable(dbStore);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE));
+                .getInstance(HddsProtos.ReplicationFactor.THREE),
+            StorageTier.getDefaultTier());
     PipelineID pipelineID = pipeline.getId();
     pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
     pipelineManager.getStateManager().updatePipelineState(
@@ -770,7 +775,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE));
+            .getInstance(HddsProtos.ReplicationFactor.THREE),
+        StorageTier.getDefaultTier());
     PipelineID pipelineID = pipeline.getId();
     pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
     pipelineManager.getStateManager().updatePipelineState(
@@ -788,7 +794,8 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE));
+                .getInstance(HddsProtos.ReplicationFactor.THREE),
+            StorageTier.getDefaultTier());
     PipelineID pipelineID = pipeline.getId();
     ContainerManager containerManager = scm.getContainerManager();
     ContainerInfo containerInfo = HddsTestUtils.
@@ -930,12 +937,12 @@ public class TestPipelineManagerImpl {
 
     // Throw on pipeline creates, so no new pipelines can be created
     doThrow(SCMException.class).when(pipelineManagerSpy)
-        .createPipeline(any(), any(), anyList());
+        .createPipeline(any(), any(), anyList(), any(StorageTier.class));
     provider = new WritableRatisContainerProvider(
         pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
 
     // Add a single pipeline to manager, (in the allocated state)
-    allocatedPipeline = pipelineManager.createPipeline(repConfig);
+    allocatedPipeline = pipelineManager.createPipeline(repConfig, StorageTier.getDefaultTier());
     pipelineManager.getStateManager()
         .updatePipelineState(allocatedPipeline.getId()
             .getProtobuf(), HddsProtos.PipelineState.PIPELINE_ALLOCATED);
@@ -972,7 +979,7 @@ public class TestPipelineManagerImpl {
 
 
     ContainerInfo c = provider.getContainer(1, repConfig,
-        owner, new ExcludeList());
+        owner, new ExcludeList(), StorageTier.getDefaultTier());
     assertEquals(c, container, "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines
@@ -1078,7 +1085,8 @@ public class TestPipelineManagerImpl {
   private static Pipeline assertAllocate(PipelineManagerImpl pipelineManager) {
     Pipeline pipeline = assertDoesNotThrow(
         () -> pipelineManager.createPipeline(
-            RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            StorageTier.getDefaultTier()));
     assertEquals(1, pipelineManager.getPipelines().size());
     assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     assertEquals(ALLOCATED, pipeline.getPipelineState());

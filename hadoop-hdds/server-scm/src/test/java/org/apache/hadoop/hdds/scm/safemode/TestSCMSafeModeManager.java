@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -312,7 +313,7 @@ public class TestSCMSafeModeManager {
       // Create pipeline
       Pipeline pipeline = pipelineManager.createPipeline(
           RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+              ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
       pipelineManager.openPipeline(pipeline.getId());
       // Mark pipeline healthy
@@ -721,7 +722,7 @@ public class TestSCMSafeModeManager {
 
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE));
+            ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
     pipeline = pipelineManager.getPipeline(pipeline.getId());
     MockRatisPipelineProvider.markPipelineHealthy(pipeline);
@@ -814,7 +815,7 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
     // Mark pipeline healthy
     pipeline = pipelineManager.getPipeline(pipeline.getId());
@@ -933,7 +934,7 @@ public class TestSCMSafeModeManager {
       assertThat(logCapturer.getOutput()).contains("SCM SafeMode Status | state=PRE_CHECKS_PASSED");
       
       Pipeline pipeline = pipelineManager.createPipeline(
-          RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), StorageTier.getDefaultTier());
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
       firePipelineEvent(pipelineManager, pipeline);

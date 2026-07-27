@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -224,7 +225,7 @@ public class TestHDDSUpgrade {
    */
   private void testPostUpgradePipelineCreation()
       throws IOException, TimeoutException {
-    Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS_THREE);
+    Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS_THREE, StorageTier.getDefaultTier());
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
     assertEquals(0,
         scmPipelineManager.getNumberOfContainers(ratisPipeline1.getId()));

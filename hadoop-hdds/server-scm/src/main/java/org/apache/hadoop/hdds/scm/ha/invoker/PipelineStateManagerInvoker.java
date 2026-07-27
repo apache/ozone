@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
@@ -136,9 +137,19 @@ public class PipelineStateManagerInvoker extends ScmInvoker<PipelineStateManager
       }
 
       @Override
+      public List<Pipeline> getPipelines(ReplicationConfig arg0, StorageTier arg1) {
+        return invoker.getImpl().getPipelines(arg0, arg1);
+      }
+
+      @Override
+      public List<Pipeline> getPipelines(ReplicationConfig arg0, Pipeline.PipelineState arg1, StorageTier arg2) {
+        return invoker.getImpl().getPipelines(arg0, arg1, arg2);
+      }
+
+      @Override
       public List<Pipeline> getPipelines(ReplicationConfig arg0, Pipeline.PipelineState arg1, Collection arg2,
-          Collection arg3) {
-        return invoker.getImpl().getPipelines(arg0, arg1, arg2, arg3);
+          Collection arg3, StorageTier arg4) {
+        return invoker.getImpl().getPipelines(arg0, arg1, arg2, arg3, arg4);
       }
 
       @Override
@@ -238,39 +249,57 @@ public class PipelineStateManagerInvoker extends ScmInvoker<PipelineStateManager
         returnValue = getImpl().getPipelines(arg11, arg12);
         break;
       }
-      if (p.length == 4 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
-          Pipeline.PipelineState.class.isInstance(p[1])) && (p[2] == null || Collection.class.isInstance(p[2])) && (p[3]
-          == null || Collection.class.isInstance(p[3]))) {
+      if (p.length == 2 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
+          StorageTier.class.isInstance(p[1]))) {
         final ReplicationConfig arg13 = (ReplicationConfig) p[0];
-        final Pipeline.PipelineState arg14 = (Pipeline.PipelineState) p[1];
-        final Collection arg15 = (Collection) p[2];
-        final Collection arg16 = (Collection) p[3];
+        final StorageTier arg14 = (StorageTier) p[1];
         returnType = List.class;
-        returnValue = getImpl().getPipelines(arg13, arg14, arg15, arg16);
+        returnValue = getImpl().getPipelines(arg13, arg14);
+        break;
+      }
+      if (p.length == 3 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
+          Pipeline.PipelineState.class.isInstance(p[1])) && (p[2] == null || StorageTier.class.isInstance(p[2]))) {
+        final ReplicationConfig arg15 = (ReplicationConfig) p[0];
+        final Pipeline.PipelineState arg16 = (Pipeline.PipelineState) p[1];
+        final StorageTier arg17 = (StorageTier) p[2];
+        returnType = List.class;
+        returnValue = getImpl().getPipelines(arg15, arg16, arg17);
+        break;
+      }
+      if (p.length == 5 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
+          Pipeline.PipelineState.class.isInstance(p[1])) && (p[2] == null || Collection.class.isInstance(p[2])) && (p[3]
+          == null || Collection.class.isInstance(p[3])) && (p[4] == null || StorageTier.class.isInstance(p[4]))) {
+        final ReplicationConfig arg18 = (ReplicationConfig) p[0];
+        final Pipeline.PipelineState arg19 = (Pipeline.PipelineState) p[1];
+        final Collection arg20 = (Collection) p[2];
+        final Collection arg21 = (Collection) p[3];
+        final StorageTier arg22 = (StorageTier) p[4];
+        returnType = List.class;
+        returnValue = getImpl().getPipelines(arg18, arg19, arg20, arg21, arg22);
         break;
       }
       throw new IllegalArgumentException("Method not found: " + methodName + " in PipelineStateManager");
 
     case "reinitialize":
-      final Table arg17 = p.length > 0 ? (Table) p[0] : null;
-      getImpl().reinitialize(arg17);
+      final Table arg23 = p.length > 0 ? (Table) p[0] : null;
+      getImpl().reinitialize(arg23);
       return Message.EMPTY;
 
     case "removeContainerFromPipeline":
-      final PipelineID arg18 = p.length > 0 ? (PipelineID) p[0] : null;
-      final ContainerID arg19 = p.length > 1 ? (ContainerID) p[1] : null;
-      getImpl().removeContainerFromPipeline(arg18, arg19);
+      final PipelineID arg24 = p.length > 0 ? (PipelineID) p[0] : null;
+      final ContainerID arg25 = p.length > 1 ? (ContainerID) p[1] : null;
+      getImpl().removeContainerFromPipeline(arg24, arg25);
       return Message.EMPTY;
 
     case "removePipeline":
-      final HddsProtos.PipelineID arg20 = p.length > 0 ? (HddsProtos.PipelineID) p[0] : null;
-      getImpl().removePipeline(arg20);
+      final HddsProtos.PipelineID arg26 = p.length > 0 ? (HddsProtos.PipelineID) p[0] : null;
+      getImpl().removePipeline(arg26);
       return Message.EMPTY;
 
     case "updatePipelineState":
-      final HddsProtos.PipelineID arg21 = p.length > 0 ? (HddsProtos.PipelineID) p[0] : null;
-      final HddsProtos.PipelineState arg22 = p.length > 1 ? (HddsProtos.PipelineState) p[1] : null;
-      getImpl().updatePipelineState(arg21, arg22);
+      final HddsProtos.PipelineID arg27 = p.length > 0 ? (HddsProtos.PipelineID) p[0] : null;
+      final HddsProtos.PipelineState arg28 = p.length > 1 ? (HddsProtos.PipelineState) p[1] : null;
+      getImpl().updatePipelineState(arg27, arg28);
       return Message.EMPTY;
 
     default:
