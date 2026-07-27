@@ -50,26 +50,28 @@ public class TestExportFileManager {
     String jobId = UUID.randomUUID().toString();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
     String tarPath = fileManager.resolveTarPath(scope, "20260101T120000Z", jobId);
-    assertTrue(tarPath.endsWith("container-ids-health-MISSING-20260101T120000Z-" + jobId + ".tar"));
+    assertTrue(tarPath.endsWith(
+        "container-ids-health-MISSING-20260101T120000Z-" + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
 
   @Test
-  public void testOrphanWorkDirRemovedOnStartup() throws Exception {
+  public void testOrphanJobDirRemovedOnStartup() throws Exception {
     String jobId = UUID.randomUUID().toString();
-    Path orphan = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId)).resolve("work");
-    Files.createDirectories(orphan);
+    Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
+    Files.createDirectories(orphanJobDir);
 
     fileManager.start();
 
-    assertFalse(Files.exists(orphan));
+    assertFalse(Files.exists(orphanJobDir));
   }
 
   @Test
   public void testIncompleteExportArtifactsRemovedOnStartup() throws Exception {
     String jobId = UUID.randomUUID().toString();
-    Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId)).resolve("work");
+    Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(jobDir);
-    File partialTar = new File(tempDir, "container-ids-health-MISSING-20260101T000000Z-" + jobId + ".tar");
+    File partialTar = new File(tempDir,
+        "container-ids-health-MISSING-20260101T000000Z-" + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX);
     assertTrue(partialTar.createNewFile());
     File inProgress = new File(tempDir, jobId + ExportFileManager.IN_PROGRESS_MARKER_SUFFIX);
     assertTrue(inProgress.createNewFile());
@@ -82,16 +84,17 @@ public class TestExportFileManager {
   }
 
   @Test
-  public void testOrphanWorkDirWithoutMarkerDoesNotDeleteCompletedTar() throws Exception {
+  public void testOrphanJobDirWithoutMarkerDoesNotDeleteCompletedTar() throws Exception {
     String jobId = UUID.randomUUID().toString();
-    File completedTar = new File(tempDir, "container-ids-health-MISSING-20260101T000000Z-" + jobId + ".tar");
+    File completedTar = new File(tempDir,
+        "container-ids-health-MISSING-20260101T000000Z-" + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX);
     assertTrue(completedTar.createNewFile());
-    Path orphanWorkDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
-    Files.createDirectories(orphanWorkDir.resolve("work"));
+    Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
+    Files.createDirectories(orphanJobDir);
 
     fileManager.start();
 
     assertTrue(completedTar.exists());
-    assertFalse(Files.exists(orphanWorkDir));
+    assertFalse(Files.exists(orphanJobDir));
   }
 }

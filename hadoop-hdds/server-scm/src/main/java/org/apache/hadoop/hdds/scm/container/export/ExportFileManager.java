@@ -30,26 +30,48 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages on-disk paths and artifacts for container ID export jobs.
- * Layout under the export directory ({@code {exportDirectory}}, typically {@code {scm.db.dirs}/exports}):
- * <p>
+ *
+ * <p>The export directory ({@code exportDirectory}, typically {@code {scm.db.dirs}/exports})
+ * uses the layout below. The manager gzip-compresses the archive ({@code .tar.gz}) so operators
+ * can stream entries with {@code zcat}
+ * 
+ * <pre>
  * {exportDirectory}/
- *   {jobId}.in-progress                             // marker while a job is running
- *   container-ids-{scope}-{timestamp}-{jobId}.tar   // completed export archive
- *   export-{jobId}/                                 // per-job workspace (removed on success)
- *     work/
- *       container-ids-{scope}-{timestamp}-part001.txt
- *       ...
- * <p>
- * Shard text files are written under {@code export-{jobId}/work/}, appended into the TAR at
- * {@code {exportDirectory}}, then the manager deletes the workspace. The manager clears the
- * {@code .in-progress} marker only after the TAR closes successfully. On startup, the manager
- * removes orphaned markers, workspaces, and partial TAR files for the same job id together.
+ * ├── {jobId}.in-progress
+ * ├── container-ids-{scope}-{timestamp}-{jobId}.tar.gz
+ * └── export_{jobId}/
+ *     ├── container-ids-{scope}-{timestamp}-part001.txt
+ *     └── ...
+ * </pre>
+ *
+ * <p>{@code export_{jobId}/} holds shard text files while the job appends them into the archive.
+ *
+ * <p><b>When {@code export_{jobId}/} is deleted:</b> the export manager deletes it after the
+ * archive closes successfully, or during {@link #cleanupFailedArtifacts} on failure or cancel.
+ * On startup, {@link #start()} deletes a leftover {@code export_{jobId}/} when no in-progress
+ * marker remains. If the marker still exists, {@link #start()} deletes {@code export_{jobId}/}
+ * together with the marker and any partial archive for that job id.
+ *
+ * <p><b>When {@code .tar.gz} is deleted:</b> {@link #cleanupFailedArtifacts} deletes partial
+ * archives for failed or cancelled jobs. {@link #start()} deletes partial archives for jobs that
+ * still have an in-progress marker. Completed archives remain on disk until the export manager
+ * evicts the job from memory ({@code maxTerminalJobs} in {@code ContainerExportManager}) or an
+ * operator deletes them manually. After SCM restart, in-memory eviction state is lost, so
+ * completed archives persist until manual cleanup.
+ *
+ * <p><b>SCM restart while a job runs:</b> the in-progress marker and {@code export_{jobId}/}
+ * remain on disk, but in-memory job status is lost. {@link #start()} treats the job as incomplete,
+ * removes the marker, workspace, and any partial {@code .tar.gz} for that job id, and the
+ * operator re-submits the export on the new leader.
  */
 final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
+
   static final String IN_PROGRESS_MARKER_SUFFIX = ".in-progress";
-  static final String EXPORT_JOB_DIR_PREFIX = "export-";
+  static final String EXPORT_JOB_DIR_PREFIX = "export_";
+  static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
+
   private final String exportDirectory;
 
   ExportFileManager(String exportDirectory) {
@@ -66,8 +88,9 @@ final class ExportFileManager {
   }
 
   String resolveTarPath(ExportScope scope, String fileTimestamp, String jobId) {
-    String tarFileName = String.format("container-ids-%s-%s-%s.tar", scope.getValue(), fileTimestamp, jobId);
-    return exportDirectory + File.separator + tarFileName;
+    String archiveFileName = String.format("container-ids-%s-%s-%s%s",
+        scope.getValue(), fileTimestamp, jobId, EXPORT_ARCHIVE_SUFFIX);
+    return exportDirectory + File.separator + archiveFileName;
   }
 
   void markExportInProgress(String jobId) throws IOException {
@@ -84,7 +107,7 @@ final class ExportFileManager {
     }
     File tar = new File(tarPath);
     if (tar.isFile() && FileUtils.deleteQuietly(tar)) {
-      LOG.debug("Removed container export TAR: {}", tar.getName());
+      LOG.debug("Removed container export archive: {}", tar.getName());
     }
   }
 
@@ -134,19 +157,19 @@ final class ExportFileManager {
     File tar = findTarForJobId(jobId);
     if (tar != null) {
       FileUtils.deleteQuietly(tar);
-      LOG.info("Removed incomplete container export TAR for job {}: {}", jobId, tar.getName());
+      LOG.info("Removed incomplete container export archive for job {}: {}", jobId, tar.getName());
     }
-    File jobWorkDir = new File(exportDirectory, exportJobDirName(jobId));
-    if (jobWorkDir.isDirectory()) {
-      FileUtils.deleteQuietly(jobWorkDir);
-      LOG.info("Removed orphaned container export work directory: {}", jobWorkDir.getAbsolutePath());
+    File jobDir = new File(exportDirectory, exportJobDirName(jobId));
+    if (jobDir.isDirectory()) {
+      FileUtils.deleteQuietly(jobDir);
+      LOG.info("Removed orphaned container export job directory: {}", jobDir.getAbsolutePath());
     }
   }
 
   private File findTarForJobId(String jobId) {
     File exportDir = new File(exportDirectory);
-    File[] matches = exportDir.listFiles(
-        (dir, fileName) -> fileName.endsWith("-" + jobId + ".tar"));
+    String suffix = "-" + jobId + EXPORT_ARCHIVE_SUFFIX;
+    File[] matches = exportDir.listFiles((dir, fileName) -> fileName.endsWith(suffix));
     if (matches == null || matches.length == 0) {
       return null;
     }
