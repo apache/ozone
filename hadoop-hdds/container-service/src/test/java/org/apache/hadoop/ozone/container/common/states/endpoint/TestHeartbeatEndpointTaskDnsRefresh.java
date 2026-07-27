@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.mockito.Mockito.any;
@@ -57,7 +57,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
   public void connectionFailureAtThresholdTriggersRefresh() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 2);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD, 2);
     SCMConnectionManager cm = runHeartbeat(conf, 3, new ConnectException("refused"));
     verify(cm, times(1)).refreshSCMServer(eq(SCM), any());
   }
@@ -82,7 +82,7 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
   public void belowThresholdDoesNotTriggerRefresh() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY, true);
-    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_THRESHOLD, 5);
+    conf.setInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD, 5);
     SCMConnectionManager cm = runHeartbeat(conf, 1, new ConnectException("refused"));
     verify(cm, never()).refreshSCMServer(any(), any());
   }

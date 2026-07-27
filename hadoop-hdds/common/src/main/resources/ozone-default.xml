@@ -4007,7 +4007,7 @@
   </property>
 
   <property>
-    <name>hdds.heartbeat.address.refresh.threshold</name>
+    <name>hdds.heartbeat.address.refresh.missed-count-threshold</name>
     <value>3</value>
     <tag>OZONE, DATANODE, HA</tag>
     <description>Consecutive heartbeat failures the DataNode tolerates
