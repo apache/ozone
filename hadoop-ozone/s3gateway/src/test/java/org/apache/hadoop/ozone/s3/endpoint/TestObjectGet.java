@@ -126,8 +126,17 @@ public class TestObjectGet {
     String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'}, ISO_8859_1);
     assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, unreadableKey));
 
-    String malformedUtf8Key = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'}, UTF_8);
+    String malformedUtf8Key = new String(new byte[] {(byte) 0xff}, UTF_8);
     assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, malformedUtf8Key));
+  }
+
+  @Test
+  public void testGetValidUnicodeKey() throws Exception {
+    String unicodeKey = "café.txt";
+    assertSucceeds(() -> put(rest, BUCKET_NAME, unicodeKey, CONTENT));
+    Response response = get(rest, BUCKET_NAME, unicodeKey);
+    assertEquals(String.valueOf(CONTENT.length()),
+        response.getHeaderString("Content-Length"));
   }
 
   @Test

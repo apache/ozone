@@ -620,7 +620,7 @@ public abstract class EndpointBase {
 
   /**
    * Reject object keys that cannot be represented in a valid URI. AWS S3 returns
-   * InvalidURI for unreadable keys (non-printable ASCII 128-255) before lookup.
+   * InvalidURI for keys containing malformed UTF-8 or ISO control characters.
    */
   protected void validateObjectKeyUri(String keyPath) throws OS3Exception {
     if (keyPath == null || keyPath.indexOf('\uFFFD') >= 0) {
@@ -628,8 +628,7 @@ public abstract class EndpointBase {
     }
 
     for (int i = 0; i < keyPath.length(); i++) {
-      char c = keyPath.charAt(i);
-      if (c >= 0x80 && c <= 0xFF) {
+      if (Character.isISOControl(keyPath.charAt(i))) {
         throw newError(INVALID_URI, keyPath);
       }
     }
