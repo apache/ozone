@@ -71,8 +71,12 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
       formattingCLIUtils.addHeaders(SCM_ROLES_HEADER);
 
       for (String role : peerRoles) {
-        String[] roleItems = HddsUtils.parseRatisRoleString(role);
-        formattingCLIUtils.addLine(roleItems);
+        try {
+          String[] roleItems = HddsUtils.parseRatisRoleString(role);
+          formattingCLIUtils.addLine(roleItems);
+        } catch (IllegalArgumentException e) {
+          formattingCLIUtils.addLine(new String[]{role, "", "", "", ""});
+        }
       }
       System.out.println(formattingCLIUtils.render());
     } else {
@@ -87,12 +91,18 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     Map<String, Map<String, String>> allRoles = new HashMap<>();
     for (String role : peerRoles) {
       Map<String, String> roleDetails = new HashMap<>();
-      String[] fields = HddsUtils.parseRatisRoleString(role);
-      roleDetails.put("address", fields[0] + ":" + fields[1]);
-      roleDetails.put("raftPeerRole", fields[2]);
-      roleDetails.put("ID", fields[3]);
-      roleDetails.put("InetAddress", fields[4]);
-      allRoles.put(fields[0], roleDetails);
+      try {
+        String[] fields = HddsUtils.parseRatisRoleString(role);
+        roleDetails.put("address", HddsUtils.getHostPortString(
+            fields[0], Integer.parseInt(fields[1])));
+        roleDetails.put("raftPeerRole", fields[2]);
+        roleDetails.put("ID", fields[3]);
+        roleDetails.put("InetAddress", fields[4]);
+        allRoles.put(fields[0], roleDetails);
+      } catch (IllegalArgumentException e) {
+        roleDetails.put("address", role);
+        allRoles.put(role, roleDetails);
+      }
     }
     return allRoles;
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import java.net.InetSocketAddress;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.net.NetUtils;
 
 /**
@@ -35,7 +36,7 @@ public class HostAndPort {
   public HostAndPort(String host, int port) {
     this.host = host;
     this.port = port;
-    this.hostAndPortString = host + ":" + port;
+    this.hostAndPortString = HddsUtils.getHostPortString(host, port);
     this.hash = host.hashCode() ^ Integer.hashCode(port);
     // TODO: HDDS-15533 change the address resolution logic and make this.address threadsafe.
     this.address = NetUtils.createSocketAddr(hostAndPortString);

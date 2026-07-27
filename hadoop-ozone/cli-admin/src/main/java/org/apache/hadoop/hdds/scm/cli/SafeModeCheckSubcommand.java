@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -177,7 +178,8 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
 
   /**
    * Check if the given SCMNodeInfo matches the target address.
-   * Tries to match by direct string comparison and by resolved address.
+   * Tries to match by direct string comparison and by resolved InetAddress.
+   * This handles IPv6 equivalence (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1).
    */
   private boolean matchesAddress(String address1, String address2) {
     if (address1.equalsIgnoreCase(address2)) {
@@ -185,24 +187,9 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     }
 
     try {
-      // Parse both addresses into host:port components
-      String[] parts1 = address1.split(":", 2);
-      String[] parts2 = address2.split(":", 2);
-
-      String host1 = parts1[0];
-      String host2 = parts2[0];
-      
-      // Hostnames must match
-      if (!host1.equalsIgnoreCase(host2)) {
-        return false;
-      }
-
-      // If both have ports specified, they must match
-      if (parts1.length > 1 && parts2.length > 1) {
-        return parts1[1].equals(parts2[1]);
-      }
-
-      return true;
+      InetAddress inet1 = InetAddress.getByName(address1);
+      InetAddress inet2 = InetAddress.getByName(address2);
+      return inet1.equals(inet2);
     } catch (Exception e) {
       // If address resolution fails, no match
       return false;

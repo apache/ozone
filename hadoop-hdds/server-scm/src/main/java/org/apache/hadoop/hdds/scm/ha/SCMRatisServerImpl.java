@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -294,15 +296,19 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         continue;
       }
       String host = HddsUtils.getHostName(peer.getAddress()).orElse("");
-      int port = HddsUtils.getHostPort(peer.getAddress()).orElse(0);
-      String normalizedAddress = HddsUtils.getHostPortString(host, port);
+      OptionalInt portOpt = HddsUtils.getHostPort(peer.getAddress());
+      if (!portOpt.isPresent()) {
+        LOG.error("SCM Ratis peer address {} has no port, skipping",
+            peer.getAddress());
+        continue;
+      }
+      String normalizedAddress = HddsUtils.getHostPortString(host, portOpt.getAsInt());
       String role = peer.equals(leader)
           ? RaftProtos.RaftPeerRole.LEADER.toString()
           : RaftProtos.RaftPeerRole.FOLLOWER.toString();
       String hostIp = "";
       if (peerInetAddress != null) {
-        String rawIp = peerInetAddress.getHostAddress();
-        hostIp = rawIp.contains(":") ? "[" + rawIp + "]" : rawIp;
+        hostIp = InetAddresses.toUriString(peerInetAddress);
       }
       String roleEntry = normalizedAddress + ":" + role + ":"
           + peer.getId().toString() + ":" + hostIp;

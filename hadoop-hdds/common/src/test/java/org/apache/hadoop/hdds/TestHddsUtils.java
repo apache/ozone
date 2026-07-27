@@ -137,6 +137,24 @@ public class TestHddsUtils {
     assertEquals("", result[4]);
   }
 
+  @Test
+  void testParseRatisRoleStringRejectsNull() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(null));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsEmpty() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(""));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsTooFewFields() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString("host:9894"));
+  }
+
   static List<Arguments> validPaths() {
     return Arrays.asList(
         Arguments.of("/", "/"),

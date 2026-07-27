@@ -253,6 +253,9 @@ public final class HddsUtils {
    * @return a 5-element array: {host, port, role, id, hostIP}
    */
   public static String[] parseRatisRoleString(String roleString) {
+    Preconditions.checkArgument(roleString != null && !roleString.isEmpty(),
+        "Role string must not be null or empty");
+
     // Parse from the right: the last field is hostIP (possibly bracketed),
     // then id (uuid, no colons), then role (LEADER/FOLLOWER, no colons),
     // and the remainder is host:port (which may be bracketed IPv6).
@@ -260,28 +263,38 @@ public final class HddsUtils {
 
     // Field 5: hostIP — may be bracketed IPv6 like [2001:db8::1]
     String hostIp;
-    if (idx > 0 && roleString.charAt(idx - 1) == ']') {
+    if (roleString.charAt(idx - 1) == ']') {
       int bracket = roleString.lastIndexOf('[');
+      Preconditions.checkArgument(bracket > 0,
+          "Malformed role string (unmatched bracket): %s", roleString);
       hostIp = roleString.substring(bracket + 1, idx - 1);
-      idx = bracket - 1; // skip the ':' before '['
+      idx = bracket - 1;
     } else {
       int sep = roleString.lastIndexOf(':');
+      Preconditions.checkArgument(sep > 0,
+          "Malformed role string (expected host:port:role:id:hostIP): %s", roleString);
       hostIp = roleString.substring(sep + 1);
       idx = sep;
     }
 
     // Field 4: id (uuid or peer id, no colons)
     int sep3 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep3 > 0,
+        "Malformed role string (cannot find id field): %s", roleString);
     String id = roleString.substring(sep3 + 1, idx);
     idx = sep3;
 
     // Field 3: role (LEADER/FOLLOWER, no colons)
     int sep2 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep2 > 0,
+        "Malformed role string (cannot find role field): %s", roleString);
     String role = roleString.substring(sep2 + 1, idx);
     idx = sep2;
 
     // Remainder is host:port — use HostAndPort to parse safely
     String hostPort = roleString.substring(0, idx);
+    Preconditions.checkArgument(!hostPort.isEmpty(),
+        "Malformed role string (empty host:port): %s", roleString);
     HostAndPort hp = HostAndPort.fromString(hostPort);
     String host = hp.getHost();
     String port = String.valueOf(hp.getPort());
