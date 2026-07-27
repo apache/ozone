@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.protobuf.Message;
 import java.util.List;
@@ -38,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -97,17 +94,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
-      LayoutVersionProto versionInfo = null;
-      if (!heartbeat.hasDataNodeLayoutVersion()) {
-        // Backward compatibility to make sure old Datanodes can still talk to
-        // SCM.
-        versionInfo = toVersionProto(INITIAL_VERSION, INITIAL_VERSION);
-      } else {
-        versionInfo = heartbeat.getDataNodeLayoutVersion();
+      // Process the last known version reported by the datanode only when attached.
+      if (heartbeat.hasDatanodeVersion()) {
+        LOG.debug("Processing DataNode version report.");
+        nodeManager.processVersionReport(datanodeDetails, heartbeat.getDatanodeVersion());
       }
-
-      LOG.debug("Processing DataNode Layout Report.");
-      nodeManager.processVersionReport(datanodeDetails, versionInfo);
 
       CommandQueueReportProto commandQueueReport = null;
       if (heartbeat.hasCommandQueueReport()) {
@@ -247,18 +238,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public Map<SCMCommandProto.Type, Integer> getCommandsToBeSent() {
       return commandsToBeSent;
-    }
-  }
-
-  /**
-   * Layout report event payload with origin.
-   */
-  public static class LayoutReportFromDatanode
-      extends ReportFromDatanode<LayoutVersionProto> {
-
-    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
-                                  LayoutVersionProto report) {
-      super(datanodeDetails, report);
     }
   }
 

@@ -27,7 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
@@ -108,10 +108,10 @@ public final class RegisterEndpointTask implements
 
       if (rpcEndPoint.getState()
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
-        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(
+        DatanodeVersionProto versionInfo = DatanodeVersionProto.newBuilder()
+            .setApparentVersion(
                 versionManager.getApparentVersion().serialize())
-            .setSoftwareLayoutVersion(
+            .setSoftwareVersion(
                 versionManager.getSoftwareVersion().serialize())
             .build();
         ContainerReportsProto containerReport =
@@ -122,7 +122,7 @@ public final class RegisterEndpointTask implements
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getExtendedProtoBufMessage(),
-            nodeReport, containerReport, pipelineReportsProto, layoutInfo);
+            nodeReport, containerReport, pipelineReportsProto, versionInfo);
         Preconditions.assertEquals(datanodeDetails.getUuidString(), response.getDatanodeUUID(), "datanodeID");
         Preconditions.assertTrue(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");

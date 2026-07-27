@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -128,13 +128,13 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
-      LayoutVersionProto versionInfo = toVersionProto(
+      DatanodeVersionProto versionInfo = toVersionProto(
           versionManager.getApparentVersion(),
           versionManager.getSoftwareVersion());
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
-          .setDataNodeLayoutVersion(versionInfo);
+          .setDatanodeVersion(versionInfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
@@ -363,9 +363,9 @@ public class HeartbeatEndpointTask
         processCommonCommand(commandResponseProto,
             setNodeOperationalStateCommand);
         break;
-      case finalizeNewLayoutVersionCommand:
+      case finalizeNewDatanodeVersionCommand:
         FinalizeVersionCommand finalizeVersionCommand =
-            FinalizeVersionCommand.getFromProtobuf(commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+            FinalizeVersionCommand.getFromProtobuf(commandResponseProto.getFinalizeNewDatanodeVersionCommandProto());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM finalize command {}", finalizeVersionCommand.getId());
         }

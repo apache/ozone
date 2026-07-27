@@ -816,7 +816,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
           .newBuilder()
           .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
           .setContainerReport(containerReport)
-          .setDataNodeLayoutVersion(UpgradeUtils.defaultVersionProto())
+          .setDatanodeVersion(UpgradeUtils.defaultVersionProto())
           .build();
       datanodeScmClient.sendHeartbeat(heartbeatRequest);
       // scm commands are ignored

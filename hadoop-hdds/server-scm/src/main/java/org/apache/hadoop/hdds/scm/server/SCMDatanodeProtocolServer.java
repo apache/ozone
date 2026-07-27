@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.createPipelineCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.refreshVolumeUsageInfo;
@@ -58,7 +58,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -230,7 +230,7 @@ public class SCMDatanodeProtocolServer implements
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo)
+      DatanodeVersionProto versionInfo)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
@@ -241,7 +241,7 @@ public class SCMDatanodeProtocolServer implements
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
         .register(datanodeDetails, nodeReport, pipelineReportsProto,
-            layoutInfo);
+            versionInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,
@@ -419,10 +419,10 @@ public class SCMDatanodeProtocolServer implements
             .setSetNodeOperationalStateCommandProto(
                 ((SetNodeOperationalStateCommand)cmd).getProto())
             .build();
-    case finalizeNewLayoutVersionCommand:
+    case finalizeNewDatanodeVersionCommand:
       return builder
-            .setCommandType(finalizeNewLayoutVersionCommand)
-            .setFinalizeNewLayoutVersionCommandProto(
+            .setCommandType(finalizeNewDatanodeVersionCommand)
+            .setFinalizeNewDatanodeVersionCommandProto(
                 ((FinalizeVersionCommand)cmd).getProto())
             .build();
     case refreshVolumeUsageInfo:

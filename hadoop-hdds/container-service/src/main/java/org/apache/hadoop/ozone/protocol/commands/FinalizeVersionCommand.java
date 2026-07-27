@@ -18,32 +18,25 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewDatanodeVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
 /**
  * Asks DataNode to finalize new upgrade version.
  */
 public class FinalizeVersionCommand
-    extends SCMCommand<FinalizeNewLayoutVersionCommandProto> {
+    extends SCMCommand<FinalizeNewDatanodeVersionCommandProto> {
 
-  private boolean finalizeUpgrade = false;
-  private LayoutVersionProto versionInfo;
+  private final int expectedSoftwareVersion;
 
-  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
-                                LayoutVersionProto versionInfo,
-                                long id) {
+  public FinalizeVersionCommand(int expectedSoftwareVersion, long id) {
     super(id);
-    finalizeUpgrade = finalizeNewLayoutVersion;
-    this.versionInfo = versionInfo;
+    this.expectedSoftwareVersion = expectedSoftwareVersion;
   }
 
-  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
-                                LayoutVersionProto versionInfo) {
+  public FinalizeVersionCommand(int expectedSoftwareVersion) {
     super();
-    finalizeUpgrade = finalizeNewLayoutVersion;
-    this.versionInfo = versionInfo;
+    this.expectedSoftwareVersion = expectedSoftwareVersion;
   }
 
   /**
@@ -53,24 +46,22 @@ public class FinalizeVersionCommand
    */
   @Override
   public SCMCommandProto.Type getType() {
-    return SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+    return SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
   }
 
   @Override
-  public FinalizeNewLayoutVersionCommandProto getProto() {
-    return FinalizeNewLayoutVersionCommandProto.newBuilder()
-        .setFinalizeNewLayoutVersion(finalizeUpgrade)
+  public FinalizeNewDatanodeVersionCommandProto getProto() {
+    return FinalizeNewDatanodeVersionCommandProto.newBuilder()
+        .setExpectedSoftwareVersion(expectedSoftwareVersion)
         .setCmdId(getId())
-        .setDataNodeLayoutVersion(versionInfo)
         .build();
   }
 
   public static FinalizeVersionCommand getFromProtobuf(
-      FinalizeNewLayoutVersionCommandProto finalizeProto) {
+      FinalizeNewDatanodeVersionCommandProto finalizeProto) {
     Objects.requireNonNull(finalizeProto, "finalizeProto == null");
     return new FinalizeVersionCommand(
-        finalizeProto.getFinalizeNewLayoutVersion(),
-        finalizeProto.getDataNodeLayoutVersion(), finalizeProto.getCmdId());
+        finalizeProto.getExpectedSoftwareVersion(), finalizeProto.getCmdId());
   }
 
   @Override
@@ -81,8 +72,7 @@ public class FinalizeVersionCommand
         .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
-        .append(", finalizeUpgrade: ").append(finalizeUpgrade)
-        .append(", versionInfo: ").append(versionInfo);
+        .append(", expectedSoftwareVersion: ").append(expectedSoftwareVersion);
     return sb.toString();
   }
 }

@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getRandomPipelineReports;
@@ -78,7 +78,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -266,7 +266,7 @@ public class TestSCMNodeManager {
    * @return The created {@link DatanodeDetails}.
    */
   private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager,
-      LayoutVersionProto layout, ErrorCode expectedResult) {
+      DatanodeVersionProto versionInfo, ErrorCode expectedResult) {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport =
@@ -280,7 +280,7 @@ public class TestSCMNodeManager {
         MockDatanodeDetails.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
             Arrays.asList(metadataStorageReport)),
-        getRandomPipelineReports(), layout);
+        getRandomPipelineReports(), versionInfo);
 
     assertEquals(expectedResult, cmd.getError());
     return cmd.getDatanode();
@@ -630,9 +630,9 @@ public class TestSCMNodeManager {
       // Report a pre-finalized datanode.
       int softwareVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
       nodeManager.processVersionReport(node,
-          LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
-              .setSoftwareLayoutVersion(softwareVersion)
+          DatanodeVersionProto.newBuilder()
+              .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+              .setSoftwareVersion(softwareVersion)
               .build());
       assertEquals(0, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
@@ -640,9 +640,9 @@ public class TestSCMNodeManager {
 
       // Report a finalized datanode.
       nodeManager.processVersionReport(node,
-          LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(softwareVersion)
-              .setSoftwareLayoutVersion(softwareVersion)
+          DatanodeVersionProto.newBuilder()
+              .setApparentVersion(softwareVersion)
+              .setSoftwareVersion(softwareVersion)
               .build());
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
@@ -661,7 +661,7 @@ public class TestSCMNodeManager {
           "Finalized registration should increment finalized count");
 
 
-      LayoutVersionProto preFinalizedVersionProto =
+      DatanodeVersionProto preFinalizedVersionProto =
           toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSVersion.SOFTWARE_VERSION);
       DatanodeDetails nonFinalizedNode =
           registerWithCapacity(nodeManager, preFinalizedVersionProto, success);
@@ -740,9 +740,16 @@ public class TestSCMNodeManager {
             errorNodeNotPermitted, false),
         // Newer DN rejected, even though its apparent version matches SCM.
         Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            errorNodeNotPermitted, false),
+        // DN that does not report any version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION, null, errorNodeNotPermitted, false),
+        // DN that reports an incomplete version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            DatanodeVersionProto.newBuilder()
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build(),
             errorNodeNotPermitted, false),
 
         /* SCM FINALIZED */
@@ -761,16 +768,16 @@ public class TestSCMNodeManager {
             success, false),
         // Newer DN rejected, even though its apparent version matches SCM.
         Arguments.of(HDDSVersion.SOFTWARE_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
             errorNodeNotPermitted, false)
     );
   }
 
   @ParameterizedTest
   @MethodSource("scmDatanodeVersionCombinations")
-  public void testDatanodeFencingOnRegister(ComponentVersion scmApparent, LayoutVersionProto dnVersionProto,
+  public void testDatanodeFencingOnRegister(ComponentVersion scmApparent, DatanodeVersionProto dnVersionProto,
       ErrorCode expectedResult, boolean expectFinalizeCmd) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
@@ -795,7 +802,7 @@ public class TestSCMNodeManager {
         if (expectFinalizeCmd) {
           verify(eventPublisher, times(1)).fireEvent(eq(DATANODE_COMMAND), captor.capture());
           assertEquals(node.getID(), captor.getValue().getDatanodeId());
-          assertEquals(finalizeNewLayoutVersionCommand, captor.getValue().getCommand().getType());
+          assertEquals(finalizeNewDatanodeVersionCommand, captor.getValue().getCommand().getType());
         } else {
           verify(eventPublisher, times(0)).fireEvent(eq(DATANODE_COMMAND), captor.capture());
         }
@@ -901,7 +908,7 @@ public class TestSCMNodeManager {
     DatanodeDetails node1 = MockDatanodeDetails.randomDatanodeDetails();
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         node1.getID(), node1.getNetworkFullPath(), Long.MAX_VALUE);
-    LayoutVersionProto preFinalizedDNVersion =
+    DatanodeVersionProto preFinalizedDNVersion =
         toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION);
     nodeManager.register(node1,
         HddsTestUtils.createNodeReport(Collections.singletonList(storageReport), emptyList()),
