@@ -110,9 +110,10 @@ class TestDatanodeHddsVolumeFailureDetection {
     if (!volumeSet.getVolumesList().isEmpty()) {
       return;
     }
-    // A schema V3 volume failure closes the shared DB, which requires a
-    // datanode restart. Schema V2 uses per-container DBs, so restoring the
-    // volume to the active map is sufficient for the next test.
+    // A schema V3 volume failure closes the shared DB, which requires a datanode restart.
+    // Schema V2 uses per-container DBs, so reactivate the volume to avoid the restart cost.
+    // It intentionally remains in failedVolumeMap: later tests use the active map, the next
+    // failure replaces the entry for the same path, and this cluster is closed after this invocation.
     if (schemaV3) {
       cluster.restartHddsDatanode(0, true);
       return;
@@ -289,8 +290,6 @@ class TestDatanodeHddsVolumeFailureDetection {
    * test to reach the helper method {@link HddsVolume#checkDbHealth}.
    * As a workaround, we test the helper method directly.
    * As we test the helper method directly, we cannot test for schemas older than V3.
-   *
-   * @throws Exception
    */
   @Test
   void corruptDbFileWithoutDbHandleCacheInvalidation() throws Exception {
@@ -369,8 +368,8 @@ class TestDatanodeHddsVolumeFailureDetection {
     ozoneConfig.setInt(OZONE_CONTAINER_CACHE_SIZE, 1);
     ozoneConfig.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100, TimeUnit.MILLISECONDS);
     ozoneConfig.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    ozoneConfig.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, TimeUnit.SECONDS);
-    ozoneConfig.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, TimeUnit.SECONDS);
+    ozoneConfig.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    ozoneConfig.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
     if (!schemaV3) {
       ContainerTestUtils.disableSchemaV3(ozoneConfig);
     }
