@@ -344,7 +344,10 @@ public abstract class EndpointBase {
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
         if (mapKey.regionMatches(true, 0, RESERVED_USER_METADATA_KEY_PREFIX, 0,
             RESERVED_USER_METADATA_KEY_PREFIX.length())) {
-          throw newError(INVALID_ARGUMENT, key);
+          OS3Exception ex = newError(INVALID_ARGUMENT, key);
+          ex.setErrorMessage("User metadata keys must not start with the reserved prefix "
+              + RESERVED_USER_METADATA_KEY_PREFIX);
+          throw ex;
         }
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");

@@ -125,6 +125,7 @@ public class TestEndpointBase {
     OS3Exception e = assertThrows(OS3Exception.class, () -> endpointBase
         .getCustomMetadataFromHeaders(s3requestHeaders));
     assertThat(e.getCode()).contains(INVALID_ARGUMENT.getCode());
+    assertThat(e.getErrorMessage()).contains(RESERVED_USER_METADATA_KEY_PREFIX);
   }
 
   private static Stream<String> reservedInternalMetadataKeyPrefixCases() {

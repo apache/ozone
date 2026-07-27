@@ -526,8 +526,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * Store standard S3 object headers from the PUT request in key metadata.
    */
   private void putStandardObjectHeaders(Map<String, String> metadata) {
-    for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-      String headerName = entry.getKey();
+    for (String headerName : overrideQueryParameter.keySet()) {
       String value = getHeaders().getHeaderString(headerName);
       if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
         value = normalizeContentEncoding(value);
