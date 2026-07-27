@@ -3356,24 +3356,32 @@ class TestKeyLifecycleService extends OzoneTestBase {
       throws Exception {
     OzoneConfiguration omConf = new OzoneConfiguration();
     omConf.set(OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(omConf, null);
+    OMMetadataManager realMetadataManager = new OmMetadataManagerImpl(omConf, null);
     try {
       String uploadA = OMMultipartUploadUtils.getMultipartUploadId();
       String uploadB = OMMultipartUploadUtils.getMultipartUploadId();
       String uploadC = OMMultipartUploadUtils.getMultipartUploadId();
 
-      addSplitSchemaPart(omMetadataManager, uploadA, 1);
-      addSplitSchemaPart(omMetadataManager, uploadA, 2);
-      addSplitSchemaPart(omMetadataManager, uploadC, 1);
+      addSplitSchemaPart(realMetadataManager, uploadA, 1);
+      addSplitSchemaPart(realMetadataManager, uploadA, 2);
+      addSplitSchemaPart(realMetadataManager, uploadC, 1);
 
-      OMMetadataManager mockMM = Mockito.spy(omMetadataManager);
-      Table<OmMultipartPartKey, OmMultipartPartInfo> mockPartsTable =
-          Mockito.spy(omMetadataManager.getMultipartPartsTable());
-      when(mockMM.getMultipartPartsTable()).thenReturn(mockPartsTable);
-      when(mockPartsTable.iterator(eq(OmMultipartPartKey.prefix(uploadB))))
-          .thenThrow(new RocksDatabaseException("simulated corruption"));
+      // Spy only the lightweight parts table and inject an IOException for
+      // uploadB's prefix scan to simulate a corrupt read; uploadA and uploadC
+      // fall through to the real table with real data. doThrow(...).when(...)
+      // is used (not when(...).thenThrow(...)) so the real iterator() is not
+      // invoked during stubbing, which would leak a native RocksDB iterator
+      // and block getStore().close().
+      Table<OmMultipartPartKey, OmMultipartPartInfo> spyPartsTable =
+          Mockito.spy(realMetadataManager.getMultipartPartsTable());
+      Mockito.doThrow(new RocksDatabaseException("simulated corruption"))
+          .when(spyPartsTable).iterator(eq(OmMultipartPartKey.prefix(uploadB)));
+
+      OMMetadataManager mockMM = Mockito.mock(OMMetadataManager.class);
+      when(mockMM.getMultipartPartsTable()).thenReturn(spyPartsTable);
 
       assertEquals(2, OMMultipartUploadUtils.countParts(mockMM, uploadA));
+      assertEquals(1, OMMultipartUploadUtils.countParts(mockMM, uploadC));
       assertThrows(IOException.class,
           () -> OMMultipartUploadUtils.countParts(mockMM, uploadB));
 
@@ -3391,7 +3399,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(2, list.size()); // uploadA and uploadC only
       assertEquals(3, list.getPartCount()); // 2 (uploadA) + 1 (uploadC)
     } finally {
-      omMetadataManager.getStore().close();
+      realMetadataManager.getStore().close();
     }
   }
 
