@@ -44,9 +44,10 @@ author: Abhishek Pal
    * [7.4 UserInfo change and UGI construction](#74-userinfo-change-and-ugi-construction)
    * [7.5 OMRequest wire extension](#75-omrequest-wire-extension)
 8. [Token Signing and Verification](#8-token-signing-and-verification)
-   * [8.1 Signing algorithm](#81-signing-algorithm)
+   * [8.1 Signing algorithm and key source](#81-signing-algorithm-and-key-source)
    * [8.2 Signing input](#82-signing-input)
    * [8.3 Verification at OM](#83-verification-at-om)
+   * [8.4 SCM secret-key integration](#84-scm-secret-key-integration)
 9. [Phase 1 — OzoneFS / Hadoop-RPC Clients](#9-phase-1--ozonefs--hadoop-rpc-clients)
 10. [Phase 2 — S3 Gateway](#10-phase-2--s3-gateway)
 11. [Edge Cases and Security Considerations](#11-edge-cases-and-security-considerations)
@@ -158,16 +159,15 @@ OM trusts the *identity* the token asserts (subject and groups) because the sign
 
 ### 3.2 Module structure
 
-- **`hadoop-ozone/ozone-custos-common`**: shared library containing the `CustosTokenProto` definition, `CustosTokenVerifier`, and the provider plugin interfaces (`CustosProvider`, `CustosCredential`, `CustosIdentity`, `CustosException`). Depended on by both Custos and OM. OM needs only the verifier and the token type; it does not depend on the provider implementations.
-- **`hadoop-ozone/ozone-custos`**: the standalone Custos service process — the gRPC server, the provider implementations, provider loading, token issuance and signing, audit, and metrics.
-
-Splitting the verifier and token type into a common module keeps OM's dependency surface small: OM links only against `ozone-custos-common`, so provider dependencies (for example a JWKS/OIDC client) never enter the OM classpath.
+- **`hadoop-ozone/ozone-custos-common`**: shared library containing the `CustosTokenProto` definition, the `CustosTokenSigner` interface (with the shared `computeSigningInput` used by both signing and verification), and the provider plugin interfaces (`CustosProvider`, `IdentityProvider`, `CustosCredential`, `CustosIdentity`, `CustosException`). Depended on by both Custos and OM.
+- **`hadoop-ozone/ozone-custos`**: the standalone Custos service process — the gRPC server, the provider and identity-provider implementations, provider loading, the SCM-backed token signer, token issuance, audit, and metrics. Depends on `hadoop-hdds/framework` for the SCM `SecretKeyClient` (see [Section 8.4](#84-scm-secret-key-integration)).
+- **OM** owns its own `CustosTokenVerifier` (in the `ozone-manager` module). OM links only against `ozone-custos-common` for the token type and `computeSigningInput`, and verifies with the SCM `SecretKeyClient` it already holds — so the Custos provider dependencies (for example a JWKS/OIDC client) never enter the OM classpath.
 
 ### 3.3 Deployment and scaling
 
 Custos is stateless.
 It holds no per-client session state: a token is self-describing and is verified from its signature alone.
-All signing and verification use the symmetric key that SCM already distributes through `SecretKeyClient` / `ManagedSecretKey`, so any Custos instance can issue a token that any OM can verify, and OM never has to reach a *specific* Custos instance.
+All signing and verification use the symmetric key that SCM distributes through `SecretKeyClient` / `ManagedSecretKey` ([Section 8.4](#84-scm-secret-key-integration)), so any Custos instance can issue a token that any OM can verify, and OM never has to reach a *specific* Custos instance.
 
 Because there is no shared state to coordinate, Custos can run as a single instance for a small cluster or as several independent instances behind a load balancer for availability and throughput.
 Instance count is independent of the OM count; Custos does not join the OM Ratis ring.
@@ -243,7 +243,7 @@ It is multi-use, has a longer TTL, and carries the driver's groups.
 The token is session-scoped rather than per-operation on purpose: a single filesystem operation already spans several OM RPCs (open, get key info, commit, and so on), and a job issues many such operations, so a per-operation token would force a Custos round trip on the hot path.
 A session-scoped multi-use token matches how the delegation token works today, and how AWS STS session credentials work.
 YARN distributes it to executors exactly as before — it is still a `Token<>` inside `Credentials`.
-Executors put it in `OMRequest.custosToken` (field 150, a high field number chosen to avoid collision with other in-flight `OMRequest` fields).
+Executors put it in `OMRequest.custosToken` (field 154, the next free `OMRequest` field number).
 OM verifies the signature locally.
 No executor contacts Custos.
 The renewer calls the Custos renew endpoint instead of the delegation token renew path.
@@ -270,33 +270,41 @@ The client sees no difference — the same keys and the same requests keep worki
 
 ## 6. Custos Provider Interface
 
-The pluggable provider model is the core of Custos.
-Every credential type is validated by a `CustosProvider`, and Custos picks the provider from the credential type.
-Custos owns this contract; it is not tied to any single feature or credential type.
+The pluggable provider model is the core of Custos, split into two contracts so that credential *validation* and identity *enrichment* can vary independently.
+
+**Authentication — `CustosProvider`.**
+A `CustosProvider` validates one credential type and returns the authenticated subject (a principal name). Custos selects the provider from the credential type.
 
 ```java
 public interface CustosProvider {
-  CustosIdentity authenticate(CustosCredential credential)
+  String validateSubject(CustosCredential credential)
       throws CustosException;
 }
 ```
 
-- `CustosCredential` is the input. It carries the credential type and the raw credential material — a bearer token, a SPNEGO token, or S3 SigV4 material. A single input type lets Custos route on type without special-casing any provider.
-- `CustosIdentity` is the result. Its fields are `subject`, `groups`, `roles`, `issuer`, `authMethod`, `authenticatedAt`, and `expiresAt`.
+**Identity resolution — `IdentityProvider`.**
+Once a subject is authenticated, an `IdentityProvider` resolves the full `CustosIdentity` for it — the groups and roles that go into the token. Keeping this separate lets, for example, a SPNEGO credential be validated by `KerberosProvider` while groups are resolved by `KerberosIdentityProvider` (Hadoop group mapping), or an OIDC credential be validated once and enriched from a directory.
 
-Custos ships these providers:
+- `CustosCredential` is the single input to `CustosProvider`. It carries the credential type and the raw credential material — a bearer token, a SPNEGO token, or S3 SigV4 material — so all providers share one input and Custos can route on type without special-casing.
+- `CustosIdentity` is the result of identity resolution. Its fields are `subject`, `groups`, `roles`, `issuer`, `authMethod`, `authenticatedAt`, and `expiresAt`.
 
-| Provider class | Credential type | Validation |
-|:---------------|:----------------|:-----------|
-| `OidcProvider` | OIDC JWT (bearer token) | Validate the JWT against a JWKS endpoint (RSA keys only, reject `alg=none`). Groups and roles come from the token claims. |
-| `KerberosProvider` | SPNEGO token | Accept the client SPNEGO token with the Custos service keytab (`ozone.custos.kerberos.keytab`). The service principal travels in the credential from the client; Custos does not read a principal config locally. Group resolution is handled by `KerberosIdentityProvider`. |
-| `S3SecretProvider` | SigV4 static key | Look up the secret with `S3SecretManager.getSecretString(accessId)` and verify the HMAC with `AWSV4AuthValidator.validateRequest()`. |
-| `DelegationTokenProvider` | `Token<OzoneTokenIdentifier>` | `OzoneDelegationTokenSecretManager.retrievePassword()`. Lets existing delegation-token holders work through the same contract. |
+Custos ships these providers (authentication) and identity providers (resolution):
 
-Two pieces of machinery hold this together:
+| Provider | Credential / role | Behavior |
+|:---------|:------------------|:---------|
+| `KerberosProvider` (auth) | SPNEGO token | Accept the client SPNEGO token with the Custos service keytab (`ozone.custos.kerberos.keytab`). The service principal travels in the credential from the client. |
+| `OidcProvider` (auth) | OIDC JWT (bearer token) | Validate the JWT against a JWKS endpoint (RSA keys only, reject `alg=none`); the subject and claims come from the token. |
+| `S3SecretProvider` (auth) | SigV4 static key | Look up the secret with `S3SecretManager.getSecretString(accessId)` and verify the HMAC with `AWSV4AuthValidator.validateRequest()`. |
+| `DelegationTokenProvider` (auth) | `Token<OzoneTokenIdentifier>` | `OzoneDelegationTokenSecretManager.retrievePassword()`, letting existing delegation-token holders work through the same contract. |
+| `KerberosIdentityProvider` (identity) | subject → groups | Resolve groups through Hadoop's `GroupMappingServiceProvider`. |
+| `OidcIdentityProvider` / `LdapIdentityProvider` (identity) | subject → groups/roles | Resolve from JWT claims or an LDAP directory. |
 
-- **Config-driven provider loading.** Custos loads providers from a config key `ozone.custos.providers` (a comma-separated list of class names), following the same pattern Ozone already uses for `ozone.acl.authorizer.class`. A `ServiceLoader`-based mechanism can be added later ([Section 13](#13-future-work)).
-- **One credential input type.** `CustosCredential` must be able to carry every credential type — a bearer token, a SPNEGO token, or S3 SigV4 material — so all providers share a single input and Custos can route on type without special-casing.
+Two config keys drive loading, both comma-separated class-name lists in the pattern Ozone already uses for `ozone.acl.authorizer.class`:
+
+- `ozone.custos.providers` — the authentication `CustosProvider`s.
+- `ozone.custos.identity.providers` — the `IdentityProvider`s.
+
+A `ServiceLoader`-based mechanism can be added later ([Section 13](#13-future-work)).
 
 The whole feature is gated behind `ozone.custos.enabled`.
 When it is off, none of the paths below are active and Ozone behaves exactly as it does today.
@@ -338,10 +346,10 @@ There is deliberately no `cmdType`, `resourceScope`, `allowedAction`, or policy 
 
 | Field | Verification / use at OM | Purpose |
 |:------|:-------------------------|:--------|
-| `subject` | Becomes the request identity | Maps to `UserInfo.userName` |
-| `groups` | Set on the constructed UGI | Group membership without an out-of-band lookup |
+| `subject` | Becomes the request identity in `UserInfo.userName`; `createUGI` maps it through `hadoop.security.auth_to_local` | Full principal, mapped to the effective user exactly as a native Kerberos RPC |
+| `groups` | Recorded in `UserInfo.groups` and replicated with the request | Group membership carried without an out-of-band lookup |
 | `audience` | Must match this OM's service/cluster id | Prevents cross-cluster token reuse |
-| `expiryMs` | Must be in the future vs. the leader transaction timestamp (with clock skew tolerance) | Natural expiry |
+| `expiryMs` | Must be in the future when the OM leader verifies the token | Natural expiry |
 | `issuedAtMs` / `maxLifetimeMs` | Renewal is refused past `issuedAtMs + maxLifetimeMs` | Bounds total token lifetime |
 | `tokenId` | Not replayed (write ops); revocation lookup | Duplicate-mutation and revocation control |
 | `signature` | HMAC verified with the SCM key named by `signingKeyId` | Integrity and authenticity |
@@ -354,72 +362,77 @@ It is added to every `OMRequest` as an optional field, and on write requests it 
 
 ### 7.4 UserInfo change and UGI construction
 
-So OM can build a `UserGroupInformation` that includes groups, add a `groups` field to `UserInfo`.
-Field number 2 is currently free:
+`UserInfo` carries a `groups` field (field 2) so the token's groups travel with the request:
 
 ```protobuf
 message UserInfo {
     optional string userName = 1;
-    repeated string groups = 2;       // NEW
+    repeated string groups = 2;
     optional string remoteAddress = 3;
     optional string hostName = 4;
 }
 ```
 
-Then extend `OMClientRequest.createUGI()` so that, when the request was verified from a `CustosToken`, it sets these groups on the UGI instead of leaving them empty.
-Today the method sets only the user name:
+When a request is verified from a `CustosToken`, OM builds the request identity from the token: the token `subject` becomes `UserInfo.userName` and the token `groups` become `UserInfo.groups`.
+This `UserInfo` is what OM replicates through Ratis and later reconstructs on apply.
+
+`OMClientRequest.createUGI()` builds the `UserGroupInformation` from the subject:
 
 ```java
 userGroupInformation = UserGroupInformation.createRemoteUser(
     getUserInfo().getUserName());
 ```
 
-With the change, the groups carried in the token flow into the UGI, so the existing ACL-check path has group membership available without a separate Ranger group lookup.
+The subject is the full authenticated principal (for example `user/host@REALM`), and `createRemoteUser` maps it to the effective user through OM's `hadoop.security.auth_to_local` rules — the same mapping a native Kerberos RPC uses. The token's `groups` are carried in `UserInfo` for identity and audit; making them the authoritative source for ACL group membership (in place of OM's configured group mapping) is future work.
 
 ### 7.5 OMRequest wire extension
 
-`OMRequest` gains one new optional field:
+`OMRequest` gains one new optional field carrying the serialized `CustosTokenProto` as raw bytes:
 
 ```protobuf
 message OMRequest {
   // ... existing fields unchanged ...
 
-  // Token issued by Custos. When present, OM uses it for identity.
-  // When absent, OM falls back to the existing Kerberos / S3Authentication paths.
-  optional CustosTokenProto custosToken = 150;
+  // Serialized CustosTokenProto issued by Custos. When present, OM uses it for
+  // identity; when absent, OM falls back to the existing Kerberos /
+  // S3Authentication paths.
+  optional bytes custosToken = 154;
 }
 ```
 
-Field 150 is a deliberately high number, chosen to stay clear of other in-flight `OMRequest` fields so the two can merge in either order.
+The token is carried as `bytes` rather than a typed `CustosTokenProto` field so that `interface-client` (where `OMRequest` is defined) needs no build dependency on `ozone-custos-common`. OM parses the bytes with `CustosTokenProto.parseFrom(...)` on the request path.
+Field 154 is the next free `OMRequest` field number.
 The field is optional, so a client that never sets it behaves exactly as today.
 
 ---
 
 ## 8. Token Signing and Verification
 
-### 8.1 Signing algorithm
+### 8.1 Signing algorithm and key source
 
-Custos signs with **HMAC-SHA256**.
+Custos signs the token with **HMAC-SHA256**, keyed by an **SCM-managed symmetric secret key**.
+The key is never configured or shared out of band: both Custos and OM obtain `ManagedSecretKey`s from SCM's secret-key service through a `SecretKeyClient`, the same infrastructure Ozone delegation tokens and block tokens use. Section [8.4](#84-scm-secret-key-integration) covers how Custos is authorized to fetch these keys.
 
 | Aspect | Choice | Rationale |
 |:-------|:-------|:----------|
-| Algorithm | HMAC-SHA256 | Fast to verify; OM verifies it on every request, including the Ratis apply path |
-| Key distribution | SCM `SecretKeyClient` / `ManagedSecretKey` | Already exists and already distributes symmetric keys to Ozone services |
-| Key rotation | SCM-managed, grace-period overlap | Both the old and the new key are accepted during the rotation window (see [Section 11](#11-edge-cases-and-security-considerations)) |
+| Algorithm | HMAC-SHA256 | Fast to verify; OM verifies it on every request |
+| Key source | SCM-managed `ManagedSecretKey` fetched via `SecretKeyClient` | Reuses SCM key distribution and rotation; no key material in configuration |
+| Key selection | `signingKeyId` = the SCM key's id, stamped into the token | The verifier looks up the exact key by id instead of trying keys; lets rotation and revocation target a specific key |
+| Key rotation | SCM-managed, grace-period overlap | Both the old and the new key verify during the rotation window (see [Section 11](#11-edge-cases-and-security-considerations)) |
 
-The token records `signingKeyId`, so a verifier looks up the exact key that signed it rather than trying keys.
-This also removes any incentive to make the key guessable and lets revocation target a specific key id.
+Custos signs with SCM's **current** key (`SecretKeyClient.getCurrentSecretKey()`); OM verifies by looking up the key the token names (`SecretKeyClient.getSecretKey(signingKeyId)`). Because the key is chosen by id, there is no incentive to make it guessable.
 
 ### 8.2 Signing input
 
-The signing input is the protobuf serialization of the token with the signature-related fields cleared:
+The signing input is the protobuf serialization of the token with the signature-related fields cleared.
+It is a static method on the `CustosTokenSigner` interface in `ozone-custos-common`, so the Custos signer and the OM verifier compute over identical bytes:
 
 ```java
-public byte[] computeSigningInput(CustosTokenProto.Builder token) {
-  return token.clone()
+static byte[] computeSigningInput(CustosTokenProto token) {
+  return token.toBuilder()
       .clearSignature()
-      .clearSigningKeyId()
       .clearSignatureAlgorithm()
+      .clearSigningKeyId()
       .build()
       .toByteArray();
 }
@@ -427,27 +440,75 @@ public byte[] computeSigningInput(CustosTokenProto.Builder token) {
 
 ### 8.3 Verification at OM
 
-`CustosTokenVerifier` runs entirely locally and makes no network calls, so it is safe on the Ratis apply path:
+Custos signs a freshly built token with the current SCM key and stamps the key's id and algorithm into it:
 
 ```java
-public VerifiedIdentity verify(CustosTokenProto token, OMRequest request)
-    throws InvalidCustosTokenException {
-  verifySignature(token);   // HMAC with the SCM key named by signingKeyId
-  verifyExpiry(token);      // expiryMs in the future vs. the leader transaction timestamp
-  verifyAudience(token);    // audience matches this OM
-  // (write ops only) replay / revocation check on tokenId
-  return new VerifiedIdentity(token.getSubject(), token.getGroupsList(),
-      token.getAuthProvider());
+ManagedSecretKey key = secretKeyClient.getCurrentSecretKey();
+byte[] signature = key.sign(CustosTokenSigner.computeSigningInput(token));
+token = token.toBuilder()
+    .setSignature(ByteString.copyFrom(signature))
+    .setSignatureAlgorithm(key.getSecretKey().getAlgorithm())
+    .setSigningKeyId(key.getId().toString())
+    .build();
+```
+
+OM's `CustosTokenVerifier` looks the key up by `signingKeyId` and checks the HMAC and expiry, using the `SecretKeyClient` OM already holds:
+
+```java
+ManagedSecretKey key = secretKeyClient.getSecretKey(
+    UUID.fromString(token.getSigningKeyId()));
+if (key == null || !key.isValidSignature(
+        CustosTokenSigner.computeSigningInput(token),
+        token.getSignature().toByteArray())) {
+  throw new OMException("...", ResultCodes.INVALID_CUSTOS_TOKEN);
+}
+if (token.hasExpiryMs() && token.getExpiryMs() < now) {
+  throw new OMException("...", ResultCodes.INVALID_CUSTOS_TOKEN);
 }
 ```
 
 Key points:
 
-- **Expiry is checked against the leader-assigned transaction timestamp**, not the local wall clock of whichever follower is applying the log. Every OM applies the same log entry with the same timestamp, so all replicas reach the same expiry decision deterministically.
-- **Signature comparison uses `MessageDigest.isEqual()`** (constant-time). `Arrays.equals()` short-circuits on the first mismatched byte and leaks timing information about the expected signature.
-- A verification failure — expired, bad signature, wrong audience, unknown or revoked signing key, replay — returns a single new result code `INVALID_CUSTOS_TOKEN` on `OMException.ResultCodes`.
+- **Verification runs on the OM leader during request pre-processing** (`OMClientRequest.getUserIfNotExists`, in `preExecute`), before the request is submitted to Ratis. The verified `subject` and `groups` are recorded in `UserInfo` and replicated, so followers reconstruct the same identity from the replicated `UserInfo` without re-verifying.
+- **No network call is made to Custos**, and in steady state none to SCM either: the `SecretKeyClient` caches keys by id and refreshes them on a schedule.
+- **Signature comparison is constant-time** — `ManagedSecretKey.isValidSignature` uses `MessageDigest.isEqual`, which does not short-circuit on the first mismatched byte.
+- A verification failure — bad signature, unknown signing key, or expiry — returns the result code `INVALID_CUSTOS_TOKEN` on `OMException.ResultCodes`.
+- **Audience binding and write-replay protection** are planned hardening (see [Section 11](#11-edge-cases-and-security-considerations)); the fields (`audience`, `tokenId`) are present in the token for that purpose.
 
-After verification, OM builds the UGI from `subject` + `groups` ([Section 7.4](#74-userinfo-change-and-ugi-construction)) and runs its existing ACL checks against it.
+After verification, OM builds the UGI from `subject` ([Section 7.4](#74-userinfo-change-and-ugi-construction)) and runs its existing ACL checks against it.
+
+### 8.4 SCM secret-key integration
+
+Custos signing and OM verification both need the **same** SCM-managed symmetric key.
+SCM already serves such keys to OM, datanodes, and SCM itself over its secret-key protocol, authorized **per service identity**.
+Making Custos sign with these keys therefore requires SCM-side work: Custos becomes a first-class client of that protocol, with its own authorized identity.
+
+```
+                     ┌────────────────────────────────────────────┐
+                     │                    SCM                      │
+                     │   secret-key service (SCMSecretKeyProtocol) │
+                     │   one rotating ManagedSecretKey{ id, bytes }│
+                     └───▲───────────────────────────────▲─────────┘
+   SecretKeyProtocolCustos│ (Kerberos:                    │ SecretKeyProtocolOm
+   ACL: …secretkey.custos │  custos/_HOST)                │ (Kerberos: om/_HOST)
+                     ┌────┴─────┐                    ┌────┴─────┐
+                     │  Custos  │ sign w/ current key│    OM    │ verify by signingKeyId
+                     └──────────┘                    └──────────┘
+```
+
+**New SCM secret-key protocol for Custos.**
+- `SecretKeyProtocolCustos` / `SecretKeyProtocolCustosPB` (in `hadoop-hdds/framework`) sit alongside the existing `SecretKeyProtocolOm` / `SecretKeyProtocolDatanode` / `SecretKeyProtocolScm` and share the same `SCMSecretKeyProtocolService`; they differ only in Kerberos client-principal and ACL.
+- SCM registers the protocol on its security server (`SCMSecurityProtocolServer`, via `HddsServerUtil.addPBProtocol`) and authorizes it in `SCMPolicyProvider` under a new ACL key `hdds.security.client.scm.secretkey.custos.protocol.acl` (default `*`). When `hadoop.security.authorization=true`, a served protocol **must** appear in `SCMPolicyProvider` or SCM rejects the call; the ACL then restricts which principals may fetch keys through it. OM has the exact analogue (`…secretkey.om.protocol.acl`).
+- `HddsServerUtil.getSecretKeyClientForCustos(conf)` builds the client-side protocol translator.
+
+**Custos identity and key fetch.**
+- Custos authenticates to SCM with its **own Kerberos identity** — keytab `ozone.custos.kerberos.keytab`, principal `ozone.custos.kerberos.principal`. It logs in from the keytab at startup and runs its secret-key client under that identity. **No X.509 certificate is involved**; authentication to SCM is Kerberos.
+- Custos builds a `DefaultSecretKeyClient` over `getSecretKeyClientForCustos(...)`, starts it, then holds the `SecretKeyClient` used by the signer. The client fetches the current key at startup and polls SCM for rotation.
+
+**OM side.**
+- OM needs no new SCM protocol. It uses the `SecretKeyClient` it already holds (`SecretKeyProtocolOm`, exposed as `ozoneManager.getSecretKeyClient()`) to look up the key named by `signingKeyId`.
+
+Because Custos and OM each fetch from the one SCM key service through their individually-authorized protocols, a token Custos signs with the current key verifies at any OM by key id, and key rotation and revocation ride on SCM's existing key lifecycle — with no key material in configuration.
 
 ---
 
@@ -478,7 +539,7 @@ YARN distributes it the same way it distributes a delegation token.
 
 Executors receive the token in `Credentials`.
 A new `CustosTokenSelector` (modeled on `OzoneDelegationTokenSelector`) selects tokens of kind `CustosToken`.
-On the client side, `OzoneManagerProtocolClientSideTranslatorPB.submitRequest()` reads the token from the UGI and sets `OMRequest.custosToken` (field 150).
+On the client side, `OzoneManagerProtocolClientSideTranslatorPB.submitRequest()` reads the token from the UGI and sets the serialized token on `OMRequest.custosToken` (field 154).
 
 ### 9.4 Token renewal
 
@@ -494,17 +555,19 @@ When it is enabled but a request carries no `CustosToken`, OM falls back to the 
 
 ### 9.6 OM verification changes
 
-In the OM server-side translator, before the existing S3 auth check, add a token-verification step:
+When a request carries `custosToken`, OM parses the bytes and verifies the token during request identity resolution (`OMClientRequest.getUserIfNotExists`, in `preExecute` on the leader):
 
 ```java
-if (request.hasCustosToken()) {
-  custosTokenVerifier.verify(request.getCustosToken(), request);
-  // build UserInfo (with groups) from the verified token
+if (omRequest.hasCustosToken()) {
+  CustosTokenProto token =
+      CustosTokenProto.parseFrom(omRequest.getCustosToken().toByteArray());
+  custosTokenVerifier.verify(token);
+  // build UserInfo (userName + groups) from the verified token
 }
 ```
 
-`CustosTokenVerifier` runs entirely locally (see [Section 8.3](#83-verification-at-om)): it checks the HMAC signature, the expiry against the leader-assigned transaction timestamp, and the audience.
-It makes no network calls, so it is safe on the Ratis apply path.
+`CustosTokenVerifier` verifies locally with the SCM key named by `signingKeyId` (see [Section 8.3](#83-verification-at-om)) and makes no call to Custos.
+The verified `subject` and `groups` become the request's `UserInfo`, which is replicated through Ratis so followers reconstruct the same identity.
 
 ### 9.7 UGI construction with groups
 
@@ -572,15 +635,14 @@ This reuses the Phase 2 flow ([Section 10.1](#101-flow-for-a-static-s3-key)) unc
 
 ## 11. Edge Cases and Security Considerations
 
-**SCM signing key unavailable at OM restart.**
-Token verification needs the signing key from SCM.
-During OM log replay after a restart, that key must be reachable, or verification of replayed requests fails.
-The verifier caches keys by `signingKeyId` and must tolerate a temporary SCM outage rather than fail replay outright.
+**SCM secret key must be reachable for verification.**
+OM verifies a token by looking up its signing key from SCM by `signingKeyId`.
+OM's `SecretKeyClient` caches keys by id and refreshes them on a schedule, so steady-state verification makes no per-request SCM call and can tolerate a brief SCM outage from cache rather than failing live requests.
+Custos likewise needs SCM reachable at startup to fetch its first signing key.
 
-**Token expiry during Ratis replication (clock skew).**
-A token can be within its lifetime when the leader accepts a write and slightly past it by the time a follower applies the log entry.
-Because expiry is checked against the *leader-assigned transaction timestamp* rather than each node's wall clock, all replicas decide expiry identically.
-On top of that, OM applies a configurable clock-skew tolerance (`ozone.custos.token.clock.skew.ms`, default 30000), and token TTLs should be set comfortably longer than the maximum expected replication latency.
+**Token expiry is decided on the leader.**
+Expiry is checked once, on the OM leader, when it verifies the token during request pre-processing; the verified identity is then replicated in `UserInfo`, so followers apply the log without re-checking expiry.
+Token TTLs should be set comfortably longer than a single request's processing time, and a configurable clock-skew tolerance (`ozone.custos.token.clock.skew.ms`) can absorb small differences between the client, Custos, and OM clocks.
 
 **Key rotation overlap.**
 During signing-key rotation both the old and the new key must verify:
