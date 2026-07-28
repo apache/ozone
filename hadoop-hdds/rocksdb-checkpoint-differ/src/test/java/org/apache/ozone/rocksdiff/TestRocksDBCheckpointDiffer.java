@@ -1013,8 +1013,7 @@ public class TestRocksDBCheckpointDiffer {
     int validatedSnapshotPairs = 0;
     boolean sawNonEmptyDiff = false;
 
-    for (int destIndex = 0; destIndex < snapshots.size(); destIndex++) {
-      DifferSnapshotInfo snap = snapshots.get(destIndex);
+    for (DifferSnapshotInfo snap : snapshots) {
       List<SstFileInfo> metadataDiff = buildNonDagMetadataDiff(src, snap, allTables);
       List<SstFileInfo> metadataDiffViaApi = differ.getSSTDiffList(
           new DifferSnapshotVersion(src, 0, allTables),
