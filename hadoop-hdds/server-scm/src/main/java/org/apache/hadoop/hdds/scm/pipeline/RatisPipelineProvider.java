@@ -157,7 +157,7 @@ public class RatisPipelineProvider
       );
     }
 
-    List<DatanodeDetails> dns;
+    final List<DatanodeDetails> dns;
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
     switch (factor) {
@@ -165,21 +165,7 @@ public class RatisPipelineProvider
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes);
       break;
     case THREE:
-      List<DatanodeDetails> excludeDueToEngagement = filterNodes(true);
-      List<DatanodeDetails> currentExcluded = new ArrayList<>(excludedNodes);
-      currentExcluded.addAll(excludeDueToEngagement);
-      try {
-        dns = placementPolicy.chooseDatanodes(currentExcluded,
-            favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-            containerSizeBytes);
-      } catch (SCMException scmException) {
-        excludeDueToEngagement = filterNodes(false);
-        currentExcluded = new ArrayList<>(excludedNodes);
-        currentExcluded.addAll(excludeDueToEngagement);
-        dns = placementPolicy.chooseDatanodes(currentExcluded,
-            favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-            containerSizeBytes);
-      }
+      dns = chooseThreeFactorDatanodes(excludedNodes, favoredNodes, factor.getNumber());
 
       break;
     default:
@@ -231,23 +217,39 @@ public class RatisPipelineProvider
         .build();
   }
 
-  /**
-   *
-   * @return
-   */
-  private List<DatanodeDetails> filterNodes(boolean filterRatisStreaming) {
+  private List<DatanodeDetails> chooseThreeFactorDatanodes(
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, int requiredNode)
+      throws IOException{
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    final List<DatanodeDetails> excluded = new ArrayList<>();
+    excludedNodes = excludedNodes.isEmpty() ? new ArrayList<>() : excludedNodes;
+    List<DatanodeDetails> strictExcludedNodes = null;
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
-      if (count >= nodeManager.pipelineLimit(d) ||
-          (filterRatisStreaming && !d.hasPort(RATIS_DATASTREAM))) {
-        excluded.add(d);
+      if (count >= nodeManager.pipelineLimit(d)) {
+        excludedNodes.add(d);
+      } else if (!d.hasPort(RATIS_DATASTREAM)) {
+        if (strictExcludedNodes == null) {
+          strictExcludedNodes = new ArrayList<>();
+        }
+        strictExcludedNodes.add(d);
       }
     }
-    return excluded;
+    if (strictExcludedNodes != null) {
+      strictExcludedNodes.addAll(excludedNodes);
+      try {
+        return placementPolicy.chooseDatanodes(strictExcludedNodes,
+            favoredNodes, requiredNode, minRatisVolumeSizeBytes,
+            containerSizeBytes);
+      } catch (SCMException scmException) {
+        LOG.debug("Failed to allocate datanodes with strict exclusion (non-streaming nodes excluded)." +
+            " Falling back.", scmException);
+      }
+    }
+    return placementPolicy.chooseDatanodes(excludedNodes,
+          favoredNodes, requiredNode, minRatisVolumeSizeBytes,
+          containerSizeBytes);
   }
 
   /**
