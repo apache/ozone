@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Removes the orphan "finalizing in progress" mark written into the SCM meta table by pre-ZDU
+ * Removes the "finalizing in progress" mark, which may be left over in SCM meta table from pre-ZDU
  * code. Deleting an absent key is a no-op, making the action idempotent.
  */
 @ScmUpgradeActionForVersion(version = ZDU)
