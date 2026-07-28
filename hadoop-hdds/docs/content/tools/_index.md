@@ -53,6 +53,7 @@ Admin commands:
    * **admin** -  Collects admin and developer related commands related to the 
    ozone components.
    * **insight** - Generic tool to display filtered log, metrics or configs to help debuging. See [the observability]({{< ref "feature/Observability.md" >}}) page for more information.
+   * **daemonlog** - Gets or sets the runtime log level of Ozone daemon loggers through their HTTP endpoints.
    * **classpath** - Prints the class path needed to get the hadoop jar and the
     required libraries.
    * **dtutil**    - Operations related to delegation tokens

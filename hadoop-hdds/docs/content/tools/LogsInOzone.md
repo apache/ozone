@@ -93,6 +93,37 @@ rootLogger.level = debug
 
 After saving the file and restarting the service, the service will start logging more detailed debug information.
 
+### Changing Service Log Levels at Runtime
+
+Use `ozone daemonlog` to inspect or change the log level of a running Ozone daemon without restarting it. The command talks to the daemon's HTTP endpoint and is useful when you need temporary debug logging while troubleshooting a live service.
+
+```bash
+ozone daemonlog -getlevel <host:port> <logger-name> [-protocol http|https]
+ozone daemonlog -setlevel <host:port> <logger-name> <level> [-protocol http|https]
+```
+
+The `<host:port>` value is the daemon HTTP address. For example, the default HTTP ports are `9874` for Ozone Manager, `9876` for Storage Container Manager, `9882` for Datanode, `9878` for S3 Gateway, and `9888` for Recon.
+
+The following example checks the effective log level for the SCM event queue logger:
+
+```bash
+ozone daemonlog -getlevel scm.example.com:9876 org.apache.hadoop.hdds.server.events.EventQueue
+```
+
+To increase the same logger to `DEBUG`:
+
+```bash
+ozone daemonlog -setlevel scm.example.com:9876 org.apache.hadoop.hdds.server.events.EventQueue DEBUG
+```
+
+After collecting the required debug information, reset the logger to its previous level:
+
+```bash
+ozone daemonlog -setlevel scm.example.com:9876 org.apache.hadoop.hdds.server.events.EventQueue INFO
+```
+
+The change applies to the running daemon process. To make a log level change persistent across restarts, update the service's `log4j.properties` file instead.
+
 ### Enabling Debug Logs for CLI Tools
 
 To enable debug logging for Ozone CLI tools (e.g., `ozone sh volume create`), you can set the `OZONE_ROOT_LOGGER` environment variable to `debug`:
