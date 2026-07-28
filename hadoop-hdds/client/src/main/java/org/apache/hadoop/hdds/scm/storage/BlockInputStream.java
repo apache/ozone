@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -69,7 +71,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
@@ -107,6 +109,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
   private BlockData blockData;
+
+  private Pipeline failedPipeline;
+
+  private ReentrantLock lock = new ReentrantLock();
 
   public BlockInputStream(
       BlockLocationInfo blockInfo,
@@ -209,7 +215,25 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+    lock.lock();
+    try {
+      refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void refreshBlockInfoForPositionRead(IOException cause, Pipeline pipeline) throws IOException {
+    lock.lock();
+    try {
+      if (failedPipeline != pipeline) {
+        refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+        failedPipeline = pipeline;
+      }
+
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -289,7 +313,106 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     return new ChunkInputStream(chunkInfo, blockID,
-        xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
+        xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get, lock);
+  }
+
+  @Override
+  public boolean readFully(long pos, ByteBuffer buffer) throws IOException {
+    Preconditions.checkArgument(buffer != null);
+    if (!initialized) {
+      initialize();
+    }
+
+    if (pos < 0 || pos > length) {
+      if (pos == 0) {
+        // It is possible for length and pos to be zero in which case
+        // seek should return instead of throwing exception
+        return true;
+      }
+      throw new EOFException(
+          "EOF encountered at pos: " + pos + " for block: " + blockID);
+    }
+
+    checkOpen();
+    int len = buffer.remaining();
+    int innerRetries = 0;
+    int chunkIdx = Arrays.binarySearch(chunkOffsets, pos);
+    if (chunkIdx < 0) {
+      // Binary search returns -insertionPoint - 1  if element is not present
+      // in the array. insertionPoint is the point at which element would be
+      // inserted in the sorted array. We need to adjust the chunkIndex
+      // accordingly so that chunkIndex = insertionPoint - 1
+      chunkIdx = -chunkIdx - 2;
+    }
+
+    int totalReadLen = 0;
+    while (len > 0) {
+      if (chunkIdx >= chunkStreams.size()) {
+        if (totalReadLen == 0) {
+          throw new EOFException(
+              "EOF encountered at pos: " + pos + " for block: " + blockID);
+        }
+        return true;
+      }
+
+      // Get the current chunkStream and read data from it
+      ChunkInputStream current = chunkStreams.get(chunkIdx);
+      long offsetInChunk = pos - chunkOffsets[chunkIdx];
+      int numBytesToRead = Math.min(len, (int)(current.getLength() - offsetInChunk));
+      if (numBytesToRead <= 0) {
+        if (totalReadLen == 0) {
+          throw new EOFException(
+              "EOF encountered at pos: " + pos + " for block: " + blockID);
+        }
+        return true;
+      }
+      int numBytesRead;
+      int bufferLimit = buffer.limit();
+      try {
+        if (numBytesToRead < len) {
+          buffer.limit(buffer.position() + numBytesToRead);
+        }
+        numBytesRead = current.read(offsetInChunk, buffer);
+        innerRetries = 0;
+
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e, retryPolicy, ++innerRetries)) {
+          handlePositionReadError(e, pipelineRef.get());
+          continue;
+        } else {
+          throw e;
+        }
+      } catch (IOException ex) {
+        if (shouldRetryRead(ex, retryPolicy, ++innerRetries)) {
+          if (isConnectivityIssue(ex)) {
+            handlePositionReadError(ex, pipelineRef.get());
+          } else {
+            current.releaseClient();
+          }
+          continue;
+        } else {
+          throw ex;
+        }
+      } finally {
+        buffer.limit(bufferLimit);
+      }
+      if (numBytesRead != numBytesToRead) {
+        // This implies that there is either data loss or corruption in the
+        // chunk entries. Even EOF in the current stream would be covered in
+        // this case.
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+                "numBytesRead=%d", current.getChunkName(), current.getLength(),
+            numBytesToRead, numBytesRead));
+      }
+      len -= numBytesRead;
+      pos += numBytesRead;
+      totalReadLen += numBytesRead;
+      chunkIdx++;
+    }
+    return true;
   }
 
   @Override
@@ -464,9 +587,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void releaseClient() {
-    if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
-      xceiverClient = null;
+    lock.lock();
+    try {
+      if (xceiverClientFactory != null && xceiverClient != null) {
+        xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
+        xceiverClient = null;
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -518,15 +646,35 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void handleReadError(IOException cause) throws IOException {
-    releaseClient();
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
-    if (inputStreams != null) {
-      for (ChunkInputStream is : inputStreams) {
-        is.releaseClient();
+    lock.lock();
+    try {
+      releaseClient();
+      final List<ChunkInputStream> inputStreams = this.chunkStreams;
+      if (inputStreams != null) {
+        for (ChunkInputStream is : inputStreams) {
+          is.releaseClient();
+        }
       }
+      refreshBlockInfo(cause);
+    } finally {
+      lock.unlock();
     }
+  }
 
-    refreshBlockInfo(cause);
+  private void handlePositionReadError(IOException cause, Pipeline pipeline) throws IOException {
+    lock.lock();
+    try {
+      releaseClient();
+      final List<ChunkInputStream> inputStreams = this.chunkStreams;
+      if (inputStreams != null) {
+        for (ChunkInputStream is : inputStreams) {
+          is.releaseClient();
+        }
+      }
+      refreshBlockInfoForPositionRead(cause, pipeline);
+    } finally {
+      lock.unlock();
+    }
   }
 
   public synchronized List<ChunkInputStream> getChunkStreams() {

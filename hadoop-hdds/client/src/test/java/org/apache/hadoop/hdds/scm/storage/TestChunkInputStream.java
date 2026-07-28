@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.EOFException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -269,8 +270,7 @@ public class TestChunkInputStream {
                 ByteStringConversion::safeWrap));
 
     try (ChunkInputStream subject = new ChunkInputStream(chunkInfo, blockID,
-        clientFactory, pipelineRef::get, false, tokenRef::get)) {
-      // WHEN
+        clientFactory, pipelineRef::get, false, tokenRef::get, null)) {      // WHEN
       subject.unbuffer();
       pipelineRef.set(newPipeline);
       tokenRef.set(newToken);
@@ -283,5 +283,49 @@ public class TestChunkInputStream {
       verify(clientFactory).acquireClientForReadData(newPipeline);
       verify(newToken).encodeToUrlString();
     }
+  }
+
+  @Test
+  public void testPositionedRead() throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(50);
+    int bytesRead = chunkStream.read(30, byteBuffer);
+    assertEquals(50, bytesRead);
+    byte[] expected = Arrays.copyOfRange(chunkData, 30, 80);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    // Read backward
+    byteBuffer = ByteBuffer.allocate(50);
+    bytesRead = chunkStream.read(10, byteBuffer);
+    assertEquals(50, bytesRead);
+    expected = Arrays.copyOfRange(chunkData, 10, 60);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    // Read forward
+    byteBuffer = ByteBuffer.allocate(50);
+    bytesRead = chunkStream.read(90, byteBuffer);
+    assertEquals(10, bytesRead);
+    expected = new byte[50];
+    System.arraycopy(chunkData, 90, expected, 0, 10);
+    assertArrayEquals(expected, byteBuffer.array());
+  }
+
+  @Test
+  public void testPositionedReadFully() throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(40);
+    chunkStream.readFully(50, byteBuffer);
+    byte[] expected = Arrays.copyOfRange(chunkData, 50, 90);
+    assertArrayEquals(expected, byteBuffer.array());
+
+    byteBuffer = ByteBuffer.allocate(50);
+    chunkStream.readFully(10, byteBuffer);
+    expected = Arrays.copyOfRange(chunkData, 10, 60);
+    assertArrayEquals(expected, byteBuffer.array());
+
+
+    byteBuffer = ByteBuffer.allocate(50);
+    chunkStream.read(90, byteBuffer);
+    expected = new byte[50];
+    System.arraycopy(chunkData, 90, expected, 0, 10);
+    assertArrayEquals(expected, byteBuffer.array());
   }
 }
