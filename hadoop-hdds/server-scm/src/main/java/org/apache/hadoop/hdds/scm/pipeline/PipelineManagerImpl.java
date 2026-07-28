@@ -592,7 +592,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   /**
    * Whether any registered node of the pipeline exposes a port name that the
-   * pipeline's stored copy of that node lacks
+   * pipeline's stored copy of that node lacks.
    */
   private boolean nodesExposeNewPorts(Pipeline pipeline) {
     for (DatanodeDetails stored : pipeline.getNodes()) {
