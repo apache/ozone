@@ -209,6 +209,14 @@ public class BlockManagerImpl implements BlockManager {
       // container to determine whether the blockCount is already incremented
       // for this block in the DB or not.
       long localID = data.getLocalID();
+      if (endOfBlock && bcsId == 0) {
+        BlockData existing = db.getStore().getBlockDataTable()
+            .get(containerData.getBlockKey(localID));
+        if (existing != null) {
+          bcsId = existing.getBlockCommitSequenceId();
+          data.setBlockCommitSequenceId(bcsId);
+        }
+      }
       boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
       boolean incrBlockCount = false;
 

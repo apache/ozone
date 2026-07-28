@@ -681,11 +681,6 @@ public class KeyValueHandler extends Handler {
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
-      if (bcsId == 0 && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.STREAM_LINK) {
-        // Stream close PutBlock is applied outside a Ratis log entry, so use the
-        // next block commit sequence id after any prior PutBlock on this container.
-        bcsId = kvContainer.getBlockCommitSequenceId() + 1;
-      }
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
 

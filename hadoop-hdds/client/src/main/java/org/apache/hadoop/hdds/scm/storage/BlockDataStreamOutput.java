@@ -419,7 +419,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
-    containerBlockData.setBlockID(blockID.get().getDatanodeBlockIDProtobuf());
+    if (close && config.isDatastreamPutBlockOnCloseEnabled()) {
+      // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
+      waitPutBlockFuturesComplete();
+    }
     final BlockData blockData = containerBlockData.build();
     if (close) {
       // HDDS-12007 changed datanodes to ignore the following PutBlock request.
@@ -428,7 +431,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // Then, old datanodes will fail since they expect a PutBlock.
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
-          xceiverClient.getPipeline(), blockData, true, tokenString);
+              xceiverClient.getPipeline(), blockData, true, tokenString);
       dataStreamCloseReply = executePutBlockClose(putBlockRequest,
           PUT_BLOCK_REQUEST_LENGTH_MAX, out);
       dataStreamCloseReply.whenComplete((reply, e) -> {
@@ -436,7 +439,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
           try {
             executePutBlock(true, false);
-            // submitPutBlockAsync(blockData, true, force, flushPos, byteBufferList);
           } catch (IOException ex) {
             throw new CompletionException(ex);
           }
@@ -550,6 +552,19 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       futures.clear();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
+      throw new IOException(e);
+    }
+  }
+
+  private void waitPutBlockFuturesComplete() throws IOException {
+    if (putBlockFutures.isEmpty()) {
+      return;
+    }
+    try {
+      CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      checkOpen();
+    } catch (Exception e) {
+      LOG.warn("Failed to commit PutBlock before stream close: " + e);
       throw new IOException(e);
     }
   }
