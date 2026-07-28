@@ -404,6 +404,10 @@ public final class OmLCRule {
       return filter;
     }
 
+    public List<OmLCAction> getActions() {
+      return actions;
+    }
+
     public OmLCRule build() {
       return new OmLCRule(this);
     }

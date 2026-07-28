@@ -197,7 +197,9 @@ public class BucketCrudHandler extends BucketOperationHandler {
           null, null, null, null, body);
       OmLifecycleConfiguration lcc =
           s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
-      ozoneBucket.setLifecycleConfiguration(lcc);
+      if (lcc != null) {
+        ozoneBucket.setLifecycleConfiguration(lcc);
+      }
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {

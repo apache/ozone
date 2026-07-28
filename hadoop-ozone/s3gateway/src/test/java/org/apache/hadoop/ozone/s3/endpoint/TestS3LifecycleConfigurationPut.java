@@ -252,6 +252,62 @@ public class TestS3LifecycleConfigurationPut {
   }
 
   @Test
+  public void testPutLifecycleWithPastExpirationDate() throws Exception {
+    // S3 accepts past dates; they mean objects expired immediately
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule><ID>rule1</ID><Prefix>test1/</Prefix><Status>Enabled</Status>" +
+        "<Expiration><Date>2017-09-27T00:00:00+00:00</Date></Expiration>" +
+        "</Rule></LifecycleConfiguration>";
+    assertEquals(HTTP_OK,
+        bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getStatus());
+  }
+
+  @Test
+  public void testPutLifecycleWithExpiredObjectDeleteMarker() throws Exception {
+    // ExpiredObjectDeleteMarker is a valid S3 action; Ozone accepts but does not enforce it yet
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule><ID>rule1</ID><Prefix>test1/</Prefix><Status>Enabled</Status>" +
+        "<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>" +
+        "</Rule></LifecycleConfiguration>";
+    assertEquals(HTTP_OK,
+        bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getStatus());
+  }
+
+  @Test
+  public void testPutLifecycleWithExpiredObjectDeleteMarkerAndFilter() throws Exception {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule><ID>rule1</ID><Filter><Prefix>foo</Prefix></Filter><Status>Enabled</Status>" +
+        "<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>" +
+        "</Rule></LifecycleConfiguration>";
+    assertEquals(HTTP_OK,
+        bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getStatus());
+  }
+
+  @Test
+  public void testPutLifecycleWithExpiredObjectDeleteMarkerAndEmptyFilter() throws Exception {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule><ID>rule1</ID><Filter></Filter><Status>Enabled</Status>" +
+        "<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>" +
+        "</Rule></LifecycleConfiguration>";
+    assertEquals(HTTP_OK,
+        bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getStatus());
+  }
+
+  @Test
+  public void testPutLifecycleWithNoncurrentVersionExpiration() throws Exception {
+    // NoncurrentVersionExpiration is a valid S3 action; Ozone accepts but does not enforce it yet
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule><ID>rule1</ID><Prefix>past/</Prefix><Status>Enabled</Status>" +
+        "<NoncurrentVersionExpiration><NoncurrentDays>2</NoncurrentDays></NoncurrentVersionExpiration>" +
+        "</Rule>" +
+        "<Rule><ID>rule2</ID><Prefix>future/</Prefix><Status>Enabled</Status>" +
+        "<NoncurrentVersionExpiration><NoncurrentDays>3</NoncurrentDays></NoncurrentVersionExpiration>" +
+        "</Rule></LifecycleConfiguration>";
+    assertEquals(HTTP_OK,
+        bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))).getStatus());
+  }
+
+  @Test
   public void testPutInvalidAbortIncompleteMultipartUploadConfig() throws Exception {
     // Test with zero days - should fail
     testInvalidLifecycleConfiguration(

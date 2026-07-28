@@ -79,6 +79,9 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "Filter")
     private Filter filter;
 
+    @XmlElement(name = "NoncurrentVersionExpiration")
+    private NoncurrentVersionExpiration noncurrentVersionExpiration;
+
     public String getId() {
       return id;
     }
@@ -126,6 +129,14 @@ public class S3LifecycleConfiguration {
     public void setFilter(Filter filter) {
       this.filter = filter;
     }
+
+    public NoncurrentVersionExpiration getNoncurrentVersionExpiration() {
+      return noncurrentVersionExpiration;
+    }
+
+    public void setNoncurrentVersionExpiration(NoncurrentVersionExpiration noncurrentVersionExpiration) {
+      this.noncurrentVersionExpiration = noncurrentVersionExpiration;
+    }
   }
 
   /**
@@ -139,6 +150,9 @@ public class S3LifecycleConfiguration {
 
     @XmlElement(name = "Date")
     private String date;
+
+    @XmlElement(name = "ExpiredObjectDeleteMarker")
+    private Boolean expiredObjectDeleteMarker;
 
     public Integer getDays() {
       return days;
@@ -154,6 +168,36 @@ public class S3LifecycleConfiguration {
 
     public void setDate(String date) {
       this.date = date;
+    }
+
+    public Boolean getExpiredObjectDeleteMarker() {
+      return expiredObjectDeleteMarker;
+    }
+
+    public void setExpiredObjectDeleteMarker(Boolean expiredObjectDeleteMarker) {
+      this.expiredObjectDeleteMarker = expiredObjectDeleteMarker;
+    }
+
+    public boolean isUnsupported() {
+      return Boolean.TRUE.equals(expiredObjectDeleteMarker) && days == null && date == null;
+    }
+  }
+
+  /**
+   * NoncurrentVersionExpiration entity for lifecycle rule (accepted but not yet enforced).
+   */
+  @XmlAccessorType(XmlAccessType.FIELD)
+  @XmlRootElement(name = "NoncurrentVersionExpiration")
+  public static class NoncurrentVersionExpiration {
+    @XmlElement(name = "NoncurrentDays")
+    private Integer noncurrentDays;
+
+    public Integer getNoncurrentDays() {
+      return noncurrentDays;
+    }
+
+    public void setNoncurrentDays(Integer noncurrentDays) {
+      this.noncurrentDays = noncurrentDays;
     }
   }
 
@@ -291,7 +335,15 @@ public class S3LifecycleConfiguration {
           .setBucket(ozoneBucket.getName());
 
       for (Rule rule : getRules()) {
-        builder.addRule(convertToOmRule(rule));
+        OmLCRule omRule = convertToOmRule(rule);
+        if (omRule != null) {
+          builder.addRule(omRule);
+        }
+      }
+
+      if (builder.getRules().isEmpty()) {
+        // All rules used unsupported-but-valid S3 actions; accept the request without persisting.
+        return null;
       }
 
       return builder.build();
@@ -307,9 +359,11 @@ public class S3LifecycleConfiguration {
 
   /**
    * Converts a single S3 lifecycle rule to Ozone internal rule representation.
+   * Returns null when the rule contains only S3 elements not yet supported by Ozone
+   * (e.g. NoncurrentVersionExpiration, ExpiredObjectDeleteMarker).
    *
    * @param rule the S3 lifecycle rule
-   * @return OmLCRule internal rule representation
+   * @return OmLCRule internal rule representation, or null if the rule uses only unsupported actions
    */
   private OmLCRule convertToOmRule(Rule rule) throws OMException, OS3Exception {
     if (rule.getStatus() == null || rule.getStatus().isEmpty()) {
@@ -317,19 +371,32 @@ public class S3LifecycleConfiguration {
           "The Status element is required in LifecycleConfiguration");
     }
 
+    boolean hasUnsupportedAction = false;
+
     OmLCRule.Builder builder = new OmLCRule.Builder()
         .setEnabled("Enabled".equals(rule.getStatus()))
         .setId(rule.getId())
         .setPrefix(rule.getPrefix());
 
     if (rule.getExpiration() != null) {
-      builder.addAction(convertToOmExpiration(rule.getExpiration()));
+      if (rule.getExpiration().isUnsupported()) {
+        hasUnsupportedAction = true;
+      } else {
+        builder.addAction(convertToOmExpiration(rule.getExpiration()));
+      }
     }
     if (rule.getAbortIncompleteMultipartUpload() != null) {
       builder.addAction(convertToOmAbortIncompleteMultipartUpload(rule.getAbortIncompleteMultipartUpload()));
     }
+    if (rule.getNoncurrentVersionExpiration() != null) {
+      hasUnsupportedAction = true;
+    }
     if (rule.getFilter() != null) {
       builder.setFilter(convertToOmFilter(rule.getFilter()));
+    }
+
+    if (builder.getActions().isEmpty() && hasUnsupportedAction) {
+      return null;
     }
 
     return builder.build();

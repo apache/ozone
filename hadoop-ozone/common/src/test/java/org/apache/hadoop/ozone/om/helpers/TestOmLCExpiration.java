@@ -123,22 +123,21 @@ class TestOmLCExpiration {
     assertOMException(() -> exp7.build().valid(currentTime), INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
-    // Testing for date in the past with creation time
+    // Past dates are valid per S3 spec (they immediately expire objects)
     OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
         .setDate(getFutureDateString(-1));
-    assertOMException(() -> exp8.build().valid(currentTime), INVALID_REQUEST,
-        "'Date' must be in the future");
+    assertDoesNotThrow(() -> exp8.build().valid(currentTime));
 
     OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
         .setDays(0);
     assertOMException(() -> exp9.build().valid(currentTime), INVALID_REQUEST,
         "'Days' for Expiration action must be a positive integer");
 
-    // 1 minute ago with creation time
+    // A date that is not midnight UTC is rejected regardless of being past or future
     OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
         .setDate(getFutureDateString(0, 0, -1));
     assertOMException(() -> exp10.build().valid(currentTime), INVALID_REQUEST,
-        "'Date' must be in the future");
+        "'Date' must represent midnight UTC");
   }
 
   @Test

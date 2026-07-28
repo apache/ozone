@@ -84,10 +84,9 @@ public final class OmLCExpiration implements OmLCAction {
    * - Days must be a positive number greater than zero if set
    * - Either days or date should be specified, but not both or neither
    * - The date value must conform to the ISO 8601 format
-   * - The date value must be in the future
    * - The date value must be at midnight UTC (00:00:00Z)
    *
-   * @param creationTime The creation time of the lifecycle configuration in milliseconds since epoch
+   * @param creationTime unused, kept for interface compatibility
    * @throws OMException if the validation fails
    */
   @Override
@@ -107,7 +106,7 @@ public final class OmLCExpiration implements OmLCAction {
       daysInMilli = TimeUnit.DAYS.toMillis(days);
     }
     if (hasDate) {
-      validateExpirationDate(date, creationTime);
+      validateExpirationDate(date);
     }
   }
 
@@ -115,24 +114,16 @@ public final class OmLCExpiration implements OmLCAction {
    * Validates that the expiration date is:
    * - In the ISO 8601 format
    * - Includes both time and time zone (neither can be omitted)
-   * - In the future
    * - Represents midnight UTC (00:00:00Z) when converted to UTC.
    *
    * @param expirationDate The date string to validate
-   * @param creationTime The creation time to compare against in milliseconds since epoch
    * @throws OMException if the date is invalid
    */
-  private void validateExpirationDate(String expirationDate, long creationTime) throws OMException {
+  private void validateExpirationDate(String expirationDate) throws OMException {
     try {
       ZonedDateTime parsedDate = ZonedDateTime.parse(expirationDate, DateTimeFormatter.ISO_DATE_TIME);
       // Convert to UTC for validation
       ZonedDateTime dateInUTC = parsedDate.withZoneSameInstant(ZoneOffset.UTC);
-      // The date value must conform to the ISO 8601 format, be in the future.
-      ZonedDateTime createDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(creationTime), ZoneOffset.UTC);
-      if (dateInUTC.isBefore(createDate)) {
-        throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future " + createDate + "," +
-            dateInUTC, OMException.ResultCodes.INVALID_REQUEST);
-      }
 
       // Verify that the time is midnight UTC (00:00:00Z)
       if (!test && (dateInUTC.getHour() != 0 ||

@@ -294,6 +294,10 @@ public final class OmLifecycleConfiguration extends WithObjectID
       return this;
     }
 
+    public List<OmLCRule> getRules() {
+      return rules;
+    }
+
     public Builder addRule(OmLCRule rule) {
       this.rules.add(rule);
       return this;
