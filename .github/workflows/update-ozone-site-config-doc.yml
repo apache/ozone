@@ -60,7 +60,13 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          git clone --depth=1 --branch=master https://github.com/$REPO_OWNER/ozone-site.git ozone-site
+          BRANCH_EXISTS=""
+          if git clone --depth=1 --branch="$BRANCH_NAME" https://github.com/$REPO_OWNER/ozone-site.git ozone-site; then
+            BRANCH_EXISTS="true"
+          else
+            git clone --depth=1 --branch=master https://github.com/$REPO_OWNER/ozone-site.git ozone-site
+          fi
+
           cd ozone-site
 
           EXISTING_PR=$(gh pr list --repo "$REPO_OWNER/ozone-site" \
@@ -68,13 +74,14 @@ jobs:
           echo "EXISTING_PR=$EXISTING_PR" >> $GITHUB_ENV
 
           if [ -n "$EXISTING_PR" ]; then
-            echo "Open PR #$EXISTING_PR exists, checking out branch for comparison"
-            git fetch --depth=1 origin "$BRANCH_NAME"
-            git checkout -B "$BRANCH_NAME" FETCH_HEAD
+            echo "Open PR #$EXISTING_PR exists"
+          else if [[ -n "$BRANCH_EXISTS" ]]; then
+            echo "No open PR, but branch exists, resetting to master"
+            git fetch --depth 1 origin master:master
+            git reset --hard master
           else
-            echo "No open PR, creating branch from master"
-            git fetch --depth=1 origin "$BRANCH_NAME" || true
-            git checkout -B "$BRANCH_NAME" master
+            echo "No open PR or branch, creating from master"
+            git checkout -b "$BRANCH_NAME" master
           fi
 
       - name: Check if documentation changed
