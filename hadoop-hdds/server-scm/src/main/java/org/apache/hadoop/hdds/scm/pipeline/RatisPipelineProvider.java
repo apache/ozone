@@ -219,7 +219,7 @@ public class RatisPipelineProvider
 
   private List<DatanodeDetails> chooseThreeFactorDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, int requiredNode)
-      throws IOException{
+      throws IOException {
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
