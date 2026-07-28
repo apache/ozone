@@ -105,7 +105,7 @@ describe('Capacity Page', () => {
     capacityServer.use(
       http.get('api/v1/pendingDeletion', ({ request }) => {
         const url = new URL(request.url);
-        const component = url.searchParams.get("component");
+        const component = url.searchParams.get('component');
         if (component === 'dn') {
           return HttpResponse.json({
             ...mockResponses.DnPendingDeletion,
@@ -202,7 +202,7 @@ describe('Capacity Page', () => {
     capacityServer.use(
       http.get('/api/v1/pendingDeletion', ({ request }) => {
         const url = new URL(request.url);
-        const component = url.searchParams.get("component");
+        const component = url.searchParams.get('component');
         switch (component) {
         case 'scm':
           return HttpResponse.json({
@@ -216,7 +216,7 @@ describe('Capacity Page', () => {
           return HttpResponse.json(mockResponses.DnPendingDeletion);
         default:
           return HttpResponse.json({
-            message: "Unsupported pending deletion component.",
+            message: 'Unsupported pending deletion component.',
           }, { status: 400 });
         }
       })
@@ -277,7 +277,7 @@ describe('Capacity Page', () => {
       }),
       http.get('api/v1/pendingDeletion', ({ request }) => {
         const url = new URL(request.url);
-        const component = url.searchParams.get("component");
+        const component = url.searchParams.get('component');
         switch (component) {
         case 'scm':
           return HttpResponse.json(mockResponses.ScmPendingDeletion);
@@ -377,7 +377,7 @@ describe('Capacity Page', () => {
           counts.om++;
           return HttpResponse.json(mockResponses.OmPendingDeletion);
         }
-        return HttpResponse.json({ message: 'Unsupported pending deletion component.' });
+        return HttpResponse.json({ message: 'Unsupported pending deletion component.' },  { status: 400 });
       })
     );
     return counts;
