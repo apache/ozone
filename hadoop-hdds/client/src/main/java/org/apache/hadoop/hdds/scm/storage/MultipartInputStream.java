@@ -198,6 +198,10 @@ public class MultipartInputStream extends ExtendedInputStream {
     final long oldPos = getPos();
     seek(position);
     try {
+      int remainingBeforeRead = buffer.remaining();
+      if (remainingBeforeRead == 0) {
+        return true;
+      }
       read(new ByteBufferReader(buffer) {
         @Override
         int readImpl(InputStream inputStream) throws IOException {
@@ -205,6 +209,10 @@ public class MultipartInputStream extends ExtendedInputStream {
               .readFully(getBuffer(), false);
         }
       });
+      if (remainingBeforeRead - buffer.remaining() == 0) {
+        throw new EOFException("EOF encountered at pos: " + position +
+            " for key: " + key);
+      }
     } finally {
       seek(oldPos);
     }

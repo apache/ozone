@@ -201,11 +201,7 @@ public class BucketCrudHandler extends BucketOperationHandler {
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.ACCESS_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
-      } else if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, bucketName, ex);
-      }
+      throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
   }
