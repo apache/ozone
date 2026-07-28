@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashMap;
@@ -77,7 +77,7 @@ public class ReplicationSupervisorSchedulingBenchmark {
 
     //schedule 100 container replication
     for (int i = 0; i < 100; i++) {
-      rs.addTask(new ReplicationTask(toTarget(i, target), replicator));
+      rs.addTask(new ReplicationTask(getReplicateContainerCommand(i, target), replicator));
     }
     rs.shutdownAfterFinish();
     final long executionTime = Time.monotonicNow() - start;
