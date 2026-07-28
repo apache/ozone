@@ -102,7 +102,7 @@ ozone daemonlog -getlevel <host:port> <logger-name> [-protocol http|https]
 ozone daemonlog -setlevel <host:port> <logger-name> <level> [-protocol http|https]
 ```
 
-The `<host:port>` value is the daemon HTTP address. For example, the default HTTP ports are `9874` for Ozone Manager, `9876` for Storage Container Manager, `9882` for Datanode, `9878` for S3 Gateway, and `9888` for Recon.
+The `<host:port>` value is the daemon HTTP address. For example, the default HTTP ports are `9874` for Ozone Manager, `9876` for Storage Container Manager, `9882` for Datanode, `19878` for the S3 Gateway web admin server, and `9888` for Recon.
 
 The following example checks the effective log level for the SCM event queue logger:
 
