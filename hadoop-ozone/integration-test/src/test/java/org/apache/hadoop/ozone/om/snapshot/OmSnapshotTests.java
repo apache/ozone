@@ -116,10 +116,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -263,7 +263,7 @@ public abstract class OmSnapshotTests {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }
@@ -284,7 +284,7 @@ public abstract class OmSnapshotTests {
     if (createLinkedBucket) {
       String sourceBucketName = linkedBuckets.computeIfAbsent(bucketVal, (k) -> bucketVal + counter.incrementAndGet());
       volume.createBucket(sourceBucketName);
-      TestDataUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
+      DataTestUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
       this.linkedBuckets.put(bucketVal, sourceBucketName);
     } else {
       volume.createBucket(bucketVal);

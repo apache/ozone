@@ -479,7 +479,7 @@ public class S3LifecycleConfiguration {
     if (date != null && !date.isEmpty()) {
       expiration.setDate(date);
     }
-    if (ozoneExpiration.getDays() > 0) {
+    if (ozoneExpiration.getDays() != null && ozoneExpiration.getDays() > 0) {
       expiration.setDays(ozoneExpiration.getDays());
     }
 
@@ -497,7 +497,8 @@ public class S3LifecycleConfiguration {
 
     AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = new AbortIncompleteMultipartUpload();
 
-    if (ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation() > 0) {
+    if (ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation() != null
+        && ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation() > 0) {
       abortIncompleteMultipartUpload.setDaysAfterInitiation(
           ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation());
     }

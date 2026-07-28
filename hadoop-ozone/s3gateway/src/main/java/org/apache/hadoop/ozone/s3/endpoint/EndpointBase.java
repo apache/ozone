@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
@@ -107,6 +109,7 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -241,6 +244,35 @@ public abstract class EndpointBase {
 
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
+  }
+
+  /**
+   * Maps a duplicate bucket create to the S3 error expected by AWS when the
+   * requester already owns the bucket name.
+   */
+  protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
+    try {
+      OzoneBucket existingBucket = getVolume().getBucket(bucketName);
+      if (isSameBucketOwner(existingBucket.getOwner())) {
+        return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
+      }
+    } catch (IOException ex) {
+      LOG.debug("Could not resolve duplicate bucket owner for {}", bucketName, ex);
+    }
+    return newError(BUCKET_ALREADY_EXISTS, bucketName, cause);
+  }
+
+  private boolean isSameBucketOwner(String bucketOwner) {
+    String requestOwner = getRequestOwner();
+    return requestOwner != null && requestOwner.equals(bucketOwner);
+  }
+
+  private String getRequestOwner() {
+    if (s3Auth == null || s3Auth.getUserPrincipal() == null) {
+      return null;
+    }
+    return UserGroupInformation.createRemoteUser(s3Auth.getUserPrincipal())
+        .getShortUserName();
   }
 
   /**

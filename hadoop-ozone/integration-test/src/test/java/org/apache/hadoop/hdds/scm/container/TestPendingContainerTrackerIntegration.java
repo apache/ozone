@@ -30,8 +30,8 @@ import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -82,7 +82,7 @@ public class TestPendingContainerTrackerIntegration {
     client = cluster.newClient();
 
     // Create bucket for testing
-    bucket = TestDataUtil.createVolumeAndBucket(client);
+    bucket = DataTestUtil.createVolumeAndBucket(client);
 
     SCMNodeManager nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     assertNotNull(nodeManager);

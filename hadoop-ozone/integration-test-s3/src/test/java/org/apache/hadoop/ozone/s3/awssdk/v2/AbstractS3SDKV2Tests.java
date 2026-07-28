@@ -233,6 +233,37 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     }
   }
 
+  /**
+   * s3-tests: test_bucket_create_exists.
+   */
+  @Test
+  public void testCreateBucketAlreadyOwnedByYou() {
+    final String bucketName = getBucketName("owned-by-you");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(),
+        exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testCreateBucketAlreadyExistsDifferentOwner() throws IOException {
+    final String bucketName = getBucketName("other-owner");
+    final String otherOwner = "other-s3-owner";
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setOwner(otherOwner).build());
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(),
+        exception.awsErrorDetails().errorCode());
+  }
+
   @Test
   public void testPutObject() {
     final String bucketName = getBucketName();

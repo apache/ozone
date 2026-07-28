@@ -129,6 +129,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -252,6 +253,35 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertTrue(s3Client.doesBucketExist(bucketName));
     assertTrue(s3Client.doesBucketExistV2(bucketName));
     assertTrue(isBucketEmpty(b));
+  }
+
+  /**
+   * s3-tests: test_bucket_create_exists.
+   */
+  @Test
+  public void testCreateBucketAlreadyOwnedByYou() {
+    final String bucketName = getBucketName("owned-by-you");
+    s3Client.createBucket(bucketName);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.createBucket(bucketName));
+    assertEquals(409, ase.getStatusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(), ase.getErrorCode());
+  }
+
+  @Test
+  public void testCreateBucketAlreadyExistsDifferentOwner() throws IOException {
+    final String bucketName = getBucketName("other-owner");
+    final String otherOwner = "other-s3-owner";
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setOwner(otherOwner).build());
+    }
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.createBucket(bucketName));
+    assertEquals(409, ase.getStatusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(), ase.getErrorCode());
   }
 
   @Test
