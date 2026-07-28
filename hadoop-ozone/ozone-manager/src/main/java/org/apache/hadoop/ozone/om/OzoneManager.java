@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -1350,6 +1351,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public NetworkTopology getClusterMap() {
+    return requireNonNull(getClusterMapAllowNull(),
+        "OM topology cache has not been initialized yet.");
+  }
+
+  public NetworkTopology getClusterMapAllowNull() {
     return scmTopologyClient.getClusterMap();
   }
 
@@ -3005,8 +3011,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             volumeName, null, null);
       }
       metrics.incNumBucketLists();
-      return bucketManager.listBuckets(volumeName,
+      List<OmBucketInfo> buckets = bucketManager.listBuckets(volumeName,
           startKey, prefix, maxNumOfBuckets, hasSnapshot);
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache = new HashMap<>();
+      for (int i = 0; i < buckets.size(); i++) {
+        try {
+          buckets.set(i, enrichLinkBucketInfo(buckets.get(i), resolvedSourceCache));
+        } catch (IOException e) {
+          LOG.debug("Failed to enrich listBuckets entry for {}/{}; returning raw entry",
+              volumeName, buckets.get(i).getBucketName(), e);
+        }
+      }
+      return buckets;
     } catch (IOException ex) {
       metrics.incNumBucketListFails();
       auditSuccess = false;
@@ -3019,6 +3035,62 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
+  }
+
+  /**
+   * For link buckets, follows the link chain and overlays the source bucket's
+   * operational properties onto the link's {@link OmBucketInfo}. Non-link
+   * buckets and dangling links are returned unchanged.
+   */
+  private OmBucketInfo enrichLinkBucketInfo(OmBucketInfo bucketInfo)
+      throws IOException {
+    return enrichLinkBucketInfo(bucketInfo, null);
+  }
+
+  private OmBucketInfo enrichLinkBucketInfo(
+      OmBucketInfo bucketInfo,
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache)
+      throws IOException {
+    if (!bucketInfo.isLink()) {
+      return bucketInfo;
+    }
+    // We already know that `bucketInfo` is a linked one,
+    // so we skip one `getBucketInfo` and start with the known link.
+    ResolvedBucket resolvedBucket =
+        resolveBucketLink(Pair.of(
+                bucketInfo.getSourceVolume(),
+                bucketInfo.getSourceBucket()),
+            true);
+
+    // If it is a dangling link it means no real bucket exists,
+    // for example, it could have been deleted, but the links still present.
+    if (resolvedBucket.isDangling()) {
+      return bucketInfo;
+    }
+    OmBucketInfo realBucket = getResolvedSourceBucket(resolvedBucket, resolvedSourceCache);
+    return bucketInfo.withOperationalPropertiesFrom(realBucket);
+  }
+
+  private OmBucketInfo getResolvedSourceBucket(
+      ResolvedBucket resolvedBucket,
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache)
+      throws IOException {
+    Pair<String, String> sourceKey = Pair.of(
+        resolvedBucket.realVolume(),
+        resolvedBucket.realBucket());
+    if (resolvedSourceCache != null) {
+      OmBucketInfo cachedSource = resolvedSourceCache.get(sourceKey);
+      if (cachedSource != null) {
+        return cachedSource;
+      }
+    }
+    OmBucketInfo realBucket = bucketManager.getBucketInfo(
+        resolvedBucket.realVolume(),
+        resolvedBucket.realBucket());
+    if (resolvedSourceCache != null) {
+      resolvedSourceCache.put(sourceKey, realBucket);
+    }
+    return realBucket;
   }
 
   /**
@@ -3042,46 +3114,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketInfos();
 
-      OmBucketInfo bucketInfo = bucketManager.getBucketInfo(volume, bucket);
-
-      // No links - return the bucket info right away.
-      if (!bucketInfo.isLink()) {
-        return bucketInfo;
-      }
-      // Otherwise follow the links to find the real bucket.
-      // We already know that `bucketInfo` is a linked one,
-      // so we skip one `getBucketInfo` and start with the known link.
-      ResolvedBucket resolvedBucket =
-          resolveBucketLink(Pair.of(
-                  bucketInfo.getSourceVolume(),
-                  bucketInfo.getSourceBucket()),
-              true);
-
-      // If it is a dangling link it means no real bucket exists,
-      // for example, it could have been deleted, but the links still present.
-      if (!resolvedBucket.isDangling()) {
-        OmBucketInfo realBucket =
-            bucketManager.getBucketInfo(
-                resolvedBucket.realVolume(),
-                resolvedBucket.realBucket());
-        // Pass the real bucket metadata in the link bucket info.
-        return bucketInfo.toBuilder()
-            .setDefaultReplicationConfig(
-                realBucket.getDefaultReplicationConfig())
-            .setIsVersionEnabled(realBucket.getIsVersionEnabled())
-            .setStorageType(realBucket.getStorageType())
-            .setQuotaInBytes(realBucket.getQuotaInBytes())
-            .setQuotaInNamespace(realBucket.getQuotaInNamespace())
-            .setUsedBytes(realBucket.getUsedBytes())
-            .setSnapshotUsedBytes(realBucket.getSnapshotUsedBytes())
-            .setSnapshotUsedNamespace(realBucket.getSnapshotUsedNamespace())
-            .setUsedNamespace(realBucket.getUsedNamespace())
-            .addAllMetadata(realBucket.getMetadata())
-            .setBucketLayout(realBucket.getBucketLayout())
-            .build();
-      }
-      // If no real bucket exists, return the requested one's info.
-      return bucketInfo;
+      return enrichLinkBucketInfo(
+          bucketManager.getBucketInfo(volume, bucket));
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
