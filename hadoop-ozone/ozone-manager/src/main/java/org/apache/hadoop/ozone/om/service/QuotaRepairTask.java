@@ -366,34 +366,8 @@ public class QuotaRepairTask {
         }
       }));
 
-      // await every scan before propagating a failure, so no scan outlives the checkpoint;
-      // retry an interrupted wait so the interrupted future is not abandoned mid-run
-      boolean interrupted = false;
-      Exception scanFailure = null;
-      for (Future<?> f : tasks) {
-        boolean done = false;
-        while (!done) {
-          try {
-            f.get();
-            done = true;
-          } catch (InterruptedException ex) {
-            interrupted = true;
-            if (scanFailure == null) {
-              scanFailure = ex;
-            }
-          } catch (ExecutionException ex) {
-            done = true;
-            if (scanFailure == null) {
-              scanFailure = ex;
-            } else {
-              scanFailure.addSuppressed(ex);
-            }
-          }
-        }
-      }
-      if (interrupted) {
-        Thread.currentThread().interrupt();
-      }
+      // await every scan before propagating a failure, so no scan outlives the checkpoint
+      Exception scanFailure = awaitAll(tasks, null);
       if (scanFailure != null) {
         throw scanFailure;
       }
@@ -634,7 +608,6 @@ public class QuotaRepairTask {
     }
     int count = 0;
     long startTime = Time.monotonicNow();
-    boolean interrupted = false;
     Exception failure = null;
     try {
       while (keyIter.hasNext()) {
@@ -647,7 +620,7 @@ public class QuotaRepairTask {
       }
       putBatch(q, kvList, tasks);
     } catch (InterruptedException ex) {
-      interrupted = true;
+      Thread.currentThread().interrupt();
       failure = ex;
       q.clear();
     } catch (ExecutionException | RuntimeException ex) {
@@ -656,8 +629,22 @@ public class QuotaRepairTask {
     } finally {
       isRunning.set(false);
     }
-    // always await workers so none outlives this scan and touches a closed table;
-    // retry an interrupted wait so the interrupted future is not abandoned mid-run
+    // always await workers so none outlives this scan and touches a closed table
+    failure = awaitAll(tasks, failure);
+    if (failure != null) {
+      throw new UncheckedExecutionException(failure);
+    }
+    LOG.info("Recalculate {} completed, count {} time {}ms", strType,
+        count, (Time.monotonicNow() - startTime));
+  }
+
+  /**
+   * Awaits every task, retrying an interrupted wait so the interrupted future is not
+   * abandoned mid-run; an interrupt seen while waiting is restored before returning.
+   * Returns the passed-in failure or the first failure seen, with later ones suppressed.
+   */
+  private static Exception awaitAll(List<Future<?>> tasks, Exception failure) {
+    boolean interrupted = false;
     for (Future<?> f : tasks) {
       boolean done = false;
       while (!done) {
@@ -682,11 +669,7 @@ public class QuotaRepairTask {
     if (interrupted) {
       Thread.currentThread().interrupt();
     }
-    if (failure != null) {
-      throw new UncheckedExecutionException(failure);
-    }
-    LOG.info("Recalculate {} completed, count {} time {}ms", strType,
-        count, (Time.monotonicNow() - startTime));
+    return failure;
   }
 
   /**
