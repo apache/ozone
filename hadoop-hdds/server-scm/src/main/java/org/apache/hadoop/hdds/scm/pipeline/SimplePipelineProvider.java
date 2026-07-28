@@ -59,7 +59,7 @@ public class SimplePipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
     StorageType storageType = storageTier.getUniformStorageType();
-    List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
+    List<DatanodeDetails> dns = pickAllNodesNotUsed(replicationConfig);
     dns = dns.stream().filter(dn ->
             ((DatanodeInfo) dn).getStorageReports().stream()
             .anyMatch(reportProto ->
