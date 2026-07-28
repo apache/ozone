@@ -288,9 +288,10 @@ public class TestOzoneFileSystemDataStreamEnablement {
       reloaded.forEach(p -> assertFalse(allNodesHaveDatastreamPort(p),
           "reloaded pipeline should still be portless"));
 
-      // Close the non-streamable pipeline(s); a fresh streaming-capable
-      // pipeline is created in their place by BackgroundPipelineCreator.
-      pipelineManager.closeNonStreamablePipelines();
+      // Close the pipeline(s) exposing the new datastream port; a fresh
+      // streaming-capable pipeline is created in their place by
+      // BackgroundPipelineCreator.
+      pipelineManager.closePipelinesExposingNewPorts();
       waitForStreamablePipeline();
 
       // The new pipeline actually serves a streaming write end-to-end.
@@ -337,7 +338,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       cluster.restartStorageContainerManager(true);
       waitForAllRegisteredNodesToHaveDatastreamPort();
       cluster.getStorageContainerManager().getPipelineManager()
-          .closeNonStreamablePipelines();
+          .closePipelinesExposingNewPorts();
       waitForStreamablePipeline();
 
       // Phase 2: datastream enabled -> every write streams, none fail.

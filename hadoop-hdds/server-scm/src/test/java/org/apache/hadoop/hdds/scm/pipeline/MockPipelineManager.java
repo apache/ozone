@@ -250,7 +250,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void closeNonStreamablePipelines() {
+  public void closePipelinesExposingNewPorts() {
 
   }
 

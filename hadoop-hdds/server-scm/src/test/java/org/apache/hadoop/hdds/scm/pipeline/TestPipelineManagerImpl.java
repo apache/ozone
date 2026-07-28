@@ -1021,7 +1021,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testCloseNonStreamablePipelines() throws Exception {
+  public void testClosePipelinesExposingNewPorts() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       // Registered datanodes (MockNodeManager) expose all ports incl datastream.
       final List<DatanodeInfo> registered = nodeManager.getAllNodes();
@@ -1046,10 +1046,10 @@ public class TestPipelineManagerImpl {
       // ALLOCATED (non-open) portless -> skipped.
       final Pipeline allocated = addPipeline(pipelineManager, ALLOCATED, idsB);
 
-      pipelineManager.closeNonStreamablePipelines();
+      pipelineManager.closePipelinesExposingNewPorts();
 
       assertFalse(exists(pipelineManager, stale.getId()),
-          "legacy portless OPEN pipeline should be closed and deleted");
+          "OPEN pipeline whose nodes expose new ports should be closed and deleted");
       assertTrue(exists(pipelineManager, portful.getId()));
       assertTrue(exists(pipelineManager, unreg.getId()));
       assertTrue(exists(pipelineManager, allocated.getId()));
@@ -1057,7 +1057,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testCloseNonStreamablePipelinesSwallowsError() throws Exception {
+  public void testClosePipelinesExposingNewPortsSwallowsError() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       final List<DatanodeInfo> registered = nodeManager.getAllNodes();
       final List<DatanodeDetails> nodes = new ArrayList<>();
@@ -1069,17 +1069,17 @@ public class TestPipelineManagerImpl {
       final PipelineManagerImpl spy = spy(pipelineManager);
       doThrow(new IOException("boom")).when(spy).closePipeline(stale.getId());
       // The close failure is logged and swallowed; the loop does not throw.
-      spy.closeNonStreamablePipelines();
+      spy.closePipelinesExposingNewPorts();
       assertTrue(exists(pipelineManager, stale.getId()));
     }
   }
 
   @Test
   public void testScrubAndCloseWiring() throws Exception {
-    // The background task scrubs then closes non-streamable pipelines; on an
-    // empty manager both are no-ops and must not throw.
+    // The background task scrubs then closes pipelines exposing new ports; on
+    // an empty manager both are no-ops and must not throw.
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
-      pipelineManager.scrubAndCloseNonStreamablePipelines();
+      pipelineManager.scrubAndClosePipelinesExposingNewPorts();
     }
   }
 
@@ -1089,8 +1089,8 @@ public class TestPipelineManagerImpl {
       final PipelineManagerImpl spy = spy(pipelineManager);
       doThrow(new IOException("boom")).when(spy).scrubPipelines();
       // Scrub failure is logged and swallowed; the close pass still runs.
-      spy.scrubAndCloseNonStreamablePipelines();
-      verify(spy).closeNonStreamablePipelines();
+      spy.scrubAndClosePipelinesExposingNewPorts();
+      verify(spy).closePipelinesExposingNewPorts();
     }
   }
 }

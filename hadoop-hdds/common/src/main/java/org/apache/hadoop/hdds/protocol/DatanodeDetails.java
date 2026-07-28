@@ -385,6 +385,19 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
+   * Whether this datanode exposes a port name that {@code other} lacks
+   *
+   * @param other a previously recorded snapshot of this node
+   * @return true if this node advertises a port name not present in
+   *     {@code other}
+   */
+  public boolean exposesNewPorts(DatanodeDetails other) {
+    return getPorts().stream()
+        .map(Port::getName)
+        .anyMatch(name -> !other.hasPort(name));
+  }
+
+  /**
    * Helper method to get the Ratis port.
    * 
    * @return Port
