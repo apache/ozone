@@ -23,8 +23,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 /**
  * Container listing filters for an export job.
  * An export job filters containers by {@link ContainerHealthState}, {@link LifeCycleState} or both.
- * Example TAR name:
- * {@code container-ids-health-MISSING_lifecycle-OPEN-20260101T120000Z-{jobId}.tar.gz}
+ * Example archive name:
+ * {@code container-ids-health-MISSING_lifecycle-OPEN-20260101T120000Z.tar.gz}
  */
 public final class ExportScope {
 
