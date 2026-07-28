@@ -75,7 +75,7 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Open PR #$EXISTING_PR exists"
-          else if [[ -n "$BRANCH_EXISTS" ]]; then
+          elif [[ -n "$BRANCH_EXISTS" ]]; then
             echo "No open PR, but branch exists, resetting to master"
             git fetch --depth 1 origin master:master
             git reset --hard master
