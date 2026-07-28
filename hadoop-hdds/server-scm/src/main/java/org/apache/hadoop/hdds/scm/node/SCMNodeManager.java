@@ -475,10 +475,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         } else if (portsChanged(oldNode, datanodeDetails)) {
-          // Refresh the stored node when its port set changes (e.g. a datanode
-          // restarts with Ratis DataStream enabled and now exposes the
-          // RATIS_DATASTREAM port). Otherwise the stale record would keep
-          // streaming clients from reaching the datastream port (HDDS-15799).
+          // Refresh the stored node when its port set changes
           LOG.info("Updating ports for registered datanode {}: {} -> {}",
               datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
