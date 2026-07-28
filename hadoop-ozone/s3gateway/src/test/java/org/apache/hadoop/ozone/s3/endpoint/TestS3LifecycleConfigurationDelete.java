@@ -55,8 +55,12 @@ public class TestS3LifecycleConfigurationDelete {
   @Test
   public void testDeleteNonExistentLifecycleConfiguration()
       throws Exception {
+    String bucketName = "bucket1";
+    Response r = bucketEndpoint.delete(bucketName);
+    assertEquals(HTTP_NO_CONTENT, r.getStatus());
+
     try {
-      bucketEndpoint.delete("bucket1");
+      bucketEndpoint.get(bucketName);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
