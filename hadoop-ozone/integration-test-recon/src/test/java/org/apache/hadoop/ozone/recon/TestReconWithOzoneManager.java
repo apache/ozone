@@ -456,7 +456,7 @@ public class TestReconWithOzoneManager {
     // 8. Start OM
     cluster.getOzoneManager().restart();
     // restart() rebuilds the OM metadata manager, so re-fetch the live handle.
-    metadataManager = cluster.getOzoneManager().getMetadataManager();
+    refreshOmMetadataManager();
 
     // 9. Write more keys and verify delta resumes
     addKeys(25, 30);
@@ -479,6 +479,10 @@ public class TestReconWithOzoneManager {
         return false;
       }
     }, 1000, 30000);
+  }
+
+  private static void refreshOmMetadataManager() {
+    metadataManager = cluster.getOzoneManager().getMetadataManager();
   }
 
   private void addKeys(int start, int end) throws Exception {
