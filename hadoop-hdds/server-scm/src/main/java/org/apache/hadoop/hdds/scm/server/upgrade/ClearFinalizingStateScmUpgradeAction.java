@@ -20,16 +20,29 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import static org.apache.hadoop.hdds.HDDSVersion.ZDU;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.ScmUpgradeActionForVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * No-op upgrade action used only to verify that {@link ScmUpgradeActionForVersion} is scanned by
- * {@link org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider} in tests.
+ * Removes the orphan "finalizing in progress" mark written into the SCM meta table by pre-ZDU
+ * code. Deleting an absent key is a no-op, making the action idempotent.
  */
 @ScmUpgradeActionForVersion(version = ZDU)
-public class ZduScmUpgradeActionForTest implements ScmUpgradeAction {
+public class ClearFinalizingStateScmUpgradeAction implements ScmUpgradeAction {
+  private static final Logger LOG = LoggerFactory.getLogger(ClearFinalizingStateScmUpgradeAction.class);
+
+  // Orphan "finalizing in progress" mark written by pre-ZDU SCM code; removed on ZDU finalization.
+  private static final String LEGACY_FINALIZING_KEY = "#FINALIZING";
+
   @Override
-  public void execute(OzoneStorageContainerManager arg) {
+  public void execute(OzoneStorageContainerManager context) throws Exception {
+    StorageContainerManager scm = (StorageContainerManager) context;
+    Table<String, String> metaTable = scm.getScmMetadataStore().getMetaTable();
+    scm.getScmHAManager().getDBTransactionBuffer().removeFromBuffer(metaTable, LEGACY_FINALIZING_KEY);
+    LOG.info("Removed leftover SCM finalizing mark {} during ZDU finalization.", LEGACY_FINALIZING_KEY);
   }
 }
