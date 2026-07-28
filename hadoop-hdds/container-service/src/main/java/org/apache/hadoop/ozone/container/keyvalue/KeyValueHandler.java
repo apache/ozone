@@ -1841,7 +1841,8 @@ public class KeyValueHandler extends Handler {
    * the end of our current block file. Since we currently don't support leaving holes in block files, reconciliation
    * for this block will be stopped at this point and whatever data we have pulled will be committed.
    * Block commit sequence ID of the block and container are only updated based on the peer's value if the entire block
-   * is read and written successfully.
+   * is read and written successfully, i.e. only when the local block ends up covering every chunk in the peer's
+   * committed block metadata (see coversPeerBlock); chunks already present locally count toward that coverage.
    *
    * To avoid verbose logging during reconciliation, this method should not log successful operations above the debug
    * level.
@@ -1974,7 +1975,18 @@ public class KeyValueHandler extends Handler {
       if (!localOffset2Chunk.isEmpty()) {
         List<ContainerProtos.ChunkInfo> allChunks = new ArrayList<>(localOffset2Chunk.values());
         localBlockData.setChunks(allChunks);
-        putBlockForClosedContainer(container, localBlockData, maxBcsId, allChunksSuccessful);
+        // The peer's BCSID attests exactly the chunk list in its committed BlockData, so that list is the oracle for
+        // adopting it -- not the diff-derived peerChunkList, which omits chunks the peer's scanner marked unhealthy
+        // (and the in-loop unhealthy skip above does not clear allChunksSuccessful). Without this check a trailing
+        // unrepairable peer chunk lets the BCSID advance past data we do not hold: the replica would then admit
+        // reads it cannot serve and look complete to SCM's sequenceId-based source and delete selection.
+        boolean adoptPeerBcsId = allChunksSuccessful && coversPeerBlock(peerBlockData, localOffset2Chunk);
+        if (allChunksSuccessful && !adoptPeerBcsId) {
+          LOG.warn("Repaired all {} diff chunks for block {} in container {} from peer {}, but the local block does " +
+              "not cover the peer's committed chunk list. BCSID stays at the local value.",
+              peerChunkList.size(), localID, containerID, peer);
+        }
+        putBlockForClosedContainer(container, localBlockData, maxBcsId, adoptPeerBcsId);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
         chunkManager.finishWriteChunks(container, localBlockData);
       }
@@ -2006,6 +2018,24 @@ public class KeyValueHandler extends Handler {
       throw new StorageContainerException("Length mismatch for chunk at offset " + localChunkInfo.getOffset() +
           ". Expected: " + localChunkInfo.getLen() + ", Actual: " + peerChunkInfo.getLen(), CHUNK_FILE_INCONSISTENCY);
     }
+  }
+
+  /**
+   * Returns true when every chunk in the peer's committed block metadata is present locally at the same offset with
+   * the same length. Only then does the local block hold everything the peer's BCSID attests, making it safe to adopt
+   * that BCSID. Offset and length equality is sufficient: a chunk at a matching offset either matched checksums in
+   * the merkle tree diff or was length-verified during ingest this round. An empty peer chunk list is vacuously
+   * covered: the peer's BCSID then attests an empty block, which any local state satisfies.
+   */
+  private static boolean coversPeerBlock(ContainerProtos.BlockData peerBlockData,
+      NavigableMap<Long, ContainerProtos.ChunkInfo> localOffset2Chunk) {
+    for (ContainerProtos.ChunkInfo peerChunk : peerBlockData.getChunksList()) {
+      ContainerProtos.ChunkInfo localChunk = localOffset2Chunk.get(peerChunk.getOffset());
+      if (localChunk == null || localChunk.getLen() != peerChunk.getLen()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
