@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdat
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -559,6 +560,27 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Unable to refresh Recon OM DB Snapshot.", e);
       reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
+    }
+  }
+
+  @Override
+  public OMDBReprocessResponse triggerTaskRebuild() {
+    if (omMetadataManager == null || omMetadataManager.getStore() == null) {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.RETRY,
+          "Recon has not loaded an OM DB yet, so there is nothing to rebuild. Ensure an OM DB snapshot is "
+              + "present in the Recon OM DB directory and has been loaded, then retry.");
+    }
+
+    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD);
+
+    if (result == ReconTaskController.ReInitializationResult.SUCCESS) {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.ACCEPTED,
+          "Manual OM DB rebuild queued successfully.");
+    } else {
+      return new OMDBReprocessResponse(OMDBReprocessResponse.Status.RETRY,
+          "Manual OM DB rebuild could not be queued. Buffer might be full or another rebuild is "
+              + "pending. Please retry.");
     }
   }
 
