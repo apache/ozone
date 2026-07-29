@@ -377,7 +377,6 @@ public class SnapshotDefragService extends BackgroundService
    * @param previousSnapshotInfo information about the previous snapshot.
    * @param snapshotInfo information about the current snapshot for which
    *                     incremental defragmentation is performed.
-   * @param snapshotVersion the version of the snapshot to be processed.
    * @param checkpointStore the dbStore instance where data
    *                        updates are ingested after being processed.
    * @param bucketPrefixInfo table prefix information associated with buckets,
@@ -387,7 +386,7 @@ public class SnapshotDefragService extends BackgroundService
    */
   @VisibleForTesting
   void performIncrementalDefragmentation(SnapshotInfo previousSnapshotInfo, SnapshotInfo snapshotInfo,
-      int snapshotVersion, DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
+      DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
       throws IOException {
     // Map of delta files grouped on the basis of the tableName.
     Collection<Pair<Path, SstFileInfo>> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
@@ -411,22 +410,18 @@ public class SnapshotDefragService extends BackgroundService
       for (Map.Entry<String, List<Path>> entry : tableGroupedDeltaFiles.entrySet()) {
         String table = entry.getKey();
         List<Path> deltaFiles = entry.getValue();
-        Path fileToBeIngested;
-        if (deltaFiles.size() == 1 && snapshotVersion > 0) {
-          // If there is only one delta file for the table and the snapshot version is also not 0 then the same delta
-          // file can reingested into the checkpointStore.
-          fileToBeIngested = deltaFiles.get(0);
-        } else {
-          Table<String, CodecBuffer> snapshotTable = snapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
-          Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
-          String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
-          Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
-              previousSnapshotTable, tableBucketPrefix);
-          fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
-          filesToBeDeleted.add(spillResult.getLeft());
-        }
+        // Delta candidates are live RocksDB SSTs selected at file granularity,
+        // not valid external SSTs containing an exact bucket-level delta. Always
+        // rebuild the logical delta, even when there is only one candidate file.
+        Table<String, CodecBuffer> snapshotTable = snapshot.get().getMetadataManager().getStore()
+            .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
+        Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
+            .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
+        String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
+        Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
+            previousSnapshotTable, tableBucketPrefix);
+        Path fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
+        filesToBeDeleted.add(spillResult.getLeft());
         if (fileToBeIngested != null) {
           if (!fileToBeIngested.toFile().exists()) {
             throw new IOException("Delta file does not exist: " + fileToBeIngested);
@@ -687,8 +682,8 @@ public class SnapshotDefragService extends BackgroundService
         LOG.info("Performing incremental defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
             snapshotInfo.getSnapshotId());
         try {
-          performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
-              checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+          performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, checkpointDBStore, prefixInfo,
+              COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
           perfMetrics.setSnapshotDefragServiceIncLatencyMs(Time.monotonicNow() - defragStart);
         } catch (IOException e) {
           snapshotMetrics.incNumSnapshotIncDefragFails();

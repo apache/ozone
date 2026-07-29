@@ -49,7 +49,7 @@ function ozone_debug
 function ozone_validate_classpath_usage
 {
   description=$'The --validate flag checks that all jars required for the command are present on the classpath\n\n'
-  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
+  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop datanode|om|recon|s3g|scm\n\n'
   options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
   ozone_error "${description}${usage_text}${options}"
   exit 1
@@ -636,7 +636,7 @@ function ozone_bootstrap
   export HDDS_LIB_JARS_DIR="${OZONE_HOME}/share/ozone/lib"
 
   export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
-  export OZONE_OPTS=${OZONE_OPTS:-"-Djava.net.preferIPv4Stack=true"}
+  export OZONE_OPTS=${OZONE_OPTS:-}
   ozone_using_envvar OZONE_OPTS
   JSVC_HOME=${JSVC_HOME:-"/usr/bin"}
 
@@ -1334,8 +1334,6 @@ function ozone_add_to_classpath_userpath
 ## @return       may exit on failure conditions
 function ozone_os_tricks
 {
-  local bindv6only
-
   OZONE_IS_CYGWIN=false
   case ${OZONE_OS_TYPE} in
     Darwin)
@@ -1356,25 +1354,6 @@ function ozone_os_tricks
       # with the many threads that we use in Hadoop. Tune the variable
       # down to prevent vmem explosion.
       export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
-      # we put this in QA test mode off so that non-Linux can test
-      if [[ "${QATESTMODE}" = true ]]; then
-        return
-      fi
-
-      # NOTE! OZONE_ALLOW_IPV6 is a developer hook.  We leave it
-      # undocumented in ozone-env.sh because we don't want users to
-      # shoot themselves in the foot while devs make IPv6 work.
-
-      bindv6only=$(/sbin/sysctl -n net.ipv6.bindv6only 2> /dev/null)
-
-      if [[ -n "${bindv6only}" ]] &&
-         [[ "${bindv6only}" -eq "1" ]] &&
-         [[ "${OZONE_ALLOW_IPV6}" != "yes" ]]; then
-        ozone_error "ERROR: \"net.ipv6.bindv6only\" is set to 1 "
-        ozone_error "ERROR: Hadoop networking could be broken. Aborting."
-        ozone_error "ERROR: For more info: http://wiki.apache.org/hadoop/HadoopIPv6"
-        exit 1
-      fi
     ;;
     CYGWIN*)
       # Flag that we're running on Cygwin to trigger path translation later.

@@ -82,9 +82,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
@@ -657,14 +659,27 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     assertNotNull(omMultipartKeyInfo);
 
-    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
-        omMultipartKeyInfo.getPartKeyInfoMap()) {
-      String partKeyName = partKeyInfo.getPartName();
+    // Collect the part names as stored in the DB. For the split parts-table
+    // schema the parts live in the multipart parts table rather than inline
+    // in the multipart info table.
+    List<String> dbPartNames = new ArrayList<>();
+    if (omMultipartKeyInfo.getSchemaVersion()
+        == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+      for (OmMultipartPartInfo partInfo :
+          OMMultipartUploadUtils.scanParts(metadataMgr, uploadID).values()) {
+        dbPartNames.add(partInfo.getPartName());
+      }
+    } else {
+      for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+          omMultipartKeyInfo.getPartKeyInfoMap()) {
+        dbPartNames.add(partKeyInfo.getPartName());
+      }
+    }
 
-      // reconstruct full part name with volume, bucket, partKeyName
-      String fullKeyPartName =
-          metadataMgr.getOzoneKey(volumeName, bucketName, keyName);
-
+    // reconstruct full part name with volume, bucket, partKeyName
+    String fullKeyPartName =
+        metadataMgr.getOzoneKey(volumeName, bucketName, keyName);
+    for (String partKeyName : dbPartNames) {
       // partKeyName format in DB - partKeyName + ClientID
       assertTrue(partKeyName.startsWith(fullKeyPartName),
           "Invalid partKeyName format in DB: " + partKeyName
@@ -1016,10 +1031,69 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     s3Bucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
-    OzoneKeyDetails s3KeyDetailsWithNotExistedParts = ozClient.getProxy()
-            .getS3KeyDetails(s3Bucket.getName(), keyName, 4);
-    List<OzoneKeyLocation> ozoneKeyLocations = s3KeyDetailsWithNotExistedParts.getOzoneKeyLocations();
-    assertEquals(0, ozoneKeyLocations.size());
+    // Reading a part number beyond the object's part count must fail with
+    // InvalidPart, instead of silently returning an empty (0-byte) result.
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART, () ->
+        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 4));
+  }
+
+  @Test
+  void testGetPartNumberWithNonContiguousParts() throws Exception {
+    String parentDir = "a/b/c/d/e/f/";
+    keyName = parentDir + "file-ABC";
+    OzoneVolume s3volume = store.getVolume("s3v");
+    s3volume.createBucket(bucketName);
+    OzoneBucket s3Bucket = s3volume.getBucket(bucketName);
+
+    Map<Integer, String> partsMap = new TreeMap<>();
+    String uploadID = initiateMultipartUpload(s3Bucket, keyName, RATIS,
+            ONE);
+    Pair<String, String> partNameAndETag1 = uploadPart(s3Bucket, keyName,
+            uploadID, 1, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 97));
+    partsMap.put(1, partNameAndETag1.getKey());
+
+    // Part 2 is uploaded but deliberately omitted from the completion below.
+    uploadPart(s3Bucket, keyName, uploadID, 2,
+            generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 98));
+
+    byte[] part3Data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 99);
+    Pair<String, String> partNameAndETag3 = uploadPart(s3Bucket, keyName,
+            uploadID, 3, part3Data);
+    // Complete with non-contiguous part numbers {1, 3}, omitting part 2.
+    partsMap.put(3, partNameAndETag3.getKey());
+
+    s3Bucket.completeMultipartUpload(keyName, uploadID, partsMap);
+
+    // Part 3 exists among the object's blocks, so reading it must succeed.
+    OzoneKeyDetails part3 =
+        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 3);
+    assertEquals(part3Data.length, part3.getDataSize());
+
+    // Part 2 was omitted at completion, so it does not exist and must fail.
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART, () ->
+        ozClient.getProxy().getS3KeyDetails(s3Bucket.getName(), keyName, 2));
+  }
+
+  @Test
+  void testGetPartNumberOnNonMultipartKey() throws Exception {
+    keyName = "non-multipart-file";
+    OzoneVolume s3volume = store.getVolume("s3v");
+    s3volume.createBucket(bucketName);
+    OzoneBucket s3Bucket = s3volume.getBucket(bucketName);
+
+    byte[] data = generateData(1024, (byte) 97);
+    try (OzoneOutputStream out = s3Bucket.createKey(keyName, data.length)) {
+      out.write(data);
+    }
+
+    // partNumber == 1 on a non-multipart key returns the whole object.
+    OzoneKeyDetails part1 =
+        ozClient.getProxy().getS3KeyDetails(bucketName, keyName, 1);
+    assertEquals(data.length, part1.getDataSize());
+
+    // partNumber > 1 on a non-multipart key is out of range.
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART, () ->
+        ozClient.getProxy().getS3KeyDetails(bucketName, keyName, 2));
   }
 
   private String verifyUploadedPart(String uploadID, String partName,

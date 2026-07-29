@@ -94,7 +94,7 @@ public class TestFileSizeCountTask {
     fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
     fileSizeCountTaskFSO = new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
     // Clear RocksDB table before each test.
-    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
+    try (TableIterator<FileSizeCountKey, Table.KeyValue<FileSizeCountKey, Long>> iterator = 
          reconFileMetadataManager.getFileCountTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<FileSizeCountKey, Long> keyValue = iterator.next();

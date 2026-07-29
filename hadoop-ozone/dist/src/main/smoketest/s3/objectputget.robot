@@ -283,9 +283,8 @@ Create&Download big file by multipart upload and get file via part numbers
 
                                 Should Be Equal As Integers        10000000    ${${part_1_size} + ${part_2_size}}
 
-    ${get_part_3_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_3 --part-number 3
-                                Should contain                     ${get_part_3_response}    \"ContentLength\": 0
-                                Should contain                     ${get_part_3_response}    \"PartsCount\": 2
+    ${get_part_3_response}      Execute AWSS3APICli and checkrc    get-object --bucket ${BUCKET} --key big_file /tmp/big_file_3 --part-number 3    255
+                                Should contain                     ${get_part_3_response}    InvalidPart
                                 # clean up
                                 Execute AWSS3Cli                   rm s3://${BUCKET}/big_file
                                 Execute                            rm -rf /tmp/big_file
@@ -296,9 +295,8 @@ Create&Download big file by multipart upload and get file via part numbers
 Create&Download big file by multipart upload and get file not existed part number
                                 Execute                    head -c 10000000 </dev/urandom > /tmp/big_file
     ${result}                   Execute AWSS3CliDebug      cp /tmp/big_file s3://${BUCKET}/
-    ${get_part_99_response}     Execute AWSS3APICli        get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 99
-                                Should contain             ${get_part_99_response}    \"ContentLength\": 0
-                                Should contain             ${get_part_99_response}    \"PartsCount\": 2
+    ${get_part_99_response}     Execute AWSS3APICli and checkrc    get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 99    255
+                                Should contain             ${get_part_99_response}    InvalidPart
                                 # clean up
                                 Execute AWSS3Cli           rm s3://${BUCKET}/big_file
                                 Execute                    rm -rf /tmp/big_file

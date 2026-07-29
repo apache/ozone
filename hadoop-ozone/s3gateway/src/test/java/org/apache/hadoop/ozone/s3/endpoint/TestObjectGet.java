@@ -17,13 +17,18 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
@@ -44,6 +49,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -55,6 +61,7 @@ import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +112,31 @@ public class TestObjectGet {
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
+  }
+
+  @Test
+  public void testGetWithNegativePartNumber() throws Exception {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> get(rest, BUCKET_NAME, KEY_NAME));
+  }
+
+  @Test
+  public void testGetUnreadableKey() {
+    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'}, ISO_8859_1);
+    assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, unreadableKey));
+
+    String malformedUtf8Key = new String(new byte[] {(byte) 0xff}, UTF_8);
+    assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, malformedUtf8Key));
+  }
+
+  @Test
+  public void testGetValidUnicodeKey() throws Exception {
+    String unicodeKey = "café.txt";
+    assertSucceeds(() -> put(rest, BUCKET_NAME, unicodeKey, CONTENT));
+    Response response = get(rest, BUCKET_NAME, unicodeKey);
+    assertEquals(String.valueOf(CONTENT.length()),
+        response.getHeaderString("Content-Length"));
   }
 
   @Test
@@ -194,6 +226,21 @@ public class TestObjectGet {
 
     Response response = get(rest, BUCKET_NAME, KEY_NAME);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void getKeyWithCustomMetadata() throws IOException, OS3Exception {
+    final String keyName = "key-with-meta";
+    final String metaValue = "mymeta";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", metaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(metaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
   }
 
   @Test

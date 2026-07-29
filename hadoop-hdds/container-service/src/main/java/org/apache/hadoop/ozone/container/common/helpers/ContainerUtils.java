@@ -403,4 +403,30 @@ public final class ContainerUtils {
               " not support.");
     }
   }
+
+  /**
+   * @return true if the DataNode may auto-create a missing container for this request
+   */
+  public static boolean isContainerCreatable(ContainerCommandRequestProto request) {
+    switch (request.getCmdType()) {
+    case PutBlock:
+      return isContainerAutoCreateAllowed(request.getPutBlock());
+    case WriteChunk:
+      return isContainerAutoCreateAllowed(request.getWriteChunk());
+    case PutSmallFile:
+      return isContainerAutoCreateAllowed(request.getPutSmallFile().getBlock());
+    default:
+      return true;
+    }
+  }
+
+  private static boolean isContainerAutoCreateAllowed(
+      ContainerProtos.PutBlockRequestProto putBlock) {
+    return !putBlock.hasContainerAutoCreate() || putBlock.getContainerAutoCreate();
+  }
+
+  private static boolean isContainerAutoCreateAllowed(
+      ContainerProtos.WriteChunkRequestProto writeChunk) {
+    return !writeChunk.hasContainerAutoCreate() || writeChunk.getContainerAutoCreate();
+  }
 }

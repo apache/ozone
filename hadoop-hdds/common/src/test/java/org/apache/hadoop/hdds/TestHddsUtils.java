@@ -59,10 +59,24 @@ public class TestHddsUtils {
     assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
 
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("[::1]:9862"));
+
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("::1"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("2001:db8::1"));
+
     assertEquals(Optional.of("2001:db8::1"),
         HddsUtils.getHostName("[2001:db8::1]:9862"));
-    assertEquals(Optional.of("0.0.0.0"),
-        HddsUtils.getHostName("0.0.0.0:9876"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("[2001:db8::1]"));
+
+    // Malformed host:port input is rejected, matching getHostPort().
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.getHostName("a:b"));
   }
 
   @Test

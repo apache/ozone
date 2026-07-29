@@ -259,7 +259,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     createSnapshotForBucket(volumeName, bucket1Name, snapshotName2);
     assertEquals(2, getOmMetadataManager().countRowsInTable(snapshotRenamedTable));
     // Verify the remaining entries are from bucket2
-    try (TableIterator<String, ? extends Table.KeyValue<String, String>> iter =
+    try (TableIterator<String, Table.KeyValue<String, String>> iter =
              snapshotRenamedTable.iterator()) {
       iter.seekToFirst();
       while (iter.hasNext()) {
@@ -419,7 +419,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     // 5. Verify deletedTable now only contains the key from bucket2 (1 row)
     assertEquals(1, getOmMetadataManager().countRowsInTable(deletedTable));
     // Verify the remaining entry is from bucket2
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> iter = deletedTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, RepeatedOmKeyInfo>> iter = deletedTable.iterator()) {
       iter.seekToFirst();
       while (iter.hasNext()) {
         String key = iter.next().getKey();
@@ -457,7 +457,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     // 5. Verify deletedTable now only contains the key from bucket2 (1 row)
     assertEquals(1, getOmMetadataManager().countRowsInTable(deletedDirTable));
     // Verify the remaining entry is from bucket2
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iter = deletedDirTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iter = deletedDirTable.iterator()) {
       while (iter.hasNext()) {
         String key = iter.next().getKey();
         assertTrue(key.startsWith(getOmMetadataManager().getBucketKeyPrefixFSO(volumeName, bucket2Name)),

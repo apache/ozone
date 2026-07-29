@@ -55,12 +55,24 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY = OZONE_RECON_CHATBOT_PREFIX
       + "anthropic.api.key";
 
+  /**
+   * Gateway API key. Used when provider is set to "gateway" to route all requests
+   * (regardless of underlying model) through an OpenAI-compatible gateway (e.g. LiteLLM).
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_API_KEY = OZONE_RECON_CHATBOT_PREFIX + "gateway.api.key";
+
   // ── Per-provider base URL overrides (optional) ──────────────
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "openai.base.url";
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT = "https://api.openai.com";
   
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gemini.base.url";
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com/v1beta/openai/";
+
+  /**
+   * Required base URL when using the "gateway" provider. Points to your internal
+   * OpenAI-compatible endpoint. No default is provided.
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gateway.base.url";
 
   // ── Execution policy ────────────────────────────────────────
 
@@ -140,6 +152,14 @@ public final class ChatbotConfigKeys {
       OZONE_RECON_CHATBOT_PREFIX + "anthropic.models";
   public static final String OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT =
       "claude-opus-4-6,claude-sonnet-4-6";
+
+  /**
+   * Comma-separated list of model aliases exposed by your OpenAI-compatible gateway.
+   * Required when using the "gateway" provider. Include all models (Claude, Gemini, GPT)
+   * that your gateway supports. No default is provided.
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_MODELS =
+      OZONE_RECON_CHATBOT_PREFIX + "gateway.models";
 
   // ── Anthropic-specific headers ───────────────────────────────
   /**

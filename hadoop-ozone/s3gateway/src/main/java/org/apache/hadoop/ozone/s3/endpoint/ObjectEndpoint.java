@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
@@ -58,6 +59,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -362,6 +364,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   ) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
+      validateObjectKeyUri(keyPath);
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
       throw newError(bucketName, keyPath, ex);
@@ -373,6 +376,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -485,6 +492,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
+      addCustomMetadataHeaders(responseBuilder, keyDetails);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -537,6 +545,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  /**
+   * Guarantees that an S3-originated multipart upload part carries an ETag
+   * before it is committed. S3 requires every uploaded part to have an ETag
+   * (see UploadPart and CompleteMultipartUpload), and all S3 gateway
+   * part-write paths stamp the MD5 of the part as its ETag. This pre-commit
+   * check enforces that invariant so no S3 part can be committed without one
+   * (e.g. an UploadPartCopy whose source key has no ETag).
+   *
+   * <p>Note: the Ozone Manager also enforces a mandatory ETag server-side for
+   * every committed part (in the split parts-table schema) for ALL clients,
+   * not just S3. This gateway-side check is an earlier, S3-native failure so
+   * the client gets a clean S3 error instead of an OM INVALID_REQUEST.
+   */
+  private static void requirePartETag(Map<String, String> metadata)
+      throws IOException {
+    if (metadata == null
+        || StringUtils.isBlank(metadata.get(OzoneConsts.ETAG))) {
+      throw new IOException(
+          "S3 multipart upload part cannot be committed without an ETag");
+    }
+  }
+
   static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
     String eTag = key.getMetadata().get(OzoneConsts.ETAG);
     if (eTag != null) {
@@ -563,6 +593,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     OzoneKey key;
     try {
@@ -570,7 +605,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      key = getClientProtocol().headS3Object(bucketName, keyPath);
+      // A partNumber is validated against the object's parts and yields the
+      // metadata of that part; an out-of-range part throws InvalidPart.
+      key = (partNumber != 0) ?
+          getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
+          getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
@@ -891,11 +930,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_HEADER_RANGE);
         RangeHeader rangeHeader = null;
         if (range != null) {
-          rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 0);
+          Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(range);
+          if (!matcher.matches()
+              || matcher.group("start").isEmpty()
+              || matcher.group("end").isEmpty()) {
+            throw newError(S3ErrorTable.INVALID_ARGUMENT, range);
+          }
+          long startOffset = Long.parseLong(matcher.group("start"));
+          long endOffset = Long.parseLong(matcher.group("end"));
+          long sourceSize = sourceKeyDetails.getDataSize();
+          if (startOffset > endOffset || endOffset >= sourceSize) {
+            throw newError(S3ErrorTable.INVALID_RANGE, range);
+          }
+          rangeHeader = new RangeHeader(startOffset, endOffset, false, false);
           // When copy Range, the size of the target key is the
           // length specified by COPY_SOURCE_HEADER_RANGE.
-          length = rangeHeader.getEndOffset() -
-              rangeHeader.getStartOffset() + 1;
+          length = endOffset - startOffset + 1;
         } else {
           length = sourceKeyDetails.getDataSize();
         }
@@ -936,6 +986,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             if (raw != null) {
               writeGuard.getMetadata().put(OzoneConsts.ETAG, stripQuotes(raw));
             }
+            writeGuard.addPreCommit(
+                () -> requirePartETag(writeGuard.getMetadata()));
             outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -960,6 +1012,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
+          writeGuard.addPreCommit(
+              () -> requirePartETag(writeGuard.getMetadata()));
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);

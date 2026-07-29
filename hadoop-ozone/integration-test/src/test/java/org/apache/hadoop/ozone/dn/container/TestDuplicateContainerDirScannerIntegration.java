@@ -86,6 +86,7 @@ class TestDuplicateContainerDirScannerIntegration {
     conf.setStorageSize(ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
     conf.setInt(OzoneConfigKeys.OZONE_REPLICATION, ONE.getValue());
+    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "3s");
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)

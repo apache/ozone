@@ -73,6 +73,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -91,10 +92,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -197,7 +198,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -367,7 +368,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     String fakeGrandpaKey = "dir1";
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String fullKeyName = fakeParentKey + "/key1";
-    TestDataUtil.createKey(ozoneBucket, fullKeyName, new byte[0]);
+    DataTestUtil.createKey(ozoneBucket, fullKeyName, new byte[0]);
 
     // /dir1/dir2 should not exist
     assertFalse(fs.exists(new Path(fakeParentKey)));
@@ -401,6 +402,49 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
     createKeyWithECReplicationConfig(root, cluster.getConf());
+  }
+
+  @Test
+  void testContentSummaryErasureCodingPolicy() throws Exception {
+    String ratisKey = "ratis-ec-policy-key";
+    String ecKey = "ec-policy-key";
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    Path parentDir = new Path(OZONE_URI_DELIMITER, "ec-policy-mixed-o3fs");
+    Path ratisFile = new Path(parentDir, ratisKey);
+    Path ecFile = new Path(parentDir, ecKey);
+
+    fs.mkdirs(parentDir);
+    String ratisRelKey = "ec-policy-mixed-o3fs/" + ratisKey;
+    String ecRelKey = "ec-policy-mixed-o3fs/" + ecKey;
+    DataTestUtil.createKey(ozoneBucket, ratisRelKey,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new byte[]{0});
+    DataTestUtil.createKey(ozoneBucket, ecRelKey, ecConfig,
+        new byte[]{0});
+
+    try {
+      assertEquals("",
+          fs.getContentSummary(ROOT).getErasureCodingPolicy());
+      assertEquals("Replicated",
+          fs.getContentSummary(ratisFile).getErasureCodingPolicy());
+      assertEquals(ecConfig.getReplication(),
+          fs.getContentSummary(ecFile).getErasureCodingPolicy());
+      assertEquals("",
+          fs.getContentSummary(parentDir).getErasureCodingPolicy());
+    } finally {
+      fs.delete(parentDir, true);
+    }
+  }
+
+  @Test
+  void testLsDashEDoesNotThrow() throws Exception {
+    FsShell shell = new FsShell(fs.getConf());
+    try {
+      int exitCode = shell.run(new String[]{"-ls", "-R", "-e", fsRoot});
+      assertEquals(0, exitCode);
+    } finally {
+      shell.close();
+    }
   }
 
   @Test
@@ -748,7 +792,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     * the "/dir1", "/dir1/dir2/" are fake directory
     * */
     String keyName = "dir1/dir2/key1";
-    TestDataUtil.createKey(ozoneBucket, keyName, new byte[0]);
+    DataTestUtil.createKey(ozoneBucket, keyName, new byte[0]);
     FileStatus[] fileStatuses;
 
     fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
@@ -1075,7 +1119,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String sourceKeyName = fakeParentKey + "/key1";
     String targetKeyName = fakeParentKey +  "/key2";
-    TestDataUtil.createKey(ozoneBucket, sourceKeyName, new byte[0]);
+    DataTestUtil.createKey(ozoneBucket, sourceKeyName, new byte[0]);
 
     Path sourcePath = pathUnderFsRoot("/" + sourceKeyName);
     Path targetPath = pathUnderFsRoot("/" + targetKeyName);
@@ -1202,7 +1246,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testCreateKeyShouldUseRefreshedBucketReplicationConfig()
       throws IOException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     final MockClock testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String
@@ -1508,7 +1552,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
     int keySize = 1024;
-    TestDataUtil.createKey(ozoneBucket, "key1", new byte[keySize]);
+    DataTestUtil.createKey(ozoneBucket, "key1", new byte[keySize]);
     logCapturer.stopCapturing();
     String logContent = logCapturer.getOutput();
 

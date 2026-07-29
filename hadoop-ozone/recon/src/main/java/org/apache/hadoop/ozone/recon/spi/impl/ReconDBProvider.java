@@ -115,8 +115,7 @@ public class ReconDBProvider {
     if (table == null) {
       return;
     }
-    try (TableIterator<Object, ? extends KeyValue<Object, Object>>
-            tableIterator = table.iterator()) {
+    try (TableIterator<Object, Table.KeyValue<Object, Object>> tableIterator = table.iterator()) {
       while (tableIterator.hasNext()) {
         KeyValue<Object, Object> entry = tableIterator.next();
         table.delete(entry.getKey());

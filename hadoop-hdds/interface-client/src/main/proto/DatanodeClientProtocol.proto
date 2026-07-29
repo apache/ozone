@@ -88,6 +88,8 @@ enum Type {
   GetContainerChecksumInfo = 23;
   // Allows us to read a block
   ReadBlock = 24;
+  // Initializes a stream for writing data with PutBlock commited on close.
+  StreamInitWithPutBlock = 25;
 }
 
 
@@ -326,6 +328,7 @@ message BlockData {
 message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
+  optional bool containerAutoCreate = 3;
 }
 
 message PutBlockResponseProto {
@@ -441,6 +444,7 @@ message WriteChunkRequestProto  {
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
   optional PutBlockRequestProto block = 4;
+  optional bool containerAutoCreate = 5;
 }
 
 message WriteChunkResponseProto {
