@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,13 +27,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteMarkerResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
@@ -55,12 +59,25 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   private void setupVersionedBucket() throws Exception {
+    setupVersionedBucket(OzoneConsts.QUOTA_RESET, OzoneConsts.QUOTA_RESET);
+  }
+
+  private void setupVersionedBucket(long quotaInBytes, long quotaInNamespace)
+      throws Exception {
+    setupVersionedBucket(quotaInBytes, quotaInNamespace, 0L);
+  }
+
+  private void setupVersionedBucket(long quotaInBytes, long quotaInNamespace,
+      long usedNamespace) throws Exception {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setBucketLayout(BucketLayout.OBJECT_STORE)
         .setVersioningStatus(BucketVersioningStatus.ENABLED)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace)
+        .setUsedNamespace(usedNamespace)
         .setCreationTime(Time.now())
         .build();
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -112,18 +129,19 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
         omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
   }
 
-  private OMRequest commitRequest(boolean isHsync) {
+  private OMRequest commitRequest(boolean isHsync, long dataSize,
+      long writerClientId) {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setModificationTime(Time.now())
-        .setDataSize(0)
+        .setDataSize(dataSize)
         .build();
     return OMRequest.newBuilder()
         .setCommitKeyRequest(CommitKeyRequest.newBuilder()
             .setKeyArgs(keyArgs)
-            .setClientID(clientID)
+            .setClientID(writerClientId)
             .setHsync(isHsync))
         .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
         .setClientId(UUID.randomUUID().toString()).build();
@@ -135,13 +153,25 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
 
   private OMClientResponse commitAt(long trxnLogIndex, boolean isHsync)
       throws Exception {
-    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationConfig, omMetadataManager);
-    OMClientResponse response = new OMKeyCommitRequest(commitRequest(isHsync),
-        getBucketLayout()).validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    OMClientResponse response =
+        commitAt(trxnLogIndex, isHsync, 0L, clientID);
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         response.getOMResponse().getStatus());
     return response;
+  }
+
+  /**
+   * Commits the key as the writer identified by {@code writerClientId}. A
+   * non-hsync commit tombstones its own open key, so a second write of the
+   * same key comes from a different client, as it would in practice.
+   */
+  private OMClientResponse commitAt(long trxnLogIndex, boolean isHsync,
+      long dataSize, long writerClientId) throws Exception {
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
+        writerClientId, replicationConfig, omMetadataManager);
+    return new OMKeyCommitRequest(
+        commitRequest(isHsync, dataSize, writerClientId),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   private OmKeyInfo noncurrentVersion(long versionId) throws Exception {
@@ -308,6 +338,83 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNotNull(noncurrent);
     assertTrue(noncurrent.isNullVersion());
     assertFalse(noncurrent.isDeleteMarker());
+  }
+
+  /**
+   * Every version counts against the bucket's space quota: an overwrite adds
+   * the new version's usage without releasing the version it supersedes.
+   */
+  @Test
+  public void testEachVersionCountsAgainstUsedBytes() throws Exception {
+    setupVersionedBucket();
+    String bucketKey =
+        omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        commitAt(500L, false, 100L, clientID).getOMResponse().getStatus());
+    long afterFirst = omMetadataManager.getBucketTable().get(bucketKey)
+        .getUsedBytes();
+    assertEquals(QuotaUtil.getReplicatedSize(100L, replicationConfig),
+        afterFirst);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        commitAt(600L, false, 300L, clientID + 1).getOMResponse().getStatus());
+    long afterSecond = omMetadataManager.getBucketTable().get(bucketKey)
+        .getUsedBytes();
+    assertEquals(afterFirst
+            + QuotaUtil.getReplicatedSize(300L, replicationConfig),
+        afterSecond);
+    assertEquals(2, omMetadataManager.getBucketTable().get(bucketKey)
+        .getUsedNamespace());
+  }
+
+  @Test
+  public void testVersionedWriteRejectedWhenSpaceQuotaExceeded()
+      throws Exception {
+    long quota = QuotaUtil.getReplicatedSize(150L, replicationConfig);
+    setupVersionedBucket(quota, OzoneConsts.QUOTA_RESET);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        commitAt(500L, false, 100L, clientID).getOMResponse().getStatus());
+    // the first version is not released, so the second one no longer fits
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        commitAt(600L, false, 100L, clientID + 1).getOMResponse().getStatus());
+
+    OmKeyInfo current = currentVersion();
+    assertEquals(500L, current.getVersionId());
+    assertNull(noncurrentVersion(500L));
+  }
+
+  @Test
+  public void testVersionedWriteRejectedWhenNamespaceQuotaExceeded()
+      throws Exception {
+    setupVersionedBucket(OzoneConsts.QUOTA_RESET, 1L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        commitAt(500L, false, 0L, clientID).getOMResponse().getStatus());
+    // each version is a record of its own, so the second one needs namespace
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        commitAt(600L, false, 0L, clientID + 1).getOMResponse().getStatus());
+  }
+
+  /** A delete marker is a record too, so it needs namespace quota. */
+  @Test
+  public void testDeleteMarkerRejectedWhenNamespaceQuotaExceeded()
+      throws Exception {
+    // the bucket already holds the one key its namespace quota allows
+    setupVersionedBucket(OzoneConsts.QUOTA_RESET, 1L, 1L);
+    seedCurrentVersion(100L);
+
+    OMClientResponse response = new OMKeyDeleteRequest(deleteRequest(),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, 200L);
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        response.getOMResponse().getStatus());
+    assertFalse(currentVersion().isDeleteMarker());
+    // a rejected request must not leave the superseded version behind in the
+    // versionedKeyTable cache, and its response has to declare that table so
+    // that the double buffer cleans up whatever the request did touch
+    assertNull(noncurrentVersion(100L));
+    assertInstanceOf(OMKeyDeleteMarkerResponse.class, response);
   }
 
   /**
