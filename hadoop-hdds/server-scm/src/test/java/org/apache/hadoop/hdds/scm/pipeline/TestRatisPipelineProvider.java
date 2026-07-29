@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -96,9 +97,8 @@ public class TestRatisPipelineProvider {
     init(maxPipelinePerNode, conf, testDir);
   }
 
-  public void initWithNodes(int maxPipelinePerNode, List<DatanodeDetails> nodes, int count)
+  public void initWithNodes(int maxPipelinePerNode, OzoneConfiguration conf, List<DatanodeDetails> nodes, int count)
       throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, count);
     initializeCommonState(maxPipelinePerNode, conf);
@@ -287,6 +287,9 @@ public class TestRatisPipelineProvider {
 
   @Test
   public void testCreatePipelinePrioritizesRatisStreamingNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     List<DatanodeDetails> nodes = new ArrayList<>();
     // Add 3 nodes WITH RATIS_DATASTREAM
     for (int i = 0; i < 3; i++) {
@@ -297,7 +300,7 @@ public class TestRatisPipelineProvider {
       nodes.add(createDatanodeDetails(false));
     }
 
-    initWithNodes(1, nodes, 3);
+    initWithNodes(1, conf, nodes, 3);
     Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     assertEquals(3, pipeline.getNodes().size());
     for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -308,6 +311,9 @@ public class TestRatisPipelineProvider {
 
   @Test
   public void testCreatePipelineFallsBackWhenNotEnoughRatisStreamingNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     List<DatanodeDetails> nodes = new ArrayList<>();
     // Add 2 nodes WITH RATIS_DATASTREAM
     for (int i = 0; i < 2; i++) {
@@ -316,7 +322,7 @@ public class TestRatisPipelineProvider {
     // Add 1 node WITHOUT RATIS_DATASTREAM
     nodes.add(createDatanodeDetails(false));
 
-    initWithNodes(1, nodes, 3);
+    initWithNodes(1, conf, nodes, 3);
     Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     assertEquals(3, pipeline.getNodes().size());
     

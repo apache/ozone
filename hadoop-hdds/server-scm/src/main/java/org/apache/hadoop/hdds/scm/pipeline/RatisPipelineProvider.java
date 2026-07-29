@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -66,6 +67,7 @@ public class RatisPipelineProvider
   private final SCMContext scmContext;
   private final long containerSizeBytes;
   private final long minRatisVolumeSizeBytes;
+  private final boolean isRatisStreamingEnabled;
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
@@ -92,6 +94,9 @@ public class RatisPipelineProvider
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
         StorageUnit.BYTES);
+    this.isRatisStreamingEnabled = conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     try {
       leaderChoosePolicy = LeaderChoosePolicyFactory
           .getPolicy(conf, nodeManager, stateManager);
@@ -223,23 +228,29 @@ public class RatisPipelineProvider
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    excludedNodes = excludedNodes.isEmpty() ? new ArrayList<>() : excludedNodes;
-    List<DatanodeDetails> strictExcludedNodes = null;
+    excludedNodes = excludedNodes.isEmpty() ? null : excludedNodes;
+    List<DatanodeDetails> additionalExcludedNodes = null;
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
       if (count >= nodeManager.pipelineLimit(d)) {
-        excludedNodes.add(d);
-      } else if (!d.hasPort(RATIS_DATASTREAM)) {
-        if (strictExcludedNodes == null) {
-          strictExcludedNodes = new ArrayList<>();
+        if (excludedNodes == null) {
+          excludedNodes = new ArrayList<>();
         }
-        strictExcludedNodes.add(d);
+        excludedNodes.add(d);
+      } else if (isRatisStreamingEnabled && !d.hasPort(RATIS_DATASTREAM)) {
+        if (additionalExcludedNodes == null) {
+          additionalExcludedNodes = new ArrayList<>();
+        }
+        additionalExcludedNodes.add(d);
       }
     }
-    if (strictExcludedNodes != null) {
-      strictExcludedNodes.addAll(excludedNodes);
+    // If the cluster does not support Ratis streaming, or if all nodes support it, no fallback will occur.
+    if (additionalExcludedNodes != null) {
+      if (excludedNodes != null) {
+        additionalExcludedNodes.addAll(excludedNodes);
+      }
       try {
-        return placementPolicy.chooseDatanodes(strictExcludedNodes,
+        return placementPolicy.chooseDatanodes(additionalExcludedNodes,
             favoredNodes, requiredNode, minRatisVolumeSizeBytes,
             containerSizeBytes);
       } catch (SCMException scmException) {
