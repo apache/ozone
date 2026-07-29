@@ -86,8 +86,16 @@ public class SnapshotDiffResponse {
     return reason;
   }
 
+  public SubStatus getSubStatus() {
+    return subStatus;
+  }
+
   public void setSubStatus(SubStatus subStatus) {
     this.subStatus = subStatus;
+  }
+
+  public double getProgressPercent() {
+    return progressPercent;
   }
 
   public void setProgressPercent(double progressPercent) {
@@ -143,11 +151,10 @@ public class SnapshotDiffResponse {
       str.append(".\n");
       if (subStatus != null) {
         str.append("SubStatus : ")
-            .append(subStatus);
-        if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS) ||
-            subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)) {
-          str.append("Keys Processed Estimated Percentage : ")
-              .append(progressPercent);
+            .append(subStatus)
+            .append('\n');
+        if (subStatus.hasProgress()) {
+          str.append(String.format("Keys Processed Estimated Percentage : %.1f%n", progressPercent));
         }
       }
     }
@@ -183,7 +190,12 @@ public class SnapshotDiffResponse {
     SST_FILE_DELTA_FULL_DIFF,
     OBJECT_ID_MAP_GEN_OBS,
     OBJECT_ID_MAP_GEN_FSO,
-    DIFF_REPORT_GEN;
+    DIFF_REPORT_GEN,
+    PATH_RESOLUTION_FSO;
+
+    public boolean hasProgress() {
+      return this == OBJECT_ID_MAP_GEN_OBS || this == OBJECT_ID_MAP_GEN_FSO;
+    }
 
     public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
       return SubStatus.valueOf(subStatusProto.name());

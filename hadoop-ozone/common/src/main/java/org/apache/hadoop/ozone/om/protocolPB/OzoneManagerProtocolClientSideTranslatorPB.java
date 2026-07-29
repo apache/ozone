@@ -1468,12 +1468,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
 
-    return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
-        diffResponse.getSnapshotDiffReport()),
+    SnapshotDiffResponse result = new SnapshotDiffResponse(
+        SnapshotDiffReportOzone.fromProtobuf(diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
         diffResponse.getReason(),
         reportOnly);
+    if (diffResponse.hasSubStatus()) {
+      result.setSubStatus(SnapshotDiffResponse.SubStatus.fromProtoBuf(diffResponse.getSubStatus()));
+      result.setProgressPercent(diffResponse.getProgressPercent());
+    }
+    return result;
   }
 
   /**

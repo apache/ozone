@@ -2256,6 +2256,7 @@ message SnapshotDiffResponse {
       OBJECT_ID_MAP_GEN_OBS = 3;
       OBJECT_ID_MAP_GEN_FSO = 4;
       DIFF_REPORT_GEN = 5;
+      PATH_RESOLUTION_FSO = 6;
   }
 
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
@@ -2263,6 +2264,7 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+  optional double progressPercent = 6;
 }
 
 message SubmitSnapshotDiffResponse {
