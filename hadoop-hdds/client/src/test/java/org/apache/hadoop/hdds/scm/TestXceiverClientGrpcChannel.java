@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -33,7 +34,7 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class TestXceiverClientGrpc {
+class TestXceiverClientGrpcChannel {
 
   private static final int PORT = 9882;
   private static final String HOSTNAME = "dn-host.example.com";
@@ -41,7 +42,7 @@ class TestXceiverClientGrpc {
 
   @ParameterizedTest(name = "useDatanodeHostname={0}")
   @ValueSource(booleans = {false, true})
-  void createChannelUsesConfiguredAddress(boolean useHostname) throws IOException {
+  void createChannelUsesConfiguredAddress(boolean useHostname) throws IOException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, useHostname);
 
@@ -55,6 +56,7 @@ class TestXceiverClientGrpc {
       assertThat(channel.authority()).isEqualTo(expectedHost + ":" + PORT);
     } finally {
       channel.shutdownNow();
+      channel.awaitTermination(10, TimeUnit.SECONDS);
     }
   }
 
