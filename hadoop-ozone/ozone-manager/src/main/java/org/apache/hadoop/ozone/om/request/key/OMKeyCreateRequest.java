@@ -502,5 +502,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
       builder.setDerivedKey(ByteString.copyFrom(derivedKey));
     }
+    return builder;
   }
 }
