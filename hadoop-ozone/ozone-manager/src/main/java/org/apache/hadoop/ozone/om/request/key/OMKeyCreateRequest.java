@@ -339,6 +339,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      CreateKeyResponse.Builder builder =
+          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
@@ -356,12 +358,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
-      CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+      builder.setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion);
-      getResponseWithDerivedKey(builder, omRequest, ozoneManager, createKeyRequest);
       // Prepare response
       omResponse.setCreateKeyResponse(builder.build())
           .setCmdType(Type.CreateKey);
@@ -483,9 +483,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     return req;
   }
 
-  protected void getResponseWithDerivedKey(
-      CreateKeyResponse.Builder builder, OMRequest omRequest, OzoneManager ozoneManager,
+  protected CreateKeyResponse.Builder getResponseBuilderWithDerivedKey(
+      OMRequest omRequest, OzoneManager ozoneManager,
       CreateKeyRequest createKeyRequest) throws IOException {
+    CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder();
     if (omRequest.hasS3Authentication() && ozoneManager.isSecurityEnabled()
         && createKeyRequest.hasDerivedKeyPiggyBacking()
         && createKeyRequest.getDerivedKeyPiggyBacking()
