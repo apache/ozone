@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
-import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -51,10 +50,7 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -211,16 +207,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                   keyArgs.getLatestVersionLocation()))
               .setID(clientID)
               .setOpenVersion(openVersion);
-      if (getOmRequest().hasS3Authentication() && ozoneManager.isSecurityEnabled()
-          && createKeyRequest.hasDerivedKeyPiggyBacking()
-          && createKeyRequest.getDerivedKeyPiggyBacking()
-      ) {
-        OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(getOmRequest());
-        if (s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {
-          byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
-          createKeyResponseBuilder.setDerivedKey(ByteString.copyFrom(derivedKey));
-        }
-      }
+      getResponseWithDerivedKey(createKeyResponseBuilder, getOmRequest(), ozoneManager, createKeyRequest);
       omResponse.setCreateKeyResponse(createKeyResponseBuilder.build())
               .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),

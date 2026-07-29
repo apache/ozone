@@ -85,8 +85,6 @@ public final class AWSV4AuthValidator {
     String dateStamp = signData[0];
     String regionName = signData[1];
     String serviceName = signData[2];
-    LOG.info("key: {}, dateStamp: {}, regionName: {}, serviceName: {}",
-        key, dateStamp, regionName, serviceName);
     byte[] kDate = sign(("AWS4" + key)
         .getBytes(StandardCharsets.UTF_8), dateStamp);
     byte[] kRegion = sign(kDate, regionName);
@@ -102,11 +100,6 @@ public final class AWSV4AuthValidator {
       String userKey) {
     String expectedSignature = Hex.encode(sign(getSigningKey(userKey,
         strToSign), strToSign));
-    return expectedSignature.equals(signature);
-  }
-
-  public static boolean validateChunk(String signature, String chunk, byte[] derivedKey) {
-    String expectedSignature = Hex.encode(sign(derivedKey, chunk));
     return expectedSignature.equals(signature);
   }
 }

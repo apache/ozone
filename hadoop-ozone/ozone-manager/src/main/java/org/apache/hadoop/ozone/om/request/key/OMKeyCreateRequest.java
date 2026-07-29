@@ -361,16 +361,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion);
-      if (omRequest.hasS3Authentication() && ozoneManager.isSecurityEnabled()
-          && createKeyRequest.hasDerivedKeyPiggyBacking()
-          && createKeyRequest.getDerivedKeyPiggyBacking()
-      ) {
-        OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(omRequest);
-        if (s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {
-          byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
-          builder.setDerivedKey(ByteString.copyFrom(derivedKey));
-        }
-      }
+      getResponseWithDerivedKey(builder, omRequest, ozoneManager, createKeyRequest);
       // Prepare response
       omResponse.setCreateKeyResponse(builder.build())
           .setCmdType(Type.CreateKey);
@@ -490,5 +481,25 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  protected void getResponseWithDerivedKey(
+      CreateKeyResponse.Builder builder, OMRequest omRequest, OzoneManager ozoneManager,
+      CreateKeyRequest createKeyRequest) throws IOException {
+    if (omRequest.hasS3Authentication() && ozoneManager.isSecurityEnabled()
+        && createKeyRequest.hasDerivedKeyPiggyBacking()
+        && createKeyRequest.getDerivedKeyPiggyBacking()
+    ) {
+      OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(omRequest);
+      if (!s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {
+        // Piggyback was requested but this token type cannot produce a derived key.
+        // S3 Gateway should only set this flag for S3AUTHINFO tokens.
+        LOG.warn("Derived key piggyback requested but token type is {}, " +
+                "not S3AUTHINFO. Derived key will not be returned.",
+            s3Token.getTokenType());
+      }
+      byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
+      builder.setDerivedKey(ByteString.copyFrom(derivedKey));
+    }
   }
 }
