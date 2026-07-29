@@ -168,7 +168,7 @@ Assume Role And Configure STS Profile
     Configure STS Profile         ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${STS_SESSION_TOKEN}
 
 Assume Role Should Fail
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_cli_args}=${EMPTY}
     Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
 
     IF                            '${expected_http_code}' != '${EMPTY}'
@@ -177,6 +177,7 @@ Assume Role Should Fail
         ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --profile permanent --debug 2>&1
         ${cmd} =                  Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --duration-seconds ${duration_seconds}    ${cmd}
         ${cmd} =                  Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
+        ${cmd} =                  Set Variable If               '${extra_cli_args}' != '${EMPTY}'    ${cmd} ${extra_cli_args}    ${cmd}
 
         ${output} =               Execute And Ignore Error      ${cmd}
         Should Contain            ${output}                     ${expected_error}
@@ -197,10 +198,26 @@ Assume Role Should Fail
 
 Assume Role Should Fail Using Curl
     # This keyword is needed to test boundary cases that the aws client prevents you from issuing, such as too short duration for token
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=400  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=400  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_curl_params}=${EMPTY}
     ${cmd} =                      Set Variable                  curl --silent --show-error --include --request POST --aws-sigv4 "aws:amz:us-east-1:sts" --user '${perm_access_key_id}:${perm_secret_key}' --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "Action=AssumeRole" --data-urlencode "Version=2011-06-15" --data-urlencode "RoleArn=${role_arn}" --data-urlencode "RoleSessionName=${role_session_name}" ${STS_ENDPOINT_URL}
     ${cmd} =                      Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --data-urlencode "DurationSeconds=${duration_seconds}"    ${cmd}
     ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --data-urlencode "Policy=${policy_json}"    ${cmd}
+    ${cmd} =                      Set Variable If               '${extra_curl_params}' != '${EMPTY}'    ${cmd} ${extra_curl_params}    ${cmd}
+    ${output} =                   Execute And Ignore Error      ${cmd}
+    Should Contain                ${output}                     ${expected_error}
+    @{http_codes} =               Get Regexp Matches            ${output}    (?m)^HTTP/[0-9.]+ ([0-9]{3})    1
+    ${code_count} =               Get Length                    ${http_codes}
+    Should Be True                ${code_count} > 0             Expected to find an HTTP status code in curl output, but none was found.
+    ${http_code} =                Get From List                 ${http_codes}    -1
+    Should Be Equal As Strings    ${http_code}                  ${expected_http_code}
+
+Assume Role Should Fail Using Curl Get
+    # STS supports GET requests with query parameters. Use this to validate query-string parsing / validation.
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=400  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_curl_params}=${EMPTY}
+    ${cmd} =                      Set Variable                  curl --silent --show-error --include --request GET --get --aws-sigv4 "aws:amz:us-east-1:sts" --user '${perm_access_key_id}:${perm_secret_key}' --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "Action=AssumeRole" --data-urlencode "Version=2011-06-15" --data-urlencode "RoleArn=${role_arn}" --data-urlencode "RoleSessionName=${role_session_name}" ${STS_ENDPOINT_URL}
+    ${cmd} =                      Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --data-urlencode "DurationSeconds=${duration_seconds}"    ${cmd}
+    ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --data-urlencode "Policy=${policy_json}"    ${cmd}
+    ${cmd} =                      Set Variable If               '${extra_curl_params}' != '${EMPTY}'    ${cmd} ${extra_curl_params}    ${cmd}
     ${output} =                   Execute And Ignore Error      ${cmd}
     Should Contain                ${output}                     ${expected_error}
     @{http_codes} =               Get Regexp Matches            ${output}    (?m)^HTTP/[0-9.]+ ([0-9]{3})    1
