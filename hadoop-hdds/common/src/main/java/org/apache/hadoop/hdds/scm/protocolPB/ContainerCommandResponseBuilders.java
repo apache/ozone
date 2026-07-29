@@ -337,10 +337,16 @@ public final class ContainerCommandResponseBuilders {
 
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
+    return getReadBlockResponse(request, checksumData,
+        ByteString.copyFrom(data), offset);
+  }
 
+  public static ContainerCommandResponseProto getReadBlockResponse(
+      ContainerCommandRequestProto request, ChecksumData checksumData,
+      ByteString data, long offset) {
     ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
         .setChecksumData(checksumData.getProtoBufMessage())
-        .setData(ByteString.copyFrom(data))
+        .setData(data)
         .setOffset(offset)
         .build();
 

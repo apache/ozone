@@ -35,6 +35,9 @@ public enum DatanodeVersion implements ComponentVersion {
           "a PutBlock request"),
   STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
+  RATIS_DATASTREAM_READ_BLOCK_SUPPORT(4,
+      "This version supports Ratis DataStream ReadBlock, including "
+          + "group-independent reads for closed containers."),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
