@@ -163,18 +163,20 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
   @Produces(MediaType.APPLICATION_XML)
   public Response post(Form form) throws OS3Exception {
-    final MultivaluedMap<String, String> formParams = form == null ? null : form.asMap();
-    final String action = formParams == null ? null : formParams.getFirst("Action");
-    final String roleArn = formParams == null ? null : formParams.getFirst("RoleArn");
-    final String roleSessionName = formParams == null ? null : formParams.getFirst("RoleSessionName");
-    final Integer durationSeconds =
-        parseIntegerOrNull(formParams == null ? null : formParams.getFirst("DurationSeconds"));
-    final String version = formParams == null ? null : formParams.getFirst("Version");
-    final String awsIamSessionPolicy = formParams == null ? null : formParams.getFirst("Policy");
+    if (form == null) {
+      return unknownOperationExceptionResponse();
+    }
 
-    final Set<String> formParamNames = formParams == null ? Collections.emptySet() : formParams.keySet();
+    final MultivaluedMap<String, String> formParams = form.asMap();
+    final String action = formParams.getFirst("Action");
+    final String roleArn = formParams.getFirst("RoleArn");
+    final String roleSessionName = formParams.getFirst("RoleSessionName");
+    final Integer durationSeconds = parseIntegerOrNull(formParams.getFirst("DurationSeconds"));
+    final String version = formParams.getFirst("Version");
+    final String awsIamSessionPolicy = formParams.getFirst("Policy");
+
     return handleSTSRequest(
-        formParamNames, action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
+        formParams.keySet(), action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
   }
 
   private Response handleSTSRequest(Set<String> paramNamesToValidate, String action, String roleArn,
@@ -184,10 +186,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     try {
       if (action == null) {
         // Amazon STS has a different structure for the XML error response when the action is missing
-        return Response.status(BAD_REQUEST)
-            .entity("<UnknownOperationException/>")
-            .type(MediaType.APPLICATION_XML)
-            .build();
+        return unknownOperationExceptionResponse();
       }
 
       switch (action) {
@@ -366,9 +365,14 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   }
 
   private static boolean isAllowedAssumeRoleParameter(String paramName) {
-    return StringUtils.isBlank(paramName)
-        || ASSUME_ROLE_ALLOWED_PARAMS.contains(paramName)
-        || Strings.CI.startsWith(paramName, SIGV4_PARAM_PREFIX);
+    return ASSUME_ROLE_ALLOWED_PARAMS.contains(paramName) || Strings.CI.startsWith(paramName, SIGV4_PARAM_PREFIX);
+  }
+
+  private static Response unknownOperationExceptionResponse() {
+    return Response.status(BAD_REQUEST)
+        .entity("<UnknownOperationException/>")
+        .type(MediaType.APPLICATION_XML)
+        .build();
   }
 
   private static boolean isAwsValidButNotImplementedAssumeRoleParameter(String paramName) {

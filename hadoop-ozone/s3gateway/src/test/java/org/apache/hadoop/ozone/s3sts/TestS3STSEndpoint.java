@@ -145,8 +145,7 @@ public class TestS3STSEndpoint {
     setBaseAssumeRoleFormParameters();
     formParameters.param("ExternalId", "external-id");
 
-    final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.post(formParameters));
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
 
     assertEquals(501, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -219,8 +218,7 @@ public class TestS3STSEndpoint {
     setBaseAssumeRoleFormParameters();
     formParameters.param("TotallyUnknownParam", "y");
 
-    final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.post(formParameters));
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -234,6 +232,40 @@ public class TestS3STSEndpoint {
   }
 
   @Test
+  public void testStsAssumeRoleRejectsBlankParameterNameForGetMethod() throws Exception {
+    setAssumeRoleQueryParameters("", "x");
+
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "Unsupported AssumeRole parameter(s): ");
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsBlankParameterNameForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
+    formParameters.param("", "x");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "Unsupported AssumeRole parameter(s): ");
+  }
+
+  @Test
   public void testStsAssumeRoleIgnoresUnknownQueryStringParameterForPostMethod() {
     queryParameters.add("foo", "bar");
 
@@ -241,6 +273,7 @@ public class TestS3STSEndpoint {
     // Query string parameters should not affect validation results.
     setBaseAssumeRoleFormParameters();
     final Response response = endpoint.post(formParameters);
+    response.close();
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -254,8 +287,7 @@ public class TestS3STSEndpoint {
     formParameters.param("Signature", "signature");
     formParameters.param("Expires", "3600");
 
-    final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.post(formParameters));
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -355,6 +387,22 @@ public class TestS3STSEndpoint {
     final Document doc = parseXml(errorMessage);
     final Element root = doc.getDocumentElement();
     assertEquals("UnknownOperationException", root.getLocalName());
+  }
+
+  @Test
+  public void testStsNullFormForPostMethod() throws Exception {
+    final Response response = endpoint.post(null);
+
+    assertEquals(400, response.getStatus());
+    verifyNoInteractions(auditLogger);
+    final String errorMessage = (String) response.getEntity();
+    assertEquals("<UnknownOperationException/>", errorMessage);
+
+    final Document doc = parseXml(errorMessage);
+    final Element root = doc.getDocumentElement();
+    assertEquals("UnknownOperationException", root.getLocalName());
+
+    response.close();
   }
 
   @Test
