@@ -160,6 +160,38 @@ public class TestTypedTable {
   }
 
   @Test
+  public void testClear() throws Exception {
+    final TypedTable<Long, String> table = newTypedTable(1, LongCodec.get(), StringCodec.get());
+
+    table.clear();
+    assertTrue(table.isEmpty());
+
+    table.put(1L, "one");
+    table.clear();
+    assertTrue(table.isEmpty());
+
+    table.put(1L, "one");
+    table.put(2L, "two");
+    table.put(3L, "three");
+    table.clear();
+    assertTrue(table.isEmpty());
+
+    table.put(4L, "four");
+    assertEquals("four", table.get(4L));
+  }
+
+  @Test
+  public void testClearInMemoryTable() throws Exception {
+    final Table<Long, String> table = new InMemoryTestTable<>();
+    table.put(1L, "one");
+    table.put(2L, "two");
+
+    table.clear();
+
+    assertTrue(table.isEmpty());
+  }
+
+  @Test
   public void testEmptyStringCodecBuffer() throws Exception {
     final StringCodec codec = StringCodec.get();
     assertTrue(codec.supportCodecBuffer());
