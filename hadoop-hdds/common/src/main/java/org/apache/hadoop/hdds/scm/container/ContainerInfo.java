@@ -91,7 +91,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // Health state of the container (determined by ReplicationManager)
   private ContainerHealthState healthState;
   private boolean suppressed;
-  private StorageTier storageTier;
+  private final StorageTier storageTier;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -299,13 +299,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   @Nullable
-  @JsonIgnore
   public StorageTier getStorageTier() {
     return storageTier;
-  }
-
-  public void setStorageTier(StorageTier storageTier) {
-    this.storageTier = storageTier;
   }
 
   @JsonIgnore

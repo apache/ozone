@@ -221,6 +221,17 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     }
 
     public UniformDatanodesFactory build() {
+      for (int i = 0; i < datanodeStorageType.size(); i++) {
+        List<StorageType> storageTypes = Objects.requireNonNull(
+            datanodeStorageType.get(i),
+            "Datanode storageType list cannot be null");
+        if (!storageTypes.isEmpty()
+            && storageTypes.size() != numDataVolumes) {
+          throw new IllegalArgumentException("Datanode " + i
+              + " storageType list size " + storageTypes.size()
+              + " must equal numDataVolumes " + numDataVolumes + ".");
+        }
+      }
       return new UniformDatanodesFactory(this);
     }
 

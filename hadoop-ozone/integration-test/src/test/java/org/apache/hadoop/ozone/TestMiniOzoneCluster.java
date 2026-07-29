@@ -23,13 +23,16 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_R
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -277,6 +280,18 @@ public class TestMiniOzoneCluster {
     volumeList.forEach(storageVolume -> assertEquals(
             (long) StorageSize.parse(reservedSpace).getValue(),
             storageVolume.getVolumeUsage().getReservedInBytes()));
+  }
+
+  @Test
+  public void testDatanodeStorageTypeCountMustMatchVolumeCount() {
+    List<List<StorageType>> storageTypes = Collections.singletonList(
+        Collections.singletonList(StorageType.DISK));
+
+    assertThrows(IllegalArgumentException.class,
+        () -> UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(2)
+            .setDatanodeStorageType(storageTypes)
+            .build());
   }
 
 }

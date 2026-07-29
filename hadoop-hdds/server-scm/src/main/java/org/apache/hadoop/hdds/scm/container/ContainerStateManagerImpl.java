@@ -529,15 +529,13 @@ public final class ContainerStateManagerImpl
 
   private ContainerInfo findContainerWithSpaceAndStorageTier(final long size,
       final NavigableSet<ContainerID> searchSet, @Nonnull StorageTier storageTier) {
-      // Get the container with space to meet our request. Containers with a
-      // null storageTier are treated as matching any tier (upgrade-compat with
-      // pre-storageTier containers).
+    // Get the container with space to meet our request and exact tier.
     for (ContainerID id : searchSet) {
       try (AutoCloseableLock ignored = readLock(id)) {
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
         if (containerInfo.getUsedBytes() + size <= this.containerSize &&
-            (containerInfo.getStorageTier() == null ||
-                containerInfo.getStorageTier().equals(storageTier))) {
+            containerInfo.getStorageTier() != null &&
+            containerInfo.getStorageTier().equals(storageTier)) {
           containerInfo.updateLastUsedTime();
           return containerInfo;
         }
