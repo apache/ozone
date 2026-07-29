@@ -211,9 +211,9 @@ public class BlockManagerImpl implements BlockManager {
       long localID = data.getLocalID();
       // For the PutBlock that is endOfBlock and meanwhile bscId = 0, it means
       // this PutBlock comes from data stream close without going through the
-      // Ratis, thus there is no log index. In this case, we should not let
+      // Raft, thus there is no log index. In this case, we should not let
       // 0 to overwrite previous possible PutBlocks from Ratis log that were
-      // generated during immediate flushes from an active data stream. Instead,
+      // generated during immediate flushes from the active data stream. Instead,
       // we should load the latest bscid and reuse that id.
       if (endOfBlock && bcsId == 0) {
         BlockData existing = db.getStore().getBlockDataTable()
