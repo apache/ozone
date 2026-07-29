@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
@@ -1022,6 +1023,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testClosePipelinesExposingNewPorts() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       // Registered datanodes (MockNodeManager) expose all ports incl datastream.
       final List<DatanodeInfo> registered = nodeManager.getAllNodes();
@@ -1057,7 +1059,78 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testClosePipelinesExposingNewPortsSkippedWhenDataStreamDisabled()
+      throws Exception {
+    // Datastream disabled (default): even a portless RATIS pipeline is kept.
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline portless = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesExposingNewPorts();
+
+      assertTrue(exists(pipelineManager, portless.getId()),
+          "portless pipeline must be kept while datastream is disabled");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSkipsEcPipeline()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 5; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline ec = Pipeline.newBuilder()
+          .setReplicationConfig(new ECReplicationConfig(3, 2))
+          .setNodes(nodes)
+          .setState(OPEN)
+          .setId(PipelineID.randomId())
+          .build();
+      pipelineManager.getStateManager().addPipeline(
+          ec.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+
+      pipelineManager.closePipelinesExposingNewPorts();
+
+      assertTrue(exists(pipelineManager, ec.getId()),
+          "EC pipeline must not be closed by datastream port scrubbing");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsKeepsNotYetRestartedNodes()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      // Nodes are registered and healthy but still lack the datastream port
+      // (they have not restarted yet during a rolling enablement).
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        final DatanodeDetails portless = portlessDatanode(DatanodeID.randomID());
+        nodeManager.register(new DatanodeInfo(portless,
+            NodeStatus.inServiceHealthy(), null,
+            HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT), null, null);
+        nodes.add(portless);
+      }
+      final Pipeline pending = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesExposingNewPorts();
+
+      assertTrue(exists(pipelineManager, pending.getId()),
+          "pipeline whose registered nodes have not yet advertised the "
+              + "datastream port must be kept");
+    }
+  }
+
+  @Test
   public void testClosePipelinesExposingNewPortsSwallowsError() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       final List<DatanodeInfo> registered = nodeManager.getAllNodes();
       final List<DatanodeDetails> nodes = new ArrayList<>();

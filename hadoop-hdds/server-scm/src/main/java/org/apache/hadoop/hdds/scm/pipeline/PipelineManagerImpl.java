@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -559,8 +560,9 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   /**
-   * Scrub pipelines, then close (and delete) OPEN pipelines whose registered
-   * nodes now expose a port name the pipeline's stored node snapshot lacks.
+   * Scrub pipelines, then close (and delete) OPEN RATIS pipelines whose
+   * registered nodes now advertise the RATIS_DATASTREAM port their stored node
+   * snapshot lacks.
    */
   void scrubAndClosePipelinesExposingNewPorts() {
     try {
@@ -573,31 +575,45 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void closePipelinesExposingNewPorts() {
+    if (!isDataStreamEnabled()) {
+      return;
+    }
     for (Pipeline pipeline : getPipelines()) {
-      if (!pipeline.isOpen() || !nodesExposeNewPorts(pipeline)) {
+      if (!pipeline.isOpen()
+          || pipeline.getType() != ReplicationType.RATIS
+          || !nodesMissingDataStreamPort(pipeline)) {
         continue;
       }
       try {
         final PipelineID id = pipeline.getId();
-        LOG.info("Closing pipeline {} whose nodes expose a new port so a "
-            + "pipeline advertising it can replace it", id);
+        LOG.info("Closing RATIS pipeline {} whose nodes now advertise the "
+            + "datastream port so a datastream-capable pipeline can replace it",
+            id);
         closePipeline(id);
         deletePipeline(id);
       } catch (IOException e) {
-        LOG.error("Failed to close pipeline {} exposing a new port",
-            pipeline.getId(), e);
+        LOG.error("Failed to close RATIS pipeline {} missing the datastream "
+            + "port", pipeline.getId(), e);
       }
     }
   }
 
+  private boolean isDataStreamEnabled() {
+    return conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+  }
+
   /**
-   * Whether any registered node of the pipeline exposes a port name that the
-   * pipeline's stored copy of that node lacks.
+   * Whether any registered node of the pipeline now advertises the
+   * RATIS_DATASTREAM port that the pipeline's stored node snapshot lacks.
    */
-  private boolean nodesExposeNewPorts(Pipeline pipeline) {
+  private boolean nodesMissingDataStreamPort(Pipeline pipeline) {
     for (DatanodeDetails stored : pipeline.getNodes()) {
       final DatanodeDetails current = nodeManager.getNode(stored.getID());
-      if (current != null && current.exposesNewPorts(stored)) {
+      if (current != null
+          && current.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
+          && !stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
         return true;
       }
     }
