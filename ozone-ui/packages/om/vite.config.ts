@@ -74,6 +74,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:9862',
       },
+      // JMX endpoint — proxied to the json-server mock in dev (see mock/server.cjs).
+      '/jmx': {
+        target: 'http://localhost:9878',
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

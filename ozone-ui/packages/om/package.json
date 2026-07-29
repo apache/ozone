@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --port=3000",
+    "mock:om": "node mock/server.cjs",
+    "dev:om:mock": "npm-run-all -p mock:om dev",
     "build": "vite build",
     "lint": "eslint ."
   },

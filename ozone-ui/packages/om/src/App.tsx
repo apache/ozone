@@ -15,26 +15,60 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useState } from 'react';
-import { Button } from 'antd';
-import './App.css';
+
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppstoreOutlined } from '@ant-design/icons';
+import { AppLayout, Chip, IconButton, Sidebar, UtilityBar } from '@ozone-ui/shared';
+import { navItems, SIDEBAR_WIDTH } from './navigation';
+import OverviewPage from './pages/Overview/OverviewPage';
+import Placeholder from './pages/Placeholder';
+
+/** Product branding: the app name plus a chip showing the current host. */
+const BrandTitle = () => {
+  const host = window.location.hostname;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      Ozone Manager
+      {host && (
+        <Chip color="neutral" size="small">
+          {host}
+        </Chip>
+      )}
+    </span>
+  );
+};
+
+const utilityBar = (
+  <UtilityBar
+    leading={
+      <IconButton
+        icon={<AppstoreOutlined style={{ fontSize: 18 }} />}
+        label="App switcher"
+        tooltip={null}
+      />
+    }
+    branding={<BrandTitle />}
+  />
+);
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <div className="App">
-      <h1>Ozone OM</h1>
-      <div className="card">
-        <Button type="primary" onClick={() => setCount((count) => count + 1)}>
-          Count is {count}
-        </Button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">Click on the Vite and React logos to learn more</p>
-    </div>
+    <AppLayout
+      utilityBar={utilityBar}
+      sider={<Sidebar items={navItems} width={SIDEBAR_WIDTH} />}
+    >
+      <Routes>
+        <Route path="/" element={<OverviewPage />} />
+        <Route path="/configuration" element={<Placeholder title="Configuration" />} />
+        <Route path="/rpc" element={<Placeholder title="Remote Procedure Call" />} />
+        <Route path="/ozone-manager" element={<Placeholder title="Ozone Manager" />} />
+        <Route path="/jmx-info" element={<Placeholder title="JMX" />} />
+        <Route path="/stacks" element={<Placeholder title="Stacks" />} />
+        <Route path="/documentation" element={<Placeholder title="Documentation" />} />
+        <Route path="/log-levels" element={<Placeholder title="Log levels" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppLayout>
   );
 }
 

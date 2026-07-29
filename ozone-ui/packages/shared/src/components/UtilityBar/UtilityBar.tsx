@@ -17,34 +17,75 @@
  */
 
 import React from 'react';
-import { colors, fontFamilies, semanticColors, spacing, textStyles } from '../../theme/tokens';
+import { BellOutlined, QuestionCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { fontFamilies, semanticColors, spacing, textStyles } from '../../theme/tokens';
+import IconButton from '../IconButton/IconButton';
 
 export interface UtilityBarProps {
   /** Left slot, e.g. an app switcher or menu button. */
   leading?: React.ReactNode;
-  /** Product / app title shown next to the leading slot. */
+  /** Product branding shown next to the leading slot (name/logo + host chip). */
+  branding?: React.ReactNode;
+  /** @deprecated Use `branding`. Kept for back-compat; rendered when `branding` is unset. */
   title?: React.ReactNode;
   /** Optional centre slot (e.g. global search). */
   center?: React.ReactNode;
-  /** Right slot, e.g. notification/user icon buttons. */
+  /**
+   * Right slot. When omitted, the bar renders the standard Help / Notifications
+   * / Profile actions (wire them up via the `on*` handlers below).
+   */
   actions?: React.ReactNode;
+  /** Handler for the standard Help action (used when `actions` is not provided). */
+  onHelp?: () => void;
+  /** Handler for the standard Notifications action. */
+  onNotifications?: () => void;
+  /** Handler for the standard Profile action. */
+  onProfile?: () => void;
   /** Height in px. Defaults to 48. */
   height?: number;
   style?: React.CSSProperties;
 }
 
 /**
- * Global top utility bar (the dark chrome at the very top of every screen).
- * Provides leading/title, an optional centre slot and right-aligned actions.
+ * Global top utility bar (the app chrome at the very top of every screen).
+ * Provides a leading slot, product `branding`, an optional centre slot and
+ * right-aligned actions — defaulting to the standard Help / Notifications /
+ * Profile buttons when `actions` is not supplied.
  */
 export const UtilityBar: React.FC<UtilityBarProps> = ({
   leading,
+  branding,
   title,
   center,
   actions,
+  onHelp,
+  onNotifications,
+  onProfile,
   height = 48,
   style,
-}) => (
+}) => {
+  const brand = branding ?? title;
+  const rightContent = actions ?? (
+    <>
+      <IconButton
+        icon={<QuestionCircleOutlined style={{ fontSize: 18 }} />}
+        label="Help"
+        onClick={onHelp}
+      />
+      <IconButton
+        icon={<BellOutlined style={{ fontSize: 18 }} />}
+        label="Notifications"
+        onClick={onNotifications}
+      />
+      <IconButton
+        icon={<UserOutlined style={{ fontSize: 18 }} />}
+        label="Profile"
+        onClick={onProfile}
+      />
+    </>
+  );
+
+  return (
   <div
     style={{
       display: 'flex',
@@ -52,24 +93,24 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
       gap: spacing.md,
       height,
       paddingInline: spacing.md,
-      background: colors.pewter[950],
-      color: 'rgb(255, 255, 255)',
+      background: semanticColors.bgTopbar,
+      color: semanticColors.textPrimary,
       ...style,
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
       {leading}
-      {title && (
+      {brand && (
         <span
           style={{
             fontFamily: fontFamilies.appTitle,
             fontSize: textStyles.appTitle.fontSize,
             fontWeight: textStyles.appTitle.fontWeight,
             lineHeight: `${textStyles.appTitle.lineHeight}px`,
-            color: 'rgb(255, 255, 255)',
+            color: semanticColors.textPrimary,
           }}
         >
-          {title}
+          {brand}
         </span>
       )}
     </div>
@@ -82,12 +123,13 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: spacing.xs,
-        color: semanticColors.textDisabled,
+        color: semanticColors.textSecondary,
       }}
     >
-      {actions}
+      {rightContent}
     </div>
   </div>
-);
+  );
+};
 
 export default UtilityBar;

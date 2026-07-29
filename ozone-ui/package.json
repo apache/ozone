@@ -13,6 +13,8 @@
     "dev:recon": "pnpm --filter @ozone-ui/ozone-recon run dev",
     "dev:scm": "pnpm --filter @ozone-ui/ozone-scm run dev",
     "dev:om": "pnpm --filter @ozone-ui/ozone-om run dev",
+    "mock:om": "pnpm --filter @ozone-ui/ozone-om run mock:om",
+    "dev:om:mock": "pnpm --filter @ozone-ui/ozone-om run dev:om:mock",
     "clean": "rm -rf build && pnpm -r exec rm -rf dist node_modules",
     "clean:cache": "rm -rf node_modules/.vite && pnpm -r exec rm -rf node_modules/.vite",
     "clean:all": "pnpm run clean && pnpm run clean:cache",

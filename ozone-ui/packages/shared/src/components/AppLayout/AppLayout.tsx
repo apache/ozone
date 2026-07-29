@@ -23,6 +23,8 @@ import { semanticColors, spacing, textStyles } from '../../theme/tokens';
 const { Header, Content } = Layout;
 
 export interface AppLayoutProps {
+  /** Full-width chrome rendered above the rail + content row (e.g. the shared `UtilityBar`). */
+  utilityBar?: React.ReactNode;
   /** Navigation rail, typically the shared `Sidebar`. */
   sider?: React.ReactNode;
   /** Page/section title rendered in the header. */
@@ -41,6 +43,7 @@ export interface AppLayoutProps {
  * layout background. Compose with the shared `Sidebar` for the `sider` slot.
  */
 export const AppLayout: React.FC<AppLayoutProps> = ({
+  utilityBar,
   sider,
   title,
   headerExtra,
@@ -48,9 +51,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   maxContentWidth,
 }) => {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {sider}
-      <Layout>
+    // Lock the shell to the viewport so the rail (and its bottom collapse
+    // trigger) stay fixed while only the content column scrolls.
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      {utilityBar}
+      <Layout style={{ flex: 1, minHeight: 0 }}>
+        {sider}
+        {/* Breathing room between the navigation rail and the content column. */}
+        <Layout style={{ marginInlineStart: spacing.lg, minHeight: 0 }}>
         {(title || headerExtra) && (
           <Header
             style={{
@@ -100,7 +108,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           >
             {children}
           </div>
-        </Content>
+          </Content>
+        </Layout>
       </Layout>
     </Layout>
   );
