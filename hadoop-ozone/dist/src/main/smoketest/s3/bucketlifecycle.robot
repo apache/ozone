@@ -55,3 +55,11 @@ Delete bucket lifecycle configuration
                         Should Be Empty         ${result}
     ${result} =         Execute AWSS3APICli and checkrc     get-bucket-lifecycle-configuration --bucket ${bucket}    255
                         Should contain          ${result}           NoSuchLifecycleConfiguration
+
+Delete bucket non-lifecycle configuration
+    [tags]    no-bucket-type
+    ${bucket} =         Create bucket
+    ${result} =         Execute AWSS3APICli     delete-bucket-lifecycle --bucket ${bucket}
+                        Should Be Empty         ${result}
+    ${result} =         Execute AWSS3APICli and checkrc     get-bucket-lifecycle-configuration --bucket ${bucket}    255
+                        Should contain          ${result}           NoSuchLifecycleConfiguration

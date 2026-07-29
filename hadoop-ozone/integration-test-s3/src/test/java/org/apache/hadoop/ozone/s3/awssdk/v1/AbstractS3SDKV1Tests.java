@@ -2136,8 +2136,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     // Test delete lifecycle for a bucket, while doesn't have lifecycle
     assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
-    assertThrows(AmazonServiceException.class,
-        () -> s3Client.deleteBucketLifecycleConfiguration(bucketName));
+    // Idempotent delete: no exception expected even without an existing config
+    s3Client.deleteBucketLifecycleConfiguration(bucketName);
 
     // First create a lifecycle configuration
     BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
