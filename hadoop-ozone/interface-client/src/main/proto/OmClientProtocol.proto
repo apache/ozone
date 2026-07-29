@@ -1150,6 +1150,14 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // S3-compatible object versioning: the versionId proposed for the version
+    // this request creates. It is generated in preExecute, on the OM that
+    // received the request, so every OM applies the same value; the applying
+    // OM raises it to come after the key's current version if the proposal does
+    // not already. Set on every request that can create a version, and ignored
+    // unless the bucket has versioning enabled when the request is applied.
+    optional uint64 proposedVersionId = 25;
 }
 
 message KeyLocation {
