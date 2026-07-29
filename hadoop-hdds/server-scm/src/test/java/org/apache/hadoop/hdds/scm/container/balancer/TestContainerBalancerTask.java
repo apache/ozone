@@ -489,7 +489,42 @@ public class TestContainerBalancerTask {
       moveCompletionExecutor.shutdownNow();
     }
   }
-  
+
+  @Test
+  public void testExcludeContainersDueToFailurePersistsAcrossIterations() throws Exception {
+    when(moveManager.move(any(ContainerID.class), any(DatanodeDetails.class),
+        any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(2);
+    balancerConfiguration.setBalancingInterval(0);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
+        nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails().getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+
+    ArgumentCaptor<ContainerID> containerCaptor = ArgumentCaptor.forClass(ContainerID.class);
+    verify(moveManager, atLeast(1)).move(containerCaptor.capture(),
+        any(DatanodeDetails.class), any(DatanodeDetails.class));
+    ContainerID failedContainerId = containerCaptor.getAllValues().get(0);
+
+    assertTrue(containerBalancerTask.getSelectionCriteria()
+        .getExcludeDueToFailContainers().contains(failedContainerId));
+
+    long failedContainerMoveAttempts = containerCaptor.getAllValues().stream()
+        .filter(id -> id.equals(failedContainerId))
+        .count();
+    assertEquals(1, failedContainerMoveAttempts,
+        "Permanently failed container should not be retried in later iterations");
+  }
+
   /**
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.

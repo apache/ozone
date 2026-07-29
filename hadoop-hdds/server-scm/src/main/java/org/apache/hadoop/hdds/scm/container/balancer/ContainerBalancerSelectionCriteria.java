@@ -55,7 +55,7 @@ public class ContainerBalancerSelectionCriteria {
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
-  private Set<ContainerID> excludeContainersDueToFailure;
+  private final Set<ContainerID> excludeContainersDueToFailure;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
@@ -66,12 +66,24 @@ public class ContainerBalancerSelectionCriteria {
       ContainerManager containerManager,
       FindSourceStrategy findSourceStrategy,
       Map<ContainerID, DatanodeDetails> containerToSourceMap) {
+    this(balancerConfiguration, nodeManager, replicationManager, containerManager,
+        findSourceStrategy, containerToSourceMap, new HashSet<>());
+  }
+
+  public ContainerBalancerSelectionCriteria(
+      ContainerBalancerConfiguration balancerConfiguration,
+      NodeManager nodeManager,
+      ReplicationManager replicationManager,
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy,
+      Map<ContainerID, DatanodeDetails> containerToSourceMap,
+      Set<ContainerID> excludeContainersDueToFailure) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
-    excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersDueToFailure = excludeContainersDueToFailure;
     excludeContainers = balancerConfiguration.getExcludeContainers();
     includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;

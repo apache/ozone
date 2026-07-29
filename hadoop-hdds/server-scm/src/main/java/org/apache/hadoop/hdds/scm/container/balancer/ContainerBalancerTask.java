@@ -108,6 +108,7 @@ public class ContainerBalancerTask implements Runnable {
 
   private Set<DatanodeDetails> selectedTargets;
   private Set<DatanodeDetails> selectedSources;
+  private final Set<ContainerID> excludeContainersDueToFailure = new HashSet<>();
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
@@ -635,7 +636,7 @@ public class ContainerBalancerTask implements Runnable {
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager, findSourceStrategy,
-        containerToSourceMap);
+        containerToSourceMap, excludeContainersDueToFailure);
     return true;
   }
 
