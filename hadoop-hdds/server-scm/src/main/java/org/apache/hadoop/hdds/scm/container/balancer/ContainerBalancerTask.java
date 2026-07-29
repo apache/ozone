@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -94,6 +95,7 @@ public class ContainerBalancerTask implements Runnable {
   private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
+  private final ContainerMoveFailureTracker moveFailureTracker;
   private double upperLimit;
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -151,6 +153,7 @@ public class ContainerBalancerTask implements Runnable {
     this.containerBalancer = containerBalancer;
     this.config = config;
     this.metrics = metrics;
+    this.moveFailureTracker = new ContainerMoveFailureTracker();
     this.scmContext = scm.getScmContext();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
@@ -346,7 +349,7 @@ public class ContainerBalancerTask implements Runnable {
         currentIterationResultName,
         iterationDuration
     );
-    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
+    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics, moveFailureTracker);
 
     DataMoveInfo dataMoveInfo =
         getDataMoveInfo(sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
@@ -793,7 +796,8 @@ public class ContainerBalancerTask implements Runnable {
         LOG.warn("Container balancer is interrupted");
         Thread.currentThread().interrupt();
       } catch (TimeoutException e) {
-        long timeoutCounts = cancelMovesThatExceedTimeoutDuration();
+        long timeoutCounts = cancelMovesThatExceedTimeoutDuration(
+            ContainerMoveFailureReason.ITERATION_MOVE_TIMEOUT.name());
         LOG.warn("{} Container moves are canceled.", timeoutCounts);
         metrics.incrementNumContainerMovesTimeoutInLatestIteration(
             timeoutCounts);
@@ -836,7 +840,7 @@ public class ContainerBalancerTask implements Runnable {
    * @return number of moves that did not complete (timed out) and were
    * cancelled.
    */
-  private long cancelMovesThatExceedTimeoutDuration() {
+  private long cancelMovesThatExceedTimeoutDuration(String reason) {
     Set<Map.Entry<ContainerMoveSelection,
         CompletableFuture<MoveManager.MoveResult>>>
         entries = moveSelectionToFutureMap.entrySet();
@@ -851,11 +855,13 @@ public class ContainerBalancerTask implements Runnable {
           CompletableFuture<MoveManager.MoveResult>>
           entry = iterator.next();
       if (!entry.getValue().isDone()) {
+        ContainerMoveSelection moveSelection = entry.getKey();
+        ContainerID containerID = moveSelection.getContainerID();
+        DatanodeDetails source = containerToSourceMap.get(containerID);
+        DatanodeDetails target = moveSelection.getTargetNode();
         LOG.warn("Container move timed out for container {} from source {}" +
-                " to target {}.", entry.getKey().getContainerID(),
-            containerToSourceMap.get(entry.getKey().getContainerID()),
-            entry.getKey().getTargetNode());
-
+                " to target {}.", containerID, source, target);
+        moveFailureTracker.recordFailure(reason, containerID, source, target);
         entry.getValue().cancel(true);
         numCancelled += 1;
       }
@@ -1004,11 +1010,15 @@ public class ContainerBalancerTask implements Runnable {
         metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
         moveSelectionToFutureMap.remove(moveSelection);
         if (ex != null) {
-          LOG.info("Container move for container {} from source {} to " +
-                  "target {} failed with exceptions.",
-              containerID, source,
-              moveSelection.getTargetNode(), ex);
-          metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+          if (!isCancellationCause(ex)) {
+            LOG.info("Container move for container {} from source {} to " +
+                    "target {} failed with exceptions.",
+                containerID, source,
+                moveSelection.getTargetNode(), ex);
+            metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+            moveFailureTracker.recordFailure(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+                containerID, source, moveSelection.getTargetNode());
+          }
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
             metrics.incrementDataSizeMovedInLatestIteration(containerInfo.getUsedBytes());
@@ -1021,6 +1031,7 @@ public class ContainerBalancerTask implements Runnable {
                     " {} failed: {}",
                 moveSelection.getContainerID(), source,
                 moveSelection.getTargetNode(), result);
+            moveFailureTracker.recordFailure(result, containerID, source, moveSelection.getTargetNode());
           }
         }
       });
@@ -1032,14 +1043,20 @@ public class ContainerBalancerTask implements Runnable {
       // exclude the container which caused failure of move to avoid error in next run.
       selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND.name(),
+          containerID, source, moveSelection.getTargetNode());
       return false;
     } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND.name(),
+          containerID, source, moveSelection.getTargetNode());
       return false;
     } catch (ContainerReplicaNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND.name(),
+          containerID, source, moveSelection.getTargetNode());
       // add source back to queue for replica not found only
       // the container is not excluded as it is a replica related failure
       findSourceStrategy.addBackSourceDataNode(source);
@@ -1225,6 +1242,11 @@ public class ContainerBalancerTask implements Runnable {
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
     metrics.resetNumContainerMovesFailedInLatestIteration();
+    moveFailureTracker.reset();
+  }
+
+  private static boolean isCancellationCause(Throwable ex) {
+    return ex instanceof CancellationException;
   }
 
   /**
@@ -1341,5 +1363,19 @@ public class ContainerBalancerTask implements Runnable {
     RUNNING,
     STOPPING,
     STOPPED
+  }
+
+  /**
+   * Recorded when a scheduled container move fails before {@link MoveManager#move}
+   * completes, or when the balancer stops waiting for in-flight moves.
+   */
+  enum ContainerMoveFailureReason {
+    PRE_MOVE_CONTAINER_NOT_FOUND,
+    PRE_MOVE_NODE_NOT_FOUND,
+    PRE_MOVE_REPLICA_NOT_FOUND,
+    /**
+     * Move did not complete before the iteration move wait timeout expired.
+     */
+    ITERATION_MOVE_TIMEOUT
   }
 }

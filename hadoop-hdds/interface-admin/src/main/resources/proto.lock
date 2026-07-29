@@ -2339,6 +2339,64 @@
                 "name": "iterationDuration",
                 "type": "int64",
                 "optional": true
+              },
+              {
+                "id": 12,
+                "name": "containerMoveFailuresByReason",
+                "type": "ContainerMoveFailureSummaryProto",
+                "is_repeated": true
+              },
+              {
+                "id": 13,
+                "name": "containerMoveFailureDetails",
+                "type": "ContainerMoveFailureDetailProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerMoveFailureSummaryProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "reason",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "count",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerMoveFailureDetailProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerId",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "sourceDatanodeUuid",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "targetDatanodeUuid",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "reason",
+                "type": "string",
+                "optional": true
               }
             ]
           },
