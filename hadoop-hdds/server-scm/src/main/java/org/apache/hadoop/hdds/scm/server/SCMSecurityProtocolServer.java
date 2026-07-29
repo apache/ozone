@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
@@ -61,15 +62,19 @@ import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocol.SecretKeyProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -79,6 +84,7 @@ import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +102,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       .getLogger(SCMSecurityProtocolServer.class);
   private CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
+  // Lazily created null-store root CA used to sign SCM certificates when no Ratis leader is known.
+  private CertificateServer leaderlessRootCertificateServer;
   private final RPC.Server rpcServer; // HADOOP RPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
@@ -326,7 +334,29 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM);
+    boolean leaderless = !storageContainerManager.checkLeader()
+        && isLeaderlessPrimaryScmSigner(storageContainerManager,
+            storageContainerManager.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+            isRenew);
+
+    return getEncodedCertToString(certSignReq, NodeType.SCM, leaderless, scmNodeDetails.getScmNodeId());
+  }
+
+  /**
+   * Single source of truth for whether this SCM should sign its own leaderless bootstrap SCM
+   * certificate: no Ratis leader is known cluster-wide (not merely that this node isn't leader),
+   * this is not a renewal, and this SCM hosts the primary root CA.
+   *
+   * @param scm     - the serving StorageContainerManager.
+   * @param nle     - the NotLeaderException produced by the local Ratis server, or null.
+   * @param isRenew - whether this request is a certificate renewal.
+   * @return true iff the leaderless SCM-certificate signing path should be used.
+   */
+  @VisibleForTesting
+  public static boolean isLeaderlessPrimaryScmSigner(StorageContainerManager scm, NotLeaderException nle,
+      boolean isRenew) {
+    return !isRenew && nle != null && nle.getSuggestedLeader() == null
+        && scm.getRootCertificateServer() != null;
   }
 
   /**
@@ -338,8 +368,28 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    */
   private synchronized String getEncodedCertToString(String certSignReq,
       NodeType nodeType) throws IOException {
-    Future<CertPath> future;
+    return getEncodedCertToString(certSignReq, nodeType, false, null);
+  }
+
+  /**
+   *  Request certificate for the specified role.
+   * @param certSignReq - Certificate signing request.
+   * @param nodeType    - role OM/SCM/DATANODE
+   * @param leaderless  - true iff this is the leaderless bootstrap SCM certificate signing path.
+   * @param scmNodeId   - requesting SCM node id; only used (for logging) when leaderless is true.
+   * @return String         - SCM signed pem encoded certificate.
+   * @throws IOException
+   */
+  private synchronized String getEncodedCertToString(String certSignReq,
+      NodeType nodeType, boolean leaderless, String scmNodeId) throws IOException {
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
+    if (leaderless) {
+      String certId = String.valueOf(sequenceIdGen.getNextCertificateIdWithoutRatis(
+          storageContainerManager.getScmMetadataStore()));
+      return signAndPersistLeaderlessScmCertificate(getLeaderlessRootCertificateServer(),
+          storageContainerManager.getCertificateStore(), csr, certId, scmNodeId);
+    }
+    Future<CertPath> future;
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(csr,
           KERBEROS_TRUSTED, nodeType, getNextCertificateId());
@@ -365,7 +415,68 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     }
   }
 
-  private SCMSecurityException generateException(Exception ex, NodeType role) {
+  /**
+   * Lazily create and cache the null-store root CA used to sign SCM certificates on the
+   * leaderless bootstrap path. It shares the DefaultCAProfile/root-CA shape of the primary's
+   * real root CA, but with a null CertificateStore so signing does not depend on Ratis.
+   */
+  private synchronized CertificateServer getLeaderlessRootCertificateServer() throws IOException {
+    if (leaderlessRootCertificateServer == null) {
+      leaderlessRootCertificateServer = HASecurityUtils.initializeRootCertificateServer(
+          new SecurityConfig(config), null, storageContainerManager.getScmStorageConfig(),
+          new DefaultCAProfile());
+    }
+    return leaderlessRootCertificateServer;
+  }
+
+  /**
+   * Sign and persist an SCM certificate on the leaderless bootstrap path: no Ratis leader is
+   * known, so the certificate is signed with a null-store root CA and persisted directly
+   * (unreplicated) rather than through the Ratis-replicated {@code storeValidCertificate}.
+   *
+   * @param nullStoreRootCa  - null-store root CA to sign with.
+   * @param certificateStore - store to persist the issued leaf certificate into.
+   * @param csr              - certificate signing request.
+   * @param certId           - certificate serial id allocated without Ratis.
+   * @param scmNodeId        - requesting SCM node id, used only for logging.
+   * @return String - SCM signed pem encoded certificate.
+   * @throws IOException
+   */
+  @VisibleForTesting
+  static String signAndPersistLeaderlessScmCertificate(CertificateServer nullStoreRootCa,
+      CertificateStore certificateStore, PKCS10CertificationRequest csr, String certId,
+      String scmNodeId) throws IOException {
+    Future<CertPath> future = nullStoreRootCa.requestCertificate(csr, KERBEROS_TRUSTED, NodeType.SCM, certId);
+    CertPath certPath;
+    try {
+      certPath = future.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw generateException(e, NodeType.SCM);
+    } catch (ExecutionException e) {
+      if (e.getCause() != null) {
+        if (e.getCause() instanceof SCMSecurityException) {
+          throw (SCMSecurityException) e.getCause();
+        } else {
+          throw generateException(e, NodeType.SCM);
+        }
+      } else {
+        throw generateException(e, NodeType.SCM);
+      }
+    }
+
+    X509Certificate leaf = (X509Certificate) certPath.getCertificates().get(0);
+    BigInteger leafSerial = leaf.getSerialNumber();
+    // Collision backstop: never re-allocate or store on collision, just propagate.
+    certificateStore.checkValidCertID(leafSerial);
+    certificateStore.storeValidScmCertificate(leafSerial, leaf);
+    LOGGER.warn("Issued SCM certificate for SCM node {} with serial {} on the leaderless " +
+            "bootstrap path; the Ratis leadership check was bypassed because no leader is known.",
+        scmNodeId, leafSerial);
+    return getPEMEncodedString(certPath);
+  }
+
+  private static SCMSecurityException generateException(Exception ex, NodeType role) {
     SCMSecurityException.ErrorCode errorCode;
     if (role == NodeType.SCM) {
       errorCode = SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;

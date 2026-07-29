@@ -181,6 +181,44 @@ public class SequenceIdGenerator {
   }
 
   /**
+   * Allocate the next CertificateId directly against the CertificateId row
+   * of {@link SCMMetadataStore#getSequenceIdTable()}, bypassing Ratis. This
+   * is used for leaderless bootstrap certificate signing, where no Ratis
+   * leader is available yet.
+   *
+   * The live StateManager cache and any un-exhausted batch are refreshed
+   * under the same lock, so that a later Ratis-based allocation of
+   * CertificateId (e.g. after a leader election) cannot CAS a stale cached
+   * lastId and reissue the value handed out here.
+   *
+   * @param scmMetadataStore : the SCMMetadataStore to allocate against.
+   * @return the newly allocated CertificateId.
+   */
+  public long getNextCertificateIdWithoutRatis(SCMMetadataStore scmMetadataStore)
+      throws IOException {
+    lock.lock();
+    try {
+      // Re-derive the CertificateId row from existing certificates if missing.
+      upgradeToCertificateSequenceId(scmMetadataStore, false);
+
+      Table<SequenceIdType, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
+      Long lastId = sequenceIdTable.get(SequenceIdType.CertificateId);
+      long newId = (lastId != null ? lastId : INVALID_SEQUENCE_ID) + 1;
+      sequenceIdTable.put(SequenceIdType.CertificateId, newId);
+
+      // Refresh the live, non-Ratis state so that a subsequent Ratis-based
+      // allocation cannot reissue newId from a stale cached lastId.
+      invalidateBatchInternal();
+      stateManager.reinitialize(sequenceIdTable);
+
+      LOG.info("Allocated {} {} without Ratis.", SequenceIdType.CertificateId, newId);
+      return newId;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
    * Maintain SequenceIdTable in RocksDB.
    */
   public interface StateManager extends SCMHandler {
