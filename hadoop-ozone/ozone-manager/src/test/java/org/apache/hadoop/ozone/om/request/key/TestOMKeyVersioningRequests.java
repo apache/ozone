@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
@@ -69,14 +70,46 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
 
   /** Puts a current version into keyTable, as an earlier write would have. */
   private String seedCurrentVersion(Long versionId) throws Exception {
+    return seedCurrentVersion(versionId, false);
+  }
+
+  private String seedCurrentVersion(Long versionId, boolean deleteMarker)
+      throws Exception {
     OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
             volumeName, bucketName, keyName, replicationConfig)
         .setVersionId(versionId)
+        .setDeleteMarker(deleteMarker)
         .build();
     String ozoneKey = omMetadataManager.getOzoneKey(
         volumeName, bucketName, keyName);
     omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, keyInfo);
     return ozoneKey;
+  }
+
+  private OMRequest deleteRequest() {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setModificationTime(Time.now())
+        .build();
+    return OMRequest.newBuilder()
+        .setDeleteKeyRequest(DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs))
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  private OMClientResponse deleteAt(long trxnLogIndex) throws Exception {
+    OMClientResponse response = new OMKeyDeleteRequest(deleteRequest(),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    return response;
+  }
+
+  private OmKeyInfo currentVersion() throws Exception {
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
   }
 
   private OMRequest commitRequest(boolean isHsync) {
@@ -209,5 +242,92 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
     assertEquals(500L, recommitted.getVersionId());
     assertNull(noncurrentVersion(500L));
+  }
+
+  @Test
+  public void testDeleteInsertsMarkerAndKeepsPreviousVersion()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+
+    deleteAt(200L);
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertTrue(current.isDeleteMarker());
+    assertEquals(200L, current.getVersionId());
+    assertEquals(0L, current.getDataSize());
+    assertTrue(current.getLatestVersionLocations().getLocationList().isEmpty());
+
+    OmKeyInfo noncurrent = noncurrentVersion(100L);
+    assertNotNull(noncurrent);
+    assertFalse(noncurrent.isDeleteMarker());
+  }
+
+  /** S3 inserts a delete marker even for a key that does not exist. */
+  @Test
+  public void testDeleteOfMissingKeyStillInsertsMarker() throws Exception {
+    setupVersionedBucket();
+
+    deleteAt(200L);
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertTrue(current.isDeleteMarker());
+    assertEquals(200L, current.getVersionId());
+    assertNull(noncurrentVersion(VersionIdGenerator.UNSET_VERSION_ID));
+  }
+
+  /** Deleting a key whose current version is already a marker stacks another. */
+  @Test
+  public void testDeleteStacksAnotherMarker() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L, true);
+
+    deleteAt(200L);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isDeleteMarker());
+    assertEquals(200L, current.getVersionId());
+
+    OmKeyInfo stacked = noncurrentVersion(100L);
+    assertNotNull(stacked);
+    assertTrue(stacked.isDeleteMarker());
+  }
+
+  @Test
+  public void testDeleteOfPreVersioningRecordMovesItToNullVersion()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(null);
+
+    deleteAt(200L);
+
+    OmKeyInfo noncurrent =
+        noncurrentVersion(VersionIdGenerator.UNSET_VERSION_ID);
+    assertNotNull(noncurrent);
+    assertTrue(noncurrent.isNullVersion());
+    assertFalse(noncurrent.isDeleteMarker());
+  }
+
+  /**
+   * A delete marker holds no blocks, so it consumes namespace but no space,
+   * and the superseded version keeps its own usage.
+   */
+  @Test
+  public void testDeleteMarkerConsumesNamespaceButNoSpace() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+    String bucketKey =
+        omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo before = omMetadataManager.getBucketTable().get(bucketKey);
+    long usedBytes = before.getUsedBytes();
+    long usedNamespace = before.getUsedNamespace();
+
+    deleteAt(200L);
+
+    OmBucketInfo after = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(usedBytes, after.getUsedBytes());
+    assertEquals(usedNamespace + 1, after.getUsedNamespace());
   }
 }
