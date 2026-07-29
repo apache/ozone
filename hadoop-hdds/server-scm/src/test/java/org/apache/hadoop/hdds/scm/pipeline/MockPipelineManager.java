@@ -250,11 +250,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void closePipelinesExposingNewPorts() {
-
-  }
-
-  @Override
   public void scrubPipelines() {
 
   }

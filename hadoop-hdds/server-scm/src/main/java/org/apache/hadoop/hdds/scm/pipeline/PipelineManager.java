@@ -117,15 +117,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void closeStalePipelines(DatanodeDetails datanodeDetails);
 
-  /**
-   * When datastream is enabled, close OPEN RATIS pipelines whose datanodes now
-   * advertise the RATIS_DATASTREAM port that the pipeline's stored node
-   * snapshot lacks, so datastream-capable pipelines are created in their place.
-   * A pipeline cannot pick up a newly advertised port in place, so it must be
-   * recreated.
-   */
-  void closePipelinesExposingNewPorts();
-
   void scrubPipelines() throws IOException;
 
   void startPipelineCreator();

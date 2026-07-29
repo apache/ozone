@@ -564,7 +564,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * registered nodes now advertise the RATIS_DATASTREAM port their stored node
    * snapshot lacks.
    */
-  void scrubAndClosePipelinesExposingNewPorts() {
+  public void scrubAndClosePipelinesExposingNewPorts() {
     try {
       scrubPipelines();
     } catch (IOException e) {
@@ -573,8 +573,7 @@ public class PipelineManagerImpl implements PipelineManager {
     closePipelinesExposingNewPorts();
   }
 
-  @Override
-  public void closePipelinesExposingNewPorts() {
+  void closePipelinesExposingNewPorts() {
     if (!isDataStreamEnabled()) {
       return;
     }

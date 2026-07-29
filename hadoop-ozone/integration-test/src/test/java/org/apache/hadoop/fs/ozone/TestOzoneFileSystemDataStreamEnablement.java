@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -281,8 +282,8 @@ public class TestOzoneFileSystemDataStreamEnablement {
       cluster.restartStorageContainerManager(true);
       waitForAllRegisteredNodesToHaveDatastreamPort();
 
-      final PipelineManager pipelineManager =
-          cluster.getStorageContainerManager().getPipelineManager();
+      final PipelineManagerImpl pipelineManager =
+          (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
       final List<Pipeline> reloaded = openRatisThreePipelines();
       assertFalse(reloaded.isEmpty());
       reloaded.forEach(p -> assertFalse(allNodesHaveDatastreamPort(p),
@@ -291,7 +292,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       // Close the pipeline(s) exposing the new datastream port; a fresh
       // streaming-capable pipeline is created in their place by
       // BackgroundPipelineCreator.
-      pipelineManager.closePipelinesExposingNewPorts();
+      pipelineManager.scrubAndClosePipelinesExposingNewPorts();
       waitForStreamablePipeline();
 
       // The new pipeline actually serves a streaming write end-to-end.
@@ -337,8 +338,8 @@ public class TestOzoneFileSystemDataStreamEnablement {
       waitForAllRegisteredNodesToHaveDatastreamPort();
       cluster.restartStorageContainerManager(true);
       waitForAllRegisteredNodesToHaveDatastreamPort();
-      cluster.getStorageContainerManager().getPipelineManager()
-          .closePipelinesExposingNewPorts();
+      ((PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager())
+          .scrubAndClosePipelinesExposingNewPorts();
       waitForStreamablePipeline();
 
       // Phase 2: datastream enabled -> every write streams, none fail.
