@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -177,9 +178,9 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
   }
 
   /**
-   * Check if the given SCMNodeInfo matches the target address.
-   * Tries to match by direct string comparison and by resolved InetAddress.
-   * This handles IPv6 equivalence (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1).
+   * Check if the given addresses match by comparing host portions and ports.
+   * Inputs may be bare hosts or host:port strings. Handles IPv6 equivalence
+   * (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1) by resolving to InetAddress.
    */
   private boolean matchesAddress(String address1, String address2) {
     if (address1.equalsIgnoreCase(address2)) {
@@ -187,9 +188,25 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     }
 
     try {
-      InetAddress inet1 = InetAddress.getByName(address1);
-      InetAddress inet2 = InetAddress.getByName(address2);
-      return inet1.equals(inet2);
+      String host1 = HddsUtils.getHostName(address1).orElse(address1);
+      String host2 = HddsUtils.getHostName(address2).orElse(address2);
+
+      boolean hostsMatch = host1.equalsIgnoreCase(host2);
+      if (!hostsMatch) {
+        InetAddress inet1 = InetAddress.getByName(host1);
+        InetAddress inet2 = InetAddress.getByName(host2);
+        hostsMatch = inet1.equals(inet2);
+      }
+      if (!hostsMatch) {
+        return false;
+      }
+
+      OptionalInt port1 = HddsUtils.getHostPort(address1);
+      OptionalInt port2 = HddsUtils.getHostPort(address2);
+      if (port1.isPresent() && port2.isPresent()) {
+        return port1.getAsInt() == port2.getAsInt();
+      }
+      return true;
     } catch (Exception e) {
       // If address resolution fails, no match
       return false;
