@@ -56,7 +56,7 @@ class TestXceiverClientGrpcChannel {
       assertThat(channel.authority()).isEqualTo(expectedHost + ":" + PORT);
     } finally {
       channel.shutdownNow();
-      channel.awaitTermination(10, TimeUnit.SECONDS);
+      channel.awaitTermination(5, TimeUnit.SECONDS);
     }
   }
 
