@@ -181,6 +181,22 @@ public class TestTypedTable {
   }
 
   @Test
+  public void testClearMalformedKey() throws Exception {
+    final RDBTable rawTable = rdb.getTable(families.get(2));
+    final TypedTable<String, String> table =
+        new TypedTable<>(rawTable, StringCodec.get(), StringCodec.get(), TableCache.CacheType.PARTIAL_CACHE);
+
+    // The last key decodes with replacement characters, so it does not re-encode back to the same bytes;
+    // see TestCodec#testStringCodecMalformedUtf8String.
+    final byte[] malformed = {(byte) 0xC3, (byte) '/', 0, 0, 0, 1};
+    rawTable.put(malformed, StringCodec.get().toPersistedFormat("value"));
+
+    table.clear();
+
+    assertTrue(table.isEmpty());
+  }
+
+  @Test
   public void testClearInMemoryTable() throws Exception {
     final Table<Long, String> table = new InMemoryTestTable<>();
     table.put(1L, "one");
