@@ -88,6 +88,10 @@ import org.junit.jupiter.api.io.TempDir;
  * BlockData chunk list keeps the BCSID at the local value. A positive-control test asserts adoption
  * still occurs when the local block fully covers the peer's committed chunk list.
  *
+ * <p>A cross-block test covers the container-level variant: block coverage licenses only the block's own
+ * BCSID, while the container BCSID quantifies over all blocks and advances once per reconciliation round,
+ * only when every repaired block in the round ended fully covered.
+ *
  * <p>These tests mock only the peer side (the BlockInputStream and its single served chunk) and
  * exercise the real reconcileChunksPerBlock against a real closed container. Before the fix the
  * BCSID is advanced to 99 and the assertions below fail; after the fix the BCSID stays at 1.
@@ -314,8 +318,59 @@ public class TestReconcileChunksPerBlockHoleBcsId {
     assertEquals(PEER_BCSID, after.getBlockCommitSequenceId(),
         "block BCSID must advance to the peer value (" + PEER_BCSID + ") when the local block covers the peer's "
             + "committed chunk list");
+    // The per-block repair leaves the container BCSID untouched; the round-end step advances it when every
+    // repaired block in the round ended fully covered, mirroring reconcileContainerInternal.
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
+        "per-block repair must not touch the container BCSID");
+    handler.advanceContainerBcsIdForFullyCoveredRound(container, true, PEER_BCSID);
     assertEquals(PEER_BCSID, container.getContainerData().getBlockCommitSequenceId(),
-        "container BCSID must advance to the peer value (" + PEER_BCSID + ") on a fully covered block");
+        "container BCSID must advance to the peer value (" + PEER_BCSID + ") after a fully covered round");
+  }
+
+  @Test
+  public void completeBlockMustNotAdvanceContainerPastIncompleteEarlierBlock() throws Exception {
+    // Cross-block variant: coversPeerBlock proves completeness for ONE block, but the container BCSID
+    // quantifies over ALL blocks. A fully covered block at a higher BCSID must not advance the container
+    // past another block that remains incomplete at a lower BCSID.
+    long incompleteBlockId = 1L;
+    long completeBlockId = 2L;
+    long incompleteBlockBcsId = PEER_BCSID - 1;
+
+    // Block 1 from the peer: committed at BCSID 98 with two chunks; the trailing chunk is unhealthy, so
+    // only chunk 0 is recovered and the block stays incomplete.
+    ContainerProtos.ChunkInfo incompleteChunk0 = chunkProto("incomplete-0", 0, (byte) 'b');
+    ContainerProtos.ChunkInfo incompleteChunk1 = chunkProto("incomplete-1", CHUNK_LEN, (byte) 'c');
+    installMockedPeerStream(peerBlockDataWithChunks(incompleteBlockId, incompleteBlockBcsId,
+        incompleteChunk0, incompleteChunk1), 0);
+    handler.reconcileChunksPerBlock(container, peerPipeline, dnClient, incompleteBlockId,
+        Arrays.asList(chunkMerkleTree(0), unhealthyChunkMerkleTree(CHUNK_LEN)),
+        new ContainerMerkleTreeWriter(), ByteBuffer.allocate(CHUNK_LEN));
+
+    BlockData incompleteAfter = handler.getBlockManager().getBlock(
+        container, new BlockID(CONTAINER_ID, incompleteBlockId));
+    assertEquals(1, incompleteAfter.getChunks().size());
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId());
+
+    // Block 2 from the peer: committed at BCSID 99 with a single chunk that is fully recovered.
+    ContainerProtos.ChunkInfo completeChunk0 = chunkProto("complete-0", 0, (byte) 'b');
+    installMockedPeerStream(peerBlockDataWithChunks(completeBlockId, PEER_BCSID, completeChunk0), 0);
+    handler.reconcileChunksPerBlock(container, peerPipeline, dnClient, completeBlockId,
+        Collections.singletonList(chunkMerkleTree(0)),
+        new ContainerMerkleTreeWriter(), ByteBuffer.allocate(CHUNK_LEN));
+
+    // The complete block adopts the peer's block BCSID...
+    BlockData completeAfter = handler.getBlockManager().getBlock(
+        container, new BlockID(CONTAINER_ID, completeBlockId));
+    assertEquals(PEER_BCSID, completeAfter.getBlockCommitSequenceId());
+    // ...but the container BCSID must not advance past the incomplete earlier block: container BCSID 99
+    // would attest block 1's commit at 98, whose trailing chunk this replica does not hold.
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
+        "container BCSID must not advance past the incomplete block");
+    // The round-end advancement is suppressed as well, because the round left block 1 partially repaired --
+    // this mirrors reconcileContainerInternal accumulating coverage across the per-block repairs of one round.
+    handler.advanceContainerBcsIdForFullyCoveredRound(container, false, PEER_BCSID);
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
+        "round-end container BCSID advancement must be suppressed when any block in the round stayed partial");
   }
 
   /**
@@ -323,9 +378,17 @@ public class TestReconcileChunksPerBlockHoleBcsId {
    * committed BlockData (BCSID 99) and serves one contiguous chunk at offset CHUNK_LEN.
    */
   private void installMockedPeerStream(ContainerProtos.BlockData peerBlockData) throws Exception {
+    installMockedPeerStream(peerBlockData, CHUNK_LEN);
+  }
+
+  /**
+   * Same as above, serving the single mocked chunk at the given offset instead of CHUNK_LEN.
+   */
+  private void installMockedPeerStream(ContainerProtos.BlockData peerBlockData, long servedChunkOffset)
+      throws Exception {
     byte[] peerChunkData = new byte[CHUNK_LEN];
     Arrays.fill(peerChunkData, (byte) 'b');
-    ChunkInfo peerChunkAtChunkLen = new ChunkInfo("peer-chunk", CHUNK_LEN, CHUNK_LEN);
+    ChunkInfo peerChunkAtChunkLen = new ChunkInfo("peer-chunk", servedChunkOffset, CHUNK_LEN);
     peerChunkAtChunkLen.setChecksumData(checksumOf(peerChunkData));
 
     ChunkInputStream mockChunkStream = mock(ChunkInputStream.class);
@@ -369,11 +432,16 @@ public class TestReconcileChunksPerBlockHoleBcsId {
    * reconcileChunksPerBlock reads via getStreamBlockData and compares against at commit time.
    */
   private static ContainerProtos.BlockData peerBlockDataWithChunks(ContainerProtos.ChunkInfo... chunks) {
+    return peerBlockDataWithChunks(LOCAL_ID, PEER_BCSID, chunks);
+  }
+
+  private static ContainerProtos.BlockData peerBlockDataWithChunks(long localId, long bcsId,
+      ContainerProtos.ChunkInfo... chunks) {
     return ContainerProtos.BlockData.newBuilder()
         .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(CONTAINER_ID)
-            .setLocalID(LOCAL_ID)
-            .setBlockCommitSequenceId(PEER_BCSID)
+            .setLocalID(localId)
+            .setBlockCommitSequenceId(bcsId)
             .build())
         .addAllChunks(Arrays.asList(chunks))
         .build();

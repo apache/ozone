@@ -1144,12 +1144,17 @@ public class KeyValueHandler extends Handler {
    * @param kvContainer           - Container for which block data need to be persisted.
    * @param blockData             - Block Data to be persisted (BlockData should have the chunks).
    * @param blockCommitSequenceId - Block Commit Sequence ID for the block.
-   * @param overwriteBscId        - To overwrite bcsId in the block data and container. In case of chunk failure
-   *                              during reconciliation, we do not want to overwrite the bcsId as this block/container
-   *                              is incomplete in its current state.
+   * @param overwriteBscId        - To overwrite bcsId in the block data. In case of chunk failure during
+   *                              reconciliation, we do not want to overwrite the bcsId as this block is incomplete
+   *                              in its current state.
+   * @param updateContainerBcsId  - Also advance the container-wide BCSID to this block's value. The container BCSID
+   *                              quantifies over all blocks, so reconciliation passes false here and advances the
+   *                              container once per peer round instead, only when every repaired block ended fully
+   *                              covered (see advanceContainerBcsIdForFullyCoveredRound).
    */
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
-                                         long blockCommitSequenceId, boolean overwriteBscId)
+                                         long blockCommitSequenceId, boolean overwriteBscId,
+                                         boolean updateContainerBcsId)
       throws IOException {
     Objects.requireNonNull(kvContainer, "kvContainer == null");
     Objects.requireNonNull(blockData, "blockData == null");
@@ -1164,7 +1169,9 @@ public class KeyValueHandler extends Handler {
       blockData.setBlockCommitSequenceId(blockCommitSequenceId);
     }
 
-    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId);
+    // The block data is persisted with whatever BCSID it carries; the flag passed down only gates the
+    // container-wide BCSID update.
+    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId && updateContainerBcsId);
     ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
     final long numBytes = blockDataProto.getSerializedSize();
     // Increment write stats for PutBlock after write.
@@ -1693,6 +1700,10 @@ public class KeyValueHandler extends Handler {
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
         long numDivergedDeletedBlocksUpdated = 0;
+        // Container-level BCSID advancement is decided once per peer round: only when every repaired block in
+        // this round ended fully covered may the container BCSID move to the highest adopted block BCSID.
+        boolean allRepairedBlocksCovered = true;
+        long maxAdoptedBcsId = 0;
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1721,13 +1732,16 @@ public class KeyValueHandler extends Handler {
         for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
             long localID = missingBlock.getBlockID();
-            long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
                 missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
-            if (chunksInBlockRetrieved >= 0) {
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() >= 0) {
               allBlocksUpdated.add(localID);
               numMissingBlocksRepaired++;
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
                   containerID, e);
           }
@@ -1737,13 +1751,16 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
                 entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (missingChunksRepaired != 0) {
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() != 0) {
               allBlocksUpdated.add(localID);
-              numMissingChunksRepaired += missingChunksRepaired;
+              numMissingChunksRepaired += blockResult.getNumChunksRepaired();
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
@@ -1753,13 +1770,16 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
                 entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (corruptChunksRepaired != 0) {
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() != 0) {
               allBlocksUpdated.add(localID);
-              numCorruptChunksRepaired += corruptChunksRepaired;
+              numCorruptChunksRepaired += blockResult.getNumChunksRepaired();
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
@@ -1770,6 +1790,9 @@ public class KeyValueHandler extends Handler {
           updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
           numDivergedDeletedBlocksUpdated++;
         }
+
+        // Advance the container-wide BCSID only when this round left no block partially repaired.
+        advanceContainerBcsIdForFullyCoveredRound(kvContainer, allRepairedBlocksCovered, maxAdoptedBcsId);
 
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
@@ -1840,17 +1863,20 @@ public class KeyValueHandler extends Handler {
    * We will keep pulling chunks from the peer unless the requested chunk's offset would leave a hole if written past
    * the end of our current block file. Since we currently don't support leaving holes in block files, reconciliation
    * for this block will be stopped at this point and whatever data we have pulled will be committed.
-   * Block commit sequence ID of the block and container are only updated based on the peer's value if the entire block
-   * is read and written successfully, i.e. only when the local block ends up covering every chunk in the peer's
-   * committed block metadata (see coversPeerBlock); chunks already present locally count toward that coverage.
+   * The block's commit sequence ID is only updated to the peer's value if the entire block is read and written
+   * successfully, i.e. only when the local block ends up covering every chunk in the peer's committed block metadata
+   * (see coversPeerBlock); chunks already present locally count toward that coverage. The container-wide BCSID is
+   * never touched here: it quantifies over all blocks, so it is advanced once per reconciliation round, only when
+   * every repaired block ended fully covered (see advanceContainerBcsIdForFullyCoveredRound).
    *
    * To avoid verbose logging during reconciliation, this method should not log successful operations above the debug
    * level.
    *
-   * @return The number of chunks that were reconciled in our container.
+   * @return The repair outcome for this block: chunks reconciled, whether the block ended fully covered, and the
+   * block BCSID adopted from the peer (0 when none).
    */
   @VisibleForTesting
-  long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
+  BlockRepairResult reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
       DNContainerOperationClient dnClient, long localID, List<ContainerProtos.ChunkMerkleTree> peerChunkList,
       ContainerMerkleTreeWriter treeWriter, ByteBuffer chunkByteBuffer) throws IOException {
     long containerID = container.getContainerData().getContainerID();
@@ -1883,6 +1909,8 @@ public class KeyValueHandler extends Handler {
 
     boolean allChunksSuccessful = true;
     int numSuccessfulChunks = 0;
+    boolean adoptPeerBcsId = false;
+    long adoptedBcsId = 0;
 
     BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
         .setBlockID(blockID)
@@ -1980,27 +2008,77 @@ public class KeyValueHandler extends Handler {
         // (and the in-loop unhealthy skip above does not clear allChunksSuccessful). Without this check a trailing
         // unrepairable peer chunk lets the BCSID advance past data we do not hold: the replica would then admit
         // reads it cannot serve and look complete to SCM's sequenceId-based source and delete selection.
-        boolean adoptPeerBcsId = allChunksSuccessful && coversPeerBlock(peerBlockData, localOffset2Chunk);
+        adoptPeerBcsId = allChunksSuccessful && coversPeerBlock(peerBlockData, localOffset2Chunk);
+        adoptedBcsId = adoptPeerBcsId ? maxBcsId : 0;
         if (allChunksSuccessful && !adoptPeerBcsId) {
           LOG.warn("Repaired all {} diff chunks for block {} in container {} from peer {}, but the local block does " +
               "not cover the peer's committed chunk list. BCSID stays at the local value.",
               peerChunkList.size(), localID, containerID, peer);
         }
-        putBlockForClosedContainer(container, localBlockData, maxBcsId, adoptPeerBcsId);
+        putBlockForClosedContainer(container, localBlockData, maxBcsId, adoptPeerBcsId, false);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
         chunkManager.finishWriteChunks(container, localBlockData);
       }
     }
 
+    logBlockRepairOutcome(allChunksSuccessful, numSuccessfulChunks, peerChunkList.size(), localID, containerID, peer);
+    return new BlockRepairResult(numSuccessfulChunks, adoptPeerBcsId, adoptedBcsId);
+  }
+
+  private static void logBlockRepairOutcome(boolean allChunksSuccessful, int numSuccessfulChunks, int peerListSize,
+      long localID, long containerID, DatanodeDetails peer) {
     if (!allChunksSuccessful) {
       LOG.warn("Partially reconciled block {} in container {} with peer {}. {}/{} chunks were " +
-          "obtained successfully", localID, containerID, peer, numSuccessfulChunks, peerChunkList.size());
+          "obtained successfully", localID, containerID, peer, numSuccessfulChunks, peerListSize);
     } else if (LOG.isDebugEnabled()) {
       LOG.debug("Reconciled all {} chunks in block {} in container {} from peer {}",
-          peerChunkList.size(), localID, containerID, peer);
+          peerListSize, localID, containerID, peer);
+    }
+  }
+
+  /**
+   * Outcome of repairing one block from a peer, aggregated per reconciliation round by
+   * reconcileContainerInternal to decide container-level BCSID advancement.
+   */
+  static final class BlockRepairResult {
+    private final long numChunksRepaired;
+    private final boolean blockFullyCovered;
+    private final long adoptedBcsId;
+
+    BlockRepairResult(long numChunksRepaired, boolean blockFullyCovered, long adoptedBcsId) {
+      this.numChunksRepaired = numChunksRepaired;
+      this.blockFullyCovered = blockFullyCovered;
+      this.adoptedBcsId = adoptedBcsId;
     }
 
-    return numSuccessfulChunks;
+    long getNumChunksRepaired() {
+      return numChunksRepaired;
+    }
+
+    boolean isBlockFullyCovered() {
+      return blockFullyCovered;
+    }
+
+    long getAdoptedBcsId() {
+      return adoptedBcsId;
+    }
+  }
+
+  /**
+   * Advances the container-wide BCSID after reconciling with one peer, and only when every block repaired in that
+   * round ended fully covered. The container BCSID quantifies over all blocks: a fully covered block at a higher
+   * BCSID must not advance the container past another block that remains incomplete at a lower BCSID, because the
+   * missing data of that block would then be attested as present. When a round leaves any block partial, the
+   * container BCSID stays put and converges on a later round once every repair completes. Container-level adoption
+   * on merkle tree equality without repair is tracked separately in HDDS-16011.
+   */
+  @VisibleForTesting
+  void advanceContainerBcsIdForFullyCoveredRound(KeyValueContainer container, boolean allRepairedBlocksCovered,
+      long maxAdoptedBcsId) throws IOException {
+    if (!allRepairedBlocksCovered || maxAdoptedBcsId <= container.getContainerData().getBlockCommitSequenceId()) {
+      return;
+    }
+    blockManager.updateContainerBcsId(container, maxAdoptedBcsId);
   }
 
   private void verifyChunksLength(ContainerProtos.ChunkInfo peerChunkInfo, ContainerProtos.ChunkInfo localChunkInfo)
