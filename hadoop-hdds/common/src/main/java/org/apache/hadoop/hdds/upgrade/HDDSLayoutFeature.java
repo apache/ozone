@@ -42,8 +42,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
           "for the last chunk of blocks to support HBase.)"),
   WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
-  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature."),
-  SHORT_CIRCUIT_READS(11, "Short-circuit read support");
+  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
 
   //////////////////////////////  //////////////////////////////
 

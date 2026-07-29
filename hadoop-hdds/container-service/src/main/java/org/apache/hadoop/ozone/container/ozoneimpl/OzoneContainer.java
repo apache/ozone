@@ -266,14 +266,12 @@ public class OzoneContainer {
             .build());
 
     readChannel = new XceiverServerGrpc(datanodeDetails, config, readExecutors, hddsDispatcher, certClient);
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.SHORT_CIRCUIT_READS)) {
-      domainSocketFactory = DomainSocketFactory.getInstance(config);
-      if (domainSocketFactory.isServiceEnabled() && domainSocketFactory.isServiceReady()) {
-        readDomainSocketChannel = new XceiverServerDomainSocket(datanodeDetails, config,
-            hddsDispatcher, readExecutors, metrics, domainSocketFactory);
-      } else {
-        readDomainSocketChannel = null;
-      }
+    domainSocketFactory = DomainSocketFactory.getInstance(config);
+    if (domainSocketFactory.isServiceEnabled() && domainSocketFactory.isServiceReady()) {
+      readDomainSocketChannel = new XceiverServerDomainSocket(datanodeDetails, config,
+          hddsDispatcher, readExecutors, metrics, domainSocketFactory);
+    } else {
+      readDomainSocketChannel = null;
     }
 
     Duration blockDeletingSvcInterval = conf.getObject(

@@ -848,10 +848,6 @@ public class KeyValueHandler extends Handler {
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
       if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
-        if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.SHORT_CIRCUIT_READS)) {
-          throw new StorageContainerException("DataNode has not finalized " +
-              "upgrading to support short-circuit read.", UNSUPPORTED_REQUEST);
-        }
         boolean domainSocketServerEnabled = ozoneContainer != null
             && ozoneContainer.getReadDomainSocketChannel() != null
             && ozoneContainer.getReadDomainSocketChannel().isStarted();
