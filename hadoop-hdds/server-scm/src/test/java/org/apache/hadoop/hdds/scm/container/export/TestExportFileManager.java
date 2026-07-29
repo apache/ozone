@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,14 +66,17 @@ public class TestExportFileManager {
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
     File olderArchive = fileManager.resolveArchiveFile(scope, "20260101T120000Z");
     assertTrue(olderArchive.createNewFile());
+    assertTrue(olderArchive.setLastModified(1_000L));
     File newerArchive = fileManager.resolveArchiveFile(scope, "20260101T120001Z");
     assertTrue(newerArchive.createNewFile());
+    assertTrue(newerArchive.setLastModified(2_000L));
     File tempArchive = fileManager.resolveArchiveTempFile(scope, "20260101T120002Z");
     assertTrue(tempArchive.createNewFile());
 
-    assertEquals(2, fileManager.listCompletedArchivePaths().size());
-    assertEquals(olderArchive.getAbsolutePath(), fileManager.listCompletedArchivePaths().get(0));
-    assertEquals(newerArchive.getAbsolutePath(), fileManager.listCompletedArchivePaths().get(1));
+    List<String> completedPaths = fileManager.listCompletedArchivePaths();
+    assertEquals(2, completedPaths.size());
+    assertEquals(olderArchive.getAbsolutePath(), completedPaths.get(0));
+    assertEquals(newerArchive.getAbsolutePath(), completedPaths.get(1));
   }
 
   @Test
