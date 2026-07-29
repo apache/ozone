@@ -289,6 +289,14 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
+  @Config(key = "ozone.client.datastream.putblock.on.close.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
+          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPutBlockOnCloseEnabled = false;
+
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
       description = "Maximum concurrent writes allowed on each key. " +
@@ -644,6 +652,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public boolean isDatastreamPutBlockOnCloseEnabled() {
+    return datastreamPutBlockOnCloseEnabled;
+  }
+
+  public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
+    this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
   }
 
   /**

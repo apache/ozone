@@ -355,6 +355,7 @@ public class KeyValueHandler extends Handler {
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
     case StreamInit:
+    case StreamInitWithPutBlock:
       return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
