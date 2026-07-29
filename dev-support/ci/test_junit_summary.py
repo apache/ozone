@@ -96,18 +96,27 @@ class TestRender(unittest.TestCase):
     self.assertEqual(junit_summary.format_time(779), "12m59s")
     self.assertEqual(junit_summary.format_time(3725), "1h2m5s")
 
-  def test_render_counts_line(self):
+  def test_render_counts_list(self):
     md = junit_summary.render_summary(self.make_cases())
     self.assertIn("## Test Summary", md)
-    self.assertIn("4 tests run in 6s (total test time): 1 PASSED ✅, 1 FAILED ❌, 1 FLAKY ⚠️, 1 SKIPPED 🙈.", md)
+    self.assertIn("4 tests run in 6s (total test time):", md)
+    self.assertIn("- ✅ 1 PASSED\n- ❌ 1 FAILED\n- ⚠️ 1 FLAKY\n- 🙈 1 SKIPPED", md)
+
+  def test_render_counts_omit_zero(self):
+    cases = [c for c in self.make_cases() if c.status == "passed"]
+    md = junit_summary.render_summary(cases)
+    self.assertIn("- ✅ 1 PASSED", md)
+    self.assertNotIn("FAILED", md)
+    self.assertNotIn("FLAKY", md)
+    self.assertNotIn("SKIPPED", md)
 
   def test_render_tables(self):
     md = junit_summary.render_summary(self.make_cases())
-    self.assertIn("FAILED ❌ (1)", md)
+    self.assertIn("❌ FAILED (1)", md)
     self.assertIn("|common|org.X.bad|boom|2s|", md)
-    self.assertIn("FLAKY ⚠️ (1)", md)
+    self.assertIn("⚠️ FLAKY (1)", md)
     self.assertIn("|common|org.X.shaky|flap|3s|", md)
-    self.assertIn("SKIPPED 🙈 (1)", md)
+    self.assertIn("🙈 SKIPPED (1)", md)
 
   def test_render_escapes_every_cell(self):
     # parameterized test names can contain pipes and HTML-significant chars

@@ -32,10 +32,10 @@ import sys
 import xml.etree.ElementTree as ET
 from glob import glob
 
-PASSED = "PASSED ✅"
-FAILED = "FAILED ❌"
-FLAKY = "FLAKY ⚠️"
-SKIPPED = "SKIPPED 🙈"
+PASSED = "✅ PASSED"
+FAILED = "❌ FAILED"
+FLAKY = "⚠️ FLAKY"
+SKIPPED = "🙈 SKIPPED"
 
 FAIL_TAGS = frozenset(("failure", "error"))
 FLAKY_TAGS = frozenset(("flakyFailure", "flakyError"))
@@ -121,9 +121,11 @@ def render_summary(cases):
   passed, failed, flaky, skipped = select("passed"), select("failed"), select("flaky"), select("skipped")
   lines = ["## Test Summary", ""]
   # sum of per-test times, not wall clock (parallel forks make wall clock much shorter)
-  lines.append("%d tests run in %s (total test time): %d %s, %d %s, %d %s, %d %s." % (
-      len(cases), format_time(sum(c.time for c in cases)),
-      len(passed), PASSED, len(failed), FAILED, len(flaky), FLAKY, len(skipped), SKIPPED))
+  lines.append("%d tests run in %s (total test time):" % (len(cases), format_time(sum(c.time for c in cases))))
+  for group, label in ((passed, PASSED), (failed, FAILED), (flaky, FLAKY), (skipped, SKIPPED)):
+    if group:
+      emoji, word = label.split(" ", 1)
+      lines.append("- %s %d %s" % (emoji, len(group), word))
   lines.append("")
   report_url = os.environ.get("JUNIT_REPORT_URL")
   if report_url:
