@@ -19,7 +19,7 @@
 
 Adapted from Apache Kafka's .github/scripts/junit.py (summary format), reworked for Maven Surefire XML.
 
-Intended for GitHub Actions: junit_summary.py [--path DIR] [--quarantine] >> "$GITHUB_STEP_SUMMARY"
+Intended for GitHub Actions: junit_summary.py [--path DIR] >> "$GITHUB_STEP_SUMMARY"
 Optional env: JUNIT_REPORT_URL (link to the archived test report artifact).
 Prints nothing and exits 0 when no reports are found. Always exits 0.
 """
@@ -36,7 +36,6 @@ PASSED = "PASSED ✅"
 FAILED = "FAILED ❌"
 FLAKY = "FLAKY ⚠️"
 SKIPPED = "SKIPPED 🙈"
-QUARANTINED = "QUARANTINED 😷"
 
 FAIL_TAGS = frozenset(("failure", "error"))
 FLAKY_TAGS = frozenset(("flakyFailure", "flakyError"))
@@ -112,7 +111,7 @@ def render_table(title, header, rows):
   return lines
 
 
-def render_summary(cases, quarantine=False):
+def render_summary(cases):
   def select(status):
     return [c for c in cases if c.status == status]
 
@@ -138,10 +137,6 @@ def render_summary(cases, quarantine=False):
   if skipped:
     lines.extend(render_table(SKIPPED, ["Module", "Test"],
                               [[c.module, full_name(c)] for c in skipped]))
-  if quarantine:
-    ran = [c for c in cases if c.status != "skipped"]
-    lines.extend(render_table(QUARANTINED, ["Module", "Test"],
-                              [[c.module, full_name(c)] for c in ran]))
   return "\n".join(lines) + "\n"
 
 
@@ -164,8 +159,6 @@ def find_reports(base):
 def main(argv=None):
   parser = argparse.ArgumentParser(description="Print a Markdown summary of JUnit XML test reports.")
   parser.add_argument("--path", default=".", help="directory to scan for TEST-*.xml reports")
-  parser.add_argument("--quarantine", action="store_true",
-                      help="label all tests in this run as quarantined (flaky split)")
   try:
     args = parser.parse_args(argv)
   except SystemExit:
@@ -179,7 +172,7 @@ def main(argv=None):
       except Exception as e:
         print("Skipping unreadable report %s: %s" % (report, e), file=sys.stderr)
     if cases:
-      print(render_summary(cases, args.quarantine), end="")
+      print(render_summary(cases), end="")
   except Exception as e:
     print("junit_summary failed: %s" % e, file=sys.stderr)
   return 0

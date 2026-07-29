@@ -278,15 +278,9 @@ jobs:
       - name: Test summary
         if: ${{ !cancelled() }}
         continue-on-error: true
-        run: |
-          if [[ "${QUARANTINE}" == "true" ]]; then
-            python3 dev-support/ci/junit_summary.py --quarantine >> "$GITHUB_STEP_SUMMARY"
-          else
-            python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
         env:
           JUNIT_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
-          QUARANTINE: ${{ contains(inputs.script-args, 'test-flaky') }}
 
       # The following steps are hard-coded to be run only for 'build' check,
       # to avoid the need for 3 more inputs.

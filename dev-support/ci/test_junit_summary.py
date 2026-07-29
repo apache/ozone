@@ -123,10 +123,6 @@ class TestRender(unittest.TestCase):
       del os.environ["JUNIT_REPORT_URL"]
     self.assertIn("[Download test artifacts](https://example.com/artifact)", md)
 
-  def test_render_quarantine(self):
-    md = junit_summary.render_summary(self.make_cases(), quarantine=True)
-    self.assertIn("QUARANTINED 😷 (3)", md)
-
 
 class TestMain(unittest.TestCase):
 
