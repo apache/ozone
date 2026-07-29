@@ -959,11 +959,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (dbKeyInfo != null) {
       // The key already exist, the new blocks will replace old ones
       // as new versions unless the bucket does not have versioning
-      // turned on.
-      dbKeyInfo.addNewVersion(locations, false,
-              omBucketInfo.getIsVersionEnabled());
+      // turned on. With S3-compatible versioning the previous current version
+      // is kept as its own record in the versionedKeyTable at commit time, so
+      // the in-record block version list is not used to accumulate object
+      // versions and always holds a single version.
+      boolean keepInRecordVersions = omBucketInfo.getIsVersionEnabled()
+          && !omBucketInfo.isS3VersioningEnabled();
+      dbKeyInfo.addNewVersion(locations, false, keepInRecordVersions);
       long newSize = size;
-      if (omBucketInfo.getIsVersionEnabled()) {
+      if (keepInRecordVersions) {
         newSize += dbKeyInfo.getDataSize();
       }
       // The modification time is set in preExecute. Use the same

@@ -416,6 +416,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
+  private final VersionIdAllocator versionIdAllocator;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
   private ExecutorService edekCacheLoader = null;
 
@@ -565,6 +566,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
+    versionIdAllocator = new VersionIdAllocator(conf);
     replicationConfigValidator =
         conf.getObject(ReplicationConfigValidator.class);
 
@@ -2385,6 +2387,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getObjectIdFromTxId(long trxnId) {
     return OmUtils.getObjectIdFromTxId(metadataManager.getOmEpoch(),
         trxnId);
+  }
+
+  /**
+   * Assigns the versionId of a version being committed, using the
+   * {@link org.apache.hadoop.ozone.om.helpers.VersionIdGenerator} configured
+   * for this cluster.
+   */
+  public VersionIdAllocator getVersionIdAllocator() {
+    return versionIdAllocator;
   }
 
   /**

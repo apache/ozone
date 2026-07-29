@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -303,14 +304,23 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      final boolean s3Versioning = omBucketInfo.isS3VersioningEnabled();
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo = omKeyInfo.toBuilder()
+      OmKeyInfo.Builder committedKeyBuilder = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
-          .setDataSize(commitKeyArgs.getDataSize())
-          .build();
+          .setDataSize(commitKeyArgs.getDataSize());
+      if (s3Versioning) {
+        // The version identity is frozen when the version is created: an hsync
+        // re-commit keeps updating the same version, so it keeps its versionId.
+        committedKeyBuilder.setVersionId(isSameHsyncKey
+            ? keyToDelete.getVersionId()
+            : ozoneManager.getVersionIdAllocator().allocate(omMetadataManager,
+                volumeName, bucketName, keyName, trxnLogIndex, keyToDelete));
+      }
+      omKeyInfo = committedKeyBuilder.build();
 
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
@@ -401,6 +411,24 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             dbOpenKey, newOpenKeyInfo, trxnLogIndex);
       }
 
+      // With S3-compatible versioning the overwritten current version is kept
+      // as a noncurrent version instead of being reclaimed. A record written
+      // before versioning was enabled carries no versionId and becomes the
+      // key's null version.
+      String dbVersionedKey = null;
+      OmKeyInfo versionedKeyInfo = null;
+      if (s3Versioning && keyToDelete != null && !isSameHsyncKey) {
+        versionedKeyInfo = keyToDelete.getVersionId() != null ? keyToDelete
+            : keyToDelete.toBuilder()
+                .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+                .setNullVersion(true)
+                .build();
+        dbVersionedKey = omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionedKeyInfo.getVersionId());
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            dbVersionedKey, versionedKeyInfo, trxnLogIndex);
+      }
+
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
@@ -408,7 +436,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo, dbOpenKeyToDeleteKey, openKeyToDelete);
+          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo, dbOpenKeyToDeleteKey, openKeyToDelete)
+          .withVersionedKey(dbVersionedKey, versionedKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
