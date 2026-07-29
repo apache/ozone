@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_O
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -647,6 +648,22 @@ public abstract class EndpointBase {
     ResultCodes result = ex.getResult();
     return result == ResultCodes.PERMISSION_DENIED
         || result == ResultCodes.INVALID_TOKEN;
+  }
+
+  /**
+   * Reject object keys that cannot be represented in a valid URI. AWS S3 returns
+   * InvalidURI for keys containing malformed UTF-8 or ISO control characters.
+   */
+  protected void validateObjectKeyUri(String keyPath) throws OS3Exception {
+    if (keyPath == null || keyPath.indexOf('\uFFFD') >= 0) {
+      throw newError(INVALID_URI, keyPath);
+    }
+
+    for (int i = 0; i < keyPath.length(); i++) {
+      if (Character.isISOControl(keyPath.charAt(i))) {
+        throw newError(INVALID_URI, keyPath);
+      }
+    }
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
