@@ -135,7 +135,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
 
     hostInetAddress = InetAddress.getByName(hostname);
     InetAddress rpcAddressFromConfig = InetAddress.getByName(
-        HddsUtils.getHostOnly(rpcAddrStr));
+        HddsUtils.getHostName(rpcAddrStr).orElse(""));
 
     if (!hostInetAddress.equals(rpcAddressFromConfig)) {
       throw new IOException("OM " + decommNodeId + "'s host address in " +

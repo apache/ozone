@@ -27,6 +27,8 @@ import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
 import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 
+import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -56,20 +58,6 @@ public class NSSummaryAdmin implements AdminSubcommand {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
-  /**
-   * e.g. Input: "0.0.0.0:9891" -> Output: "0.0.0.0"
-   */
-  private String getHostOnly(String host) {
-    return HddsUtils.getHostOnly(host);
-  }
-
-  /**
-   * e.g. Input: "0.0.0.0:9891" -> Output: "9891"
-   */
-  private String getPort(String host) {
-    return HddsUtils.getPort(host);
-  }
-
   public String getReconWebAddress() {
     final OzoneConfiguration conf = parent.getOzoneConf();
     final String protocol;
@@ -82,22 +70,25 @@ public class NSSummaryAdmin implements AdminSubcommand {
       protocol = HTTPS_SCHEME;
       host = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
           OZONE_RECON_HTTPS_ADDRESS_DEFAULT);
-      isHostDefault = getHostOnly(host).equals(
-          getHostOnly(OZONE_RECON_HTTPS_ADDRESS_DEFAULT));
+      isHostDefault = HddsUtils.getHostName(host)
+          .equals(HddsUtils.getHostName(OZONE_RECON_HTTPS_ADDRESS_DEFAULT));
     } else {
       protocol = HTTP_SCHEME;
       host = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY,
           OZONE_RECON_HTTP_ADDRESS_DEFAULT);
-      isHostDefault = getHostOnly(host).equals(
-          getHostOnly(OZONE_RECON_HTTP_ADDRESS_DEFAULT));
+      isHostDefault = HddsUtils.getHostName(host)
+          .equals(HddsUtils.getHostName(OZONE_RECON_HTTP_ADDRESS_DEFAULT));
     }
 
     if (isHostDefault) {
       // Fallback to <Recon RPC host name>:<Recon http(s) address port>
       final String rpcHost =
           conf.get(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
-      host = HddsUtils.getHostPortString(getHostOnly(rpcHost),
-          Integer.parseInt(getPort(host)));
+      Optional<String> rpcHostName = HddsUtils.getHostName(rpcHost);
+      OptionalInt port = HddsUtils.getHostPort(host);
+      if (rpcHostName.isPresent() && port.isPresent()) {
+        host = HddsUtils.getHostPortString(rpcHostName.get(), port.getAsInt());
+      }
     }
 
     return protocol + "://" + host;

@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -77,11 +78,11 @@ public class BaseInsightSubCommand {
   public String getHost(OzoneConfiguration conf, Component component) {
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
     String protocol = policy.isHttpsEnabled() ? HTTPS_SCHEME : HTTP_SCHEME;
-
+    
     if (component.getHostname() != null) {
       return protocol + "://" + component.getHostname() + ":" + component.getPort();
     }
-
+    
     String address = getComponentAddress(conf, component.getName(), policy);
     return protocol + "://" + address;
   }
@@ -95,7 +96,7 @@ public class BaseInsightSubCommand {
     String address;
 
     switch (componentType) {
-    case SCM:
+    case SCM: {
       if (isHttpsEnabled) {
         address = conf.get(OZONE_SCM_HTTPS_ADDRESS_KEY, OZONE_SCM_HTTP_BIND_HOST_DEFAULT + ":" +
             OZONE_SCM_HTTPS_BIND_PORT_DEFAULT);
@@ -105,18 +106,21 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      if (getHostOnly(address).equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> bindHost = HddsUtils.getHostName(address);
+      if (bindHost.isPresent()
+          && bindHost.get().equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> scmHost = HddsUtils.getHostNameFromConfigKeys(conf,
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-        if (scmHost.isPresent()) {
-          return HddsUtils.getHostPortString(scmHost.get(),
-              Integer.parseInt(getPort(address)));
+        OptionalInt port = HddsUtils.getHostPort(address);
+        if (scmHost.isPresent() && port.isPresent()) {
+          return HddsUtils.getHostPortString(scmHost.get(), port.getAsInt());
         }
       }
       return address;
+    }
 
-    case OM:
+    case OM: {
       if (isHttpsEnabled) {
         address = conf.get(OZONE_OM_HTTPS_ADDRESS_KEY, OZONE_OM_HTTP_BIND_HOST_DEFAULT + ":" +
             OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
@@ -126,36 +130,23 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      if (getHostOnly(address).equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> bindHost = HddsUtils.getHostName(address);
+      if (bindHost.isPresent()
+          && bindHost.get().equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> omHost = HddsUtils.getHostNameFromConfigKeys(conf,
             OMConfigKeys.OZONE_OM_ADDRESS_KEY);
-        if (omHost.isPresent()) {
-          return HddsUtils.getHostPortString(omHost.get(),
-              Integer.parseInt(getPort(address)));
+        OptionalInt port = HddsUtils.getHostPort(address);
+        if (omHost.isPresent() && port.isPresent()) {
+          return HddsUtils.getHostPortString(omHost.get(), port.getAsInt());
         }
       }
       return address;
+    }
 
     default:
       throw new IllegalArgumentException(
           "Component type is not supported: " + componentType);
     }
-  }
-
-  /**
-   * Extract hostname from address string.
-   * e.g. Input: "0.0.0.0:9876" -> Output: "0.0.0.0"
-   */
-  private String getHostOnly(String address) {
-    return HddsUtils.getHostOnly(address);
-  }
-
-  /**
-   * Extract port from address string.
-   * e.g. Input: "0.0.0.0:9876" -> Output: "9876"
-   */
-  private String getPort(String address) {
-    return HddsUtils.getPort(address);
   }
 
   public Map<String, InsightPoint> createInsightPoints(

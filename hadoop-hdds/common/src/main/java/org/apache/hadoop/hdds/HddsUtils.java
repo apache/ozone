@@ -203,7 +203,7 @@ public final class HddsUtils {
     if ((value == null) || value.isEmpty()) {
       return Optional.empty();
     }
-    String hostname = value.replaceAll("\\:[0-9]+$", "");
+    String hostname = HostAndPort.fromString(value).getHost();
     if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
@@ -226,28 +226,6 @@ public final class HddsUtils {
     } else {
       return OptionalInt.of(port);
     }
-  }
-
-  /**
-   * Extract the host from a host:port address string.
-   * IPv6-aware; accepts bracketed literals such as {@code [2001:db8::1]:9862}.
-   *
-   * @param address address in host:port format
-   * @return the host component without brackets
-   */
-  public static String getHostOnly(String address) {
-    return NetUtils.createSocketAddr(address).getHostString();
-  }
-
-  /**
-   * Extract the port from a host:port address string.
-   * IPv6-aware; accepts bracketed literals such as {@code [2001:db8::1]:9862}.
-   *
-   * @param address address in host:port format
-   * @return the port component as a decimal string
-   */
-  public static String getPort(String address) {
-    return String.valueOf(NetUtils.createSocketAddr(address).getPort());
   }
 
   /**
