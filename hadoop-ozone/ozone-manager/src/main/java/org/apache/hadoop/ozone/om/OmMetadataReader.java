@@ -259,8 +259,40 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-    List<OzoneFileStatus> ozoneFileStatuses =
-        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
+
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    List<OzoneFileStatus> ozoneFileStatuses;
+    try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(resolvedArgs), StoreType.OZONE, ACLType.READ,
+            bucket, resolvedArgs.getKeyName());
+      }
+      metrics.incNumListStatus();
+      ozoneFileStatuses = keyManager.listStatus(resolvedArgs, recursive,
+          startKey, maxListingPageSize, getClientAddress(),
+          allowPartialPrefixes, false);
+    } catch (Exception ex) {
+      metrics.incNumListStatusFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.LIST_STATUS, auditMap));
+      }
+    }
 
     return ozoneFileStatuses.stream()
         .map(OzoneFileStatusLight::fromOzoneFileStatus)

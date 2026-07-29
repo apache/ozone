@@ -1902,6 +1902,16 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, clientAddress,
+        allowPartialPrefixes, true);
+  }
+
+  @Override
+  @SuppressWarnings("methodlength")
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes, boolean refreshPipelineInfo)
+      throws IOException {
     Objects.requireNonNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
@@ -1920,7 +1930,8 @@ public class KeyManagerImpl implements KeyManager {
       Collection<OzoneFileStatus> statuses =
           statusHelper.listStatusFSO(args, startKey, numEntries,
           clientAddress, allowPartialPrefixes);
-      return buildFinalStatusList(statuses, args, clientAddress);
+      return buildFinalStatusList(statuses, args, clientAddress,
+          refreshPipelineInfo);
     }
 
     // A map sorted by OmKey to combine results from TableCache and DB.
@@ -1988,7 +1999,9 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
 
-    refreshPipelineFromCache(keyInfoList);
+    if (refreshPipelineInfo) {
+      refreshPipelineFromCache(keyInfoList);
+    }
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList);
@@ -2093,7 +2106,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private List<OzoneFileStatus> buildFinalStatusList(
       Collection<OzoneFileStatus> statusesCollection, OmKeyArgs omKeyArgs,
-      String clientAddress)
+      String clientAddress, boolean refreshPipelineInfo)
       throws IOException {
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
@@ -2105,19 +2118,22 @@ public class KeyManagerImpl implements KeyManager {
       fileStatusFinalList.add(fileStatus);
     }
     return sortPipelineInfo(fileStatusFinalList, keyInfoList,
-        omKeyArgs, clientAddress);
+        omKeyArgs, clientAddress, refreshPipelineInfo);
   }
 
   private List<OzoneFileStatus> sortPipelineInfo(
       List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
-      OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
+      OmKeyArgs omKeyArgs, String clientAddress, boolean refreshPipelineInfo)
+      throws IOException {
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    // refreshPipeline flag check has been removed as part of
-    // https://issues.apache.org/jira/browse/HDDS-3658.
-    // Please refer this jira for more details.
-    refreshPipelineFromCache(keyInfoList);
+    if (refreshPipelineInfo) {
+      // refreshPipeline flag check has been removed as part of
+      // https://issues.apache.org/jira/browse/HDDS-3658.
+      // Please refer this jira for more details.
+      refreshPipelineFromCache(keyInfoList);
+    }
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList);
