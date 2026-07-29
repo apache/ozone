@@ -102,7 +102,9 @@ A new column family, **versionedKeyTable**, splits responsibilities with keyTabl
 
   (fixed-width hex suffix), so all versions of a key are physically adjacent and
   ordered newest to oldest: `ListObjectVersions` and version promotion are a
-  single seek plus a sequential read.
+  single seek plus a sequential read. The table is registered in
+  `OmMetadataManagerImpl.getTableBucketPrefix` alongside the other key tables, so
+  bucket-prefixed iteration and SST filtering resolve its prefix.
 
 `OmKeyInfo` gains three optional proto fields (old records deserialize
 compatibly): `versionId` (int64, assigned once at version creation, then frozen),
@@ -203,6 +205,63 @@ version count, marker count, and noncurrent bytes are exposed via
 `ozone sh bucket info` and Recon. `maxVersions` is documented as an Ozone
 extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
 
+## Interaction with Ozone snapshots
+
+A snapshot checkpoints the entire OM RocksDB, so versionedKeyTable is captured
+automatically along with the bucket's versioning status: a snapshot holds the
+complete version history as of its creation. Snapshot creation and deletion need
+no change — `SnapshotDeletingService` moves only deletedTable, deletedDirTable
+and snapshotRenamedTable entries between snapshots, and permanently deleted
+versions travel through deletedTable, the path already used when an overwrite
+reclaims the previous blocks. Multiple versions of one key queued for deletion
+share a deletedTable entry, which is a `RepeatedOmKeyInfo` list evaluated one
+record at a time, so no new structure is required there either.
+
+What does change is **block reclamation**. Snapshots share physical blocks with
+the active object store, so a snapshot keeps its data only because
+`KeyDeletingService` refuses to reclaim blocks that a previous snapshot still
+references. That decision is made per deletedTable record by
+`ReclaimableKeyFilter`, which resolves the key's path in the previous snapshot
+and looks it up **in keyTable only**
+(`KeyManagerImpl.getPreviousSnapshotOzoneKeyInfo`), then compares objectID and
+block locations. With versioning a key's live records span two tables, so the
+lookup misses: permanently deleting a noncurrent version resolves to whatever is
+current in the previous snapshot — a different record with different blocks —
+which reads as "not present in the previous snapshot", i.e. reclaimable. Blocks
+a snapshot still points at would be deleted. objectID does not rescue the
+comparison either way: `prepareFileInfo` keeps it stable across a key's versions,
+so it matches while the block lists do not.
+
+The fix is to make that lookup version-aware. A record carrying a `versionId`
+resolves to the exact dbKey `/{volume}/{bucket}/{keyName}/{MAX - versionId}` in
+the previous snapshot's versionedKeyTable, falling back to keyTable when that
+version was current there. Because versionId is frozen at creation and never
+reused, this is an exact point lookup that *replaces* — rather than extends — the
+objectID-plus-block-list heuristic for versioned buckets. The same lookup feeds
+`calculateExclusiveSize`, keeping snapshot exclusive-size reporting correct for
+noncurrent versions.
+
+This makes deletedTable the single choke point for version reclamation: every
+path that removes a version permanently — `DELETE ?versionId=`, the `maxVersions`
+trim, and VersionCleanupService — writes the record to deletedTable and lets
+KeyDeletingService apply the snapshot-aware filter. None of them may reclaim
+blocks directly.
+
+Snapshot diff remains a **current-version diff**; versionedKeyTable is
+deliberately not added to it. keyTable still holds exactly one record per key, so
+diff cost and semantics do not change as versions accumulate. One rule does need
+stating: **a key whose current version is a delete marker counts as absent**.
+Without it a delete surfaces as a MODIFY (if the marker carries the key's
+objectID) or as a DELETE plus a phantom CREATE (if it carries a new one), instead
+of the DELETE users expect; restoring an object by removing its marker reports
+CREATE correspondingly.
+
+Reads inside a snapshot go through `OmSnapshot`, which implements
+`IOmMetadataReader`, whose `lookupKey(OmKeyArgs)` has no version dimension.
+`?versionId=` is plumbed through it so versions retained in a snapshot are
+actually readable; `ListObjectVersions` against a snapshot is out of scope for
+the first version.
+
 ## S3 Gateway and native API surface
 
 New endpoints: `PutBucketVersioning`, `GetBucketVersioning`,
@@ -218,10 +277,10 @@ versions are manageable outside the S3 path.
 Wire protocol changes are limited to optional proto fields, so old records and
 old clients are unaffected. The new column family and request surface are gated
 by `OMLayoutFeature.OBJECT_VERSIONING`; before cluster finalization, enabling
-versioning is rejected with `NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION`. Ozone
-snapshots checkpoint the whole DB, so versionedKeyTable is included
-automatically; snapshot diff must add it to its tracked table set. Buckets
-without versioning behave exactly as today (verified by benchmarks).
+versioning is rejected with `NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION`.
+Snapshots taken before the feature is used are unaffected, and snapshot
+interaction is covered above. Buckets without versioning behave exactly as today
+(verified by benchmarks).
 
 # Alternatives
 
@@ -254,6 +313,14 @@ without versioning behave exactly as today (verified by benchmarks).
   persistent allocator and reuses IDs after full deletion of a key. Replaced by the
   pinned-first generator, which special-cases only the first version and needs no
   allocator.
+- **A version-level snapshot diff** (reporting noncurrent versions created or
+  removed between two snapshots): the diff is keyed by objectID, which a key's
+  versions share, so it would need a different identity and a version dimension
+  in the report; versionedKeyTable would also have to join
+  `RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG`, paying
+  compaction-log and SST retention cost for information already reachable through
+  the snapshot's own version listing. Deferred; the diff stays a current-version
+  diff with an explicit delete-marker rule.
 - **Pinning the generator into bucket metadata** (so a bucket keeps the generator
   it was created with): removes the risk of a mid-life generator change, but adds a
   proto field, a write path in both bucket create and set-property, and leaves the
@@ -271,27 +338,33 @@ PR), in dependency order `T1 → T2 → T3 → T4 → T5 → (T6 ∥ T7) → (T8
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
 | T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, transaction-index default, commit-time ordering check, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
-| T4 Read / permanent delete / promotion | `?versionId=` reads, permanent delete, version promotion |
+| T4 Read / permanent delete / promotion | `?versionId=` reads (including through `OmSnapshot`), permanent delete with the version-aware reclamation lookup, version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
 | T6 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
 | T7 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
 | T8 Reclamation | `maxVersions` trim, VersionCleanupService, expired marker cleanup |
 | T9 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
-| T10 Wrap-up | upgrade validation, snapshot diff adaptation, robot tests, benchmarks, docs |
+| T10 Wrap-up | upgrade validation, snapshot delete-marker diff rule and exclusive-size accounting, robot tests, benchmarks, docs |
 
-Testing follows three tracks: unit/integration tests per sub-task acceptance
+Testing follows four tracks: unit/integration tests per sub-task acceptance
 criteria (state machine, two-table atomicity, promotion, null-slot semantics,
-`maxVersions` boundaries); S3 compatibility via the smoketest/s3 robot suite and
-the versioning subset of ceph/s3-tests; performance benchmarks asserting no
-regression with versioning off and O(1) write latency with it on.
+`maxVersions` boundaries); snapshot integration tests that take a snapshot and
+then permanently delete a noncurrent version, a current version and a delete
+marker in the active bucket, asserting that every version the snapshot holds
+stays readable, that its exclusive size is reported correctly, and that the
+blocks are reclaimed once the snapshot is deleted; S3 compatibility via the
+smoketest/s3 robot suite and the versioning subset of ceph/s3-tests; performance
+benchmarks asserting no regression with versioning off and O(1) write latency
+with it on.
 
 Open questions tracked for implementation: the `maxVersions` default and cluster
 cap; obfuscation of the external versionId encoding, and how a pinned first version
 is rendered; whether changing `ozone.om.versioning.version-id-generator` should take
 effect without an OM restart, and the operational procedure for keys already written
 under the previous generator; `PutBucketVersioning(Suspended)` on a never-versioned
-bucket (align via s3-tests); the snapshot diff change surface; interaction with
-hsync/append writes (appends apply to the current version and create no new one);
+bucket (align via s3-tests); whether `ListObjectVersions` against a snapshot is
+worth adding once the feature has landed; interaction with hsync/append writes
+(appends apply to the current version and create no new one);
 multipart uploads (the version is created at `CompleteMultipartUpload` commit; parts
 are invisible).
 
