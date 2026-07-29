@@ -367,7 +367,6 @@ Create Action Matches Assume Role Policies
     END
 
 Create Action Matches Volume Policies
-Create Action Matches Volume Policies
     # Apply action-matches conditions at volume level so READ is scoped to the intended S3 action.
     ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GET_STAR_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "Get*" ] } ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg volume access         ${policy_items}
