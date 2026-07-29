@@ -290,6 +290,26 @@ public class TestOMStartFinalizeUpgradeRequest extends OMKeyRequestTests {
     verify(scmContainerLocationProtocol).finalizeUpgrade();
   }
 
+  @Test
+  public void testForceSkipsPeerVersionCheckForMismatchedPeer() throws IOException {
+    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    when(ozoneManager.getPeerNodes()).thenReturn(Collections.singletonList(buildPeer("om2")));
+    OMAdminProtocolClientSideImpl olderClient = peerClientWithVersion(OzoneManagerVersion.HBASE_SUPPORT);
+
+    try (MockedStatic<OMAdminProtocolClientSideImpl> factory =
+             mockStatic(OMAdminProtocolClientSideImpl.class)) {
+      factory.when(() -> OMAdminProtocolClientSideImpl.createProxyForSingleOM(any(), any(), any()))
+          .thenReturn(olderClient);
+
+      // With force=true the peer version check is skipped, so a peer running a different software
+      // version does not prevent finalization and SCM is still asked to begin finalizing.
+      new OMStartFinalizeUpgradeRequest(buildRequest(true)).preExecute(ozoneManager);
+    }
+
+    verify(olderClient, never()).getPeerUpgradeStatus();
+    verify(scmContainerLocationProtocol).finalizeUpgrade();
+  }
+
   private static OMNodeDetails buildPeer(String nodeId) {
     return new OMNodeDetails.Builder()
         .setOMServiceId("testService")

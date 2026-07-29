@@ -100,7 +100,7 @@ message GetPeerUpgradeStatusRequest {
 
 message GetPeerUpgradeStatusResponse {
     // Serialized OzoneManagerVersion.SOFTWARE_VERSION of the responding OM binary.
-    optional int32 omSoftwareVersion = 2;
+    optional int32 omSoftwareVersion = 1;
 }
 
 /**

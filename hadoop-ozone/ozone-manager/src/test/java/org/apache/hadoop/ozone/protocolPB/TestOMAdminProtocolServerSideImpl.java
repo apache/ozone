@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.Ge
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link OMAdminProtocolServerSideImpl#getPeerUpgradeStatus}.
+ * Tests for {@link OMAdminProtocolServerSideImpl}.
  */
 public class TestOMAdminProtocolServerSideImpl {
 
