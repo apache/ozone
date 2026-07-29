@@ -96,7 +96,7 @@ public class BaseInsightSubCommand {
     String address;
 
     switch (componentType) {
-    case SCM: {
+    case SCM:
       if (isHttpsEnabled) {
         address = conf.get(OZONE_SCM_HTTPS_ADDRESS_KEY, OZONE_SCM_HTTP_BIND_HOST_DEFAULT + ":" +
             OZONE_SCM_HTTPS_BIND_PORT_DEFAULT);
@@ -106,21 +106,20 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      Optional<String> bindHost = HddsUtils.getHostName(address);
-      if (bindHost.isPresent()
-          && bindHost.get().equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> scmBindHost = HddsUtils.getHostName(address);
+      if (scmBindHost.isPresent()
+          && scmBindHost.get().equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> scmHost = HddsUtils.getHostNameFromConfigKeys(conf,
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-        OptionalInt port = HddsUtils.getHostPort(address);
-        if (scmHost.isPresent() && port.isPresent()) {
-          return HddsUtils.getHostPortString(scmHost.get(), port.getAsInt());
+        OptionalInt scmPort = HddsUtils.getHostPort(address);
+        if (scmHost.isPresent() && scmPort.isPresent()) {
+          return HddsUtils.getHostPortString(scmHost.get(), scmPort.getAsInt());
         }
       }
       return address;
-    }
 
-    case OM: {
+    case OM:
       if (isHttpsEnabled) {
         address = conf.get(OZONE_OM_HTTPS_ADDRESS_KEY, OZONE_OM_HTTP_BIND_HOST_DEFAULT + ":" +
             OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
@@ -130,18 +129,17 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      Optional<String> bindHost = HddsUtils.getHostName(address);
-      if (bindHost.isPresent()
-          && bindHost.get().equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> omBindHost = HddsUtils.getHostName(address);
+      if (omBindHost.isPresent()
+          && omBindHost.get().equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> omHost = HddsUtils.getHostNameFromConfigKeys(conf,
             OMConfigKeys.OZONE_OM_ADDRESS_KEY);
-        OptionalInt port = HddsUtils.getHostPort(address);
-        if (omHost.isPresent() && port.isPresent()) {
-          return HddsUtils.getHostPortString(omHost.get(), port.getAsInt());
+        OptionalInt omPort = HddsUtils.getHostPort(address);
+        if (omHost.isPresent() && omPort.isPresent()) {
+          return HddsUtils.getHostPortString(omHost.get(), omPort.getAsInt());
         }
       }
       return address;
-    }
 
     default:
       throw new IllegalArgumentException(
