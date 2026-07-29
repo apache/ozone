@@ -474,7 +474,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
-        } else if (portsChanged(oldNode, datanodeDetails)) {
+        } else if (oldNode.portsChanged(datanodeDetails)) {
           // Refresh the stored node when its port set changes
           LOG.info("Updating ports for registered datanode {}: {} -> {}",
               datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
@@ -490,22 +490,6 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         .setDatanode(datanodeDetails)
         .setClusterID(this.scmStorageConfig.getClusterID())
         .build();
-  }
-
-  /**
-   * Whether the datanode's exposed ports changed between two registrations.
-   * Compared as a set of name=value entries, since
-   * {@link DatanodeDetails.Port#equals} ignores the port value.
-   */
-  private static boolean portsChanged(DatanodeDetails oldNode,
-      DatanodeDetails newNode) {
-    return !portValues(oldNode).equals(portValues(newNode));
-  }
-
-  private static Set<String> portValues(DatanodeDetails datanodeDetails) {
-    return datanodeDetails.getPorts().stream()
-        .map(port -> port.getName() + "=" + port.getValue())
-        .collect(Collectors.toSet());
   }
 
   /**
