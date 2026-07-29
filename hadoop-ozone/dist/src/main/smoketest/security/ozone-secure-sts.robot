@@ -52,6 +52,7 @@ ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}           action-matches-putobject-read
 ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}   action-matches-putobject-create-write
 ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}      action-matches-getobject-putobject
 ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}  action-matches-uploadpartcopy-expected-owner
+${ACTION_MATCHES_GET_STAR_READ_ROLE}            action-matches-get-star-read
 ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE_ARN}   arn:aws:iam::123456789012:role/${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}
 ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE_ARN}   arn:aws:iam::123456789012:role/${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}
 ${PARTIAL_BUCKET_READ_ROLE_ARN}                 arn:aws:iam::123456789012:role/${PARTIAL_BUCKET_READ_ROLE}
@@ -64,6 +65,7 @@ ${ACTION_MATCHES_PUTOBJECT_READ_ROLE_ARN}       arn:aws:iam::123456789012:role/$
 ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}
 ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}
 ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
+${ACTION_MATCHES_GET_STAR_READ_ROLE_ARN}        arn:aws:iam::123456789012:role/${ACTION_MATCHES_GET_STAR_READ_ROLE}
 ${TEST_USER_NON_ADMIN}                  testuser2
 @{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_LISTABLE_OBJECT_KEYS_OBS}     file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt    zeroByteFile    zeroByteFolder/
@@ -354,28 +356,31 @@ Create Partial Access Table Policies
     Create Ranger Policy          ${upload_prefix_policy}
 
 Create Action Matches Roles in Ranger
-    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
+    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}    ${ACTION_MATCHES_GET_STAR_READ_ROLE}
         ${role_json} =            Set Variable                  { "name": "${role}", "description": "Action-matches scoped role" }
         Create Ranger Role        ${role_json}
     END
 
 Create Action Matches Assume Role Policies
-    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
+    FOR    ${role}    IN    ${ACTION_MATCHES_PUTOBJECT_READ_ROLE}    ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}    ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}    ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}    ${ACTION_MATCHES_GET_STAR_READ_ROLE}
         Create Ranger Assume Role Policy  ${role}              ${ICEBERG_SVC_CATALOG_USER}
     END
 
 Create Action Matches Volume Policies
+Create Action Matches Volume Policies
     # Apply action-matches conditions at volume level so READ is scoped to the intended S3 action.
-    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GET_STAR_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "Get*" ] } ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg volume access         ${policy_items}
 
 Create Action Matches Bucket Policies
-    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GET_STAR_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "Get*" ] } ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg ${ICEBERG_BUCKET_OBS} bucket access  ${policy_items}
 
 Create Action Matches Table Policies
-    # READ with action-matches=PutObject must not authorize PutObject; CREATE+WRITE with action-matches=PutObject must only authorize PutObject; READ+CREATE+WRITE with action-matches=GetObject and PutObject supports UploadPartCopy source read and destination write.
-    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false } ]
+    # READ with action-matches=PutObject must not authorize PutObject; CREATE+WRITE with action-matches=PutObject must only authorize PutObject.
+    # READ+CREATE+WRITE with action-matches=GetObject and PutObject supports UploadPartCopy source read and destination write.
+    # READ with action-matches=Get* must authorize GetObject but not PutObject.
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "create", "isAllowed": true }, { "type": "write", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "GetObject", "PutObject" ] } ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ACTION_MATCHES_GET_STAR_READ_ROLE}" ], "conditions": [ { "type": "action-matches", "values": [ "Get*" ] } ], "delegateAdmin": false } ]
     Update Ranger Policy Items    iceberg ${ICEBERG_BUCKET_OBS} table access  ${policy_items}
 
 Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Upload Files
@@ -638,6 +643,24 @@ Assume Role Should Fail For Too Short Role Arn
 Assume Role Should Fail For Too Short Role Session Name
     Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  role_session_name=a
 
+Assume Role With ExternalId Should Fail As UnsupportedOperation
+    Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--external-id test-external-id
+
+Assume Role With Session Tags Should Fail As UnsupportedOperation
+    Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--tags Key=tag-key1,Value=tag-value1
+
+Assume Role With ExternalId In Query Should Fail As UnsupportedOperation
+    Assume Role Should Fail Using Curl Get  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_curl_params=--data-urlencode "ExternalId=test-external-id"
+
+Assume Role With Session Tags In Query Should Fail As UnsupportedOperation
+    Assume Role Should Fail Using Curl Get  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_curl_params=--data-urlencode "Tags.member.1.Key=tag-key1" --data-urlencode "Tags.member.1.Value=tag-value1"
+
+Assume Role With Transitive Tag Keys Should Fail As UnsupportedOperation
+    Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--transitive-tag-keys tag-key1
+
+Assume Role With PolicyArns Should Fail As UnsupportedOperation
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_curl_params=--data-urlencode "PolicyArns.member.1=arn:aws:iam::123456789012:policy/test-policy"
+
 Assume Role Response Should Include STS Request Headers
     Assume Role Response Headers Should Be Present              ${PERMANENT_ACCESS_KEY_ID}  ${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
 
@@ -760,6 +783,16 @@ Ranger action-matches GetObject with READ allows UploadPartCopy source read
     Should Not Be Empty           ${upload_id}
     ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
     Should Contain                ${output}                     CopyPartResult
+
+Ranger action-matches Get* with READ allows GetObject but denies PutObject
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${key} =                      Set Variable                  sts-object-${key_suffix}.txt
+    ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
+    Create File                   ${local_path}                 action-matches get-star content
+
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ACTION_MATCHES_GET_STAR_READ_ROLE_ARN}
+    Get Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}
+    Put Object Should Fail        ${ICEBERG_BUCKET_OBS}  ${key}  AccessDenied  ${local_path}
 
 STS session policy CreateBucket must require bucket CREATE
     ${bucket_suffix} =            Generate Random String        8   [LOWER]
