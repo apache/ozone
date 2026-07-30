@@ -212,6 +212,7 @@ import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -490,6 +491,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private ExitManager exitManager;
+  /** Test-only hook to fail a checkpoint-install DB backup part way through. */
+  private FaultInjector checkpointBackupInjector;
 
   private OzoneManagerPrepareState prepareState;
 
@@ -4502,6 +4505,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Path existingItem = dbDir.toPath().resolve(itemName);
           if (Files.exists(existingItem)) {
             Path backupTarget = dbBackupDir.toPath().resolve(itemName);
+            if (checkpointBackupInjector != null) {
+              checkpointBackupInjector.pause();
+            }
             Files.move(existingItem, backupTarget);
             backedUpItems.add(itemName);
           }
@@ -5033,6 +5039,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
         visited, userGroupInformation, remoteAddress, hostName,
         allowDanglingBuckets, aclEnabled);
+  }
+
+  @VisibleForTesting
+  public void setCheckpointBackupInjector(FaultInjector injector) {
+    checkpointBackupInjector = injector;
   }
 
   @VisibleForTesting
