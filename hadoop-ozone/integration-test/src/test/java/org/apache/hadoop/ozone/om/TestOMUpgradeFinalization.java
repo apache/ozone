@@ -166,7 +166,7 @@ class TestOMUpgradeFinalization {
   }
 
   /**
-   * OM's reported finalization status should move UNFINALIZED -> PENDING (once the in-progress
+   * OM's reported finalization status should move UNFINALIZED -> IN_PROGRESS (once the in-progress
    * marker is present) -> FINALIZED.
    */
   @Test
@@ -189,9 +189,9 @@ class TestOMUpgradeFinalization {
         assertEquals(HddsProtos.FinalizationStatus.UNFINALIZED,
             omClient.queryUpgradeStatus().getOmFinalizationStatus());
 
-        // With the in-progress marker present but the OM not yet finalized, OM reports PENDING.
+        // With the in-progress marker present but the OM not yet finalized, OM reports IN_PROGRESS.
         om.getMetadataManager().getMetaTable().put(FINALIZATION_IN_PROGRESS_KEY, "ignored");
-        assertEquals(HddsProtos.FinalizationStatus.PENDING,
+        assertEquals(HddsProtos.FinalizationStatus.IN_PROGRESS,
             omClient.queryUpgradeStatus().getOmFinalizationStatus());
         om.getMetadataManager().getMetaTable().delete(FINALIZATION_IN_PROGRESS_KEY);
 

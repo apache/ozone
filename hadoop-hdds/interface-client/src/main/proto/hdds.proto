@@ -434,8 +434,7 @@ message UpgradeFinalizationStatus {
 enum FinalizationStatus {
     UNFINALIZED = 1;
     FINALIZED = 2;
-    PENDING = 3;
-    IN_PROGRESS = 4;
+    IN_PROGRESS = 3;
 }
 
 message UpgradeStatus {

@@ -109,7 +109,7 @@ public class TestStatusSubCommand {
     cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Upgrade status"));
+    assertTrue(output.contains("Upgrade finalization status"));
     assertTrue(output.contains("Cluster: IN_PROGRESS"));
     assertTrue(output.contains("OM: UNFINALIZED"));
     assertTrue(output.contains("SCM: FINALIZED"));
@@ -120,7 +120,7 @@ public class TestStatusSubCommand {
   }
 
   @Test
-  public void testStatusCommandPrintsPendingOm() throws Exception {
+  public void testStatusCommandPrintsInProgressOm() throws Exception {
     // OM has begun polling SCM (marker present) but is not finalized yet.
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
@@ -131,7 +131,7 @@ public class TestStatusSubCommand {
 
     OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
         OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
-            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.PENDING)
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
             .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
             .setHddsStatus(hddsStatus)
             .build();
@@ -141,7 +141,7 @@ public class TestStatusSubCommand {
     cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("OM: PENDING"));
+    assertTrue(output.contains("OM: IN_PROGRESS"));
     assertTrue(output.contains("Cluster: IN_PROGRESS"));
     assertTrue(output.contains("SCM: FINALIZED"));
     verify(omClient).queryUpgradeStatus();

@@ -167,7 +167,7 @@ public class TestFinalizeSubCommand {
 
     String output = outContent.toString(DEFAULT_ENCODING);
     // While polling, the shared basic status output is printed on each in-progress poll.
-    assertTrue(output.contains("Upgrade status:"));
+    assertTrue(output.contains("Upgrade finalization status:"));
     assertTrue(output.contains("Finalization complete."));
     verify(omClient, times(3)).queryUpgradeStatus();
   }

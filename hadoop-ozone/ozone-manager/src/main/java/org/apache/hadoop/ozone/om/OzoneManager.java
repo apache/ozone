@@ -3680,7 +3680,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (!versionManager.needsFinalization()) {
       omFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;
     } else if (metadataManager.getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY) != null) {
-      omFinalizationStatus = HddsProtos.FinalizationStatus.PENDING;
+      omFinalizationStatus = HddsProtos.FinalizationStatus.IN_PROGRESS;
     } else {
       omFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
     }
