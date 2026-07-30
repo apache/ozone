@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,20 +48,21 @@ class TestXceiverClientGrpcChannel {
     DatanodeDetails dn = datanodeWithDistinctHostAndIp();
     Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dn));
 
-    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-    ManagedChannel channel = client.createChannel(dn, PORT).build();
-    try {
-      String expectedHost = useHostname ? HOSTNAME : IP_ADDRESS;
-      assertThat(channel.authority()).isEqualTo(expectedHost + ":" + PORT);
-    } finally {
-      channel.shutdownNow();
-      channel.awaitTermination(5, TimeUnit.SECONDS);
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+      ManagedChannel channel = client.createChannel(dn, PORT).build();
+      try {
+        String expectedHost = useHostname ? HOSTNAME : IP_ADDRESS;
+        assertThat(channel.authority()).isEqualTo(expectedHost + ":" + PORT);
+      } finally {
+        channel.shutdownNow();
+        channel.awaitTermination(5, TimeUnit.SECONDS);
+      }
     }
   }
 
   private static DatanodeDetails datanodeWithDistinctHostAndIp() {
     return MockDatanodeDetails.createDatanodeDetails(
-        DatanodeID.of(UUID.randomUUID()), HOSTNAME, IP_ADDRESS, "/rack");
+        DatanodeID.randomID(), HOSTNAME, IP_ADDRESS, "/rack");
   }
 
 }
