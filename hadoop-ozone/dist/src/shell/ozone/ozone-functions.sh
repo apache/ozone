@@ -1335,6 +1335,7 @@ function ozone_add_to_classpath_userpath
 function ozone_os_tricks
 {
   OZONE_IS_CYGWIN=false
+  ARCH_TYPE=$(uname -m)
   case ${OZONE_OS_TYPE} in
     Darwin)
       if [[ -z "${JAVA_HOME}" ]]; then
@@ -1346,6 +1347,25 @@ function ozone_os_tricks
           export JAVA_HOME
         fi
       fi
+
+      if [ "$ARCH_TYPE" = "arm64" ]; then
+        TARGET_FILE="libhadoop_osx_aarch_64.dylib"
+      fi
+
+      pushd lib/native > /dev/null
+      # If no matching file variant was found for the current environment
+      if [ -z "$TARGET_FILE" ]; then
+        echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
+      else
+        LINK_FILE="libhadoop.dylib"
+        # Check if it already exists but points to the wrong target
+        if [ -L "$LINK_FILE" ] && [ "$(readlink "$LINK_FILE")" != "$TARGET_FILE" ]; then
+          # Forcefully recreate it so it points to the correct target file
+          ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+        fi
+        export DYLD_LIBRARY_PATH=$OZONE_HOME/lib/native:$DYLD_LIBRARY_PATH
+      fi
+      popd > /dev/null
     ;;
     Linux)
 
@@ -1354,6 +1374,28 @@ function ozone_os_tricks
       # with the many threads that we use in Hadoop. Tune the variable
       # down to prevent vmem explosion.
       export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
+
+      if [ "$ARCH_TYPE" = "aarch64" ]; then
+        TARGET_FILE="libhadoop_linux_aarch_64.so"
+      elif [ "$ARCH_TYPE" = "x86_64" ]; then
+        TARGET_FILE="libhadoop_linux_x86_64.so"
+      fi
+
+      pushd . > /dev/null && cd lib/native
+      # If no matching file variant was found for the current environment
+      if [ -z "$TARGET_FILE" ]; then
+        echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
+      else
+        LINK_FILE="libhadoop.so"
+
+        # Check if it already exists but points to the wrong target
+        if [ -L "$LINK_FILE" ] && [ "$(readlink "$LINK_FILE")" != "$TARGET_FILE" ]; then
+          # Forcefully recreate it so it points to the correct target file
+          ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+        fi
+        export LD_LIBRARY_PATH=$OZONE_HOME/lib/native:$LD_LIBRARY_PATH
+      fi
+      popd > /dev/null
     ;;
     CYGWIN*)
       # Flag that we're running on Cygwin to trigger path translation later.

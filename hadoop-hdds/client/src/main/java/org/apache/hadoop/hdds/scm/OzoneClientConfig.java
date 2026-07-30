@@ -36,7 +36,35 @@ import org.slf4j.LoggerFactory;
 public class OzoneClientConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(OzoneClientConfig.class);
+  public static final String OZONE_READ_SHORT_CIRCUIT = "ozone.client.read.short-circuit";
+  public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
+  public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
+  public static final String SHORT_CIRCUIT_PREFIX = OZONE_READ_SHORT_CIRCUIT + ".";
+  public static final short DATA_TRANSFER_VERSION = 28;
+  public static final byte DATA_TRANSFER_MAGIC_CODE = 99;
 
+  @Config(key = "ozone.client.read.short-circuit",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Whether read short-circuit is enabled or not",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private boolean shortCircuitEnabled = OZONE_READ_SHORT_CIRCUIT_DEFAULT;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "buffer.size",
+      defaultValue = "128KB",
+      type = ConfigType.SIZE,
+      description = "Buffer size of reader/writer.",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private int shortCircuitBufferSize = 128 * 1024;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "disable.interval",
+      defaultValue = "600",
+      type = ConfigType.LONG,
+      description = "If some unknown IO error happens on Domain socket read, short circuit read will be disabled " +
+          "temporarily for this period of time(seconds).",
+      tags = { ConfigTag.CLIENT })
+  private long shortCircuitReadDisableInterval = 60 * 10;
+  
   @Config(key = "ozone.client.stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -408,6 +436,30 @@ public class OzoneClientConfig {
           streamReadTimeout, defaultTimeout);
       streamReadTimeout = defaultTimeout;
     }
+  }
+
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
+  }
+
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
+  }
+
+  public int getShortCircuitBufferSize() {
+    return shortCircuitBufferSize;
+  }
+
+  public void setShortCircuitBufferSize(int size) {
+    this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
   }
 
   public long getStreamBufferFlushSize() {
