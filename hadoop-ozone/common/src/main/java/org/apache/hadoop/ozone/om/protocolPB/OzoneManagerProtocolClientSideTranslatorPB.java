@@ -1476,7 +1476,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         reportOnly);
     if (diffResponse.hasSubStatus()) {
       result.setSubStatus(SnapshotDiffResponse.SubStatus.fromProtoBuf(diffResponse.getSubStatus()));
-      result.setProgressPercent(diffResponse.getProgressPercent());
+      if (diffResponse.hasProgressPercent()) {
+        result.setProgressPercent(diffResponse.getProgressPercent());
+      }
     }
     return result;
   }

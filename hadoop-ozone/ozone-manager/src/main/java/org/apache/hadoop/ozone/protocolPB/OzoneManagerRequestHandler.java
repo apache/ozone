@@ -1484,7 +1484,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     if (response.getSubStatus() != null) {
       builder.setSubStatus(response.getSubStatus().toProtoBuf());
-      builder.setProgressPercent(response.getProgressPercent());
+      if (response.getSubStatus().hasProgress()) {
+        builder.setProgressPercent(response.getProgressPercent());
+      }
     }
 
     return builder.build();

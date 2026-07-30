@@ -1147,11 +1147,13 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                   tablePrefix, bucketId,
                   toSnapshot.getMetadataManager().getDirectoryTable())
                   .getAbsolutePathForObjectIDs(newParentIds, true));
-              LOG.info("Completed FSO path resolution for snapshot diff, resolved {} out of {} parent IDs, " +
-                      "elapsed: {}ms, jobId: {}",
-                  oldParentIdPathMap.get().size() + newParentIdPathMap.get().size(),
-                  oldParentIds.get().size() + newParentIds.get().size(),
-                  Time.monotonicNow() - pathResolutionStart, jobId);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Completed FSO path resolution for snapshot diff, resolved {} out of {} parent IDs, " +
+                        "elapsed: {}ms, jobId: {}",
+                    oldParentIdPathMap.get().size() + newParentIdPathMap.get().size(),
+                    oldParentIds.get().size() + newParentIds.get().size(),
+                    Time.monotonicNow() - pathResolutionStart, jobId);
+              }
             }
             return null;
           },
@@ -1174,8 +1176,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             if (reportEntries.getKey() >= 0 &&
                 areDiffJobAndSnapshotsActive(volumeName, bucketName,
                     fromSnapshotName, toSnapshotName)) {
-              LOG.info("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
-                  reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
+                    reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
+              }
               updateJobStatusToDone(jobKey, reportEntries.getKey(), reportEntries.getValue());
             }
             return null;
@@ -1238,8 +1242,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     Set<String> tablesToLookUp = Collections.singleton(fsTable.getName());
     Collection<Pair<Path, SstFileInfo>> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
         tablesToLookUp);
-    LOG.info("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
-        fsTable.getName(), deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
+          fsTable.getName(), deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
+    }
     recordActivity(jobKey,
         fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO : OBJECT_ID_MAP_GEN_OBS);
     addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(Pair::getLeft).collect(Collectors.toList()),
@@ -1259,11 +1265,11 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       Optional<Set<Long>> newParentIds,
       TablePrefixInfo tablePrefixes, String jobKey,
       String jobId) throws IOException, RocksDBException {
+    updateProgress(jobKey, 0.0);
     if (deltaFiles.isEmpty()) {
       return;
     }
     long objectIdMapStart = Time.monotonicNow();
-    updateProgress(jobKey, 0.0);
     AtomicLong keysProcessed = new AtomicLong(0);
     String tablePrefix = tablePrefixes.getTablePrefix(fsTable.getName());
     boolean isDirectoryTable = fsTable.getName().equals(DIRECTORY_TABLE);
@@ -1328,8 +1334,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         }
       }
     }
-    LOG.info("Generated object ID map for table '{}', keys scanned: {}, elapsed: {}ms, jobId: {}",
-        fsTable.getName(), keysProcessed.get(), Time.monotonicNow() - objectIdMapStart, jobId);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Generated object ID map for table '{}', keys scanned: {}, elapsed: {}ms, jobId: {}",
+          fsTable.getName(), keysProcessed.get(), Time.monotonicNow() - objectIdMapStart, jobId);
+    }
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
@@ -1390,6 +1398,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final Optional<Map<Long, Path>> oldParentIdPathMap,
       final Optional<Map<Long, Path>> newParentIdPathMap,
       final TablePrefixInfo tablePrefix) {
+    LOG.info("Starting diff report generation for jobId: {}.", jobId);
+
     // JobId is prepended to column family name to make it unique for request.
     try {
       try (ClosableIterator<Map.Entry<byte[], Boolean>>
