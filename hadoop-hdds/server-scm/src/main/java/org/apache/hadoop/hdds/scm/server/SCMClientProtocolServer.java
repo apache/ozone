@@ -1224,13 +1224,23 @@ public class SCMClientProtocolServer implements
           scm.getScmNodeManager().getDatanodeFinalizationCounts();
       int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
       int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
-      boolean hddsFinalized = scmFinalized && datanodeFinalizationCounts.allNodesFinalized();
+
+      HddsProtos.FinalizationStatus scmFinalizationStatus =
+          scmFinalized ? HddsProtos.FinalizationStatus.FINALIZED : HddsProtos.FinalizationStatus.UNFINALIZED;
+      HddsProtos.FinalizationStatus hddsFinalizationStatus;
+      if (!scmFinalized) {
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
+      } else if (datanodeFinalizationCounts.allNodesFinalized()) {
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;
+      } else {
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.IN_PROGRESS;
+      }
 
       HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
-          .setScmFinalized(scmFinalized)
+          .setScmFinalizationStatus(scmFinalizationStatus)
           .setNumDatanodesFinalized(finalizedDatanodes)
           .setNumDatanodesTotal(healthyDatanodes)
-          .setHddsFinalized(hddsFinalized)
+          .setHddsFinalizationStatus(hddsFinalizationStatus)
           .setScmApparentVersion(scm.getVersionManager().getApparentVersion().serialize())
           .setMinDatanodeApparentVersion(datanodeFinalizationCounts.getMinApparentVersion())
           .setMaxDatanodeApparentVersion(datanodeFinalizationCounts.getMaxApparentVersion())

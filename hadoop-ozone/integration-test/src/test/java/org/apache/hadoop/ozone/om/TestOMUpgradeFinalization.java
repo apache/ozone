@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.FINALIZATION_IN_PROGRESS_KEY;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -159,6 +161,45 @@ class TestOMUpgradeFinalization {
         // Confirm finalization happened via snapshot install, not log replay.
         assertThat(versionManagerLogCapture.getOutput()).contains("New snapshot received with higher apparent version");
         versionManagerLogCapture.stopCapturing();
+      }
+    }
+  }
+
+  /**
+   * OM's reported finalization status should move UNFINALIZED -> PENDING (once the in-progress
+   * marker is present) -> FINALIZED.
+   */
+  @Test
+  void testOmFinalizationStatusTransitions() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.serialize());
+
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build()) {
+      cluster.waitForClusterToBeReady();
+      OzoneManager om = cluster.getOzoneManager();
+
+      try (OzoneClient client = cluster.newClient()) {
+        OzoneManagerProtocol omClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
+
+        // Before finalization: no in-progress marker, OM reports UNFINALIZED.
+        assertNull(om.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY));
+        assertEquals(HddsProtos.FinalizationStatus.UNFINALIZED,
+            omClient.queryUpgradeStatus().getOmFinalizationStatus());
+
+        // With the in-progress marker present but the OM not yet finalized, OM reports PENDING.
+        om.getMetadataManager().getMetaTable().put(FINALIZATION_IN_PROGRESS_KEY, "ignored");
+        assertEquals(HddsProtos.FinalizationStatus.PENDING,
+            omClient.queryUpgradeStatus().getOmFinalizationStatus());
+        om.getMetadataManager().getMetaTable().delete(FINALIZATION_IN_PROGRESS_KEY);
+
+        // After finalization completes, OM reports FINALIZED.
+        omClient.finalizeUpgrade();
+        OMUpgradeTestUtils.waitForFinalization(omClient);
+        assertEquals(HddsProtos.FinalizationStatus.FINALIZED,
+            omClient.queryUpgradeStatus().getOmFinalizationStatus());
       }
     }
   }

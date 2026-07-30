@@ -286,8 +286,8 @@ public class TestFinalizeSubCommand {
     assertEquals(0, cmd.call());
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("OM Finalized?"));
-    assertTrue(output.contains("SCM Finalized?"));
+    assertTrue(output.contains("OM:"));
+    assertTrue(output.contains("SCM:"));
     assertTrue(output.contains("OM Apparent Version:"));
     assertTrue(output.contains("SCM Apparent Version:"));
     assertTrue(output.contains("Min Datanode Apparent Version:"));
@@ -297,10 +297,10 @@ public class TestFinalizeSubCommand {
 
   private static QueryUpgradeStatusResponse inProgressStatus(int dnFinalized, int dnTotal) {
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(false)
-        .setClusterFinalized(false)
+        .setOmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
         .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
-            .setScmFinalized(false)
+            .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
             .setNumDatanodesFinalized(dnFinalized)
             .setNumDatanodesTotal(dnTotal)
             .build())
@@ -309,10 +309,10 @@ public class TestFinalizeSubCommand {
 
   private static QueryUpgradeStatusResponse finalizedStatus(int dnFinalized, int dnTotal) {
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(true)
-        .setClusterFinalized(true)
+        .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
-            .setScmFinalized(true)
+            .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
             .setNumDatanodesFinalized(dnFinalized)
             .setNumDatanodesTotal(dnTotal)
             .build())

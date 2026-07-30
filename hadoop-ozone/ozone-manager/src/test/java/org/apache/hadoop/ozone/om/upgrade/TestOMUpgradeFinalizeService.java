@@ -125,7 +125,7 @@ public class TestOMUpgradeFinalizeService {
 
   /**
    * When the OM is the leader, finalization is needed, the finalization command is given and SCM reports
-   * hddsFinalized=true, a FinalizeUpgrade request should be submitted via Ratis.
+   * hddsFinalizationStatus=FINALIZED, a FinalizeUpgrade request should be submitted via Ratis.
    */
   @Test
   void testFinalizationTriggeredWhenScmIsFinalizedAndFinalizationInProgress() throws Exception {
@@ -133,8 +133,8 @@ public class TestOMUpgradeFinalizeService {
     when(versionManager.needsFinalization()).thenReturn(true);
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(true)
-        .setHddsFinalized(true)
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
@@ -156,7 +156,7 @@ public class TestOMUpgradeFinalizeService {
   }
 
   /**
-   * When SCM reports hddsFinalized=false (SCM is not yet finalized),
+   * When SCM reports hddsFinalizationStatus=UNFINALIZED (SCM is not yet finalized),
    * no Ratis request should be submitted.
    */
   @Test
@@ -165,8 +165,8 @@ public class TestOMUpgradeFinalizeService {
     when(versionManager.needsFinalization()).thenReturn(true);
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(false)
-        .setHddsFinalized(false)
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
         .setNumDatanodesFinalized(0)
         .setNumDatanodesTotal(3)
         .build();
@@ -247,8 +247,8 @@ public class TestOMUpgradeFinalizeService {
     when(versionManager.needsFinalization()).thenReturn(true);
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(true)
-        .setHddsFinalized(true)
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();

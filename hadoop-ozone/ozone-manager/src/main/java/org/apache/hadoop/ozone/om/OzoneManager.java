@@ -3676,15 +3676,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw e;
     }
 
-    boolean omFinalized = !versionManager.needsFinalization();
-    boolean hddsFinalized = scmStatus.getHddsFinalized();
-    boolean clusterFinalized = omFinalized && hddsFinalized;
+    HddsProtos.FinalizationStatus omFinalizationStatus;
+    if (!versionManager.needsFinalization()) {
+      omFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;
+    } else if (metadataManager.getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY) != null) {
+      omFinalizationStatus = HddsProtos.FinalizationStatus.PENDING;
+    } else {
+      omFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
+    }
+    HddsProtos.FinalizationStatus hddsFinalizationStatus = scmStatus.getHddsFinalizationStatus();
+
+    HddsProtos.FinalizationStatus clusterFinalizationStatus;
+    if (omFinalizationStatus == HddsProtos.FinalizationStatus.FINALIZED
+        && hddsFinalizationStatus == HddsProtos.FinalizationStatus.FINALIZED) {
+      clusterFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;
+    } else if (omFinalizationStatus == HddsProtos.FinalizationStatus.UNFINALIZED
+        && hddsFinalizationStatus == HddsProtos.FinalizationStatus.UNFINALIZED) {
+      clusterFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
+    } else {
+      clusterFinalizationStatus = HddsProtos.FinalizationStatus.IN_PROGRESS;
+    }
 
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(omFinalized)
+        .setOmFinalizationStatus(omFinalizationStatus)
         .setHddsStatus(scmStatus)
         .setOmApparentVersion(versionManager.getApparentVersion().serialize())
-        .setClusterFinalized(clusterFinalized)
+        .setClusterFinalizationStatus(clusterFinalizationStatus)
         .build();
   }
 

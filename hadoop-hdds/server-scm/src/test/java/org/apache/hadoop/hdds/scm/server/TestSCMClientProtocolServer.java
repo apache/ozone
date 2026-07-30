@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -49,10 +50,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -281,11 +284,48 @@ public class TestSCMClientProtocolServer {
     HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
 
     // SCM starts already finalized in tests
-    assertTrue(status.getScmFinalized());
+    assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
     // No datanodes registered
     assertEquals(0, status.getNumDatanodesFinalized());
     assertEquals(0, status.getNumDatanodesTotal());
-    assertTrue(status.getHddsFinalized());
+    assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getHddsFinalizationStatus());
+  }
+
+  @Test
+  public void testQueryUpgradeStatusHddsInProgress() throws Exception {
+    // SCM is finalized but not all datanodes are, so HDDS is only partially finalized.
+    ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
+    when(mockVersionManager.needsFinalization()).thenReturn(false);
+    ComponentVersion apparentVersion = mock(ComponentVersion.class);
+    when(apparentVersion.serialize()).thenReturn(0);
+    when(mockVersionManager.getApparentVersion()).thenReturn(apparentVersion);
+
+    NodeManager mockNodeManager = new MockNodeManager(false, 0) {
+      @Override
+      public DatanodeFinalizationCounts getDatanodeFinalizationCounts() {
+        return DatanodeFinalizationCounts.newBuilder()
+            .setNumFinalizedDatanodes(1)
+            .setTotalHealthyDatanodes(3)
+            .build();
+      }
+    };
+
+    StorageContainerManager mockScm = mockStorageContainerManager();
+    when(mockScm.getVersionManager()).thenReturn(mockVersionManager);
+    when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
+    when(mockScm.getScmContext()).thenReturn(SCMContext.emptyContext());
+
+    SCMClientProtocolServer testServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockScm, mock(ReconfigurationHandler.class));
+    try {
+      HddsProtos.UpgradeStatus status = testServer.queryUpgradeStatus();
+      assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
+      assertEquals(HddsProtos.FinalizationStatus.IN_PROGRESS, status.getHddsFinalizationStatus());
+      assertEquals(1, status.getNumDatanodesFinalized());
+      assertEquals(3, status.getNumDatanodesTotal());
+    } finally {
+      testServer.stop();
+    }
   }
 
   @Test

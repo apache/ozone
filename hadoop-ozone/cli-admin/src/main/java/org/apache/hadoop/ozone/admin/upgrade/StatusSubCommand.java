@@ -75,9 +75,10 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
 
   /** Basic, non-verbose human-readable status. */
   static void printBasic(QueryUpgradeStatusResponse status, PrintWriter out) {
-    out.println("Upgrade status:");
-    out.println("    OM Finalized? " + status.getOmFinalized());
-    out.println("    SCM Finalized? " + status.getHddsStatus().getScmFinalized());
+    out.println("Upgrade finalization status:");
+    out.println("    Cluster: " + status.getClusterFinalizationStatus().name());
+    out.println("    OM: " + status.getOmFinalizationStatus().name());
+    out.println("    SCM: " + status.getHddsStatus().getScmFinalizationStatus().name());
     out.println("    Datanodes finalized: " + status.getHddsStatus().getNumDatanodesFinalized()
         + "/" + status.getHddsStatus().getNumDatanodesTotal());
   }
@@ -88,11 +89,12 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
    */
   static void printVerbose(QueryUpgradeStatusResponse status, PrintWriter out) {
     HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
-    out.println("Upgrade status:");
-    out.println("    OM Finalized?            " + status.getOmFinalized());
+    out.println("Upgrade finalization status:");
+    out.println("    Cluster:                 " + status.getClusterFinalizationStatus().name());
+    out.println("    OM:                      " + status.getOmFinalizationStatus().name());
     out.println("    OM Apparent Version:     "
         + OzoneManagerVersion.deserialize(status.getOmApparentVersion()).toString());
-    out.println("    SCM Finalized?           " + hdds.getScmFinalized());
+    out.println("    SCM:                     " + hdds.getScmFinalizationStatus().name());
     out.println("    SCM Apparent Version:    " + HDDSVersion.deserialize(hdds.getScmApparentVersion()).toString());
     out.println("    Datanodes finalized:     " + hdds.getNumDatanodesFinalized() + "/" + hdds.getNumDatanodesTotal());
     out.println("    Min Datanode Apparent Version: "
@@ -109,9 +111,10 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
    * JSON-friendly DTO mirroring {@link QueryUpgradeStatusResponse}.
    */
   public static final class UpgradeStatusDto {
-    private boolean omFinalized;
+    private String clusterFinalizationStatus;
+    private String omFinalizationStatus;
     private String omApparentVersion;
-    private boolean scmFinalized;
+    private String scmFinalizationStatus;
     private String scmApparentVersion;
     private int datanodesFinalized;
     private int datanodesTotal;
@@ -121,8 +124,9 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
     public static UpgradeStatusDto from(QueryUpgradeStatusResponse status) {
       HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
       UpgradeStatusDto dto = new UpgradeStatusDto();
-      dto.omFinalized = status.getOmFinalized();
-      dto.scmFinalized = hdds.getScmFinalized();
+      dto.clusterFinalizationStatus = status.getClusterFinalizationStatus().name();
+      dto.omFinalizationStatus = status.getOmFinalizationStatus().name();
+      dto.scmFinalizationStatus = hdds.getScmFinalizationStatus().name();
       dto.datanodesFinalized = hdds.getNumDatanodesFinalized();
       dto.datanodesTotal = hdds.getNumDatanodesTotal();
       dto.omApparentVersion = OzoneManagerVersion.deserialize(status.getOmApparentVersion()).toString();
@@ -132,16 +136,20 @@ public class StatusSubCommand extends AbstractSubcommand implements Callable<Int
       return dto;
     }
 
-    public boolean isOmFinalized() {
-      return omFinalized;
+    public String getClusterFinalizationStatus() {
+      return clusterFinalizationStatus;
+    }
+
+    public String getOmFinalizationStatus() {
+      return omFinalizationStatus;
     }
 
     public String getOmApparentVersion() {
       return omApparentVersion;
     }
 
-    public boolean isScmFinalized() {
-      return scmFinalized;
+    public String getScmFinalizationStatus() {
+      return scmFinalizationStatus;
     }
 
     public String getScmApparentVersion() {

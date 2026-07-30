@@ -475,14 +475,14 @@ public class TestOzoneManagerRequestHandler {
     OzoneManager ozoneManager = handler.getOzoneManager();
 
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(true)
-        .setHddsFinalized(false)
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
     OzoneManagerProtocolProtos.QueryUpgradeStatusResponse expected =
         OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
-            .setOmFinalized(true)
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
             .setHddsStatus(hddsStatus)
             .build();
     Mockito.when(ozoneManager.queryUpgradeStatus()).thenReturn(expected);

@@ -1666,10 +1666,10 @@ message QueryUpgradeStatusRequest {
 }
 
 message QueryUpgradeStatusResponse {
-    // True when OM, SCM and all healthy datanodes are finalized
-    optional bool clusterFinalized = 1;
+    // Aggregate status of OM, SCM and all healthy datanodes
+    optional hadoop.hdds.FinalizationStatus clusterFinalizationStatus = 1;
     optional hadoop.hdds.UpgradeStatus hddsStatus = 2;
-    optional bool omFinalized = 3;
+    optional hadoop.hdds.FinalizationStatus omFinalizationStatus = 3;
     optional uint32 omApparentVersion = 4;
 }
 
