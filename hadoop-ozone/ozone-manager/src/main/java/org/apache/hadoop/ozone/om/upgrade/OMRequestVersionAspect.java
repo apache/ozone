@@ -67,7 +67,7 @@ public class OMRequestVersionAspect {
       versionManager = ozoneManager.getVersionManager();
     } else {
       throw new IOException(
-          "Unable to resolve OMVersionManager for layout validation; "
+          "Unable to resolve OMVersionManager for version validation; "
               + "expected OzoneManagerRequestHandler or OMClientRequest.preExecute: "
               + joinPoint.toShortString());
     }
