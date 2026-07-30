@@ -3650,14 +3650,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return FINALIZED_MSG;
     }
     versionManager.finalizeUpgrade();
-    // OM clients currently require STARTING_MSG to be returned when this method succeeds.
-    // TODO This will be removed when OM learns to finalize from SCM.
+    // Old OM clients currently require STARTING_MSG to be returned when this method succeeds.
 
     return STARTING_MSG;
   }
 
   @Override
   public void finalizeUpgrade() throws IOException {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequest
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
     // Server-side stub; the real implementation is handled via the Ratis request path through
     // OMStartFinalizeUpgradeRequest
     throw new UnsupportedOperationException();
@@ -4606,7 +4612,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omNodeDetails.getServiceId();
   }
 
-  @VisibleForTesting
   public List<OMNodeDetails> getPeerNodes() {
     return new ArrayList<>(peerNodesMap.values());
   }

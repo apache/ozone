@@ -554,12 +554,13 @@ enum Status {
 
     DIRECTORY_NOT_EMPTY = 68;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
-    UPDATE_LAYOUT_VERSION_FAILED = 71;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
-    PREPARE_FAILED = 73; // Deprecated
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74; // Deprecated
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69; // [deprecated = true]
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70; // [deprecated = true]
+    UPDATE_LAYOUT_VERSION_FAILED = 71; // [deprecated = true]
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72; // [deprecated = true]
+    PREPARE_FAILED = 73; // [deprecated = true]
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74; // [deprecated = true]
+
     NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
 
     TENANT_NOT_FOUND = 76;
@@ -1657,6 +1658,7 @@ message FinalizeUpgradeResponse {
 }
 
 message StartFinalizeUpgradeRequest {
+    optional bool force = 1 [default = false];
 }
 
 message StartFinalizeUpgradeResponse {

@@ -2050,7 +2050,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
     StartFinalizeUpgradeRequest req = StartFinalizeUpgradeRequest.newBuilder()
+        .setForce(force)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.StartFinalizeUpgrade)

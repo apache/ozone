@@ -46,6 +46,13 @@ public class FinalizeSubCommand extends AbstractSubcommand implements Callable<I
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
+  @CommandLine.Option(
+      names = {"--force"},
+      description = "Skip all software version checks before finalizing.",
+      defaultValue = "false",
+      hidden = true)
+  private boolean force;
+
   @CommandLine.Option(names = {"--wait"},
       defaultValue = "false",
       description = "After initiating finalization, poll the cluster status until the entire cluster (OM, SCM, "
@@ -62,7 +69,14 @@ public class FinalizeSubCommand extends AbstractSubcommand implements Callable<I
             "`ozone admin om finalizeupgrade`");
         return 1;
       }
-      client.finalizeUpgrade();
+
+      if (force) {
+        out().println("--force specified: all software version checks will be skipped before finalizing.");
+        client.forceFinalizeUpgrade();
+      } else {
+        client.finalizeUpgrade();
+      }
+
       if (wait) {
         out().println("Cluster finalization has been started. Waiting for the cluster to finalize; "
             + "interrupt with Ctrl-C to stop waiting (finalization continues on the server).");

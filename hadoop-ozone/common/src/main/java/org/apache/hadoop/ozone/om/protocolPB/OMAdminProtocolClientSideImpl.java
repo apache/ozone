@@ -33,6 +33,7 @@ import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -44,6 +45,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.Co
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
@@ -257,6 +260,17 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
           ". This likely indicates a server error.");
       // Unreachable, required for compilation
       return false;
+    }
+  }
+
+  @Override
+  public OzoneManagerVersion getPeerUpgradeStatus() throws IOException {
+    try {
+      GetPeerUpgradeStatusResponse response = rpcProxy.getPeerUpgradeStatus(
+          NULL_RPC_CONTROLLER, GetPeerUpgradeStatusRequest.newBuilder().build());
+      return OzoneManagerVersion.deserialize(response.getOmSoftwareVersion());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
     }
   }
 

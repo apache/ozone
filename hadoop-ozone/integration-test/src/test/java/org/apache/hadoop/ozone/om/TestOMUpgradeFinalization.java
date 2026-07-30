@@ -109,7 +109,7 @@ class TestOMUpgradeFinalization {
         // Finalize the running (active) OMs.
         LOG.info("Finalizing OMs");
         OzoneManagerProtocol omClient = objectStore.getClientProxy().getOzoneManagerClient();
-        omClient.finalizeUpgrade();
+        omClient.forceFinalizeUpgrade();
         OMUpgradeTestUtils.waitForFinalization(omClient);
         LOG.info("Finalized active OMs");
 
@@ -175,7 +175,7 @@ class TestOMUpgradeFinalization {
   }
 
   private static void writeKeysToIncreaseLogIndex(OzoneManagerRatisServer omRatisServer,
-      long targetLogIndex, OzoneBucket bucket) throws IOException {
+                                                  long targetLogIndex, OzoneBucket bucket) throws IOException {
     long logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     while (logIndex < targetLogIndex) {
       createKey(bucket);
