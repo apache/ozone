@@ -72,6 +72,31 @@ class TestParseReport(unittest.TestCase):
     flaky = next(c for c in cases if c.status == "flaky")
     self.assertEqual(flaky.message, "Connection refused")
 
+  def test_message_keeps_junit5_tail_when_custom_message_floods(self):
+    # assertEquals(expected, actual, message) renders as "<custom message> ==> expected: ... but was: ...";
+    # some tests embed whole logs as the custom message, which would push the tail past the truncation limit
+    flood = "log line&#10;" * 100
+    xml = ('<testsuite><testcase name="t" classname="C" time="1">'
+           '<failure message="client log:&#10;%s ==> expected: &lt;1&gt; but was: &lt;2&gt;"/>'
+           '</testcase></testsuite>' % flood)
+    with tempfile.TemporaryDirectory() as tmp:
+      path = self.write_report(tmp, "m/target/surefire-reports/TEST-x.xml", content=xml)
+      cases = junit_summary.parse_report(path)
+    self.assertEqual(cases[0].message, "expected: <1> but was: <2>")
+
+  def test_message_junit5_tail_edge_cases(self):
+    fromstring = junit_summary.ET.fromstring
+    # short custom messages are meaningful and kept in full
+    elem = fromstring('<failure message="wrong count ==&gt; expected: &lt;1&gt; but was: &lt;2&gt;"/>')
+    self.assertEqual(junit_summary.clean_message(elem), "wrong count ==> expected: <1> but was: <2>")
+    # assertion values containing " ==> " must not corrupt the tail
+    long_context = "x" * 400
+    elem = fromstring('<failure message="%s ==&gt; expected: &lt;a ==&gt; b&gt; but was: &lt;c&gt;"/>' % long_context)
+    self.assertEqual(junit_summary.clean_message(elem), "expected: <a ==> b> but was: <c>")
+    # long messages with " ==> " but no assertion framing fall back to head truncation
+    elem = fromstring('<failure message="pipeline A ==&gt; B failed %s"/>' % long_context)
+    self.assertTrue(junit_summary.clean_message(elem).startswith("pipeline A ==> B failed"))
+
   def test_module_name_from_path(self):
     # normal surefire layout: module is the dir above target/
     self.assertEqual(junit_summary.module_name("hadoop-hdds/common/target/surefire-reports/TEST-a.xml"), "common")

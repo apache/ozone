@@ -62,8 +62,13 @@ def module_name(xml_path):
 
 
 def clean_message(elem):
-  message = elem.get("message") or (elem.text or "")
-  message = " ".join(message.split())
+  message = " ".join((elem.get("message") or (elem.text or "")).split())
+  if len(message) > MESSAGE_LIMIT:
+    # JUnit 5 appends "==> expected: ... but was: ..." after the custom message; when a test embeds
+    # a whole log as the custom message, drop it and keep the tail with the actual failure
+    idx = message.find(" ==> expected:")
+    if idx != -1:
+      message = message[idx + len(" ==> "):]
   if len(message) > MESSAGE_LIMIT:
     message = message[:MESSAGE_LIMIT] + "..."
   return message
