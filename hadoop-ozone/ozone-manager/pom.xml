@@ -234,11 +234,6 @@
       <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-docs</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-tcnative-boringssl-static</artifactId>
       <scope>runtime</scope>
@@ -377,12 +372,6 @@
                   <artifactId>hdds-server-framework</artifactId>
                   <outputDirectory>${project.build.outputDirectory}</outputDirectory>
                   <includes>webapps/static/**/*.*</includes>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.ozone</groupId>
-                  <artifactId>hdds-docs</artifactId>
-                  <outputDirectory>${project.build.outputDirectory}/webapps/ozoneManager</outputDirectory>
-                  <includes>docs/**/*.*</includes>
                 </artifactItem>
               </artifactItems>
               <overWriteSnapshots>true</overWriteSnapshots>

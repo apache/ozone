@@ -27,7 +27,7 @@ BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-V -B -DskipTests -DskipDocs --no-transfer-progress'
+MAVEN_OPTIONS='-V -B -DskipTests --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Pcoverage"

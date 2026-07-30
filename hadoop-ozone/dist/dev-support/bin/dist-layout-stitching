@@ -112,9 +112,6 @@ run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/stop-ozone.sh" "sbin/"
 # fault injection tests
 run cp  -r "${ROOT}/hadoop-ozone/fault-injection-test/network-tests/src/test/blockade" tests
 
-# Optional documentation, could be missing
-cp -r "${ROOT}/hadoop-hdds/docs/target/classes/docs" ./
-
 # BOM is created only when using 'dist' profile
 cp -p "${ROOT}"/target/bom.* ./
 

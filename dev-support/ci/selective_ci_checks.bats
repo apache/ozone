@@ -242,16 +242,22 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
-@test "docs only" {
-  run dev-support/ci/selective_ci_checks.sh 474457cb3
-
-  assert_output -p 'basic-checks=["rat","docs"]'
-  assert_output -p needs-build=false
-  assert_output -p needs-compile=false
-  assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=false
-  assert_output -p needs-kubernetes-tests=false
-}
+# TODO: Re-enable as a "design only" test once a change under the top-level
+# design/ directory is committed upstream. The former "docs only" case pinned
+# commit 474457cb3, which only touched hadoop-hdds/docs (removed along with the
+# Hugo site). No historical commit exercises the new ^design matcher, so update
+# this to a design/-only commit SHA and assert basic-checks=["rat"] with all
+# needs-* false.
+# @test "design only" {
+#   run dev-support/ci/selective_ci_checks.sh <design-only-sha>
+#
+#   assert_output -p 'basic-checks=["rat"]'
+#   assert_output -p needs-build=false
+#   assert_output -p needs-compile=false
+#   assert_output -p needs-compose-tests=false
+#   assert_output -p needs-integration-tests=false
+#   assert_output -p needs-kubernetes-tests=false
+# }
 
 @test "main/java change" {
   run dev-support/ci/selective_ci_checks.sh 86a771dfe
@@ -289,7 +295,7 @@ load bats-assert/load.bash
 @test "java and docs change" {
   run dev-support/ci/selective_ci_checks.sh 2c0adac26
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","docs","findbugs","pmd"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -311,7 +317,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -322,7 +328,7 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -345,7 +351,7 @@ load bats-assert/load.bash
 @test "CI workflow change (check.yml)" {
   run dev-support/ci/selective_ci_checks.sh 1468af02067ec75b255f605816c32f8bf4dfaabf
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -356,7 +362,7 @@ load bats-assert/load.bash
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
