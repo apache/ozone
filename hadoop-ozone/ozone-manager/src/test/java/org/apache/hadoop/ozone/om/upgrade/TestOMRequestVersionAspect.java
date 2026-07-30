@@ -27,9 +27,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Class to test annotation based interceptor that checks whether layout
  * feature API is allowed.
  */
-public class TestOMLayoutFeatureAspect {
+public class TestOMRequestVersionAspect {
 
   @TempDir
   private Path temporaryFolder;
@@ -54,7 +56,7 @@ public class TestOMLayoutFeatureAspect {
   }
 
   /**
-   * Exercises {@link OMLayoutFeatureAspect#checkLayoutFeature} for an
+   * Exercises {@link OMRequestVersionAspect#checkLayoutFeature} for an
    * {@link org.apache.hadoop.ozone.om.request.OMClientRequest#preExecute} join
    * point using the real {@link OMSnapshotCreateRequest#preExecute} metadata
    * (including {@link DisallowedUntilLayoutVersion}).
@@ -67,7 +69,7 @@ public class TestOMLayoutFeatureAspect {
     when(om.getVersionManager()).thenReturn(ovm);
 
     OMSnapshotCreateRequest request = mock(OMSnapshotCreateRequest.class);
-    OMLayoutFeatureAspect aspect = new OMLayoutFeatureAspect();
+    OMRequestVersionAspect aspect = new OMRequestVersionAspect();
 
     JoinPoint joinPoint = mock(JoinPoint.class);
     when(joinPoint.getTarget()).thenReturn(request);
@@ -85,5 +87,40 @@ public class TestOMLayoutFeatureAspect {
         () -> aspect.checkLayoutFeature(joinPoint));
     assertThat(omException.getMessage())
         .contains("cannot be invoked before finalization");
+  }
+
+  /**
+   * Exercises {@link OMRequestVersionAspect#checkOmVersion} for an
+   * {@link OzoneManagerRequestHandler} join point using a locally
+   * {@link DisallowedUntilOmVersion}-annotated method.
+   */
+  @Test
+  public void testDisallowedUntilOmVersion() throws Throwable {
+    OzoneManager om = mock(OzoneManager.class);
+    OMVersionManager ovm = mock(OMVersionManager.class);
+    when(ovm.isAllowed(any(ComponentVersion.class))).thenReturn(false);
+    when(om.getVersionManager()).thenReturn(ovm);
+
+    OzoneManagerRequestHandler handler = mock(OzoneManagerRequestHandler.class);
+    when(handler.getOzoneManager()).thenReturn(om);
+    OMRequestVersionAspect aspect = new OMRequestVersionAspect();
+
+    JoinPoint joinPoint = mock(JoinPoint.class);
+    when(joinPoint.getTarget()).thenReturn(handler);
+    when(joinPoint.getArgs()).thenReturn(new Object[]{});
+
+    MethodSignature methodSignature = mock(MethodSignature.class);
+    when(methodSignature.getMethod())
+        .thenReturn(getClass().getDeclaredMethod("omVersionGated"));
+    when(joinPoint.getSignature()).thenReturn(methodSignature);
+
+    OMException omException = assertThrows(OMException.class,
+        () -> aspect.checkOmVersion(joinPoint));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
+  }
+
+  @DisallowedUntilOmVersion(OzoneManagerVersion.ZDU)
+  void omVersionGated() {
   }
 }
