@@ -653,6 +653,54 @@ public class TestOMRatisSnapshots {
     }
   }
 
+  /**
+   * After a successful install the in-memory transaction info must describe the
+   * position the state machine was unpaused at, not the follower's pre-install
+   * index. Asserted immediately after the call: a later takeSnapshot recomputes
+   * the value from the applied index and would mask a regression here.
+   *
+   * This pins an Ozone-internal invariant, not the Ratis contract. Calling
+   * installCheckpoint directly queues no Ratis reload, so the pre-fix value seen
+   * here is starker than a real install leaves behind.
+   */
+  @Test
+  public void testInstallCheckpointPublishesNewTransactionInfo() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    DBCheckpoint leaderDbCheckpoint =
+        leaderOM.getMetadataManager().getStore().getCheckpoint(false);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    assertTrue(omDbDir.toFile().mkdir());
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    TransactionInfo leaderCheckpointTrxnInfo =
+        OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+
+    // The follower was never started, so restarting its RPC server at the end of
+    // installCheckpoint fails. That happens after the transaction info is published
+    // and is not what this test is about, so swallow the exit.
+    followerOM.setExitManagerForTesting(new DummyExitManager());
+
+    TermIndex installed = followerOM.installCheckpoint(
+        leaderOMNodeId, leaderCheckpointLocation, leaderCheckpointTrxnInfo);
+    assertNotNull(installed, "Install should have succeeded");
+    assertEquals(leaderCheckpointTrxnInfo.getTransactionIndex(), installed.getIndex());
+
+    assertEquals(installed, followerOM.getTransactionInfo().getTermIndex(),
+        "In-memory transaction info must match the index the state machine was unpaused at");
+  }
+
   @Test
   public void testInstallSnapshotFromLeaderFailedDownloadCleanupSucceeds()
       throws Exception {

@@ -4387,7 +4387,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (oldOmMetadataManagerStopped) {
         time = Time.monotonicNow();
         reloadOMState();
-        setTransactionInfo(TransactionInfo.valueOf(termIndex));
+        // Ratis reads this field as the state machine's latest snapshot. Most callers survive
+        // a stale value by also consulting latestInstalledSnapshot; getLastEntry() does not,
+        // and decideVote() uses it. Publish the index we unpause at, not the one before it.
+        setTransactionInfo(TransactionInfo.valueOf(term, lastAppliedIndex));
         omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
