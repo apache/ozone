@@ -141,6 +141,8 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
       assertTrue(versionManager.needsFinalization());
       DatanodeUpgradeAction quotaAction = versionManager.getUpgradeActionsForTesting().get(DATANODE_SCHEMA_V3);
       assertInstanceOf(DatanodeSchemaV3FinalizeAction.class, quotaAction);
+      DatanodeUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(HDDSVersion.ZDU);
+      assertInstanceOf(ZduDatanodeUpgradeActionForTest.class, zduAction);
     }
 
     try (DatanodeVersionManager versionManager =
@@ -148,6 +150,8 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
       assertFalse(versionManager.needsFinalization());
       DatanodeUpgradeAction quotaAction = versionManager.getUpgradeActionsForTesting().get(DATANODE_SCHEMA_V3);
       assertInstanceOf(DatanodeSchemaV3FinalizeAction.class, quotaAction);
+      DatanodeUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(HDDSVersion.ZDU);
+      assertInstanceOf(ZduDatanodeUpgradeActionForTest.class, zduAction);
     }
   }
 

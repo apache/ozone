@@ -260,9 +260,12 @@ public final class OmUtils {
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetBucketTagging:
-      return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
+    // They are marked as read-only since they don't modify state anymore.
+    case Prepare:
+    case CancelPrepare:
     case QueryUpgradeStatus:
       return true;
     case CreateVolume:
@@ -299,8 +302,6 @@ public final class OmUtils {
       // as deprecated
     case FinalizeUpgrade:
     case StartFinalizeUpgrade:
-    case Prepare:
-    case CancelPrepare:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:

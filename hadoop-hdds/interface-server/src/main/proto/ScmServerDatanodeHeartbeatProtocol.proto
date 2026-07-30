@@ -75,12 +75,24 @@ enum Status {
 }
 
 /**
+ * Deprecated, please use DatanodeVersionProto instead. The field names
+ * metadataLayoutVersion and softwareLayoutVersion have been replaced by
+ * apparentVersion and softwareVersion respectively.
+ *
  * DataNode will advertise its current layout version through
  * heartbeat as well as registration mechanism.
  */
 message LayoutVersionProto {
    required uint32 metadataLayoutVersion = 1;
    required uint32 softwareLayoutVersion = 2;
+}
+
+/**
+ * Used by Datanodes to report their versions to SCM.
+ */
+message DatanodeVersionProto {
+   optional uint32 apparentVersion = 1;
+   optional uint32 softwareVersion = 2;
 }
 
 /**
@@ -102,7 +114,8 @@ message SCMRegisterRequestProto {
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;
-  optional LayoutVersionProto dataNodeLayoutVersion = 5;
+  optional LayoutVersionProto dataNodeLayoutVersion = 5 [deprecated = true];
+  optional DatanodeVersionProto datanodeVersion = 6;
 }
 
 /**
@@ -137,8 +150,9 @@ message SCMHeartbeatRequestProto {
   optional ContainerActionsProto containerActions = 6;
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
-  optional LayoutVersionProto dataNodeLayoutVersion = 9;
+  optional LayoutVersionProto dataNodeLayoutVersion = 9 [deprecated = true];
   optional CommandQueueReportProto commandQueueReport = 10;
+  optional DatanodeVersionProto datanodeVersion = 11;
 }
 
 message CommandQueueReportProto {
@@ -324,10 +338,11 @@ message SCMCommandProto {
     createPipelineCommand = 6;
     closePipelineCommand = 7;
     setNodeOperationalStateCommand = 8;
-    finalizeNewLayoutVersionCommand = 9;
+    finalizeNewLayoutVersionCommand = 9 [deprecated = true];
     refreshVolumeUsageInfo = 10;
     reconstructECContainersCommand = 11;
     reconcileContainerCommand = 12;
+    finalizeNewDatanodeVersionCommand = 13;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -340,10 +355,11 @@ message SCMCommandProto {
   optional ClosePipelineCommandProto closePipelineCommandProto = 8;
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
   optional FinalizeNewLayoutVersionCommandProto
-  finalizeNewLayoutVersionCommandProto = 10;
+  finalizeNewLayoutVersionCommandProto = 10 [deprecated = true];
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
   optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
+  optional FinalizeNewDatanodeVersionCommandProto finalizeNewDatanodeVersionCommandProto = 14;
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
@@ -431,6 +447,7 @@ message ReplicateContainerCommandProto {
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;
   optional ReplicationCommandPriority priority = 6 [default = NORMAL];
+  optional uint32 apparentVersion = 7;
 }
 
 /**
@@ -497,12 +514,22 @@ message ProcessCRLCommandProto {
 }
 
 /**
+ * Deprecated, please use FinalizeNewDatanodeVersionCommandProto instead.
+ *
  * This command asks the DataNode to finalize a new layout version.
  */
 message FinalizeNewLayoutVersionCommandProto {
   required bool finalizeNewLayoutVersion = 1 [default = false];
   required LayoutVersionProto dataNodeLayoutVersion = 2;
   required int64 cmdId = 3;
+}
+
+/**
+ * This command asks the Datanode to finalize a new datanode version.
+ */
+message FinalizeNewDatanodeVersionCommandProto {
+  optional uint32 expectedSoftwareVersion = 1;
+  optional int64 cmdId = 2;
 }
 
 /**

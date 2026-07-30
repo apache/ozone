@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.commons.io.output.NullOutputStream.NULL_OUTPUT_STREAM;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -68,7 +68,7 @@ class TestPushReplicator {
     SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, compression);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(getReplicateContainerCommand(containerID, target),
         subject);
 
     // WHEN
@@ -89,7 +89,7 @@ class TestPushReplicator {
         fut -> fut.completeExceptionally(new Exception("testing"));
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(getReplicateContainerCommand(containerID, target),
         subject);
 
     // WHEN
@@ -111,7 +111,7 @@ class TestPushReplicator {
     };
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
-    ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
+    ReplicationTask task = new ReplicationTask(getReplicateContainerCommand(containerID, target),
         subject);
 
     // WHEN

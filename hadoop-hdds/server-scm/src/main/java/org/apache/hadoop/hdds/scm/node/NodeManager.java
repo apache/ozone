@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -155,6 +155,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     int finalizedNodes = 0;
     int totalHealthyNodes = 0;
     boolean allSoftwareVersionsMatchScm = true;
+    int minApparentVersion = Integer.MAX_VALUE;
+    int maxApparentVersion = 0;
 
     for (DatanodeInfo dn : getAllNodes()) {
       try {
@@ -175,6 +177,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
         ComponentVersion dnApparentVersion = dn.getLastKnownApparentVersion();
         ComponentVersion dnSoftwareVersion = dn.getLastKnownSoftwareVersion();
+
+        int dnApparentVersionInt = dnApparentVersion.serialize();
+        minApparentVersion = Math.min(minApparentVersion, dnApparentVersionInt);
+        maxApparentVersion = Math.max(maxApparentVersion, dnApparentVersionInt);
 
         if (!dnApparentVersion.equals(dnSoftwareVersion)) {
           // Datanode has not yet finalized
@@ -199,7 +205,40 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       }
     }
 
-    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes, allSoftwareVersionsMatchScm);
+    if (minApparentVersion == Integer.MAX_VALUE) {
+      // No healthy datanode with version info was found
+      minApparentVersion = 0;
+    }
+
+    return DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(finalizedNodes)
+        .setTotalHealthyDatanodes(totalHealthyNodes)
+        .setMinApparentVersion(minApparentVersion)
+        .setMaxApparentVersion(maxApparentVersion)
+        .setAllSoftwareVersionsMatchScm(allSoftwareVersionsMatchScm)
+        .build();
+  }
+
+  /**
+   * Returns the lowest apparent version among the given datanodes,
+   * so every node involved in an operation uses the same, mutually-supported
+   * version.
+   *
+   * @throws NodeNotFoundException if SCM has no record of one of the nodes;
+   *     callers must not proceed with an operation involving a node SCM does
+   *     not know about.
+   */
+  default ComponentVersion getLowestApparentVersion(DatanodeDetails... nodes)
+      throws NodeNotFoundException {
+    ComponentVersion[] versions = new ComponentVersion[nodes.length];
+    for (int i = 0; i < nodes.length; i++) {
+      DatanodeInfo info = getNode(nodes[i].getID());
+      if (info == null) {
+        throw new NodeNotFoundException(nodes[i].getID());
+      }
+      versions[i] = info.getLastKnownApparentVersion();
+    }
+    return ComponentVersion.min(versions);
   }
 
   /**
@@ -384,13 +423,12 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                          NodeReportProto nodeReport);
 
   /**
-   * Process Node LayoutVersion report.
+   * Process Node version report.
    *
    * @param datanodeDetails
-   * @param layoutReport
+   * @param versionReport
    */
-  void processVersionReport(DatanodeDetails datanodeDetails,
-                            LayoutVersionProto layoutReport);
+  void processVersionReport(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the
@@ -510,14 +548,20 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   final class DatanodeFinalizationCounts {
     private final int numFinalizedDatanodes;
     private final int totalHealthyDatanodes;
+    private final int minApparentVersion;
+    private final int maxApparentVersion;
     private final boolean allSoftwareVersionsMatchScm;
 
-    public DatanodeFinalizationCounts(int numFinalizedDatanodes,
-                                      int totalHealthyDatanodes,
-                                      boolean allSoftwareVersionsMatchScm) {
-      this.numFinalizedDatanodes = numFinalizedDatanodes;
-      this.totalHealthyDatanodes = totalHealthyDatanodes;
-      this.allSoftwareVersionsMatchScm = allSoftwareVersionsMatchScm;
+    private DatanodeFinalizationCounts(Builder b) {
+      this.numFinalizedDatanodes = b.numFinalizedDatanodes;
+      this.totalHealthyDatanodes = b.totalHealthyDatanodes;
+      this.minApparentVersion = b.minApparentVersion;
+      this.maxApparentVersion = b.maxApparentVersion;
+      this.allSoftwareVersionsMatchScm = b.allSoftwareVersionsMatchScm;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
     }
 
     public int getNumFinalizedDatanodes() {
@@ -532,12 +576,60 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       return numFinalizedDatanodes == totalHealthyDatanodes;
     }
 
+    public int getMinApparentVersion() {
+      return minApparentVersion;
+    }
+
+    public int getMaxApparentVersion() {
+      return maxApparentVersion;
+    }
+
     /**
      * @return true if every healthy datanode reports the same software version as SCM
      * ({@link HDDSVersion#SOFTWARE_VERSION}), vacuously true when there are no healthy datanodes
      */
     public boolean allSoftwareVersionsMatchScmVersion() {
       return allSoftwareVersionsMatchScm;
+    }
+
+    /**
+     * Builder for {@link DatanodeFinalizationCounts}.
+     */
+    public static final class Builder {
+      private int numFinalizedDatanodes;
+      private int totalHealthyDatanodes;
+      private int minApparentVersion;
+      private int maxApparentVersion;
+      private boolean allSoftwareVersionsMatchScm;
+
+      public Builder setNumFinalizedDatanodes(int value) {
+        this.numFinalizedDatanodes = value;
+        return this;
+      }
+
+      public Builder setTotalHealthyDatanodes(int value) {
+        this.totalHealthyDatanodes = value;
+        return this;
+      }
+
+      public Builder setMinApparentVersion(int value) {
+        this.minApparentVersion = value;
+        return this;
+      }
+
+      public Builder setMaxApparentVersion(int value) {
+        this.maxApparentVersion = value;
+        return this;
+      }
+
+      public Builder setAllSoftwareVersionsMatchScm(boolean value) {
+        this.allSoftwareVersionsMatchScm = value;
+        return this;
+      }
+
+      public DatanodeFinalizationCounts build() {
+        return new DatanodeFinalizationCounts(this);
+      }
     }
   }
 }

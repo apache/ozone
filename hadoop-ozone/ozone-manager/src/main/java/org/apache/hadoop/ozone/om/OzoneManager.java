@@ -45,20 +45,22 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.FINALIZATION_IN_PROGRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -103,7 +105,6 @@ import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAU
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.S3_SECRET_STORAGE_TYPE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZED_MSG;
@@ -193,6 +194,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -484,8 +486,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private ExitManager exitManager;
-
-  private OzoneManagerPrepareState prepareState;
 
   private boolean isBootstrapping = false;
   private boolean isForcedBootstrapping = false;
@@ -964,6 +964,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new OmMetadataManagerImpl(configuration, this);
     this.metadataManager = metadataManagerImpl;
     versionManager.validateDBVersion(metadataManager.getMetaTable());
+    metrics.setFinalizationInProgress(
+        metadataManager.getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY) != null);
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
     if (isS3MultiTenancyEnabled) {
@@ -1051,11 +1053,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (withNewSnapshot) {
       versionManager.finalizeFromSnapshotIfRequired(metadataManager.getMetaTable());
-      instantiatePrepareStateAfterSnapshot();
-    } else {
-      // Prepare state depends on the transaction ID of metadataManager after a
-      // restart.
-      instantiatePrepareStateOnStartup();
     }
   }
 
@@ -3653,8 +3650,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return FINALIZED_MSG;
     }
     versionManager.finalizeUpgrade();
-    // OM clients currently require STARTING_MSG to be returned when this method succeeds.
-    // TODO This will be removed when OM learns to finalize from SCM.
+    // Old OM clients currently require STARTING_MSG to be returned when this method succeeds.
 
     return STARTING_MSG;
   }
@@ -3667,12 +3663,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequest
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
-    HddsProtos.UpgradeStatus scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+    HddsProtos.UpgradeStatus scmStatus;
+    try {
+      scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+    } catch (SCMException e) {
+      // SCM refuses the query while in safe mode
+      if (e.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
+        throw new OMException(e.getMessage(), e, NOT_SUPPORTED_OPERATION);
+      }
+      throw e;
+    }
+
+    boolean omFinalized = !versionManager.needsFinalization();
+    boolean hddsFinalized = scmStatus.getHddsFinalized();
+    boolean clusterFinalized = omFinalized && hddsFinalized;
 
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(!versionManager.needsFinalization())
+        .setOmFinalized(omFinalized)
         .setHddsStatus(scmStatus)
+        .setOmApparentVersion(versionManager.getApparentVersion().serialize())
+        .setClusterFinalized(clusterFinalized)
         .build();
   }
 
@@ -4121,7 +4139,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
-      LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
+      if (OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(ex)) {
+        LOG.error(
+            "Failed to download snapshot from leader {}: local disk appears full or over quota "
+                + "on the OM ratis snapshot volume (see previous ERROR for path/usable space). "
+                + "Free disk or adjust {}, {}, or {} before bootstrap can succeed.",
+            leaderId,
+            OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+            OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
+            OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER);
+      } else {
+        LOG.error("Failed to download snapshot from Leader {}.", leaderId, ex);
+      }
       cleanupCheckpoint(omDBCheckpoint);
       return null;
     }
@@ -4583,7 +4612,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omNodeDetails.getServiceId();
   }
 
-  @VisibleForTesting
   public List<OMNodeDetails> getPeerNodes() {
     return new ArrayList<>(peerNodesMap.values());
   }
@@ -4749,7 +4777,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Check ozone admin privilege, throws exception if not admin.
    * Only checks admin privilege if authorization is enabled.
    */
-  private void checkAdminUserPrivilege(String operation) throws IOException {
+  public void checkAdminUserPrivilege(String operation) throws IOException {
     // Skip check if authorization is disabled
     if (!isAdminAuthorizationEnabled()) {
       return;
@@ -5041,102 +5069,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OMVersionManager getVersionManager() {
     return versionManager;
-  }
-
-  public OzoneManagerPrepareState getPrepareState() {
-    return prepareState;
-  }
-
-  /**
-   * Determines if the prepare gate should be enabled on this OM after OM
-   * is restarted.
-   * This must be done after metadataManager is instantiated
-   * and before the RPC server is started.
-   */
-  private void instantiatePrepareStateOnStartup()
-      throws IOException {
-    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (txnInfo == null) {
-      // No prepare request could be received if there are not transactions.
-      prepareState = new OzoneManagerPrepareState(configuration);
-    } else {
-      prepareState = new OzoneManagerPrepareState(configuration,
-          txnInfo.getTransactionIndex());
-      TransactionInfo dbPrepareValue =
-          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-
-      boolean hasMarkerFile =
-          (prepareState.getState().getStatus() ==
-              PrepareStatus.PREPARE_COMPLETED);
-      boolean hasDBMarker = (dbPrepareValue != null);
-
-      if (hasDBMarker) {
-        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
-
-        if (hasMarkerFile) {
-          long prepareFileIndex = prepareState.getState().getIndex();
-          // If marker and DB prepare index do not match, use the DB value
-          // since this is synced through Ratis, to avoid divergence.
-          if (prepareFileIndex != dbPrepareIndex) {
-            LOG.warn("Prepare marker file index {} does not match DB prepare " +
-                "index {}. Writing DB index to prepare file and maintaining " +
-                "prepared state.", prepareFileIndex, dbPrepareIndex);
-            prepareState.finishPrepare(dbPrepareIndex);
-          }
-          // Else, marker and DB are present and match, so OM is prepared.
-        } else {
-          // Prepare cancelled with startup flag to remove marker file.
-          // Persist this to the DB.
-          // If the startup flag is used it should be used on all OMs to avoid
-          // divergence.
-          metadataManager.getTransactionInfoTable().delete(PREPARE_MARKER_KEY);
-        }
-      } else if (hasMarkerFile) {
-        // Marker file present but no DB entry present.
-        // This should never happen. If a prepare request fails partway
-        // through, OM should replay it so both the DB and marker file exist.
-        throw new OMException("Prepare marker file found on startup without " +
-            "a corresponding database entry. Corrupt prepare state.",
-            ResultCodes.PREPARE_FAILED);
-      }
-      // Else, no DB or marker file, OM is not prepared.
-    }
-  }
-
-  /**
-   * Determines if the prepare gate should be enabled on this OM after OM
-   * receives a snapshot.
-   */
-  private void instantiatePrepareStateAfterSnapshot()
-      throws IOException {
-    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (txnInfo == null) {
-      // No prepare request could be received if there are not transactions.
-      prepareState = new OzoneManagerPrepareState(configuration);
-    } else {
-      prepareState = new OzoneManagerPrepareState(configuration,
-          txnInfo.getTransactionIndex());
-      TransactionInfo dbPrepareValue =
-          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-
-      boolean hasDBMarker = (dbPrepareValue != null);
-
-      if (hasDBMarker) {
-        // Snapshot contained a prepare request to apply.
-        // Update the in memory prepare gate and marker file index.
-        // If we have already done this, the operation is idempotent.
-        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
-        prepareState.restorePrepareFromIndex(dbPrepareIndex,
-            txnInfo.getTransactionIndex());
-      } else {
-        // No DB marker.
-        // Deletes marker file if exists, otherwise does nothing if we were not
-        // already prepared.
-        prepareState.cancelPrepare();
-      }
-    }
   }
 
   public int getMinMultipartUploadPartSize() {

@@ -17,23 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 
 /**
- * Loads {@link ReconUpgradeAction} implementations annotated with {@link UpgradeActionRecon}.
+ * Loads {@link ReconUpgradeAction} implementations annotated with {@link ReconUpgradeActionForVersion}.
  */
 public final class ReconUpgradeActionProvider extends AbstractUpgradeActionProvider<ReconUpgradeAction> {
 
   public static final String RECON_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.recon.upgrade";
 
   public ReconUpgradeActionProvider() {
-    super(UpgradeActionRecon.class, ReconUpgradeAction.class, RECON_UPGRADE_CLASS_PACKAGE);
+    super(ImmutableSet.of(ReconUpgradeActionForVersion.class), ReconUpgradeAction.class, RECON_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionRecon annotation = clazz.getAnnotation(UpgradeActionRecon.class);
-    return annotation.feature();
+    return clazz.getAnnotation(ReconUpgradeActionForVersion.class).version();
   }
 }

@@ -17,66 +17,40 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QueryUpgradeStatusResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class to help test OM upgrade scenarios.
  */
 public final class OMUpgradeTestUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OMUpgradeTestUtils.class);
+
   private OMUpgradeTestUtils() {
     // Utility class.
-  }
-
-  public static void assertClusterPrepared(
-      long preparedIndex, List<OzoneManager> ozoneManagers) throws Exception {
-    for (OzoneManager om : ozoneManagers) {
-      LambdaTestUtils.await(120000,
-          1000, () -> {
-            if (!om.isRunning()) {
-              return false;
-            } else {
-              boolean preparedAtIndex = false;
-              OzoneManagerPrepareState.State state =
-                  om.getPrepareState().getState();
-
-              if (state.getStatus() == PREPARE_COMPLETED) {
-                if (state.getIndex() == preparedIndex) {
-                  preparedAtIndex = true;
-                } else {
-                  // State will not change if we are prepared at the wrong
-                  // index. Break out of wait.
-                  throw new Exception("OM " + om.getOMNodeId() + " prepared " +
-                      "but prepare index " + state.getIndex() + " does not " +
-                      "match expected prepare index " + preparedIndex);
-                }
-              }
-              return preparedAtIndex;
-            }
-          });
-    }
   }
 
   public static void waitForFinalization(OzoneManagerProtocol omClient)
       throws TimeoutException, InterruptedException {
     waitFor(() -> {
       try {
-        UpgradeFinalization.StatusAndMessages statusAndMessages =
-            omClient.queryUpgradeFinalizationProgress("finalize-test", false,
-                false);
-        System.out.println("Finalization Messages : " +
-            statusAndMessages.msgs());
-        return statusAndMessages.status().equals(FINALIZATION_DONE);
+        QueryUpgradeStatusResponse status = omClient.queryUpgradeStatus();
+        HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
+        LOG.info("Finalization status: omFinalized={}, scmFinalized={}, datanodes={}/{}",
+            status.getOmFinalized(), hdds.getScmFinalized(),
+            hdds.getNumDatanodesFinalized(), hdds.getNumDatanodesTotal());
+        return status.getOmFinalized()
+            && hdds.getScmFinalized()
+            && hdds.getNumDatanodesFinalized() == hdds.getNumDatanodesTotal();
       } catch (IOException e) {
         fail(e.getMessage());
       }

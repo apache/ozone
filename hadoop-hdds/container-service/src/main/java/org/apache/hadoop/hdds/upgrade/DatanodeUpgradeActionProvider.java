@@ -17,24 +17,32 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForVersion;
 
 /**
- * Loads {@link DatanodeUpgradeAction} implementations annotated with {@link UpgradeActionDatanode}.
+ * Loads {@link DatanodeUpgradeAction} implementations annotated with {@link DatanodeUpgradeActionForLayoutFeature} or
+ * {@link DatanodeUpgradeActionForVersion}.
  */
 public final class DatanodeUpgradeActionProvider extends AbstractUpgradeActionProvider<DatanodeUpgradeAction> {
 
   public static final String DATANODE_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.container";
 
   public DatanodeUpgradeActionProvider() {
-    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, DATANODE_UPGRADE_CLASS_PACKAGE);
+    super(ImmutableSet.of(DatanodeUpgradeActionForLayoutFeature.class, DatanodeUpgradeActionForVersion.class),
+        DatanodeUpgradeAction.class, DATANODE_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionDatanode annotation = clazz.getAnnotation(UpgradeActionDatanode.class);
-    return annotation.feature();
+    DatanodeUpgradeActionForLayoutFeature layoutAnnotation =
+        clazz.getAnnotation(DatanodeUpgradeActionForLayoutFeature.class);
+    if (layoutAnnotation != null) {
+      return layoutAnnotation.feature();
+    }
+    return clazz.getAnnotation(DatanodeUpgradeActionForVersion.class).version();
   }
 }

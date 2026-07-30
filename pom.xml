@@ -43,6 +43,7 @@
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
+    <byte-buddy.version>1.18.11</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -62,7 +63,7 @@
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
-    <cyclonedx.version>2.9.1</cyclonedx.version>
+    <cyclonedx.version>2.9.2</cyclonedx.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
     <derby.version>10.14.2.0</derby.version>
@@ -78,7 +79,7 @@
     <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
-    <excluded-test-groups>unhealthy</excluded-test-groups>
+    <excluded-test-groups>unhealthy | benchmark</excluded-test-groups>
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
@@ -92,7 +93,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <iceberg.version>1.10.1</iceberg.version>
+    <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
     <jackson2-bom.version>2.21.4</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
@@ -112,9 +113,9 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.13</jline.version>
-    <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.22</jnr-posix.version>
+    <jline.version>3.30.15</jline.version>
+    <jnr-constants.version>0.11.0</jnr-constants.version>
+    <jnr-posix.version>3.2.1</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
@@ -125,7 +126,7 @@
     <kotlin.version>1.9.25</kotlin.version>
     <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
-    <log4j2.version>2.26.0</log4j2.version>
+    <log4j2.version>2.26.1</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>3.8.0</maven-assembly-plugin.version>
@@ -216,7 +217,7 @@
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
     <!-- test groups excluded in CI (except in dedicated profiles for flaky) -->
-    <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
+    <unstable-test-groups>flaky | slow | unhealthy | benchmark</unstable-test-groups>
     <vault.driver.version>5.1.0</vault.driver.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
@@ -641,6 +642,16 @@
             <artifactId>log4j</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>${byte-buddy.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-agent</artifactId>
+        <version>${byte-buddy.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
@@ -1287,11 +1298,6 @@
         <artifactId>ozone-common</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>ozone-csi</artifactId>
-        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

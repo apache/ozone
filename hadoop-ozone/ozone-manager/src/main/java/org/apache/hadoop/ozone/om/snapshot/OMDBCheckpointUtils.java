@@ -21,6 +21,7 @@ import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -49,32 +50,75 @@ public final class OMDBCheckpointUtils {
   private OMDBCheckpointUtils() {
   }
 
+  /**
+   * Uncompressed total size of SST files under the DB checkpoint and optional
+   * snapshot paths (used for logging and follower disk checks).
+   */
+  public static final class SstSizeEstimate {
+    private final long totalBytes;
+    private final long fileCount;
+
+    public SstSizeEstimate(long totalBytes, long fileCount) {
+      this.totalBytes = totalBytes;
+      this.fileCount = fileCount;
+    }
+
+    public long getTotalBytes() {
+      return totalBytes;
+    }
+
+    public long getFileCount() {
+      return fileCount;
+    }
+  }
+
   public static boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =
         request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
     return Boolean.parseBoolean(includeParam);
   }
 
+  /**
+   * Walks the given paths and sums logical size of SST files only.
+   *
+   * @throws IOException if the file tree walk fails
+   */
+  public static SstSizeEstimate estimateCheckpointTarballSstDetails(
+      Path dbLocation, Collection<Path> snapshotPaths) throws IOException {
+    Counters.PathCounters counters = Counters.longPathCounters();
+    CountingPathVisitor visitor = new CountingPathVisitor(
+        counters, SST_FILE_FILTER, TRUE);
+    Files.walkFileTree(dbLocation, visitor);
+    boolean includeSnapshotData = !snapshotPaths.isEmpty();
+    if (includeSnapshotData) {
+      for (Path snapshotDir : snapshotPaths) {
+        Files.walkFileTree(snapshotDir, visitor);
+      }
+    }
+    return new SstSizeEstimate(
+        counters.getByteCounter().get(),
+        counters.getFileCounter().get());
+  }
+
   public static void logEstimatedTarballSize(Path dbLocation, Collection<Path> snapshotPaths) {
     try {
-      Counters.PathCounters counters = Counters.longPathCounters();
-      CountingPathVisitor visitor = new CountingPathVisitor(
-          counters, SST_FILE_FILTER, TRUE);
-      Files.walkFileTree(dbLocation, visitor);
-      boolean includeSnapshotData = !snapshotPaths.isEmpty();
-      long totalSnapshots = snapshotPaths.size();
-      if (includeSnapshotData) {
-        for (Path snapshotDir: snapshotPaths) {
-          Files.walkFileTree(snapshotDir, visitor);
-        }
-      }
-      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, SST files: {}{}",
-          counters.getByteCounter().get() / (1024),
-          counters.getFileCounter().get(),
-          (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
+      SstSizeEstimate estimate =
+          estimateCheckpointTarballSstDetails(dbLocation, snapshotPaths);
+      logEstimatedTarballSize(estimate, snapshotPaths.size());
     } catch (Exception e) {
       LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream for dbLocation:{} snapshotPaths:{}",
           dbLocation, snapshotPaths, e);
     }
+  }
+
+  /**
+   * Logs the result of a prior {@link #estimateCheckpointTarballSstDetails} call.
+   */
+  public static void logEstimatedTarballSize(SstSizeEstimate estimate, int snapshotDirCount) {
+    boolean includeSnapshotData = snapshotDirCount > 0;
+    LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, SST files: {}{}",
+        estimate.getTotalBytes() / (1024),
+        estimate.getFileCount(),
+        (includeSnapshotData ? ", snapshots: " + snapshotDirCount : ""));
   }
 }

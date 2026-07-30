@@ -2405,6 +2405,29 @@
       request OM snapshot from OM Leader.
     </description>
   </property>
+  <property>
+    <name>ozone.om.bootstrap.min.space</name>
+    <value>5GB</value>
+    <tag>OZONE, OM, HA, MANAGEMENT</tag>
+    <description>
+      Minimum free space required on the volume that holds ozone.om.ratis.snapshot.dir
+      before an OM follower downloads a ratis/bootstrap checkpoint from the leader,
+      when the leader does not supply the X-Ozone-Om-Checkpoint-Estimated-Sst-Bytes header
+      (incremental checkpoint or older OM version).
+      Use storage size syntax (e.g. 10GB). Set to 0 to disable this fallback check.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.bootstrap.checkpoint.estimated.space.headroom.ratio</name>
+    <value>2.0</value>
+    <tag>OZONE, OM, HA, MANAGEMENT</tag>
+    <description>
+      Multiplier applied to the leader-reported estimated uncompressed SST byte total
+      (X-Ozone-Om-Checkpoint-Estimated-Sst-Bytes) to approximate space needed for the
+      checkpoint tar and unpack on the follower before streaming the response body.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.fs.snapshot.max.limit</name>

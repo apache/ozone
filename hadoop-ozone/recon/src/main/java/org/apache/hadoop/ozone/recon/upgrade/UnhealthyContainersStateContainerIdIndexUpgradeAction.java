@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade action to ensure idx_state_container_id exists on UNHEALTHY_CONTAINERS.
  */
-@UpgradeActionRecon(feature = ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX)
+@ReconUpgradeActionForVersion(version = ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX)
 public class UnhealthyContainersStateContainerIdIndexUpgradeAction
     implements ReconUpgradeAction {
 

@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -381,9 +381,9 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
-        LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(versionManager.getApparentVersion().serialize())
-            .setSoftwareLayoutVersion(versionManager.getSoftwareVersion().serialize())
+        DatanodeVersionProto.newBuilder()
+            .setApparentVersion(versionManager.getApparentVersion().serialize())
+            .setSoftwareVersion(versionManager.getSoftwareVersion().serialize())
             .build());
   }
 
@@ -403,7 +403,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto dnVersionInfo) {
+      DatanodeVersionProto dnVersionInfo) {
     if (shouldFenceDatanode(datanodeDetails, dnVersionInfo)) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
@@ -726,14 +726,14 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   /**
-   * Process Layout Version report.
+   * Process version report.
    *
    * @param datanodeDetails
    * @param versionReport
    */
   @Override
   public void processVersionReport(DatanodeDetails datanodeDetails,
-                                   LayoutVersionProto versionReport) {
+                                   DatanodeVersionProto versionReport) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing version report from [datanode={}]",
           datanodeDetails.getHostName());
@@ -757,11 +757,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
-      LayoutVersionProto versionReport) {
+      DatanodeVersionProto versionReport) {
     ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getSoftwareLayoutVersion());
+        versionReport.getSoftwareVersion());
     ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getMetadataLayoutVersion());
+        versionReport.getApparentVersion());
     ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
     ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
 
@@ -795,10 +795,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         "apparent version {}", datanodeDetails, dnApparentVersion, scmApparentVersion);
 
     FinalizeVersionCommand finalizeCmd =
-        new FinalizeVersionCommand(true,
-            LayoutVersionProto.newBuilder()
-                .setSoftwareLayoutVersion(dnSoftwareVersion.serialize())
-                .setMetadataLayoutVersion(dnSoftwareVersion.serialize()).build());
+        new FinalizeVersionCommand(scmSoftwareVersion.serialize());
     try {
       finalizeCmd.setTerm(scmContext.getTermOfLeader());
       // Send Finalize command to the data node. It's OK to send Finalize command multiple times.
@@ -2041,11 +2038,15 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     }
   }
 
-  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, LayoutVersionProto versionReport) {
+  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+    if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
+      LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
+      return true;
+    }
     ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getSoftwareLayoutVersion());
+        versionReport.getSoftwareVersion());
     ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getMetadataLayoutVersion());
+        versionReport.getApparentVersion());
     return shouldFenceDatanode(dnDetails, dnSoftwareVersion, dnApparentVersion);
   }
 

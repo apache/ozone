@@ -17,27 +17,32 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 
 /**
- * Loads {@link OmUpgradeAction} implementations annotated with {@link UpgradeActionOm} from
- * {@link #OM_UPGRADE_CLASS_PACKAGE} only.
+ * Loads {@link OmUpgradeAction} implementations annotated with {@link OmUpgradeActionForLayoutFeature} or
+ * {@link OmUpgradeActionForVersion} from {@link #OM_UPGRADE_CLASS_PACKAGE}.
  */
 public final class OMUpgradeActionProvider extends AbstractUpgradeActionProvider<OmUpgradeAction> {
 
   /**
-   * Package scanned for {@link UpgradeActionOm}-annotated classes (production OM upgrade actions).
+   * Package scanned for upgrade-action-annotated classes.
    */
   public static final String OM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.om.upgrade";
 
   public OMUpgradeActionProvider() {
-    super(UpgradeActionOm.class, OmUpgradeAction.class, OM_UPGRADE_CLASS_PACKAGE);
+    super(ImmutableSet.of(OmUpgradeActionForLayoutFeature.class, OmUpgradeActionForVersion.class),
+        OmUpgradeAction.class, OM_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionOm annotation = clazz.getAnnotation(UpgradeActionOm.class);
-    return annotation.feature();
+    OmUpgradeActionForLayoutFeature layoutAnnotation = clazz.getAnnotation(OmUpgradeActionForLayoutFeature.class);
+    if (layoutAnnotation != null) {
+      return layoutAnnotation.feature();
+    }
+    return clazz.getAnnotation(OmUpgradeActionForVersion.class).version();
   }
 }

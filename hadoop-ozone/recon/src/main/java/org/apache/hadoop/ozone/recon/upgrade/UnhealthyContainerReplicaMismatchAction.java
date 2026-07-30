@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * Upgrade action for handling the addition of a new unhealthy container state in Recon, which will be for containers,
  * that have replicas with different data checksums.
  */
-@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH)
+@ReconUpgradeActionForVersion(version = UNHEALTHY_CONTAINER_REPLICA_MISMATCH)
 public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
 

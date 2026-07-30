@@ -27,7 +27,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -68,17 +68,17 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
-   * @param versionInfo Details about the LayoutVersionProto
+   * @param versionInfo Details about the DatanodeVersionProto
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-       LayoutVersionProto versionInfo, long containerRollIntervalMs) {
+       DatanodeVersionProto versionInfo, long containerRollIntervalMs) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
     this.lastKnownSoftwareVersion =
-        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getSoftwareLayoutVersion());
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getSoftwareVersion());
     this.lastKnownApparentVersion =
-        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getMetadataLayoutVersion());
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getApparentVersion());
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
@@ -112,16 +112,16 @@ public class DatanodeInfo extends DatanodeDetails {
   /**
    * Updates the last known apparent and software versions for this datanode.
    */
-  public void updateLastKnownVersions(LayoutVersionProto version) {
+  public void updateLastKnownVersions(DatanodeVersionProto version) {
     if (version == null) {
       return;
     }
     try {
       lock.writeLock().lock();
       lastKnownSoftwareVersion =
-          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getSoftwareLayoutVersion());
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getSoftwareVersion());
       lastKnownApparentVersion =
-          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getMetadataLayoutVersion());
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getApparentVersion());
     } finally {
       lock.writeLock().unlock();
     }

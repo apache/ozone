@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * The action triggers a full rebuild of the NSSummary ensuring that the new field: replicatedSizeOfFiles is correctly
  * populated for all objects.
  */
-@UpgradeActionRecon(feature = ReconVersion.REPLICATED_SIZE_OF_FILES)
+@ReconUpgradeActionForVersion(version = ReconVersion.REPLICATED_SIZE_OF_FILES)
 public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReplicatedSizeOfFilesUpgradeAction.class);

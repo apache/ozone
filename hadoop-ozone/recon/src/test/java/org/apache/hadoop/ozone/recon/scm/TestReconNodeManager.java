@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -271,9 +271,9 @@ public class TestReconNodeManager {
             errorNodeNotPermitted),
         // Newer SW DN rejected
         Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
             errorNodeNotPermitted),
 
         /* RECON FINALIZED */
@@ -292,9 +292,9 @@ public class TestReconNodeManager {
             success),
         // Newer SW DN rejected
         Arguments.of(HDDSVersion.SOFTWARE_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
             errorNodeNotPermitted)
     );
   }
@@ -302,7 +302,7 @@ public class TestReconNodeManager {
   @ParameterizedTest
   @MethodSource("reconDatanodeVersionCombinations")
   public void testDatanodeFencingOnRegister(ComponentVersion reconApparent,
-      LayoutVersionProto dnVersionProto, ErrorCode expectedResult) throws IOException {
+      DatanodeVersionProto dnVersionProto, ErrorCode expectedResult) throws IOException {
     ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);

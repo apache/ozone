@@ -18,7 +18,7 @@
 # * "Test Suite", which should be ones of the existing suites from regular CI,
 #   e.g. "cert-rotation", or
 # * "Test Filter", which is a regex pattern applied to filter test script's path
-#   (examples: "ozone-csi", "test-vault.sh", "ozone/test-ec.sh", "test-.*-rotation.sh")
+#   (examples: "ozone-ha", "test-vault.sh", "ozone/test-ec.sh", "test-.*-rotation.sh")
 
 name: repeat-acceptance-test
 on:

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils.waitForScmToFinalize;
-import static org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils.waitForScmsToFinalize;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmToFinalize;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmsToFinalize;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
@@ -130,13 +130,13 @@ public class TestScmHAFinalization {
     OzoneConfiguration conf = new OzoneConfiguration();
     init(conf, 0);
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Ensure all SCMs finalize, indicating the message has been propagated across them all
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0);
   }
 
@@ -168,13 +168,13 @@ public class TestScmHAFinalization {
 
     // Wait for finalization from the client perspective.
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         activeScms, 0);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0);
 
     // Move SCM log index farther ahead to make sure a snapshot install
@@ -193,7 +193,7 @@ public class TestScmHAFinalization {
     // apparent versin. This means the follower should see it in the DB it receives immediately to trigger finalization.
     waitForScmToFinalize(inactiveScm, true);
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         inactiveScm, 0);
 
     // Use log to verify a snapshot was installed.

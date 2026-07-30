@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.ComponentVersion;
@@ -39,14 +40,14 @@ public abstract class AbstractUpgradeActionProvider<T extends UpgradeAction<?>>
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractUpgradeActionProvider.class);
 
-  private final Class<? extends Annotation> annotationClass;
+  private final Set<Class<? extends Annotation>> annotationClasses;
   private final Class<T> actionClass;
   private final String[] packagesToScan;
 
-  protected AbstractUpgradeActionProvider(Class<? extends Annotation> annotationClass,
+  protected AbstractUpgradeActionProvider(Set<Class<? extends Annotation>> annotationClasses,
                                           Class<T> actionClass,
                                           String... packagesToScan) {
-    this.annotationClass = annotationClass;
+    this.annotationClasses = annotationClasses;
     this.actionClass = actionClass;
     this.packagesToScan = packagesToScan;
   }
@@ -60,16 +61,24 @@ public abstract class AbstractUpgradeActionProvider<T extends UpgradeAction<?>>
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
         .setExpandSuperTypes(false)
         .setParallel(true));
-    Set<Class<?>> typesAnnotatedWith = reflections.getTypesAnnotatedWith(annotationClass);
+    Set<Class<?>> typesAnnotatedWith = new HashSet<>();
+    for (Class<? extends Annotation> annotationClass : annotationClasses) {
+      typesAnnotatedWith.addAll(reflections.getTypesAnnotatedWith(annotationClass));
+    }
 
     typesAnnotatedWith.forEach(clazz -> {
+      long annotationCount = annotationClasses.stream().filter(clazz::isAnnotationPresent).count();
+      if (annotationCount > 1) {
+        throw new IllegalStateException("Upgrade action class " + clazz.getName()
+            + " has more than one upgrade action annotation. Only one is allowed.");
+      }
       if (actionClass.isAssignableFrom(clazz)) {
         try {
           @SuppressWarnings("unchecked")
           T action = (T) clazz.getDeclaredConstructor().newInstance();
-          ComponentVersion feature = extractVersion(clazz);
+          ComponentVersion version = extractVersion(clazz);
           LOG.info("Registering Upgrade Action : {}", action.name());
-          upgradeActions.put(feature, action);
+          upgradeActions.put(version, action);
         } catch (Exception e) {
           LOG.error("Cannot instantiate Upgrade Action class {}",
               clazz.getSimpleName(), e);

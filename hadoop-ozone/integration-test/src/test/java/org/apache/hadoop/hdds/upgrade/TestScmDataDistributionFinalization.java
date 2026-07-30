@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.EMPTY_SUMMARY;
-import static org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils.waitForScmsToFinalize;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmsToFinalize;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -164,13 +164,13 @@ public class TestScmDataDistributionFinalization {
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
@@ -267,13 +267,13 @@ public class TestScmDataDistributionFinalization {
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 

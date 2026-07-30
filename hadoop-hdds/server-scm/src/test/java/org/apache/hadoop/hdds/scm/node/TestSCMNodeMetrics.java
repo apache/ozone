@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.ozone.test.MetricsAsserts.assertGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -238,7 +238,8 @@ public class TestSCMNodeMetrics {
     assertGauge("TotalFilesystemAvailable", 150L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     nodeManager.processHeartbeat(registeredDatanode);
-    sleep(4000);
+    GenericTestUtils.waitFor(
+        () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
     assertGauge("InServiceHealthyNodes", 1, metricsSource);
 

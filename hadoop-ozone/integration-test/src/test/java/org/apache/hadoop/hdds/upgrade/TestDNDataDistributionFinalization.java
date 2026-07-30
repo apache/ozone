@@ -156,7 +156,7 @@ public class TestDNDataDistributionFinalization {
 
     // Wait for finalization to complete
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
 
     // Verify finalization completed
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
@@ -191,7 +191,7 @@ public class TestDNDataDistributionFinalization {
     }
     bucket.deleteKey(keyName);
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
 
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
 

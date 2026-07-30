@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade Action for DataNode for SCHEMA V3.
  */
-@UpgradeActionDatanode(feature = DATANODE_SCHEMA_V3)
+@DatanodeUpgradeActionForLayoutFeature(feature = DATANODE_SCHEMA_V3)
 public class DatanodeSchemaV3FinalizeAction
     implements DatanodeUpgradeAction {
 

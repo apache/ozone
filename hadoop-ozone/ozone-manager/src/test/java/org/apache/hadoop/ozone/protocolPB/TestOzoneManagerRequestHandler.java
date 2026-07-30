@@ -152,6 +152,89 @@ public class TestOzoneManagerRequestHandler {
     }
   }
 
+  /**
+   * getFileStatus must forward the headOp flag from the request KeyArgs into
+   * the OmKeyArgs handed to the OM, and must drop the (unrefreshed) block
+   * locations from a head-op response so it stays small (HDDS-15678).
+   */
+  @Test
+  public void getFileStatusForwardsHeadOpAndStripsLocations() throws IOException {
+    for (boolean headOp : new boolean[] {true, false}) {
+      OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+      OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+      OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+      OzoneManagerProtocolProtos.OzoneFileStatusProto proto =
+          OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+              .setKeyInfo(OzoneManagerProtocolProtos.KeyInfo.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setDataSize(0)
+                  .setType(HddsProtos.ReplicationType.RATIS)
+                  .setCreationTime(0).setModificationTime(0)
+                  .addKeyLocationList(
+                      OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
+                          .setVersion(0).build())
+                  .build())
+              .build();
+      Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(proto);
+      ArgumentCaptor<OmKeyArgs> captor = ArgumentCaptor.forClass(OmKeyArgs.class);
+      Mockito.when(ozoneManager.getFileStatus(captor.capture())).thenReturn(status);
+
+      OzoneManagerProtocolProtos.OMRequest request =
+          Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+      Mockito.when(request.getTraceID()).thenReturn("traceId");
+      Mockito.when(request.getCmdType())
+          .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+      Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+          OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+              .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setHeadOp(headOp).build())
+              .build());
+
+      OzoneManagerProtocolProtos.OMResponse response =
+          requestHandler.handleReadRequest(request);
+
+      Assertions.assertEquals(headOp, captor.getValue().isHeadOp());
+      int locations = response.getGetFileStatusResponse().getStatus()
+          .getKeyInfo().getKeyLocationListCount();
+      // headOp -> block locations stripped; otherwise retained.
+      Assertions.assertEquals(headOp ? 0 : 1, locations);
+    }
+  }
+
+  /**
+   * A head-op status with no keyInfo (defensive) must be returned unchanged.
+   */
+  @Test
+  public void getFileStatusHeadOpWithoutKeyInfoIsNoop() throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+    OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+    Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(
+        OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+            .setIsDirectory(true).build());
+    Mockito.when(ozoneManager.getFileStatus(Mockito.any())).thenReturn(status);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    Mockito.when(request.getTraceID()).thenReturn("traceId");
+    Mockito.when(request.getCmdType())
+        .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+    Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+        OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket")
+                .setKeyName("key").setHeadOp(true).build())
+            .build());
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        requestHandler.handleReadRequest(request);
+    Assertions.assertFalse(
+        response.getGetFileStatusResponse().getStatus().hasKeyInfo());
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 9, 10, 11, 50})
   public void testListKeysResponseSize(int resultSize) throws IOException {
@@ -256,6 +339,75 @@ public class TestOzoneManagerRequestHandler {
   }
 
   /**
+   * Test to verify prepare-related requests return success as no-ops, since the Ozone Manager no longer supports this
+   * operation.
+   */
+  @Test
+  public void testPrepareRequestsAreNoOps() {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+
+    // Prepare command should be a no-op.
+    OzoneManagerProtocolProtos.OMRequest prepareRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.Prepare)
+            .setClientId("test-client")
+            .setPrepareRequest(OzoneManagerProtocolProtos.PrepareRequest.newBuilder()
+                .setArgs(OzoneManagerProtocolProtos.PrepareRequestArgs.newBuilder().build())
+                .build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse prepareResponse =
+        requestHandler.handleReadRequest(prepareRequest);
+
+    Assertions.assertTrue(prepareResponse.getSuccess(), "Prepare should return success");
+    Assertions.assertTrue(prepareResponse.hasPrepareResponse(), "Prepare response should be present");
+    Assertions.assertEquals(0, prepareResponse.getPrepareResponse().getTxnID(),
+        "Prepare should return empty txnID of 0");
+    Assertions.assertEquals("Prepare is no longer required in this version",
+        prepareResponse.getMessage(), "Prepare should return deprecation message");
+
+    // PrepareStatus should always return PREPARE_COMPLETED.
+    OzoneManagerProtocolProtos.OMRequest prepareStatusRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.PrepareStatus)
+            .setClientId("test-client")
+            .setPrepareStatusRequest(OzoneManagerProtocolProtos.PrepareStatusRequest.newBuilder()
+                .setTxnID(0)
+                .build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse prepareStatusResponse =
+        requestHandler.handleReadRequest(prepareStatusRequest);
+
+    Assertions.assertTrue(prepareStatusResponse.getSuccess(), "PrepareStatus should return success");
+    Assertions.assertTrue(prepareStatusResponse.hasPrepareStatusResponse(),
+        "PrepareStatus response should be present");
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED,
+        prepareStatusResponse.getPrepareStatusResponse().getStatus(),
+        "PrepareStatus should always return PREPARE_COMPLETED for backward compatibility");
+    Assertions.assertEquals(0, prepareStatusResponse.getPrepareStatusResponse().getCurrentTxnIndex(),
+        "PrepareStatus should return currentTxnIndex of 0");
+
+    // CancelPrepare command should be a no-op.
+    OzoneManagerProtocolProtos.OMRequest cancelPrepareRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CancelPrepare)
+            .setClientId("test-client")
+            .setCancelPrepareRequest(OzoneManagerProtocolProtos.CancelPrepareRequest.newBuilder().build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse cancelPrepareResponse =
+        requestHandler.handleReadRequest(cancelPrepareRequest);
+
+    Assertions.assertTrue(cancelPrepareResponse.getSuccess(), "CancelPrepare should return success");
+    Assertions.assertTrue(cancelPrepareResponse.hasCancelPrepareResponse(),
+        "CancelPrepare response should be present");
+    Assertions.assertEquals("Cancel Prepare is no longer required in this version",
+        cancelPrepareResponse.getMessage(), "CancelPrepare should return deprecation message");
+  }
+
+  /**
    * Verify that when handleWriteRequestImpl encounters an exception during
    * validateAndUpdateCache, the audit logger is called with the correct
    * Transaction index and Command type in the audit message.
@@ -324,7 +476,7 @@ public class TestOzoneManagerRequestHandler {
 
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(true)
-        .setShouldFinalize(false)
+        .setHddsFinalized(false)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();

@@ -17,15 +17,12 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
-
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMDatanodeRequest;
@@ -71,14 +68,8 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    LayoutVersionProto versionInfo = null;
-    if (request.hasDataNodeLayoutVersion()) {
-      versionInfo = request.getDataNodeLayoutVersion();
-    } else {
-      // Backward compatibility to make sure old Datanodes can still talk to
-      // SCM.
-      versionInfo = toVersionProto(INITIAL_VERSION, INITIAL_VERSION);
-    }
+    // Datanodes which do not report a version will not be allowed to register.
+    DatanodeVersionProto versionInfo = request.hasDatanodeVersion() ? request.getDatanodeVersion() : null;
     return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport, versionInfo);
   }

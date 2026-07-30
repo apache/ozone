@@ -37,6 +37,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -80,6 +81,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -173,10 +175,11 @@ public class TestContainerPlacement {
    *
    * @throws IOException
    * @throws InterruptedException
+   * @throws TimeoutException
    */
   @Test
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException {
+      InterruptedException, TimeoutException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;
@@ -213,9 +216,8 @@ public class TestContainerPlacement {
         scmNodeManager.processHeartbeat(datanodeDetails);
       }
 
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(nodeCount, scmNodeManager.getNodeCount(null, HEALTHY));
+      GenericTestUtils.waitFor(
+          () -> scmNodeManager.getNodeCount(null, HEALTHY) == nodeCount, 100, 5000);
       assertEquals(capacity * nodeCount,
           (long) scmNodeManager.getStats().getCapacity().get());
       assertEquals(used * nodeCount,

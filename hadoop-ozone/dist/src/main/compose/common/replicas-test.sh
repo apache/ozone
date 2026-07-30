@@ -66,6 +66,8 @@ for dn_container in ${datanodes}; do
   wait_for_datanode "${dn_container}" HEALTHY 60
 done
 
+wait_for_pipeline
+
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 
 # get block locations for key

@@ -29,14 +29,14 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Action to run upgrade flow for SCM HA exactly once.
  */
-@UpgradeActionDatanode(feature = SCM_HA)
+@DatanodeUpgradeActionForLayoutFeature(feature = SCM_HA)
 public class ScmHAFinalizeUpgradeActionDatanode
     implements DatanodeUpgradeAction {
   private static final Logger LOG =

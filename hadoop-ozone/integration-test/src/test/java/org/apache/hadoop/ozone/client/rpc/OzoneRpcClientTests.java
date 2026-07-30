@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIS
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -2917,8 +2918,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListBucket()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -3014,10 +3015,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKey()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
+    String bucketA = uniqueObjectName("buc-a-");
+    String bucketB = uniqueObjectName("buc-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -3165,8 +3166,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKeyOnEmptyBucket()
       throws IOException {
-    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume = uniqueObjectName("vol-");
+    String bucket = uniqueObjectName("buc-");
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     vol.createBucket(bucket);
@@ -5166,10 +5167,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testListSnapshot() throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
+    String bucketA = uniqueObjectName("buc-a-");
+    String bucketB = uniqueObjectName("buc-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);

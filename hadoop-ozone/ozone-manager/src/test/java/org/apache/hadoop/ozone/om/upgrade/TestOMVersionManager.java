@@ -132,12 +132,16 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
       assertTrue(versionManager.needsFinalization());
       OmUpgradeAction quotaAction = versionManager.getUpgradeActionsForTesting().get(QUOTA);
       assertInstanceOf(QuotaRepairUpgradeAction.class, quotaAction);
+      OmUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(ZDU);
+      assertInstanceOf(ZduOmUpgradeActionForTest.class, zduAction);
     }
 
     try (OMVersionManager versionManager = createManager(SOFTWARE_VERSION.serialize(), new OMUpgradeActionProvider())) {
       assertFalse(versionManager.needsFinalization());
       OmUpgradeAction quotaAction = versionManager.getUpgradeActionsForTesting().get(QUOTA);
       assertInstanceOf(QuotaRepairUpgradeAction.class, quotaAction);
+      OmUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(ZDU);
+      assertInstanceOf(ZduOmUpgradeActionForTest.class, zduAction);
     }
   }
 

@@ -21,14 +21,14 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
+import org.apache.hadoop.ozone.upgrade.ScmUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * SCM Upgrade Action for the very first Upgrade Version.
  */
-@UpgradeActionScm(feature = DATANODE_SCHEMA_V2)
+@ScmUpgradeActionForLayoutFeature(feature = DATANODE_SCHEMA_V2)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements ScmUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 

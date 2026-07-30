@@ -179,6 +179,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OMException omEx = (OMException) cause;
         // Do not failover if the operation was blocked because the OM was
         // prepared.
+        // Current OMs do not support prepare for upgrade, but the client may encounter an old OM server.
         return omEx.getResult() !=
            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
       }

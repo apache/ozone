@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MA
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -165,8 +166,8 @@ public class TestOMRatisSnapshotTransfer {
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
 
-    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    volumeName = uniqueObjectName("volume");
+    bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner("user" + RandomStringUtils.secure().nextNumeric(5))

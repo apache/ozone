@@ -1285,18 +1285,26 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), true);
 
+      if (scm.getScmContext().isInSafeMode()) {
+        throw new SCMException("Cannot query upgrade status while SCM is in safe mode. Wait until SCM exits "
+            + "safe mode and try again.", ResultCodes.SAFE_MODE_EXCEPTION);
+      }
+
       boolean scmFinalized = !scm.getVersionManager().needsFinalization();
       NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts =
           scm.getScmNodeManager().getDatanodeFinalizationCounts();
       int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
       int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
-      boolean shouldFinalize = scmFinalized && datanodeFinalizationCounts.allNodesFinalized() && !scm.isInSafeMode();
+      boolean hddsFinalized = scmFinalized && datanodeFinalizationCounts.allNodesFinalized();
 
       HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
           .setScmFinalized(scmFinalized)
           .setNumDatanodesFinalized(finalizedDatanodes)
           .setNumDatanodesTotal(healthyDatanodes)
-          .setShouldFinalize(shouldFinalize)
+          .setHddsFinalized(hddsFinalized)
+          .setScmApparentVersion(scm.getVersionManager().getApparentVersion().serialize())
+          .setMinDatanodeApparentVersion(datanodeFinalizationCounts.getMinApparentVersion())
+          .setMaxDatanodeApparentVersion(datanodeFinalizationCounts.getMaxApparentVersion())
           .build();
 
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
@@ -1493,14 +1501,13 @@ public class SCMClientProtocolServer implements
           .newBuilder()
           .setIsRunning(false)
           .build();
-    } else {
-
-      return ContainerBalancerStatusInfoResponseProto
-          .newBuilder()
-          .setIsRunning(true)
-          .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
-          .build();
     }
+
+    return ContainerBalancerStatusInfoResponseProto
+        .newBuilder()
+        .setIsRunning(balancerStatusInfo.getConfiguration().getShouldRun())
+        .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
+        .build();
   }
 
   /**
@@ -1683,7 +1690,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("state", String.valueOf(state));
     try {
       List<ContainerID> results = scm.getContainerManager().getContainerIDs(
-          startContainerID, count, state);
+          startContainerID, count, state, null);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.LIST_CONTAINER_IDS, auditMap));
       return results;

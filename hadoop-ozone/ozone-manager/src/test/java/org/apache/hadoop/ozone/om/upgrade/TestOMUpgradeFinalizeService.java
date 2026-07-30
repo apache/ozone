@@ -125,7 +125,7 @@ public class TestOMUpgradeFinalizeService {
 
   /**
    * When the OM is the leader, finalization is needed, the finalization command is given and SCM reports
-   * shouldFinalize=true, a FinalizeUpgrade request should be submitted via Ratis.
+   * hddsFinalized=true, a FinalizeUpgrade request should be submitted via Ratis.
    */
   @Test
   void testFinalizationTriggeredWhenScmIsFinalizedAndFinalizationInProgress() throws Exception {
@@ -134,7 +134,7 @@ public class TestOMUpgradeFinalizeService {
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(true)
-        .setShouldFinalize(true)
+        .setHddsFinalized(true)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
@@ -156,7 +156,7 @@ public class TestOMUpgradeFinalizeService {
   }
 
   /**
-   * When SCM reports shouldFinalize=false (SCM is not yet finalized),
+   * When SCM reports hddsFinalized=false (SCM is not yet finalized),
    * no Ratis request should be submitted.
    */
   @Test
@@ -166,7 +166,7 @@ public class TestOMUpgradeFinalizeService {
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(false)
-        .setShouldFinalize(false)
+        .setHddsFinalized(false)
         .setNumDatanodesFinalized(0)
         .setNumDatanodesTotal(3)
         .build();
@@ -248,7 +248,7 @@ public class TestOMUpgradeFinalizeService {
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(true)
-        .setShouldFinalize(true)
+        .setHddsFinalized(true)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();

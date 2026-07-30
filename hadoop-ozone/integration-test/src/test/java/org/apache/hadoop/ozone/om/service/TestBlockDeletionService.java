@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetr
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils;
+import org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -137,7 +137,7 @@ public class TestBlockDeletionService {
 
     // UPGRADE SCM (if specified)
     scmClient.finalizeUpgrade();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
 
     // POST-UPGRADE
     //Step 6: Repeat the same steps in pre-upgrade

@@ -17,24 +17,31 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
+import org.apache.hadoop.ozone.upgrade.ScmUpgradeActionForLayoutFeature;
+import org.apache.hadoop.ozone.upgrade.ScmUpgradeActionForVersion;
 
 /**
- * Loads {@link ScmUpgradeAction} implementations annotated with {@link UpgradeActionScm}.
+ * Loads {@link ScmUpgradeAction} implementations annotated with {@link ScmUpgradeActionForLayoutFeature} or
+ * {@link ScmUpgradeActionForVersion}.
  */
 public final class ScmUpgradeActionProvider extends AbstractUpgradeActionProvider<ScmUpgradeAction> {
 
   public static final String SCM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.hdds.scm.server";
 
   public ScmUpgradeActionProvider() {
-    super(UpgradeActionScm.class, ScmUpgradeAction.class, SCM_UPGRADE_CLASS_PACKAGE);
+    super(ImmutableSet.of(ScmUpgradeActionForLayoutFeature.class, ScmUpgradeActionForVersion.class),
+        ScmUpgradeAction.class, SCM_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionScm annotation = clazz.getAnnotation(UpgradeActionScm.class);
-    return annotation.feature();
+    ScmUpgradeActionForLayoutFeature layoutAnnotation = clazz.getAnnotation(ScmUpgradeActionForLayoutFeature.class);
+    if (layoutAnnotation != null) {
+      return layoutAnnotation.feature();
+    }
+    return clazz.getAnnotation(ScmUpgradeActionForVersion.class).version();
   }
 }

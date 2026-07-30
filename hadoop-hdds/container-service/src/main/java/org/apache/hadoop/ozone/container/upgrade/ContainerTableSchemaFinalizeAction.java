@@ -31,14 +31,14 @@ import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade Action for DataNode for update the table schema data of containerIds Table.
  */
-@UpgradeActionDatanode(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE)
+@DatanodeUpgradeActionForLayoutFeature(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE)
 public class ContainerTableSchemaFinalizeAction
     implements DatanodeUpgradeAction {
 

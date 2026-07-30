@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -232,24 +232,24 @@ public class NodeStateManager implements Runnable, Closeable {
    * Adds a new node to the state manager.
    *
    * @param datanodeDetails DatanodeDetails
-   * @param layoutInfo LayoutVersionProto
+   * @param versionInfo DatanodeVersionProto
    *
    * @throws NodeAlreadyExistsException if the node is already present
    */
   public void addNode(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
-    nodeStateMap.addNode(newDatanodeInfo(datanodeDetails, layoutInfo));
+      DatanodeVersionProto versionInfo) throws NodeAlreadyExistsException {
+    nodeStateMap.addNode(newDatanodeInfo(datanodeDetails, versionInfo));
     try {
-      updateLastKnownVersionInfo(datanodeDetails, layoutInfo);
+      updateLastKnownVersionInfo(datanodeDetails, versionInfo);
     } catch (NodeNotFoundException ex) {
       throw new IllegalStateException("Inconsistent NodeStateMap! Datanode "
           + datanodeDetails.getID() + " was added but not found in map: " + nodeStateMap);
     }
   }
 
-  private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
+  private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, DatanodeVersionProto versionInfo) {
     final NodeStatus status = newNodeStatus(datanode);
-    return new DatanodeInfo(datanode, status, layout, containerRollIntervalMs);
+    return new DatanodeInfo(datanode, status, versionInfo, containerRollIntervalMs);
   }
 
   /**
@@ -318,33 +318,33 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Updates the last known layout version of the node.
+   * Updates the last known version of the node.
    * @param datanodeDetails DataNode Details
-   * @param layoutInfo DataNode Layout Information
+   * @param versionInfo DataNode Version Information
    *
    * @throws NodeNotFoundException if the node is not present
    */
   public void updateLastKnownVersionInfo(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo) throws NodeNotFoundException {
+      DatanodeVersionProto versionInfo) throws NodeNotFoundException {
     nodeStateMap.getNodeInfo(datanodeDetails.getID())
-        .updateLastKnownVersions(layoutInfo);
+        .updateLastKnownVersions(versionInfo);
   }
 
   /**
    * Update node.
    *
    * @param datanodeDetails the datanode details
-   * @param layoutInfo the layoutInfo
+   * @param versionInfo the datanode version information
    * @throws NodeNotFoundException the node not found exception
    */
   public void updateNode(DatanodeDetails datanodeDetails,
-                         LayoutVersionProto layoutInfo)
+                         DatanodeVersionProto versionInfo)
           throws NodeNotFoundException {
-    final DatanodeInfo newInfo = newDatanodeInfo(datanodeDetails, layoutInfo);
+    final DatanodeInfo newInfo = newDatanodeInfo(datanodeDetails, versionInfo);
     final DatanodeInfo oldInfo = nodeStateMap.updateNode(newInfo);
     LOG.info("Updated datanode {} {} to {} {}",
         oldInfo, oldInfo.getNodeStatus(), newInfo, newInfo.getNodeStatus());
-    updateLastKnownVersionInfo(datanodeDetails, layoutInfo);
+    updateLastKnownVersionInfo(datanodeDetails, versionInfo);
   }
 
   /**

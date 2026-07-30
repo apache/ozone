@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -211,7 +211,7 @@ public class ReconNodeManager extends SCMNodeManager {
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto dnVersionInfo) {
+      DatanodeVersionProto dnVersionInfo) {
     if (isNodeRegistered(datanodeDetails)) {
       try {
         nodeDB.put(datanodeDetails.getID(), datanodeDetails);
@@ -297,7 +297,7 @@ public class ReconNodeManager extends SCMNodeManager {
 
   @Override
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
-      LayoutVersionProto versionReport) {
+      DatanodeVersionProto versionReport) {
     // Recon will not send finalize commands to datanodes.
   }
 
@@ -308,11 +308,15 @@ public class ReconNodeManager extends SCMNodeManager {
    * it has finalized, unlike SCM.
    */
   @Override
-  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, LayoutVersionProto versionReport) {
+  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+    if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
+      LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
+      return true;
+    }
     ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getSoftwareLayoutVersion());
+        versionReport.getSoftwareVersion());
     ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
-        versionReport.getMetadataLayoutVersion());
+        versionReport.getApparentVersion());
     ComponentVersion reconSoftwareVersion = versionManager.getSoftwareVersion();
     ComponentVersion reconApparentVersion = versionManager.getApparentVersion();
 

@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,6 +62,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -363,8 +363,15 @@ public class TestSCMClientProtocolServer {
   @Test
   public void testFinalizeProceedsWhenAllDatanodesMatchScmVersion() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(3)
+        .setTotalHealthyDatanodes(3)
+        .setMinApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setAllSoftwareVersionsMatchScm(true)
+        .build();
     try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
-        Collections.emptyList(), new NodeManager.DatanodeFinalizationCounts(3, 3, true))) {
+        Collections.emptyList(), datanodeCounts)) {
       testServer.finalizeUpgrade();
       verify(finalizationManager).finalizeUpgrade();
     }
@@ -373,8 +380,15 @@ public class TestSCMClientProtocolServer {
   @Test
   public void testFinalizeRejectsDatanodeWithMismatchedVersion() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(3)
+        .setTotalHealthyDatanodes(3)
+        .setMinApparentVersion(HDDSVersion.DEFAULT_VERSION.serialize())
+        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setAllSoftwareVersionsMatchScm(false)
+        .build();
     try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
-        Collections.emptyList(), new NodeManager.DatanodeFinalizationCounts(3, 3, false))) {
+        Collections.emptyList(), datanodeCounts)) {
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
     }
     verify(finalizationManager, never()).finalizeUpgrade();
@@ -383,7 +397,14 @@ public class TestSCMClientProtocolServer {
   private SCMClientProtocolServer peerCheckServer(
       FinalizationManager finalizationManager, List<SCMNodeDetails> peers) throws IOException {
     // Default to all datanode versions matching SCM so the SCM peer checks are exercised in isolation.
-    return peerCheckServer(finalizationManager, peers, new NodeManager.DatanodeFinalizationCounts(0, 0, true));
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(0)
+        .setTotalHealthyDatanodes(0)
+        .setMinApparentVersion(0)
+        .setMaxApparentVersion(0)
+        .setAllSoftwareVersionsMatchScm(true)
+        .build();
+    return peerCheckServer(finalizationManager, peers, datanodeCounts);
   }
 
   private SCMClientProtocolServer peerCheckServer(
@@ -425,24 +446,23 @@ public class TestSCMClientProtocolServer {
     // No datanodes registered
     assertEquals(0, status.getNumDatanodesFinalized());
     assertEquals(0, status.getNumDatanodesTotal());
-    assertTrue(status.getShouldFinalize());
+    assertTrue(status.getHddsFinalized());
   }
 
   @Test
-  public void testQueryUpgradeStatusInSafemode() throws Exception {
-    // mockSafeModeManager defaults to returning true for getInSafeMode()
-    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
-    assertTrue(scm.isInSafeMode());
+  public void testQueryUpgradeStatusInSafemode() {
+    // Put SCM into safe mode via the context the server consults.
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.INITIAL);
+    try {
+      assertTrue(scm.getScmContext().isInSafeMode());
 
-    HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
-
-    // SCM starts already finalized in tests
-    assertTrue(status.getScmFinalized());
-    // No datanodes registered
-    assertEquals(0, status.getNumDatanodesFinalized());
-    assertEquals(0, status.getNumDatanodesTotal());
-    // shouldFinalize is false because SCM is in safe mode
-    assertFalse(status.getShouldFinalize());
+      // Querying upgrade status is blocked while SCM is in safe mode.
+      SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
+      assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+    } finally {
+      // Restore for other tests sharing the static SCM instance.
+      scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
+    }
   }
 
   private ContainerInfo newContainerWithLastUsedTime(long containerId,

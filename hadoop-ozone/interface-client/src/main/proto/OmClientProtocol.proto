@@ -75,9 +75,9 @@ enum Type {
   DBUpdates = 53;
   FinalizeUpgrade = 54; // [deprecated = true]
   FinalizeUpgradeProgress = 55;
-  Prepare = 56;
-  PrepareStatus = 57;
-  CancelPrepare = 58;
+  Prepare = 56; // Deprecated
+  PrepareStatus = 57; // Deprecated
+  CancelPrepare = 58; // Deprecated
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -223,9 +223,9 @@ message OMRequest {
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54 [deprecated = true];
   optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55 [deprecated = true];
-  optional PrepareRequest                   prepareRequest                 = 56;
-  optional PrepareStatusRequest             prepareStatusRequest           = 57;
-  optional CancelPrepareRequest             cancelPrepareRequest           = 58;
+  optional PrepareRequest                   prepareRequest                 = 56 [deprecated = true];
+  optional PrepareStatusRequest             prepareStatusRequest           = 57 [deprecated = true];
+  optional CancelPrepareRequest             cancelPrepareRequest           = 58 [deprecated = true];
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -374,9 +374,9 @@ message OMResponse {
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
   optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54 [deprecated = true];
   optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55 [deprecated = true];
-  optional PrepareResponse                 prepareResponse                 = 56;
-  optional PrepareStatusResponse           prepareStatusResponse           = 57;
-  optional CancelPrepareResponse           cancelPrepareResponse           = 58;
+  optional PrepareResponse                 prepareResponse                 = 56 [deprecated = true];
+  optional PrepareStatusResponse           prepareStatusResponse           = 57 [deprecated = true];
+  optional CancelPrepareResponse           cancelPrepareResponse           = 58 [deprecated = true];
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -554,12 +554,13 @@ enum Status {
 
     DIRECTORY_NOT_EMPTY = 68;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
-    UPDATE_LAYOUT_VERSION_FAILED = 71;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
-    PREPARE_FAILED = 73;
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69; // [deprecated = true]
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70; // [deprecated = true]
+    UPDATE_LAYOUT_VERSION_FAILED = 71; // [deprecated = true]
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72; // [deprecated = true]
+    PREPARE_FAILED = 73; // [deprecated = true]
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74; // [deprecated = true]
+
     NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
 
     TENANT_NOT_FOUND = 76;
@@ -1190,6 +1191,8 @@ message FileChecksumProto {
 }
 
 message KeyInfo {
+    // When adding a new field, update SnapshotDiffValueParser.computeKeyInfoCompareSignature()
+    // if it is required for snapshot diff comparisons.
     required string volumeName = 1;
     required string bucketName = 2;
     required string keyName = 3;
@@ -1254,6 +1257,8 @@ message BasicKeyInfo {
 }
 
 message DirectoryInfo {
+    // When adding a new field, update SnapshotDiffValueParser.computeDirectoryInfoCompareSignature()
+    // if it is required for snapshot diff comparisons.
     required string name = 1;
     required uint64 creationTime = 2;
     required uint64 modificationTime = 3;
@@ -1653,6 +1658,7 @@ message FinalizeUpgradeResponse {
 }
 
 message StartFinalizeUpgradeRequest {
+    optional bool force = 1 [default = false];
 }
 
 message StartFinalizeUpgradeResponse {
@@ -1662,8 +1668,11 @@ message QueryUpgradeStatusRequest {
 }
 
 message QueryUpgradeStatusResponse {
-    optional bool omFinalized = 1;
+    // True when OM, SCM and all healthy datanodes are finalized
+    optional bool clusterFinalized = 1;
     optional hadoop.hdds.UpgradeStatus hddsStatus = 2;
+    optional bool omFinalized = 3;
+    optional uint32 omApparentVersion = 4;
 }
 
 // deprecated, use QueryUpgradeStatusRequest/Response instead. Retained for wire compatibility.
@@ -1678,23 +1687,38 @@ message FinalizeUpgradeProgressResponse {
     required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareRequest {
-    required PrepareRequestArgs args = 1;
+    required PrepareRequestArgs args = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareRequestArgs {
-    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
-    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300, deprecated = true];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5, deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareResponse {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareStatusRequest {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and server status will always be PREPARE_COMPLETED.
+ */
 message PrepareStatusResponse {
     enum PrepareStatus {
         NOT_PREPARED = 1;
@@ -1702,13 +1726,19 @@ message PrepareStatusResponse {
         PREPARE_COMPLETED = 3;
     }
     required PrepareStatus status = 1;
-    optional uint64 currentTxnIndex = 2;
+    optional uint64 currentTxnIndex = 2 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message CancelPrepareRequest {
 
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message CancelPrepareResponse {
 
 }

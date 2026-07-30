@@ -39,7 +39,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -92,7 +91,6 @@ import org.slf4j.LoggerFactory;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
@@ -258,7 +256,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   /**
    * Closes all the communication channels of the client one-by-one.
    * When a channel is closed, no further requests can be sent via the channel,
-   * and the method waits to finish all ongoing communication.
+   * and any in-flight RPCs are cancelled immediately (shutdownNow semantics).
    */
   @Override
   public void close() {
@@ -267,37 +265,23 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       return;
     }
 
+    // Use shutdownNow() (not the graceful shutdown()) so in-flight RPCs are
+    // cancelled and the channel terminates immediately. close() is frequently
+    // invoked from cache eviction while the XceiverClientManager clientCache
+    // monitor is held (HDDS-15849); a blocking graceful drain there serializes
+    // every concurrent acquireClient()/releaseClient() call.
     for (ChannelInfo channelInfo : dnChannelInfoMap.values()) {
-      channelInfo.getChannel().shutdown();
-    }
-
-    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_WAIT_MAX_SECONDS);
-    long deadline = System.nanoTime() + maxWaitNanos;
-    List<ManagedChannel> nonTerminatedChannels = dnChannelInfoMap.values()
-        .stream()
-        .map(ChannelInfo::getChannel)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
-
-    while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
-      nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
+      ManagedChannel channel = channelInfo.getChannel();
+      channel.shutdownNow();
       try {
-        Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
+        if (!channel.awaitTermination(SHUTDOWN_WAIT_MAX_SECONDS, TimeUnit.SECONDS)) {
+          LOG.warn("Channel {} did not terminate within {}s.", channel, SHUTDOWN_WAIT_MAX_SECONDS);
+        }
       } catch (InterruptedException e) {
-        LOG.error("Interrupted while waiting for channels to terminate", e);
+        LOG.error("Interrupted while waiting for channel termination", e);
         Thread.currentThread().interrupt();
         break;
       }
-    }
-
-    List<DatanodeID> failedChannels = dnChannelInfoMap.entrySet()
-        .stream()
-        .filter(e -> !e.getValue().getChannel().isTerminated())
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toList());
-
-    if (!failedChannels.isEmpty()) {
-      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
 
     dnChannelInfoMap.clear();

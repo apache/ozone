@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Upgrade action for the INITIAL schema version, which manages constraints
  * for the UNHEALTHY_CONTAINERS table.
  */
-@UpgradeActionRecon(feature = INITIAL_VERSION)
+@ReconUpgradeActionForVersion(version = INITIAL_VERSION)
 public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
 

@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -185,5 +188,19 @@ public class TestMultipartUploadComplete {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
+  }
+
+  @Test
+  public void testMultipartEmptyPartListError() throws Exception {
+    // Initiate multipart upload
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+
+    // A CompleteMultipartUpload request with an empty part list must fail.
+    CompleteMultipartUploadRequest request = new CompleteMultipartUploadRequest();
+    rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+
+    assertErrorResponse(MALFORMED_XML,
+        () -> rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key, request));
   }
 }

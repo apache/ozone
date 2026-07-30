@@ -65,6 +65,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -89,6 +91,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -96,6 +99,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -107,6 +112,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -159,6 +165,15 @@ public class TestReplicationManager {
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
+
+    // By default every datanode is known and reports the current version, so
+    // the replication path can resolve an apparent version. Individual tests
+    // override this for specific nodes.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getNode(any(DatanodeID.class)))
+        .thenReturn(defaultNodeInfo);
 
     clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
@@ -1207,7 +1222,7 @@ public class TestReplicationManager {
     // command will be pushed from source to target
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
-    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+    ReplicateContainerCommand command = ContainerTestUtils.getReplicateContainerCommand(
         containerInfo.getContainerID(), target);
     command.setReplicaIndex(1);
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
@@ -1739,4 +1754,85 @@ public class TestReplicationManager {
         });
   }
 
+  /**
+   * Captures the ReplicateContainerCommand SCM sends to a datanode.
+   */
+  private ReplicateContainerCommand captureSentReplicateCommand() {
+    ArgumentCaptor<SCMCommand<?>> command =
+        ArgumentCaptor.forClass(SCMCommand.class);
+    verify(nodeManager).addDatanodeCommand(any(DatanodeID.class),
+        command.capture());
+    return (ReplicateContainerCommand) command.getValue();
+  }
+
+  private DatanodeInfo mockDatanodeWithApparentVersion(
+      DatanodeDetails dn, ComponentVersion version) {
+    DatanodeInfo info = mock(DatanodeInfo.class);
+    when(info.getLastKnownApparentVersion()).thenReturn(version);
+    when(nodeManager.getNode(dn.getID())).thenReturn(info);
+    return info;
+  }
+
+  /**
+   * Regardless of which datanode is newer, and regardless of the command
+   * sending path, the replicate command must carry the lowest apparent version
+   * among the source and target datanodes.
+   */
+  @ParameterizedTest
+  @CsvSource({
+      "true, true",
+      "true, false",
+      "false, true",
+      "false, false",
+  })
+  public void testApparentVersionIsLowestOfSourceAndTarget(
+      boolean throttled, boolean sourceNewer)
+      throws CommandTargetOverloadedException, NotLeaderException,
+      NodeNotFoundException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    ComponentVersion higher = HDDSVersion.ZDU;
+    mockDatanodeWithApparentVersion(source, sourceNewer ? higher : lower);
+    mockDatanodeWithApparentVersion(target, sourceNewer ? lower : higher);
+    when(nodeManager.getLowestApparentVersion(source, target))
+        .thenCallRealMethod();
+
+    if (throttled) {
+      mockReplicationCommandCounts(dn -> 0, dn -> 0);
+      replicationManager.sendThrottledReplicationCommand(containerInfo,
+          Collections.singletonList(source), target, 1);
+    } else {
+      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+          1, source, target, clock.millis() + rmConf.getEventTimeout());
+    }
+
+    assertEquals(lower, captureSentReplicateCommand().getApparentVersion());
+  }
+
+  @Test
+  public void testApparentVersionLookupThrowsWhenNodeNotFound()
+      throws NodeNotFoundException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+
+    mockDatanodeWithApparentVersion(source, HDDSVersion.SOFTWARE_VERSION);
+    // SCM has no information for the target.
+    when(nodeManager.getNode(target.getID())).thenReturn(null);
+    when(nodeManager.getLowestApparentVersion(source, target))
+        .thenCallRealMethod();
+
+    // We must not proceed with a replication command for a node we don't know.
+    assertThrows(IllegalArgumentException.class, () ->
+        replicationManager.sendLowPriorityReplicateContainerCommand(
+            containerInfo, 0, source, target,
+            clock.millis() + rmConf.getEventTimeout()));
+  }
 }

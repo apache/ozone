@@ -21,14 +21,14 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V
 
 import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
-@UpgradeActionDatanode(feature = DATANODE_SCHEMA_V2)
+@DatanodeUpgradeActionForLayoutFeature(feature = DATANODE_SCHEMA_V2)
 public class DatanodeSchemaV2FinalizeAction
     implements DatanodeUpgradeAction {
 

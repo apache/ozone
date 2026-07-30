@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -95,6 +96,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -474,5 +476,16 @@ public final class ContainerTestUtils {
         metadata.getStore().getBlockDataTable().put(blockKey, kd);
       }
     }
+  }
+
+  /**
+   * Creates a replicate container command filled in with the latest apparent
+   * version, so callers that do not exercise mixed-version handling don't need
+   * to specify it.
+   */
+  public static ReplicateContainerCommand getReplicateContainerCommand(
+      long containerID, DatanodeDetails target) {
+    return ReplicateContainerCommand.toTarget(
+        containerID, target, HDDSVersion.SOFTWARE_VERSION);
   }
 }

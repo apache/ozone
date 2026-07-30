@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getRandomPipelineReports;
@@ -41,6 +41,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -77,7 +79,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -101,13 +103,13 @@ import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -190,15 +192,16 @@ public class TestSCMNodeManager {
    * safe Mode.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmHeartbeat()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       int registeredNodes = 5;
+      long hbProcessedBefore =
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME));
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
         DatanodeDetails datanodeDetails = HddsTestUtils
@@ -206,10 +209,10 @@ public class TestSCMNodeManager {
         nodeManager.processHeartbeat(datanodeDetails);
       }
 
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
-          "Heartbeat thread should have picked up the scheduled heartbeats.");
+      // Each heartbeat above is processed synchronously by the node manager.
+      assertEquals(hbProcessedBefore + registeredNodes,
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME)),
+          "All scheduled heartbeats should have been processed.");
     }
   }
 
@@ -264,7 +267,7 @@ public class TestSCMNodeManager {
    * @return The created {@link DatanodeDetails}.
    */
   private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager,
-      LayoutVersionProto layout, ErrorCode expectedResult) {
+      DatanodeVersionProto versionInfo, ErrorCode expectedResult) {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport =
@@ -278,7 +281,7 @@ public class TestSCMNodeManager {
         MockDatanodeDetails.randomDatanodeDetails(),
         HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
             Arrays.asList(metadataStorageReport)),
-        getRandomPipelineReports(), layout);
+        getRandomPipelineReports(), versionInfo);
 
     assertEquals(expectedResult, cmd.getError());
     return cmd.getDatanode();
@@ -340,7 +343,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmHealthyNodeCount()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     final int count = 10;
 
@@ -350,9 +353,8 @@ public class TestSCMNodeManager {
             .createRandomDatanodeAndRegister(nodeManager);
         nodeManager.processHeartbeat(datanodeDetails);
       }
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == count, 100, 4000);
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(count,
@@ -565,13 +567,12 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(node1);
       nodeManager.processHeartbeat(node2);
 
-      // Sleep so that heartbeat processing thread gets to run.
-      Thread.sleep(1000);
+      // Wait for the heartbeat processing thread to mark both nodes healthy.
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 2, 100, 5000);
 
       //Assert all nodes are healthy.
       assertEquals(2, nodeManager.getAllNodes().size());
-      assertEquals(2,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       /**
        * Simulate a JVM Pause and subsequent handling in following steps:
        * Step 1 : stop heartbeat check process for stale node interval
@@ -630,9 +631,9 @@ public class TestSCMNodeManager {
       // Report a pre-finalized datanode.
       int softwareVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
       nodeManager.processVersionReport(node,
-          LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
-              .setSoftwareLayoutVersion(softwareVersion)
+          DatanodeVersionProto.newBuilder()
+              .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+              .setSoftwareVersion(softwareVersion)
               .build());
       assertEquals(0, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
@@ -640,9 +641,9 @@ public class TestSCMNodeManager {
 
       // Report a finalized datanode.
       nodeManager.processVersionReport(node,
-          LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(softwareVersion)
-              .setSoftwareLayoutVersion(softwareVersion)
+          DatanodeVersionProto.newBuilder()
+              .setApparentVersion(softwareVersion)
+              .setSoftwareVersion(softwareVersion)
               .build());
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
@@ -695,7 +696,7 @@ public class TestSCMNodeManager {
           "Finalized registration should increment finalized count");
 
 
-      LayoutVersionProto preFinalizedVersionProto =
+      DatanodeVersionProto preFinalizedVersionProto =
           toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSVersion.SOFTWARE_VERSION);
       DatanodeDetails nonFinalizedNode =
           registerWithCapacity(nodeManager, preFinalizedVersionProto, success);
@@ -715,6 +716,36 @@ public class TestSCMNodeManager {
       nodeManager.removeNode(finalizedNode);
       assertEquals(0, nodeManager.getDatanodeFinalizationCounts().getNumFinalizedDatanodes(),
           "Removing a finalized node should decrement finalized count");
+    }
+  }
+
+  @Test
+  public void testDatanodeFinalizationCountsTracksApparentVersionRange()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      // Two healthy datanodes reporting different apparent versions.
+      registerWithCapacity(nodeManager,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION), success);
+      registerWithCapacity(nodeManager, defaultVersionProto(), success);
+
+      NodeManager.DatanodeFinalizationCounts counts = nodeManager.getDatanodeFinalizationCounts();
+      assertEquals(2, counts.getTotalHealthyDatanodes());
+      assertEquals(HDDSLayoutFeature.INITIAL_VERSION.serialize(), counts.getMinApparentVersion(),
+          "Min apparent version should reflect the least-finalized datanode");
+      assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), counts.getMaxApparentVersion(),
+          "Max apparent version should reflect the most-finalized datanode");
+    }
+  }
+
+  @Test
+  public void testDatanodeFinalizationCountsWithNoHealthyDatanodes()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      NodeManager.DatanodeFinalizationCounts counts = nodeManager.getDatanodeFinalizationCounts();
+      assertEquals(0, counts.getTotalHealthyDatanodes());
+      // The MAX_VALUE sentinel used to find the min must be normalized to 0 when there is nothing to count.
+      assertEquals(0, counts.getMinApparentVersion());
+      assertEquals(0, counts.getMaxApparentVersion());
     }
   }
 
@@ -744,9 +775,16 @@ public class TestSCMNodeManager {
             errorNodeNotPermitted, false),
         // Newer DN rejected, even though its apparent version matches SCM.
         Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            errorNodeNotPermitted, false),
+        // DN that does not report any version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION, null, errorNodeNotPermitted, false),
+        // DN that reports an incomplete version is rejected.
+        Arguments.of(HDDSLayoutFeature.INITIAL_VERSION,
+            DatanodeVersionProto.newBuilder()
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build(),
             errorNodeNotPermitted, false),
 
         /* SCM FINALIZED */
@@ -765,16 +803,16 @@ public class TestSCMNodeManager {
             success, false),
         // Newer DN rejected, even though its apparent version matches SCM.
         Arguments.of(HDDSVersion.SOFTWARE_VERSION,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
-                .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
+            DatanodeVersionProto.newBuilder()
+                .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+                .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1).build(),
             errorNodeNotPermitted, false)
     );
   }
 
   @ParameterizedTest
   @MethodSource("scmDatanodeVersionCombinations")
-  public void testDatanodeFencingOnRegister(ComponentVersion scmApparent, LayoutVersionProto dnVersionProto,
+  public void testDatanodeFencingOnRegister(ComponentVersion scmApparent, DatanodeVersionProto dnVersionProto,
       ErrorCode expectedResult, boolean expectFinalizeCmd) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
@@ -799,7 +837,7 @@ public class TestSCMNodeManager {
         if (expectFinalizeCmd) {
           verify(eventPublisher, times(1)).fireEvent(eq(DATANODE_COMMAND), captor.capture());
           assertEquals(node.getID(), captor.getValue().getDatanodeId());
-          assertEquals(finalizeNewLayoutVersionCommand, captor.getValue().getCommand().getType());
+          assertEquals(finalizeNewDatanodeVersionCommand, captor.getValue().getCommand().getType());
         } else {
           verify(eventPublisher, times(0)).fireEvent(eq(DATANODE_COMMAND), captor.capture());
         }
@@ -905,7 +943,7 @@ public class TestSCMNodeManager {
     DatanodeDetails node1 = MockDatanodeDetails.randomDatanodeDetails();
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         node1.getID(), node1.getNetworkFullPath(), Long.MAX_VALUE);
-    LayoutVersionProto preFinalizedDNVersion =
+    DatanodeVersionProto preFinalizedDNVersion =
         toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSVersion.SOFTWARE_VERSION);
     nodeManager.register(node1,
         HddsTestUtils.createNodeReport(Collections.singletonList(storageReport), emptyList()),
@@ -938,8 +976,8 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
-          .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
+      nodeManager.addDatanodeCommand(node1.getID(), ContainerTestUtils
+          .getReplicateContainerCommand(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
       nodeManager.addDatanodeCommand(node1.getID(),
@@ -1762,7 +1800,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWith4LayerNetworkTopology()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1789,9 +1827,9 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -1804,7 +1842,7 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1832,10 +1870,9 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -1997,7 +2034,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWithUpdatedIpAndHostname()
-          throws IOException, InterruptedException, AuthenticationException {
+          throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
             MILLISECONDS);
@@ -2021,10 +2058,9 @@ public class TestSCMNodeManager {
       nodeManager.register(node, null, null);
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(2 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(1,
-              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();

@@ -99,6 +99,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       // Clear the finalization_in_progress key from the cache
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex()));
+      ozoneManager.getMetrics().setFinalizationInProgress(false);
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

@@ -527,10 +527,17 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     DatanodeDetails source = selectAndOptionallyExcludeDatanode(
         1, sourceWithCmds);
 
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
-    cmd.setReplicaIndex(replicaIndex);
-    sendDatanodeCommand(cmd, containerInfo, source);
+    try {
+      ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
+          containerID, target,
+          nodeManager.getLowestApparentVersion(source, target));
+      cmd.setReplicaIndex(replicaIndex);
+      sendDatanodeCommand(cmd, containerInfo, source);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
+          + "command for container " + containerID + " from source " + source + " to target " + target
+          + ". Should not happen", e);
+    }
   }
 
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
@@ -627,11 +634,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
-    final ReplicateContainerCommand command = ReplicateContainerCommand
-        .toTarget(container.getContainerID(), target);
-    command.setReplicaIndex(replicaIndex);
-    command.setPriority(ReplicationCommandPriority.LOW);
-    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
+    try {
+      final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+          container.getContainerID(), target,
+          nodeManager.getLowestApparentVersion(source, target));
+      command.setReplicaIndex(replicaIndex);
+      command.setPriority(ReplicationCommandPriority.LOW);
+      sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
+          + "command for container " + container.getContainerID() + " from source " + source
+          + " to target " + target + ". Should not happen", e);
+    }
   }
 
   /**

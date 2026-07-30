@@ -21,6 +21,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -55,7 +56,8 @@ public class CompactOMDB extends RepairTool {
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM for which db needs to be compacted.",
+      description = "NodeID of the OM for which db needs to be compacted. "
+          + "Required when OM HA is configured.",
       required = false
   )
   private String nodeId;
@@ -71,6 +73,13 @@ public class CompactOMDB extends RepairTool {
   public void execute() throws Exception {
 
     OzoneConfiguration conf = getOzoneConf();
+
+    if (nodeId == null && OmUtils.isServiceIdsDefined(conf)) {
+      error("This is an HA OM cluster; specify --node-id to select which OM's"
+          + " db to compact.");
+      return;
+    }
+
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
 
