@@ -233,7 +233,7 @@ public class DefaultProfile implements PKIProfile {
         return false;
       }
     case GeneralName.dNSName:
-      return DomainValidator.getInstance().isValid(value);
+      return DomainValidator.getInstance(true).isValid(value);
     case GeneralName.otherName:
       // for other name it's a general string, nothing to validate
       return true;

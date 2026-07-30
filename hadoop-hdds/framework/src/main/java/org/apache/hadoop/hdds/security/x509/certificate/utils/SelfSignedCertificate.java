@@ -219,7 +219,7 @@ public final class SelfSignedCertificate {
 
     public Builder addInetAddresses() throws CertificateException {
       try {
-        DomainValidator validator = DomainValidator.getInstance();
+        DomainValidator validator = DomainValidator.getInstance(true);
         // Add all valid ips.
         List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
         this.addInetAddresses(inetAddresses, validator);
