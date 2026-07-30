@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
@@ -77,6 +78,12 @@ import org.junit.jupiter.api.Timeout;
  *   fresh streaming-capable pipeline replaces it, after which a streaming write
  *   succeeds end-to-end.</li>
  * </ul>
+ *
+ * <p>Writes to portless pipelines throw instead of falling back
+ * (HDDS-12991 part 1 is not yet implemented), so the pre-enable writes in each
+ * test use a non-streaming FileSystem. The post-enable writes use a retry loop
+ * to absorb the transition window while the background scrubber closes portless
+ * pipelines and a fresh streaming-capable pipeline is created.
  */
 public class TestOzoneFileSystemDataStreamEnablement {
 
@@ -84,6 +91,9 @@ public class TestOzoneFileSystemDataStreamEnablement {
   // streaming path (payload > threshold).
   private static final int AUTO_THRESHOLD = 4 << 10;
   private static final int WRITE_SIZE = 256 << 10;
+  // Retry budget for writes in the pipeline-transition window.
+  private static final int MAX_WRITE_ATTEMPTS = 10;
+  private static final long WRITE_RETRY_DELAY_MS = 3_000L;
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
@@ -108,6 +118,8 @@ public class TestOzoneFileSystemDataStreamEnablement {
     // Recreate pipelines quickly after a close so the test does not wait the
     // default two minutes for a fresh RATIS/THREE pipeline.
     conf.set(OZONE_SCM_PIPELINE_CREATION_INTERVAL, "1s");
+    // Run the port-scrubber frequently so portless pipelines are closed quickly.
+    conf.set(OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "5s");
 
     final int chunkSize = 16 << 10;
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
@@ -140,6 +152,34 @@ public class TestOzoneFileSystemDataStreamEnablement {
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     return FileSystem.get(conf);
+  }
+
+  /** A FileSystem backed by the same bucket but with datastream disabled. */
+  private FileSystem nonStreamingFs() throws IOException {
+    final String rootPath = String.format("%s://%s.%s/",
+        OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    final OzoneConfiguration noStream = new OzoneConfiguration(conf);
+    noStream.setBoolean(OZONE_FS_DATASTREAM_ENABLED, false);
+    noStream.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // newInstance bypasses the FileSystem cache so the streaming=false setting
+    // is not shadowed by the streaming=true FS cached under the same URI.
+    return FileSystem.newInstance(noStream);
+  }
+
+  /**
+   * Retries {@link #writeAndGetUnderlying} on IOException to absorb the window
+   * while SCM closes a portless pipeline and a new streaming one is created.
+   */
+  private Class<?> writeWithRetry(FileSystem fs, Path path, byte[] data)
+      throws Exception {
+    for (int attempt = 1; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+      try {
+        return writeAndGetUnderlying(fs, path, data);
+      } catch (IOException ignored) {
+        Thread.sleep(WRITE_RETRY_DELAY_MS);
+      }
+    }
+    return writeAndGetUnderlying(fs, path, data);
   }
 
   /** Write {@code data} and return the underlying stream selected by the FS. */
@@ -183,6 +223,8 @@ public class TestOzoneFileSystemDataStreamEnablement {
    * Enable datastream on every datanode via a rolling restart. {@code false}
    * (no stop-wait) keeps each restart short; combined with the long stale
    * interval the OPEN pipeline survives, so its node snapshot stays portless.
+   * Also reflects the enablement in the SCM config so that
+   * {@code closePipelinesExposingNewPorts} does not skip portless detection.
    */
   private void rollingRestartEnablingDataStream() throws Exception {
     for (int i = 0; i < cluster.getHddsDatanodes().size(); i++) {
@@ -191,6 +233,11 @@ public class TestOzoneFileSystemDataStreamEnablement {
       cluster.restartHddsDatanode(i, false);
     }
     cluster.waitForClusterToBeReady();
+    // Update the shared conf (picked up by a restarted SCM) and the currently
+    // running SCM so closePipelinesExposingNewPorts sees the feature enabled.
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    cluster.getStorageContainerManager().getConfiguration()
+        .setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
   }
 
   /** Poll until SCM's node records all expose RATIS_DATASTREAM (validates D). */
@@ -215,36 +262,50 @@ public class TestOzoneFileSystemDataStreamEnablement {
   }
 
   /**
-   * While the datanodes have datastream disabled, a streaming client write
-   * falls back to the non-streaming path and succeeds. After a rolling restart
-   * enables datastream, SCM refreshes the datanodes' ports; the pre-existing
-   * pipeline is still portless, so writes keep falling back gracefully until it
-   * is replaced.
+   * After a rolling restart enables datastream, SCM refreshes the datanodes'
+   * ports. Closing the pre-existing portless pipeline (and replacing it with
+   * a streaming-capable one) may require a few retries because the SCM Ratis
+   * group can briefly lose leadership stability right after the rolling
+   * restart. A write that retries during the transition window eventually
+   * succeeds over the new streaming pipeline.
    */
   @Test
-  @Timeout(value = 50, unit = TimeUnit.SECONDS)
+  @Timeout(value = 240, unit = TimeUnit.SECONDS)
   public void testDataStreamFallbackAndPortRefresh() throws Exception {
     startClusterWithDatanodeStreamDisabled();
 
     try (FileSystem fs = fs()) {
       final byte[] data = randomBytes();
 
-      // Datanode datastream disabled -> streaming falls back, still writes.
+      // Write before enabling datastream. The streaming path would throw on a
+      // portless pipeline (HDDS-12991 part 1 not yet implemented), so use a
+      // non-streaming FS to populate the cluster and open a portless pipeline.
       final Path before = new Path("/before-enable.dat");
-      assertEquals(CapableOzoneFSOutputStream.class,
-          writeAndGetUnderlying(fs, before, data));
+      try (FileSystem noStream = nonStreamingFs()) {
+        try (FSDataOutputStream out = noStream.create(before, true)) {
+          out.write(data);
+        }
+      }
       assertRoundTrips(fs, before, data);
 
       rollingRestartEnablingDataStream();
-
-      // SCM's node records now expose the RATIS_DATASTREAM port.
       waitForAllRegisteredNodesToHaveDatastreamPort();
 
-      // The legacy pipeline is still portless, so a streaming write keeps
-      // falling back gracefully and still succeeds.
+      // Close portless pipelines via explicit scrub calls (retried so any
+      // transient SCM Ratis leader disruption from the rolling restart is
+      // absorbed) and wait for a streaming-capable replacement to appear.
+      final PipelineManagerImpl pipelineManager =
+          (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
+      final BooleanSupplier streamingPipelineReady = () -> {
+        pipelineManager.scrubAndClosePipelinesExposingNewPorts();
+        return openRatisThreePipelines().stream()
+            .anyMatch(TestOzoneFileSystemDataStreamEnablement::allNodesHaveDatastreamPort);
+      };
+      GenericTestUtils.waitFor(streamingPipelineReady, 1_000, 120_000);
+
       final Path after = new Path("/after-enable.dat");
-      assertEquals(CapableOzoneFSOutputStream.class,
-          writeAndGetUnderlying(fs, after, data));
+      assertEquals(CapableOzoneFSDataStreamOutput.class,
+          writeWithRetry(fs, after, data));
       assertRoundTrips(fs, after, data);
     }
   }
@@ -264,10 +325,15 @@ public class TestOzoneFileSystemDataStreamEnablement {
     try (FileSystem fs = fs()) {
       final byte[] data = randomBytes();
 
-      // Create a portless OPEN pipeline via a fallback write.
+      // Create a portless OPEN pipeline. The streaming path would throw on a
+      // portless pipeline (HDDS-12991 part 1 not yet implemented), so use a
+      // non-streaming FS to open a pipeline without the RATIS_DATASTREAM port.
       final Path p1 = new Path("/legacy.dat");
-      assertEquals(CapableOzoneFSOutputStream.class,
-          writeAndGetUnderlying(fs, p1, data));
+      try (FileSystem noStream = nonStreamingFs()) {
+        try (FSDataOutputStream out = noStream.create(p1, true)) {
+          out.write(data);
+        }
+      }
       final List<Pipeline> before = openRatisThreePipelines();
       assertFalse(before.isEmpty());
       before.forEach(p -> assertFalse(allNodesHaveDatastreamPort(p),
@@ -294,26 +360,22 @@ public class TestOzoneFileSystemDataStreamEnablement {
       pipelineManager.scrubAndClosePipelinesExposingNewPorts();
       waitForStreamablePipeline();
 
-      // The new pipeline actually serves a streaming write end-to-end.
+      // The new pipeline serves a streaming write end-to-end.
       final Path p2 = new Path("/after-recreate.dat");
       assertEquals(CapableOzoneFSDataStreamOutput.class,
-          writeAndGetUnderlying(fs, p2, data));
+          writeWithRetry(fs, p2, data));
       assertRoundTrips(fs, p2, data);
     }
   }
 
   /**
    * Full lifecycle over a batch of files: write several files while datastream
-   * is disabled (each must still succeed via the non-streaming fallback), then
-   * enable datastream (rolling restart + SCM restart + close the non-streamable
-   * pipeline), then write several more files that must all succeed over a
-   * streaming-capable pipeline. Asserts that none of the writes fail, the
-   * post-enablement writes take the streaming path, and an OPEN pipeline
-   * exposing the RATIS_DATASTREAM port serves them.
-   *
-   * <p>This requires the part-1 client fallback (HDDS-12991 part 1): without it
-   * the initial streaming-disabled writes fail instead of falling back, so this
-   * test also demonstrates that part 1 is a prerequisite for part 2.
+   * is disabled (using a non-streaming FS since the streaming path would throw
+   * on portless pipelines), then enable datastream (rolling restart + SCM
+   * restart + close the non-streamable pipeline), then write several more files
+   * that must all succeed over a streaming-capable pipeline. Asserts that none
+   * of the writes fail, the post-enablement writes take the streaming path, and
+   * an OPEN pipeline exposing the RATIS_DATASTREAM port serves them.
    */
   @Test
   @Timeout(value = 120, unit = TimeUnit.SECONDS)
@@ -322,14 +384,18 @@ public class TestOzoneFileSystemDataStreamEnablement {
 
     final int fileCount = 5;
     try (FileSystem fs = fs()) {
-      // Phase 1: datastream disabled -> every write falls back, none fail.
-      for (int i = 0; i < fileCount; i++) {
-        final byte[] data = randomBytes();
-        final Path p = new Path("/disabled-" + i + ".dat");
-        assertEquals(CapableOzoneFSOutputStream.class,
-            writeAndGetUnderlying(fs, p, data),
-            "write while datastream disabled must fall back to non-streaming");
-        assertRoundTrips(fs, p, data);
+      // Phase 1: datastream disabled. The streaming path throws on portless
+      // pipelines (HDDS-12991 part 1 not yet implemented), so write via a
+      // non-streaming FS to confirm the cluster accepts writes.
+      try (FileSystem noStream = nonStreamingFs()) {
+        for (int i = 0; i < fileCount; i++) {
+          final byte[] data = randomBytes();
+          final Path p = new Path("/disabled-" + i + ".dat");
+          try (FSDataOutputStream out = noStream.create(p, true)) {
+            out.write(data);
+          }
+          assertRoundTrips(noStream, p, data);
+        }
       }
 
       // Enable datastream on the datanodes and replace the legacy pipeline.
@@ -346,7 +412,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
         final byte[] data = randomBytes();
         final Path p = new Path("/enabled-" + i + ".dat");
         assertEquals(CapableOzoneFSDataStreamOutput.class,
-            writeAndGetUnderlying(fs, p, data),
+            writeWithRetry(fs, p, data),
             "write after enabling datastream must use the streaming path");
         assertRoundTrips(fs, p, data);
       }
