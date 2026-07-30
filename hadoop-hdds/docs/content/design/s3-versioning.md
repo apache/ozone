@@ -97,10 +97,12 @@ A new column family, **versionedKeyTable**, splits responsibilities with keyTabl
   noncurrent delete markers), each as a complete `OmKeyInfo`. The RocksDB key is
 
   ```
-  /{volume}/{bucket}/{keyName}/{Long.MAX_VALUE - versionId}
+  /{volume}/{bucket}/{keyName}\x00{Long.MAX_VALUE - versionId}
   ```
 
-  (fixed-width hex suffix), so all versions of a key are physically adjacent and
+  (fixed-width hex suffix; the separator is `0x00` rather than `/` because OBS key
+  names contain `/` verbatim, which would interleave a key's versions with those of
+  keys nested under it), so all versions of a key are physically adjacent and
   ordered newest to oldest: `ListObjectVersions` and version promotion are a
   single seek plus a sequential read. The table is registered in
   `OmMetadataManagerImpl.getTableBucketPrefix` alongside the other key tables, so
@@ -129,7 +131,7 @@ a deployment can plug in its own. The generator is cluster-wide and may be chang
 on a running cluster; it is not recorded in bucket metadata. Every generator must
 satisfy, **for itself**: strictly increasing within a key (a later version's id is
 always greater than every earlier version's id of that key); frozen once assigned;
-`0` reserved for the null slot and `1` for the first-version sentinel.
+`0` and `1` never handed out (`1` is the first-version sentinel).
 
 That guarantee binds one generator, not a sequence of them, so the write path
 enforces it at commit: a commit whose id does not come after the key's current
@@ -160,25 +162,31 @@ How a versionId is rendered on the wire — the opaque encoding, and whether the
 pinned first version is presented as a fixed literal or derived from the keyName —
 is part of the `?versionId=` read path (T4), not of generation.
 
-The null version is not a special ID value but the `isNullVersion` attribute;
+The null version is not a special ID value but the `isNullVersion` attribute — it
+carries a normally generated id like any other version, since a null created
+between two versioned writes is not the oldest one;
 `versionId=null` requests resolve to "locate this key's null slot".
 
 ## Request handling
 
 - **PUT (Enabled)**, atomic in one WriteBatch: move the current version (if any)
-  into versionedKeyTable; write the new record into keyTable as current; if
-  `maxVersions` is exceeded, trim the oldest noncurrent version in the same batch
-  (its blocks go to deletedTable).
-- **PUT (Suspended)**: locate the null slot (current, or an `isNullVersion`
-  record in versionedKeyTable) and replace it; versions accumulated while Enabled
-  are unaffected. **PUT (Unversioned)**: unchanged from today.
+  into versionedKeyTable; write the new record into keyTable as current.
+- **PUT (Suspended)**: the new record takes the null slot and becomes the current
+  version — if the null slot is already the current version, overwrite it in place;
+  otherwise move the current version into versionedKeyTable, write the new record
+  into keyTable as current, and delete the old null record (if any) from
+  versionedKeyTable, blocks to deletedTable in both cases. Versions accumulated
+  while Enabled are unaffected. **PUT (Unversioned)**: unchanged from today.
 - **GET/HEAD**: without versionId, read keyTable; a current delete marker returns
   404 with `x-amz-delete-marker: true`. With versionId, check the current version
-  first, then point-look-up versionedKeyTable.
+  first, then point-look-up versionedKeyTable; if the addressed version is a delete
+  marker, current or not, the gateway returns 405 with `x-amz-delete-marker: true`
+  and `Allow: DELETE`.
 - **DELETE without versionId (Enabled)**: move current into versionedKeyTable and
-  write a delete marker as the new current. (Suspended: the marker overwrites the
-  null slot.) **DELETE ?versionId=x**: permanently delete that version (blocks to
-  deletedTable); if it was current, trigger version promotion.
+  write a delete marker as the new current. (Suspended: the marker takes the null
+  slot exactly as a suspended PUT does.) **DELETE ?versionId=x**: permanently
+  delete that version (blocks to deletedTable); if it was current, trigger version
+  promotion.
 - **Version promotion** — the invariant is that keyTable always holds a key's
   current version. When a permanent delete removes the current version, one
   `seek` on the key's versionedKeyTable prefix yields the newest noncurrent
@@ -195,12 +203,15 @@ The null version is not a special ID value but the `isNullVersion` attribute;
 
 ## Reclamation, quota, observability
 
-Built-in bucket-level controls: `maxVersions` (default 100, 0 = unlimited;
-synchronous trim inside the write transaction; markers count toward the limit),
-`noncurrentVersionExpiration` (opt-in, enforced by a new
-**VersionCleanupService** following the `KeyDeletingService` pattern), and
+Built-in bucket-level controls: `maxVersions` (default 100, 0 = unlimited; markers
+count toward the limit), `noncurrentVersionExpiration` (opt-in), and
 expired-delete-marker cleanup (enabled by default: when only a marker remains,
-the whole key is removed). All versions count against the bucket space quota;
+the whole key is removed) — all enforced by a new **VersionCleanupService**
+following the `KeyDeletingService` pattern. A per-bucket `maxVersionsPolicy`
+selects between `TRIM` (default: reclaim oldest-first, asynchronously rather than
+inside the write transaction) and `REJECT` (the write fails instead and the
+operator chooses what to delete; opt-in, since S3 has no error code for the
+condition). All versions count against the bucket space quota;
 version count, marker count, and noncurrent bytes are exposed via
 `ozone sh bucket info` and Recon. `maxVersions` is documented as an Ozone
 extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
@@ -233,7 +244,7 @@ comparison either way: `prepareFileInfo` keeps it stable across a key's versions
 so it matches while the block lists do not.
 
 The fix is to make that lookup version-aware. A record carrying a `versionId`
-resolves to the exact dbKey `/{volume}/{bucket}/{keyName}/{MAX - versionId}` in
+resolves to the exact dbKey `/{volume}/{bucket}/{keyName}\x00{MAX - versionId}` in
 the previous snapshot's versionedKeyTable, falling back to keyTable when that
 version was current there. Because versionId is frozen at creation and never
 reused, this is an exact point lookup that *replaces* — rather than extends — the
@@ -242,10 +253,10 @@ objectID-plus-block-list heuristic for versioned buckets. The same lookup feeds
 noncurrent versions.
 
 This makes deletedTable the single choke point for version reclamation: every
-path that removes a version permanently — `DELETE ?versionId=`, the `maxVersions`
-trim, and VersionCleanupService — writes the record to deletedTable and lets
-KeyDeletingService apply the snapshot-aware filter. None of them may reclaim
-blocks directly.
+path that removes a version permanently — `DELETE ?versionId=`, the suspended
+null-slot overwrite, and VersionCleanupService — writes the record to deletedTable
+and lets KeyDeletingService apply the snapshot-aware filter. None of them may
+reclaim blocks directly.
 
 Snapshot diff remains a **current-version diff**; versionedKeyTable is
 deliberately not added to it. keyTable still holds exactly one record per key, so
@@ -331,7 +342,9 @@ interaction is covered above. Buckets without versioning behave exactly as today
 # Plan
 
 Implemented as one umbrella Jira with ten tasks (33 sub-tasks, each roughly one
-PR), in dependency order `T1 → T2 → T3 → T4 → T5 → (T6 ∥ T7) → (T8 ∥ T9) → T10`:
+PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → (T7 ∥ T8) → T9 → T10`
+(reclamation lands before the S3 endpoints, so versioning is never exposed without
+a way to reclaim versions):
 
 | Task | Scope |
 |---|---|
@@ -340,9 +353,9 @@ PR), in dependency order `T1 → T2 → T3 → T4 → T5 → (T6 ∥ T7) → (T8
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads (including through `OmSnapshot`), permanent delete with the version-aware reclamation lookup, version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
-| T6 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
-| T7 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
-| T8 Reclamation | `maxVersions` trim, VersionCleanupService, expired marker cleanup |
+| T6 Reclamation | VersionCleanupService, `maxVersions` with the `TRIM` / `REJECT` policy, expired marker cleanup |
+| T7 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
+| T8 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
 | T9 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
 | T10 Wrap-up | upgrade validation, snapshot delete-marker diff rule and exclusive-size accounting, robot tests, benchmarks, docs |
 
