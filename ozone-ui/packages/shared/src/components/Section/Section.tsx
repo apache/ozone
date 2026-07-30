@@ -37,7 +37,13 @@ export interface SectionProps {
  * right-aligned actions) followed by its content. Matches the "section-header"
  * pattern that groups the cards and tables on the Ozone detail screens.
  */
-export const Section: React.FC<SectionProps> = ({ title, description, actions, children, style }) => (
+export const Section: React.FC<SectionProps> = ({
+  title,
+  description,
+  actions,
+  children,
+  style,
+}) => (
   <section style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, ...style }}>
     <div
       style={{

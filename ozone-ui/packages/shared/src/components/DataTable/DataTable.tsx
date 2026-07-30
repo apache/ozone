@@ -75,8 +75,15 @@ export function DataTable<T extends object>({
     rowExpandable ? (
       <span
         role="button"
+        tabIndex={0}
         aria-label={expanded ? 'Collapse row' : 'Expand row'}
         onClick={(e) => onExpand(record, e)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onExpand(record, e as unknown as React.MouseEvent<HTMLElement>);
+          }
+        }}
         style={{ display: 'inline-flex', cursor: 'pointer', color: semanticColors.textSecondary }}
       >
         <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={16} />
@@ -85,11 +92,9 @@ export function DataTable<T extends object>({
       <span style={{ display: 'inline-block', width: 16 }} />
     );
 
-  const mergedExpandable = expandable
-    ? { expandIcon: themedExpandIcon, ...expandable }
-    : undefined;
+  const mergedExpandable = expandable ? { expandIcon: themedExpandIcon, ...expandable } : undefined;
 
-  const rows = dataSource ?? [];
+  const rows = useMemo(() => dataSource ?? [], [dataSource]);
   const total = rows.length;
 
   // Return to the first page whenever the row set changes (e.g. search/filter),
@@ -151,7 +156,9 @@ export function DataTable<T extends object>({
                 gap: spacing.lg,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}
+              >
                 {filters}
               </div>
               {actions && (
@@ -164,12 +171,7 @@ export function DataTable<T extends object>({
         </div>
       )}
 
-      <Table<T>
-        dataSource={pageRows}
-        pagination={false}
-        expandable={mergedExpandable}
-        {...rest}
-      />
+      <Table<T> dataSource={pageRows} pagination={false} expandable={mergedExpandable} {...rest} />
 
       {paginated && (
         <div style={{ borderTop: `1px solid ${semanticColors.border}` }}>

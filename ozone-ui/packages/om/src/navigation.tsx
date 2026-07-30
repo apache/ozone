@@ -46,14 +46,24 @@ const navItem = (key: string, label: string, path: string, icon: MenuItem['icon'
  */
 export const navItems: MenuItem[] = [
   navItem('overview', 'Overview', '/', <DashboardOutlined style={iconStyle} />),
-  navItem('configuration', 'Configuration', '/configuration', <ControlOutlined style={iconStyle} />),
+  navItem(
+    'configuration',
+    'Configuration',
+    '/configuration',
+    <ControlOutlined style={iconStyle} />
+  ),
   {
     type: 'group',
     key: 'group-diagnostics',
     label: 'Diagnostics',
     children: [
       navItem('rpc', 'Remote Procedure Call', '/rpc', <ApiOutlined style={iconStyle} />),
-      navItem('ozone-manager', 'Ozone Manager', '/ozone-manager', <ClusterOutlined style={iconStyle} />),
+      navItem(
+        'ozone-manager',
+        'Ozone Manager',
+        '/ozone-manager',
+        <ClusterOutlined style={iconStyle} />
+      ),
       navItem('jmx', 'JMX', '/jmx-info', <BarChartOutlined style={iconStyle} />),
       navItem('stacks', 'Stacks', '/stacks', <BlockOutlined style={iconStyle} />),
     ],
@@ -63,7 +73,12 @@ export const navItems: MenuItem[] = [
     key: 'group-links',
     label: 'Links',
     children: [
-      navItem('documentation', 'Documentation', '/documentation', <BookOutlined style={iconStyle} />),
+      navItem(
+        'documentation',
+        'Documentation',
+        '/documentation',
+        <BookOutlined style={iconStyle} />
+      ),
       navItem('log-levels', 'Log levels', '/log-levels', <HistoryOutlined style={iconStyle} />),
     ],
   },

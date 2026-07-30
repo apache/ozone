@@ -97,9 +97,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
         />
       </div>
 
-      <Typography.Text style={labelStyle}>
-        {`Showing ${from}-${to} of ${total}`}
-      </Typography.Text>
+      <Typography.Text style={labelStyle}>{`Showing ${from}-${to} of ${total}`}</Typography.Text>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
         <IconButton

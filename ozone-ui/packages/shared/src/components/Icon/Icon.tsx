@@ -207,9 +207,7 @@ const paths: Record<IconName, React.ReactNode> = {
       strokeLinejoin="round"
     />
   ),
-  grid: (
-    <path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" />
-  ),
+  grid: <path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" />,
   help: (
     <path
       d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-1.8-11.2a1.8 1.8 0 1 1 2.8 1.5c-.7.5-1 .9-1 1.7M12 17h.01"

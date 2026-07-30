@@ -53,10 +53,7 @@ const utilityBar = (
 
 function App() {
   return (
-    <AppLayout
-      utilityBar={utilityBar}
-      sider={<Sidebar items={navItems} width={SIDEBAR_WIDTH} />}
-    >
+    <AppLayout utilityBar={utilityBar} sider={<Sidebar items={navItems} width={SIDEBAR_WIDTH} />}>
       <Routes>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/configuration" element={<Placeholder title="Configuration" />} />

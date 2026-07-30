@@ -44,8 +44,7 @@ const runtime = {
   VmName: 'OpenJDK 64-Bit Server VM',
   VmVendor: 'AdoptOpenJDK',
   VmVersion: '25.232-b09',
-  LibraryPath:
-    ':/opt/ozone/current/lib/hadoop-ozone/share/ozone/lib',
+  LibraryPath: ':/opt/ozone/current/lib/hadoop-ozone/share/ozone/lib',
   Uptime: 78876304,
   ManagementSpecVersion: '1.2',
   SpecName: 'Java Virtual Machine Specification',

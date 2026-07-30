@@ -25,6 +25,7 @@
  * server, which proxies /jmx to it).
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const jsonServer = require('json-server');
 const jmxData = require('./jmxData.cjs');
 
@@ -41,6 +42,5 @@ server.get('/jmx', (req, res) => {
 });
 
 server.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`OM JMX mock listening on http://localhost:${PORT}/jmx?qry=...`);
 });

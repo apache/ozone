@@ -31,10 +31,11 @@ const gridStyle: React.CSSProperties = {
 
 /** "Metadata Volume Information" card. Sourced from the OM ServerRuntime bean. */
 export const MetadataVolumeSection: React.FC<SectionProps> = ({ refreshToken }) => {
-  const { data: omInfo, loading, error } = useJmxBean<OzoneManagerInfoBean>(
-    JMX_QUERY.omInfo,
-    refreshToken
-  );
+  const {
+    data: omInfo,
+    loading,
+    error,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
 
   return (
     <Section title="Metadata Volume Information">

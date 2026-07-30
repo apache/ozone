@@ -51,11 +51,7 @@ const monospace: React.CSSProperties = {
 };
 
 const escapeXml = (s: string) =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Render parameter rows as a Hadoop-style XML configuration snippet. */
 const buildConfigXml = (params: JvmParameter[]): string => {
@@ -106,10 +102,11 @@ const columns: TableColumnsType<JvmParameter> = [
  * fetched lazily only when this section renders.
  */
 export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
-  const { data: runtime, loading, error } = useJmxBean<RuntimeBean>(
-    JMX_QUERY.runtime,
-    refreshToken
-  );
+  const {
+    data: runtime,
+    loading,
+    error,
+  } = useJmxBean<RuntimeBean>(JMX_QUERY.runtime, refreshToken);
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<'All' | JvmParameterCategory>('All');
@@ -119,7 +116,9 @@ export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
   const highlights = useMemo(() => (runtime ? buildJvmHighlights(runtime) : []), [runtime]);
 
   const allRows = useMemo<JvmParameter[]>(() => {
-    if (!runtime) return [];
+    if (!runtime) {
+      return [];
+    }
     const args = parseJvmArguments(runtime.InputArguments);
     return showModules ? [...args, ...toSystemPropertyRows(runtime.SystemProperties)] : args;
   }, [runtime, showModules]);
@@ -127,8 +126,12 @@ export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return allRows.filter((row) => {
-      if (category !== 'All' && row.category !== category) return false;
-      if (!needle) return true;
+      if (category !== 'All' && row.category !== category) {
+        return false;
+      }
+      if (!needle) {
+        return true;
+      }
       return (
         row.parameter.toLowerCase().includes(needle) || row.value.toLowerCase().includes(needle)
       );
@@ -156,7 +159,9 @@ export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
     const chosen = selectedRowKeys.length
       ? allRows.filter((r) => selectedRowKeys.includes(r.key))
       : rows;
-    if (!chosen.length) return;
+    if (!chosen.length) {
+      return;
+    }
     await navigator.clipboard.writeText(buildConfigXml(chosen));
     message.success(
       `Copied ${chosen.length} ${chosen.length === 1 ? 'parameter' : 'parameters'} as XML`

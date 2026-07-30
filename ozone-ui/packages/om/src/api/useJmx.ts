@@ -39,10 +39,14 @@ export function useJmxBean<T>(qry: string, refreshToken = 0): JmxBeanState<T> {
     setState({ loading: true });
     fetchJmxBean<T>(qry)
       .then((data) => {
-        if (active) setState({ data, loading: false });
+        if (active) {
+          setState({ data, loading: false });
+        }
       })
       .catch((error: Error) => {
-        if (active) setState({ loading: false, error });
+        if (active) {
+          setState({ loading: false, error });
+        }
       });
     return () => {
       active = false;

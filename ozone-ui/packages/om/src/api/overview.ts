@@ -132,7 +132,9 @@ export function parseRatisRoles(raw: string, currentNodeId?: string): RatisRole[
       .split('|')
       .forEach((part) => {
         const sep = part.indexOf(':');
-        if (sep === -1) return;
+        if (sep === -1) {
+          return;
+        }
         fields[part.slice(0, sep).trim()] = part.slice(sep + 1).trim();
       });
     const role = (fields.Role ?? '').toUpperCase();
@@ -166,8 +168,12 @@ function splitArgument(arg: string): { parameter: string; value: string } {
   }
   if (arg.startsWith('-XX:')) {
     const body = arg.slice(4);
-    if (body.startsWith('+')) return { parameter: arg, value: 'Enabled' };
-    if (body.startsWith('-')) return { parameter: arg, value: 'Disabled' };
+    if (body.startsWith('+')) {
+      return { parameter: arg, value: 'Enabled' };
+    }
+    if (body.startsWith('-')) {
+      return { parameter: arg, value: 'Disabled' };
+    }
     const eq = body.indexOf('=');
     return eq === -1
       ? { parameter: arg, value: 'Present' }
@@ -204,9 +210,13 @@ export function toSystemPropertyRows(props: SystemProperty[]): JvmParameter[] {
 }
 
 function formatHeap(xmx: string | undefined): string {
-  if (!xmx) return 'Not set';
+  if (!xmx) {
+    return 'Not set';
+  }
   const match = xmx.slice(4).match(/^(\d+)\s*([kKmMgG])?/);
-  if (!match) return xmx.slice(4);
+  if (!match) {
+    return xmx.slice(4);
+  }
   const size = Number(match[1]);
   const unit = (match[2] ?? 'B').toUpperCase();
   const megabytes = unit === 'G' ? size * 1024 : unit === 'K' ? Math.round(size / 1024) : size;
@@ -215,11 +225,21 @@ function formatHeap(xmx: string | undefined): string {
 
 function detectGarbageCollector(args: string[]): string {
   const flags = args.join(' ');
-  if (/UseG1GC/.test(flags)) return 'G1GC';
-  if (/UseConcMarkSweepGC/.test(flags)) return 'ConcMarkSweep (CMS)';
-  if (/UseParallelGC/.test(flags)) return 'Parallel';
-  if (/UseZGC/.test(flags)) return 'ZGC';
-  if (/UseShenandoahGC/.test(flags)) return 'Shenandoah';
+  if (/UseG1GC/.test(flags)) {
+    return 'G1GC';
+  }
+  if (/UseConcMarkSweepGC/.test(flags)) {
+    return 'ConcMarkSweep (CMS)';
+  }
+  if (/UseParallelGC/.test(flags)) {
+    return 'Parallel';
+  }
+  if (/UseZGC/.test(flags)) {
+    return 'ZGC';
+  }
+  if (/UseShenandoahGC/.test(flags)) {
+    return 'Shenandoah';
+  }
   return 'Default';
 }
 
@@ -275,13 +295,19 @@ export function formatStarted(millis: number): string {
  * "12 hours 40 mins", or "5 mins". Returns "—" for missing/negative input.
  */
 export function formatElapsed(millis: number | undefined): string {
-  if (!millis || millis < 0) return '—';
+  if (!millis || millis < 0) {
+    return '—';
+  }
   const totalMinutes = Math.floor(millis / 60000);
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const mins = totalMinutes % 60;
   const unit = (n: number, name: string) => `${n} ${name}${n === 1 ? '' : 's'}`;
-  if (days > 0) return `${unit(days, 'day')} ${unit(hours, 'hour')}`;
-  if (hours > 0) return `${unit(hours, 'hour')} ${unit(mins, 'min')}`;
+  if (days > 0) {
+    return `${unit(days, 'day')} ${unit(hours, 'hour')}`;
+  }
+  if (hours > 0) {
+    return `${unit(hours, 'hour')} ${unit(mins, 'min')}`;
+  }
   return unit(mins, 'min');
 }

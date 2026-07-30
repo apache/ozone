@@ -59,55 +59,55 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         {sider}
         {/* Breathing room between the navigation rail and the content column. */}
         <Layout style={{ marginInlineStart: spacing.lg, minHeight: 0 }}>
-        {(title || headerExtra) && (
-          <Header
+          {(title || headerExtra) && (
+            <Header
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: semanticColors.bgContainer,
+                borderBottom: `1px solid ${semanticColors.border}`,
+                paddingInline: spacing.xl,
+              }}
+            >
+              {typeof title === 'string' ? (
+                <Typography.Title
+                  level={4}
+                  style={{
+                    margin: 0,
+                    fontSize: textStyles.h2.fontSize,
+                    lineHeight: `${textStyles.h2.lineHeight}px`,
+                    color: semanticColors.textPrimary,
+                  }}
+                >
+                  {title}
+                </Typography.Title>
+              ) : (
+                title
+              )}
+              {headerExtra && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  {headerExtra}
+                </div>
+              )}
+            </Header>
+          )}
+          <Content
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: semanticColors.bgContainer,
-              borderBottom: `1px solid ${semanticColors.border}`,
-              paddingInline: spacing.xl,
+              padding: spacing.xl,
+              background: semanticColors.bgLayout,
+              overflow: 'auto',
             }}
           >
-            {typeof title === 'string' ? (
-              <Typography.Title
-                level={4}
-                style={{
-                  margin: 0,
-                  fontSize: textStyles.h2.fontSize,
-                  lineHeight: `${textStyles.h2.lineHeight}px`,
-                  color: semanticColors.textPrimary,
-                }}
-              >
-                {title}
-              </Typography.Title>
-            ) : (
-              title
-            )}
-            {headerExtra && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                {headerExtra}
-              </div>
-            )}
-          </Header>
-        )}
-        <Content
-          style={{
-            padding: spacing.xl,
-            background: semanticColors.bgLayout,
-            overflow: 'auto',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: maxContentWidth,
-              marginInline: maxContentWidth ? 'auto' : undefined,
-              width: '100%',
-            }}
-          >
-            {children}
-          </div>
+            <div
+              style={{
+                maxWidth: maxContentWidth,
+                marginInline: maxContentWidth ? 'auto' : undefined,
+                width: '100%',
+              }}
+            >
+              {children}
+            </div>
           </Content>
         </Layout>
       </Layout>

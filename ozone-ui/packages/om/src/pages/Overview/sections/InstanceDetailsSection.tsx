@@ -43,10 +43,11 @@ export interface SectionProps {
  * the Roles and Metadata Volume sections) plus this node's Ratis bean.
  */
 export const InstanceDetailsSection: React.FC<SectionProps> = ({ refreshToken }) => {
-  const { data: omInfo, loading, error } = useJmxBean<OzoneManagerInfoBean>(
-    JMX_QUERY.omInfo,
-    refreshToken
-  );
+  const {
+    data: omInfo,
+    loading,
+    error,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
   const { data: ratis } = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer, refreshToken);
 
   const currentHost = omInfo

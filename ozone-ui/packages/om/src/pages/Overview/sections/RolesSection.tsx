@@ -81,10 +81,11 @@ const columns: TableColumnsType<RatisRole> = [
 
 /** "Ozone Manager Roles" HA table. Sourced from the OM ServerRuntime bean. */
 export const RolesSection: React.FC<SectionProps> = ({ refreshToken }) => {
-  const { data: omInfo, loading, error } = useJmxBean<OzoneManagerInfoBean>(
-    JMX_QUERY.omInfo,
-    refreshToken
-  );
+  const {
+    data: omInfo,
+    loading,
+    error,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
   const { data: ratis } = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer, refreshToken);
   const { data: electionCount } = useJmxBean<LeaderElectionCountBean>(
     JMX_QUERY.leaderElectionCount,

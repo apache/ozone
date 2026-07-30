@@ -86,49 +86,49 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
   );
 
   return (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: spacing.md,
-      height,
-      paddingInline: spacing.md,
-      background: semanticColors.bgTopbar,
-      color: semanticColors.textPrimary,
-      ...style,
-    }}
-  >
-    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-      {leading}
-      {brand && (
-        <span
-          style={{
-            fontFamily: fontFamilies.appTitle,
-            fontSize: textStyles.appTitle.fontSize,
-            fontWeight: textStyles.appTitle.fontWeight,
-            lineHeight: `${textStyles.appTitle.lineHeight}px`,
-            color: semanticColors.textPrimary,
-          }}
-        >
-          {brand}
-        </span>
-      )}
-    </div>
-
-    {center && <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>{center}</div>}
-
     <div
       style={{
-        marginLeft: center ? 0 : 'auto',
         display: 'flex',
         alignItems: 'center',
-        gap: spacing.xs,
-        color: semanticColors.textSecondary,
+        gap: spacing.md,
+        height,
+        paddingInline: spacing.md,
+        background: semanticColors.bgTopbar,
+        color: semanticColors.textPrimary,
+        ...style,
       }}
     >
-      {rightContent}
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+        {leading}
+        {brand && (
+          <span
+            style={{
+              fontFamily: fontFamilies.appTitle,
+              fontSize: textStyles.appTitle.fontSize,
+              fontWeight: textStyles.appTitle.fontWeight,
+              lineHeight: `${textStyles.appTitle.lineHeight}px`,
+              color: semanticColors.textPrimary,
+            }}
+          >
+            {brand}
+          </span>
+        )}
+      </div>
+
+      {center && <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>{center}</div>}
+
+      <div
+        style={{
+          marginLeft: center ? 0 : 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: spacing.xs,
+          color: semanticColors.textSecondary,
+        }}
+      >
+        {rightContent}
+      </div>
     </div>
-  </div>
   );
 };
 
