@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -49,28 +50,44 @@ public class TestExportFileManager {
 
   @Test
   public void testResolveArchiveFile() {
+    String jobId = UUID.randomUUID().toString();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File archive = fileManager.resolveArchiveFile(scope, "20260101T120000Z");
-    assertTrue(archive.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
+    File archive = fileManager.resolveArchiveFile(scope, "20260101T120000Z", jobId);
+    assertTrue(archive.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId
+        + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
 
   @Test
   public void testResolveArchiveTempFile() {
+    String jobId = UUID.randomUUID().toString();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File tempFile = fileManager.resolveArchiveTempFile(scope, "20260101T120000Z");
+    File tempFile = fileManager.resolveArchiveTempFile(scope, "20260101T120000Z", jobId);
     assertTrue(tempFile.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_TMP_SUFFIX));
+  }
+
+  @Test
+  public void testJobIdFromArchiveFileName() {
+    String jobId = UUID.randomUUID().toString();
+    String fileName = "container-ids-health-MISSING-20260101T120000Z"
+        + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
+    assertEquals(jobId, ExportFileManager.jobIdFromArchiveFileName(fileName));
+    assertNull(ExportFileManager.jobIdFromArchiveFileName("container-ids-health-MISSING-20260101T120000Z"
+        + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
 
   @Test
   public void testListCompletedArchivePaths() throws Exception {
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File olderArchive = fileManager.resolveArchiveFile(scope, "20260101T120000Z");
+    String olderJobId = UUID.randomUUID().toString();
+    File olderArchive = fileManager.resolveArchiveFile(scope, "20260101T120000Z", olderJobId);
     assertTrue(olderArchive.createNewFile());
     assertTrue(olderArchive.setLastModified(1_000L));
-    File newerArchive = fileManager.resolveArchiveFile(scope, "20260101T120001Z");
+    String newerJobId = UUID.randomUUID().toString();
+    File newerArchive = fileManager.resolveArchiveFile(scope, "20260101T120001Z", newerJobId);
     assertTrue(newerArchive.createNewFile());
     assertTrue(newerArchive.setLastModified(2_000L));
-    File tempArchive = fileManager.resolveArchiveTempFile(scope, "20260101T120002Z");
+    String tempJobId = UUID.randomUUID().toString();
+    File tempArchive = fileManager.resolveArchiveTempFile(scope, "20260101T120002Z", tempJobId);
     assertTrue(tempArchive.createNewFile());
 
     List<String> completedPaths = fileManager.listCompletedArchivePaths();
@@ -96,23 +113,20 @@ public class TestExportFileManager {
     Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(jobDir);
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "20260101T000000Z");
+    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "20260101T000000Z", jobId);
     assertTrue(partialArchiveTemp.createNewFile());
-    File inProgress = new File(tempDir, jobId + ExportFileManager.IN_PROGRESS_MARKER_SUFFIX);
-    assertTrue(inProgress.createNewFile());
 
     fileManager.start();
 
     assertFalse(Files.exists(jobDir));
     assertFalse(partialArchiveTemp.exists());
-    assertFalse(inProgress.exists());
   }
 
   @Test
-  public void testOrphanJobDirWithoutMarkerDoesNotDeleteCompletedTar() throws Exception {
+  public void testOrphanJobDirDoesNotDeleteCompletedTar() throws Exception {
     String jobId = UUID.randomUUID().toString();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File completedArchive = fileManager.resolveArchiveFile(scope, "20260101T000000Z");
+    File completedArchive = fileManager.resolveArchiveFile(scope, "20260101T000000Z", jobId);
     assertTrue(completedArchive.createNewFile());
     Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(orphanJobDir);

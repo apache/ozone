@@ -46,48 +46,38 @@ import org.slf4j.LoggerFactory;
  *
  * <p>While a job runs, shard text files are written under {@code export_{jobId}/}. The archive is
  * created only after all shards are written. The export manager writes
- * {@code container-ids-{scope}-{timestamp}.tar.gz.tmp} and atomically renames it to
+ * {@code container-ids-{scope}-{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
  * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
- * never visible. {@link #lock()} is used to exclude concurrent writers.
+ * never visible. {@link #lock()} uses {@code in_use.lock} to exclude concurrent writers.
  *
  * <pre>
  * {exportDirectory}/
  * ├── in_use.lock
- * ├── {jobId}.in-progress
- * ├── container-ids-{scope}-{timestamp}.tar.gz
- * ├── container-ids-{scope}-{timestamp}.tar.gz.tmp
+ * ├── container-ids-{scope}-{timestamp}_job{jobId}.tar.gz
+ * ├── container-ids-{scope}-{timestamp}_job{jobId}.tar.gz.tmp
  * └── export_{jobId}/
  *     ├── container-ids-{scope}-{timestamp}-part001.txt
  *     └── ...
  * </pre>
  *
- * <p><b>When {@code export_{jobId}/} is deleted:</b> the export manager deletes it after the
- * archive is committed, or during {@link #cleanupFailedArtifacts} on failure or cancel.
- * On startup, {@link #start()} deletes a leftover {@code export_{jobId}/} when no in-progress
- * marker remains. If the marker still exists, {@link #start()} deletes {@code export_{jobId}/}
- * together with the marker and any {@code .tar.gz.tmp} for that incomplete job.
+ * <p><b>Incomplete work</b> ({@code export_{jobId}/} and {@code .tar.gz.tmp}) is removed by
+ * {@link #cleanupFailedJob(Path, File)} on failure or cancel, and by {@link #start()} for every
+ * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept.
  *
- * <p><b>When {@code .tar.gz.tmp} is deleted:</b> only the temporary file is removed for
- * incomplete work; a partial {@code .tar.gz} is never written. {@link #cleanupFailedArtifacts}
- * deletes {@code .tar.gz.tmp} for failed or cancelled jobs. {@link #start()} deletes
- * {@code .tar.gz.tmp} for jobs that still have an in-progress marker.
+ * <p><b>Completed {@code .tar.gz}</b> remains on disk until the export manager evicts it
+ * ({@code maxTerminalJobs} in {@code ContainerExportManager}) via {@link #deleteExportTar(String)}.
  *
- * <p><b>When completed {@code .tar.gz} is deleted:</b> completed archives remain on disk until
- * the export manager evicts them ({@code maxTerminalJobs} in {@code ContainerExportManager}).
- *
- * <p><b>SCM restart:</b> in-memory job status is lost and {@code jobId} cannot be recovered from
- * the archive file name. {@link #listCompletedArchivePaths()} returns existing {@code tarPath}
- * values (oldest first) so {@code ContainerExportManager} can rebuild terminal-job eviction state.
- * Jobs with an in-progress marker are treated as incomplete: {@link #start()} removes the marker,
- * {@code export_{jobId}/}, and any {@code .tar.gz.tmp}, and the operator re-submits the export
- * on the new leader.
+ * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} clears incomplete work;
+ * {@link #listCompletedArchivePaths()} returns existing {@code tarPath} values (oldest first);
+ * {@link #jobIdFromArchiveFileName(String)} parses {@code jobId} for terminal-job rebuild in
+ * {@code ContainerExportManager}.
  */
 final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
 
-  static final String IN_PROGRESS_MARKER_SUFFIX = ".in-progress";
   static final String EXPORT_JOB_DIR_PREFIX = "export_";
+  static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
@@ -105,7 +95,7 @@ final class ExportFileManager {
 
   void start() throws IOException {
     Files.createDirectories(Paths.get(exportDirectory));
-    cleanupOrphanedExportArtifacts();
+    removeIncompleteWorkOnStartup();
   }
 
   void lock() throws IOException {
@@ -137,13 +127,13 @@ final class ExportFileManager {
     exportDirectoryLock = null;
   }
 
-  File resolveArchiveFile(ExportScope scope, String fileTimestamp) {
-    return new File(exportDirectory,
-        String.format("container-ids-%s-%s%s", scope.getValue(), fileTimestamp, EXPORT_ARCHIVE_SUFFIX));
+  File resolveArchiveFile(ExportScope scope, String fileTimestamp, String jobId) {
+    return new File(exportDirectory, String.format("container-ids-%s-%s%s%s%s",
+        scope.getValue(), fileTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId, EXPORT_ARCHIVE_SUFFIX));
   }
 
-  File resolveArchiveTempFile(ExportScope scope, String fileTimestamp) {
-    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, fileTimestamp));
+  File resolveArchiveTempFile(ExportScope scope, String fileTimestamp, String jobId) {
+    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, fileTimestamp, jobId));
   }
 
   /**
@@ -164,12 +154,17 @@ final class ExportFileManager {
     return archivePaths;
   }
 
-  void markExportInProgress(String jobId) throws IOException {
-    Files.createFile(inProgressMarkerFile(jobId).toPath());
-  }
-
-  void clearExportInProgress(String jobId) {
-    FileUtils.deleteQuietly(inProgressMarkerFile(jobId));
+  static String jobIdFromArchiveFileName(String fileName) {
+    if (!fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)) {
+      return null;
+    }
+    String nameWithoutSuffix = fileName.substring(0, fileName.length() - EXPORT_ARCHIVE_SUFFIX.length());
+    int jobIndex = nameWithoutSuffix.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
+    if (jobIndex < 0) {
+      return null;
+    }
+    String jobId = nameWithoutSuffix.substring(jobIndex + EXPORT_ARCHIVE_JOB_INFIX.length());
+    return isUuidDirectoryName(jobId) ? jobId : null;
   }
 
   void deleteExportTar(String tarPath) {
@@ -183,74 +178,34 @@ final class ExportFileManager {
     FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
   }
 
-  void cleanupFailedArtifacts(Path jobDir, File archiveFile, String jobId) {
+  void cleanupFailedJob(Path jobDir, File archiveFile) {
     if (jobDir != null) {
       FileUtils.deleteQuietly(jobDir.toFile());
     }
     if (archiveFile != null) {
       FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archiveFile));
-      FileUtils.deleteQuietly(archiveFile);
     }
-    clearExportInProgress(jobId);
   }
 
-  private void cleanupOrphanedExportArtifacts() {
+  private void removeIncompleteWorkOnStartup() {
     File exportDir = new File(exportDirectory);
     File[] children = exportDir.listFiles();
-    if (children == null) {
-      return;
-    }
-    for (File child : children) {
-      if (child.isFile() && child.getName().endsWith(IN_PROGRESS_MARKER_SUFFIX)) {
-        String jobId = child.getName().substring(
-            0, child.getName().length() - IN_PROGRESS_MARKER_SUFFIX.length());
-        if (isUuidDirectoryName(jobId)) {
-          removeIncompleteExportArtifacts(jobId);
-        }
-      }
-    }
-    for (File child : children) {
-      if (child.isDirectory()) {
-        String jobId = jobIdFromExportDirName(child.getName());
-        if (jobId == null) {
-          continue;
-        }
-        if (inProgressMarkerFile(jobId).exists()) {
-          removeIncompleteExportArtifacts(jobId);
-        } else {
+    if (children != null) {
+      for (File child : children) {
+        if (child.isDirectory() && jobIdFromExportDirName(child.getName()) != null) {
           FileUtils.deleteQuietly(child);
+          LOG.debug("Removed incomplete container export job directory: {}", child.getAbsolutePath());
         }
       }
     }
-    deleteOrphanArchiveTempFiles();
-  }
-
-  private void removeIncompleteExportArtifacts(String jobId) {
-    LOG.info("Removing incomplete container export artifacts for job {}", jobId);
-    FileUtils.deleteQuietly(inProgressMarkerFile(jobId));
-    deleteOrphanArchiveTempFiles();
-    File jobDir = new File(exportDirectory, exportJobDirName(jobId));
-    if (jobDir.isDirectory()) {
-      FileUtils.deleteQuietly(jobDir);
-      LOG.debug("Removed orphaned container export job directory: {}", jobDir.getAbsolutePath());
-    }
-  }
-
-  private void deleteOrphanArchiveTempFiles() {
-    File exportDir = new File(exportDirectory);
     File[] tempFiles = exportDir.listFiles((dir, fileName) -> fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX));
-    if (tempFiles == null) {
-      return;
-    }
-    for (File tempFile : tempFiles) {
-      if (FileUtils.deleteQuietly(tempFile)) {
-        LOG.debug("Removed incomplete container export archive temp file: {}", tempFile.getName());
+    if (tempFiles != null) {
+      for (File tempFile : tempFiles) {
+        if (FileUtils.deleteQuietly(tempFile)) {
+          LOG.debug("Removed incomplete container export archive temp file: {}", tempFile.getName());
+        }
       }
     }
-  }
-
-  private File inProgressMarkerFile(String jobId) {
-    return new File(exportDirectory, jobId + IN_PROGRESS_MARKER_SUFFIX);
   }
 
   static String exportJobDirName(String jobId) {
