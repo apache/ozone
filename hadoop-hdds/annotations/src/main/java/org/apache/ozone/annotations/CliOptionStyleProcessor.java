@@ -17,8 +17,6 @@
 
 package org.apache.ozone.annotations;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -45,53 +43,6 @@ public class CliOptionStyleProcessor extends AbstractProcessor {
   private static final String NAMES_ATTRIBUTE = "names";
   private static final Pattern CAMEL_CASE = Pattern.compile("--.*[A-Z].*");
   private static final Pattern UNDER_SCORE = Pattern.compile("--.*_.*");
-
-  // Keep this in sync with DeprecatedCliOption in hdds-cli-common. This module
-  // cannot depend on CLI common, as CLI common runs this processor at compile
-  // time.
-  private static final Set<String> KNOWN_DEPRECATED_OPTIONS =
-      new HashSet<>(Arrays.asList(
-          "-conf",
-          "-id",
-          "-host",
-          "-nodeid",
-          "-hostname",
-          "-al",
-          "-ffc",
-          "-fst",
-          "-tawt",
-          "-tact",
-          "-pct",
-          "-pt",
-          "--accessId",
-          "--bufferSize",
-          "--column_family",
-          "--dnSchema",
-          "--expectedGeneration",
-          "--fileCount",
-          "--fileSize",
-          "--filterByFactor",
-          "--filterByState",
-          "--keySize",
-          "--maxDatanodesPercentageToInvolvePerIteration",
-          "--maxSizeEnteringTargetInGB",
-          "--maxSizeLeavingSourceInGB",
-          "--maxSizeToMovePerIterationInGB",
-          "--nameLen",
-          "--newLeaderId",
-          "--numOfBuckets",
-          "--numOfKeys",
-          "--numOfThreads",
-          "--numOfValidateThreads",
-          "--numOfVolumes",
-          "--onlyFileNames",
-          "--replicationFactor",
-          "--replicationType",
-          "--scmHost",
-          "--secretKey",
-          "--segmentPath",
-          "--validateWrites"
-      ));
 
   @Override
   public SourceVersion getSupportedSourceVersion() {
@@ -152,7 +103,7 @@ public class CliOptionStyleProcessor extends AbstractProcessor {
 
   private void checkOptionName(String option, Element element,
       AnnotationMirror annotation, AnnotationValue value) {
-    if (hasDeprecatedStyle(option) && !isKnownDeprecatedOption(option)) {
+    if (hasDeprecatedStyle(option)) {
       processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
           String.format("CLI option '%s' uses a deprecated style. New options "
               + "should use --dash-separated-style long names or "
@@ -169,7 +120,4 @@ public class CliOptionStyleProcessor extends AbstractProcessor {
     return option.startsWith("-") && option.length() > 2;
   }
 
-  private static boolean isKnownDeprecatedOption(String option) {
-    return KNOWN_DEPRECATED_OPTIONS.contains(option);
-  }
 }
