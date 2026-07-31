@@ -71,7 +71,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
     CertificateSignRequest.Builder builder = super.configureCSRBuilder();
 
     try {
-      String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+      String hostname = getLocalHostName();
       String subject = UserGroupInformation.getCurrentUser()
           .getShortUserName() + "@" + hostname;
       builder.setCA(false)
@@ -86,6 +86,16 @@ public class DNCertificateClient extends DefaultCertificateClient {
       throw new CertificateException("Failed to get hostname or current user",
           e, CSR_ERROR);
     }
+  }
+
+  /**
+   * Returns the host name that goes into the subject of this client's CSR.
+   * Resolving it is as slow as the host's resolver, so tests override this.
+   *
+   * @return the canonical host name of the host this client runs on
+   */
+  protected String getLocalHostName() throws IOException {
+    return InetAddress.getLocalHost().getCanonicalHostName();
   }
 
   @Override
