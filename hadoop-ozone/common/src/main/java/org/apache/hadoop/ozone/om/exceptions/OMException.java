@@ -283,6 +283,14 @@ public class OMException extends IOException {
     ATOMIC_WRITE_CONFLICT,
 
     LIFECYCLE_CONFIGURATION_NOT_FOUND,
-    UPDATE_ID_NOT_MATCH
+    UPDATE_ID_NOT_MATCH,
+
+    /**
+     * The addressed version exists but is a delete marker. Kept distinct from
+     * KEY_NOT_FOUND so that the S3 Gateway can answer such a read with 405
+     * MethodNotAllowed rather than 404; the gateway mapping itself is not in
+     * place yet, and until it is the condition surfaces as an internal error.
+     */
+    KEY_IS_DELETE_MARKER
   }
 }
