@@ -75,7 +75,7 @@ public final class NoncurrentVersions {
    * path broke it. The DB search costs one seek, since it stops at the first
    * match.
    */
-  private static Pair<String, OmKeyInfo> newestMatching(
+  public static Pair<String, OmKeyInfo> newestMatching(
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, String keyName, Predicate<OmKeyInfo> filter)
       throws IOException {
