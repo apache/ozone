@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -304,9 +305,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   /**
    * Permanently removes the addressed version: the only delete that destroys
-   * data on a versioned bucket. Only a noncurrent version is handled here -
-   * removing the current one has to hand the keyTable place over to the
-   * next-newest version, which is not supported yet.
+   * data on a versioned bucket. Removing the current version hands its keyTable
+   * place over to the next-newest version of the key, or removes the key
+   * outright when none survives.
    *
    * @param currentVersion the key's current version, or null if it has none
    */
@@ -318,35 +319,23 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OMResponse.Builder omResponse) throws IOException {
 
     boolean nullVersion = keyArgs.getNullVersion();
-    if (currentVersion != null && (nullVersion
+    boolean deletingCurrent = currentVersion != null && (nullVersion
         ? currentVersion.isNullVersion()
         : Long.valueOf(keyArgs.getVersionId()).equals(
-            currentVersion.getVersionId()))) {
-      throw new OMException(
-          "Permanently deleting the current version of key " + keyName
-              + " is not supported yet", NOT_SUPPORTED_OPERATION);
-    }
+            currentVersion.getVersionId()));
 
     // Everything that can fail runs before the first cache entry is added, so
     // that a failed request leaves no versionedKeyTable cache entry behind.
     String versionedKey;
     OmKeyInfo version;
-    if (nullVersion) {
+    if (deletingCurrent) {
       versionedKey = null;
-      version = null;
-      String prefix = omMetadataManager
-          .getVersionedOzoneKeyPrefix(volumeName, bucketName, keyName);
-      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
-               omMetadataManager.getVersionedKeyTable().iterator(prefix)) {
-        while (versions.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> entry = versions.next();
-          if (entry.getValue().isNullVersion()) {
-            versionedKey = entry.getKey();
-            version = entry.getValue();
-            break;
-          }
-        }
-      }
+      version = currentVersion;
+    } else if (nullVersion) {
+      Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      versionedKey = nullSlot == null ? null : nullSlot.getKey();
+      version = nullSlot == null ? null : nullSlot.getValue();
     } else {
       versionedKey = omMetadataManager.getVersionedOzoneKey(
           volumeName, bucketName, keyName, keyArgs.getVersionId());
@@ -357,10 +346,40 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           KEY_NOT_FOUND);
     }
 
+    // Removing the current version leaves the key without one, so the newest
+    // noncurrent version is promoted to keep the invariant that keyTable holds
+    // the current version of every key that still has one. The record moves
+    // unchanged: promotion is positional, the version keeps its identity.
+    String promotedKey = null;
+    OmKeyInfo promoted = null;
+    if (deletingCurrent) {
+      Pair<String, OmKeyInfo> newest = getNewestNoncurrentVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      if (newest != null) {
+        promotedKey = newest.getKey();
+        promoted = newest.getValue();
+      }
+    }
+
     version = version.toBuilder().setUpdateID(trxnLogIndex).build();
 
-    omMetadataManager.getVersionedKeyTable().addCacheEntry(
-        new CacheKey<>(versionedKey), CacheValue.get(trxnLogIndex));
+    String objectKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    if (deletingCurrent) {
+      if (promoted != null) {
+        omMetadataManager.getKeyTable(getBucketLayout())
+            .addCacheEntry(objectKey, promoted, trxnLogIndex);
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(promotedKey), CacheValue.get(trxnLogIndex));
+      } else {
+        // no version survives, so the key disappears entirely
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+            new CacheKey<>(objectKey), CacheValue.get(trxnLogIndex));
+      }
+    } else {
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          new CacheKey<>(versionedKey), CacheValue.get(trxnLogIndex));
+    }
 
     // A delete marker holds no blocks, so it releases namespace but no space.
     long quotaReleased = sumBlockLengths(version);
@@ -370,7 +389,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     return new OMKeyVersionDeleteResponse(
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-        version, versionedKey, omBucketInfo.copyObject());
+        version, deletingCurrent ? objectKey : versionedKey, deletingCurrent,
+        promotedKey, promoted, omBucketInfo.copyObject());
   }
 
   /**
