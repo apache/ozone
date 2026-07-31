@@ -89,18 +89,19 @@ public class TestStatusSubCommand {
   }
 
   @Test
-  public void testStatusCommandPrintsUpgradeStatus() throws Exception {
+  public void testStatusCommandPrintsFinalized() throws Exception {
+    // Every component has finished finalizing and all datanodes are finalized.
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
-        .setNumDatanodesFinalized(1)
+        .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
-        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .build();
 
     OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
         OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
-            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
-            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
             .setHddsStatus(hddsStatus)
             .build();
 
@@ -110,23 +111,23 @@ public class TestStatusSubCommand {
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Upgrade finalization status"));
-    assertTrue(output.contains("Cluster: IN_PROGRESS"));
-    assertTrue(output.contains("OM: UNFINALIZED"));
+    assertTrue(output.contains("Cluster: FINALIZED"));
+    assertTrue(output.contains("OM: FINALIZED"));
     assertTrue(output.contains("SCM: FINALIZED"));
-    assertTrue(output.contains("Datanodes finalized: 1/3"));
-    // Without --verbose the apparent versions are not shown.
-    assertFalse(output.contains("Apparent Version"));
+    assertTrue(output.contains("Datanodes finalized: 3/3"));
+    // Without --verbose internal server versions are not shown.
+    assertFalse(output.toLowerCase().contains("version"));
     verify(omClient).queryUpgradeStatus();
   }
 
   @Test
-  public void testStatusCommandPrintsInProgressOm() throws Exception {
-    // OM has begun polling SCM (marker present) but is not finalized yet.
+  public void testStatusCommandPrintsInProgress() throws Exception {
+    // SCM is finalized and datanodes are partway through, but OM has not finalized yet.
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
-        .setNumDatanodesFinalized(3)
+        .setNumDatanodesFinalized(1)
         .setNumDatanodesTotal(3)
-        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
         .build();
 
     OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
@@ -141,9 +142,41 @@ public class TestStatusSubCommand {
     cmd.call();
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("OM: IN_PROGRESS"));
+    assertTrue(output.contains("Upgrade finalization status"));
     assertTrue(output.contains("Cluster: IN_PROGRESS"));
+    assertTrue(output.contains("OM: IN_PROGRESS"));
     assertTrue(output.contains("SCM: FINALIZED"));
+    assertTrue(output.contains("Datanodes finalized: 1/3"));
+    verify(omClient).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testStatusCommandPrintsUnfinalized() throws Exception {
+    // Nothing has been finalized yet.
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setNumDatanodesFinalized(0)
+        .setNumDatanodesTotal(3)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .build();
+
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+            .setHddsStatus(hddsStatus)
+            .build();
+
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Upgrade finalization status"));
+    assertTrue(output.contains("Cluster: UNFINALIZED"));
+    assertTrue(output.contains("OM: UNFINALIZED"));
+    assertTrue(output.contains("SCM: UNFINALIZED"));
+    assertTrue(output.contains("Datanodes finalized: 0/3"));
     verify(omClient).queryUpgradeStatus();
   }
 
@@ -236,13 +269,12 @@ public class TestStatusSubCommand {
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("OM:"));
-    assertTrue(output.contains("OM Apparent Version:"));
     assertTrue(output.contains("SCM:"));
-    assertTrue(output.contains("SCM Apparent Version:"));
-    assertTrue(output.contains("Min Datanode Apparent Version:"));
-    assertTrue(output.contains("Max Datanode Apparent Version:"));
-    assertTrue(output.contains(OzoneManagerVersion.ZDU.toString()));
-    assertTrue(output.contains(HDDSVersion.SOFTWARE_VERSION.toString()));
+    // Each apparent version label should be followed by the version number set on the response.
+    assertTrue(output.contains("OM Apparent Version:     " + OzoneManagerVersion.ZDU));
+    assertTrue(output.contains("SCM Apparent Version:    " + HDDSVersion.SOFTWARE_VERSION));
+    assertTrue(output.contains("Min Datanode Apparent Version: " + HDDSVersion.SOFTWARE_VERSION));
+    assertTrue(output.contains("Max Datanode Apparent Version: " + HDDSVersion.SOFTWARE_VERSION));
   }
 
   private ServiceInfoEx serviceInfoWithVersion(OzoneManagerVersion version) {

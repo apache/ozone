@@ -293,7 +293,7 @@ public class TestSCMClientProtocolServer {
 
   @Test
   public void testQueryUpgradeStatusHddsInProgress() throws Exception {
-    // SCM is finalized but not all datanodes are, so HDDS is only partially finalized.
+    // SCM is finalized but not all datanodes are, so HDDS finalization is still in progress.
     ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
     when(mockVersionManager.needsFinalization()).thenReturn(false);
     ComponentVersion apparentVersion = mock(ComponentVersion.class);

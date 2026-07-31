@@ -1219,16 +1219,21 @@ public class SCMClientProtocolServer implements
             + "safe mode and try again.", ResultCodes.SAFE_MODE_EXCEPTION);
       }
 
+      // Set SCM finalization status to return to the client.
+      // Since SCM finalization goes through Ratis, it moves from unfinalized to finalized immediately with no
+      // in-progress state.
       boolean scmFinalized = !scm.getVersionManager().needsFinalization();
+      HddsProtos.FinalizationStatus scmFinalizationStatus =
+          scmFinalized ? HddsProtos.FinalizationStatus.FINALIZED : HddsProtos.FinalizationStatus.UNFINALIZED;
+
+      // Set overall HDDS finalization status (SCM and Datanodes) to return to the client.
       NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts =
           scm.getScmNodeManager().getDatanodeFinalizationCounts();
       int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
       int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
-
-      HddsProtos.FinalizationStatus scmFinalizationStatus =
-          scmFinalized ? HddsProtos.FinalizationStatus.FINALIZED : HddsProtos.FinalizationStatus.UNFINALIZED;
       HddsProtos.FinalizationStatus hddsFinalizationStatus;
       if (!scmFinalized) {
+        // SCM must finish finalizing before Datanodes can start finalizing.
         hddsFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
       } else if (datanodeFinalizationCounts.allNodesFinalized()) {
         hddsFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;

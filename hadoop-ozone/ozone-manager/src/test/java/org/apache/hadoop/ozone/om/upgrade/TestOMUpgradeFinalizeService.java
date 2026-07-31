@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unit tests for {@link OMUpgradeFinalizeService}.
@@ -156,17 +158,18 @@ public class TestOMUpgradeFinalizeService {
   }
 
   /**
-   * When SCM reports hddsFinalizationStatus=UNFINALIZED (SCM is not yet finalized),
-   * no Ratis request should be submitted.
+   * When SCM reports an hddsFinalizationStatus other than FINALIZED (HDDS is unfinalized or still
+   * in progress), no Ratis request should be submitted.
    */
-  @Test
-  void testFinalizationSkippedWhenScmNotYetFinalized() throws Exception {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.FinalizationStatus.class, names = {"UNFINALIZED", "IN_PROGRESS"})
+  void testFinalizationSkippedWhenScmNotYetFinalized(HddsProtos.FinalizationStatus hddsStatus) throws Exception {
     when(ozoneManager.isLeaderReady()).thenReturn(true);
     when(versionManager.needsFinalization()).thenReturn(true);
 
     HddsProtos.UpgradeStatus scmStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
-        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setScmFinalizationStatus(hddsStatus)
+        .setHddsFinalizationStatus(hddsStatus)
         .setNumDatanodesFinalized(0)
         .setNumDatanodesTotal(3)
         .build();
