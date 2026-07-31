@@ -335,7 +335,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()
+          && !s3Versioning) {
+        // Under S3 versioning the overwritten version is kept in the
+        // versionedKeyTable, so its blocks must not be reclaimed here.
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
             keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         // using pseudoObjId as objectId can be same in case of overwrite key

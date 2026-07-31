@@ -331,7 +331,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         boolean isNamespaceUpdate = false;
-        if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // The S3 versioning check is redundant while the legacy flag is kept in
+        // sync with an ENABLED status, but the reclaim must depend on the
+        // status rather than on that sync: dropping the previous version's
+        // blocks would strand the version record kept for it.
+        if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()
+            && !omBucketInfo.isS3VersioningEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
               keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
