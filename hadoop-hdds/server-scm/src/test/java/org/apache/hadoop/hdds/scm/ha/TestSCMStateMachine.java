@@ -47,6 +47,7 @@ public class TestSCMStateMachine {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMMetrics metrics = SCMMetrics.create();
     when(scm.getMetrics()).thenReturn(metrics);
+    mockCloseForStateMachine(scm);
 
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
@@ -72,6 +73,7 @@ public class TestSCMStateMachine {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMMetrics metrics = SCMMetrics.create();
     when(scm.getMetrics()).thenReturn(metrics);
+    mockCloseForStateMachine(scm);
 
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
@@ -102,5 +104,17 @@ public class TestSCMStateMachine {
     }
 
     metrics.unRegister();
+  }
+
+  /**
+   * Stub the SCM HA manager so SCMStateMachine.close() sees a stopped Ratis server and performs a
+   * clean shutdown instead of dereferencing null when the state machine is auto-closed.
+   */
+  private static void mockCloseForStateMachine(StorageContainerManager scm) {
+    SCMHAManager haManager = mock(SCMHAManager.class);
+    SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+    when(scm.getScmHAManager()).thenReturn(haManager);
+    when(haManager.getRatisServer()).thenReturn(ratisServer);
+    when(ratisServer.isStopped()).thenReturn(true);
   }
 }
