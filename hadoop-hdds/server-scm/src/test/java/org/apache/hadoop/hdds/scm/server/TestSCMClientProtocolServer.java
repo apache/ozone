@@ -317,7 +317,7 @@ public class TestSCMClientProtocolServer {
   }
 
   @Test
-  public void testFinalizeRejectsOlderPeer() throws IOException {
+  public void testFinalizeRejectsOlderPeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
     StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
@@ -326,13 +326,17 @@ public class TestSCMClientProtocolServer {
              peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(matching, older);
+      // A peer on an older version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
     }
-    verify(finalizationManager, never()).finalizeUpgrade();
+    verify(finalizationManager).finalizeUpgrade();
   }
 
   @Test
-  public void testFinalizeRejectsUnknownFuturePeer() throws IOException {
+  public void testFinalizeRejectsUnknownFuturePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
     // A version not recognized by this binary deserializes to UNKNOWN_VERSION in the client translator.
@@ -343,13 +347,17 @@ public class TestSCMClientProtocolServer {
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any()))
           .thenReturn(matching, unknown);
+      // A peer on an unrecognized future version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
     }
-    verify(finalizationManager, never()).finalizeUpgrade();
+    verify(finalizationManager).finalizeUpgrade();
   }
 
   @Test
-  public void testFinalizeRejectsUnreachablePeer() throws IOException {
+  public void testFinalizeRejectsUnreachablePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
     when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
@@ -358,9 +366,13 @@ public class TestSCMClientProtocolServer {
              peerCheckServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(unreachable);
+      // An unreachable peer is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
     }
-    verify(finalizationManager, never()).finalizeUpgrade();
+    verify(finalizationManager).finalizeUpgrade();
   }
 
   @Test
@@ -381,7 +393,7 @@ public class TestSCMClientProtocolServer {
   }
 
   @Test
-  public void testFinalizeRejectsDatanodeWithMismatchedVersion() throws IOException {
+  public void testFinalizeRejectsDatanodeWithMismatchedVersionUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
         .setNumFinalizedDatanodes(3)
@@ -392,56 +404,10 @@ public class TestSCMClientProtocolServer {
         .build();
     try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
         Collections.emptyList(), datanodeCounts)) {
+      // A datanode on a mismatched version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
-    }
-    verify(finalizationManager, never()).finalizeUpgrade();
-  }
-
-  @Test
-  public void testForceFinalizeSkipsPeerVersionCheck() throws IOException {
-    FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
-    StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
-
-    try (SCMClientProtocolServer testServer =
-             peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
-         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(matching, older);
-      testServer.forceFinalizeUpgrade();
-    }
-    verify(finalizationManager).finalizeUpgrade();
-  }
-
-  @Test
-  public void testForceFinalizeSkipsUnreachablePeer() throws IOException {
-    FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
-    when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
-
-    try (SCMClientProtocolServer testServer =
-             peerCheckServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
-         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(unreachable);
-      // With force the peer version check is skipped, so an unreachable peer does not prevent
-      // finalization and its version is never queried.
-      testServer.forceFinalizeUpgrade();
-    }
-    verify(unreachable, never()).getPeerUpgradeStatus();
-    verify(finalizationManager).finalizeUpgrade();
-  }
-
-  @Test
-  public void testForceFinalizeSkipsDatanodeVersionCheck() throws IOException {
-    FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
-        .setNumFinalizedDatanodes(3)
-        .setTotalHealthyDatanodes(3)
-        .setMinApparentVersion(HDDSVersion.DEFAULT_VERSION.serialize())
-        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
-        .setAllSoftwareVersionsMatchScm(false)
-        .build();
-    try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
-        Collections.emptyList(), datanodeCounts)) {
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the datanode version check is skipped and finalization proceeds.
       testServer.forceFinalizeUpgrade();
       verify(finalizationManager).finalizeUpgrade();
     }
