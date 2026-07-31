@@ -412,28 +412,6 @@ class TestObjectPut {
   }
 
   @Test
-  void testCopyObjectToSelfWithTaggingReplace() throws Exception {
-    // Put the source object with some tags.
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    assertSucceeds(() -> putObject(CONTENT));
-    assertThat(bucket.getKey(KEY_NAME).getTags()).hasSize(2);
-
-    // Copy the object onto itself with x-amz-tagging-directive: REPLACE and a
-    // new tag set. AWS allows this as an in-place tag update.
-    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    when(headers.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("REPLACE");
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag3=value3");
-
-    assertSucceeds(() -> putObject(CONTENT));
-
-    Map<String, String> tags = assertKeyContent(bucket, KEY_NAME, CONTENT).getTags();
-    assertThat(tags)
-        .containsEntry("tag3", "value3")
-        .doesNotContainKeys("tag1", "tag2");
-  }
-
-  @Test
   void testContentTypeStoredAndCopied() throws Exception {
     // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
     when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))

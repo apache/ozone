@@ -1096,17 +1096,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
-      // The tagging and metadata directives are read up front because a
-      // self-copy is only legal when at least one attribute is being changed.
-      String tagCopyDirective = getHeaders().getHeaderString(TAG_DIRECTIVE_HEADER);
+      // Metadata directive is read up front: a self-copy is legal when metadata
+      // is being replaced (x-amz-metadata-directive: REPLACE).
       String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
-      boolean replacingTags = CopyDirective.REPLACE.name().equals(tagCopyDirective);
       boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
 
       // Checking whether we trying to copying to it self.
       if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
-          && !replacingTags && !replacingMetadata) {
-        // Self-copy without a metadata or tag replacement. AWS still allows it
+          && !replacingMetadata) {
+        // Self-copy without a metadata replacement. AWS still allows it
         // when a storage class is provided (aws cli passes storage type), so
         // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
@@ -1139,6 +1137,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Object tagging in copyObject with tagging directive
       Map<String, String> tags;
+      String tagCopyDirective = getHeaders().getHeaderString(TAG_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(tagCopyDirective) || tagCopyDirective.equals(CopyDirective.COPY.name())) {
         // Tag-set will be copied from the source directly
         tags = sourceKeyDetails.getTags();
