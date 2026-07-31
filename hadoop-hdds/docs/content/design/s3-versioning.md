@@ -344,31 +344,29 @@ interaction is covered above. Buckets without versioning behave exactly as today
 Implemented as one umbrella Jira with ten tasks (33 sub-tasks, each roughly one
 PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → (T7 ∥ T8) → T9 → T10`
 (reclamation lands before the S3 endpoints, so versioning is never exposed without
-a way to reclaim versions):
+a way to reclaim versions). The snapshot interaction described above is deferred
+past this first phase: none of the tasks below carry it, and until it lands the two
+features are not expected to be used together on the same bucket.
 
 | Task | Scope |
 |---|---|
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
 | T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, transaction-index default, commit-time ordering check, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
-| T4 Read / permanent delete / promotion | `?versionId=` reads (including through `OmSnapshot`), permanent delete with the version-aware reclamation lookup, version promotion |
+| T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
 | T6 Reclamation | VersionCleanupService, `maxVersions` with the `TRIM` / `REJECT` policy, expired marker cleanup |
 | T7 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
 | T8 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
 | T9 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
-| T10 Wrap-up | upgrade validation, snapshot delete-marker diff rule and exclusive-size accounting, robot tests, benchmarks, docs |
+| T10 Wrap-up | upgrade validation, robot tests, benchmarks, docs |
 
-Testing follows four tracks: unit/integration tests per sub-task acceptance
+Testing follows three tracks: unit/integration tests per sub-task acceptance
 criteria (state machine, two-table atomicity, promotion, null-slot semantics,
-`maxVersions` boundaries); snapshot integration tests that take a snapshot and
-then permanently delete a noncurrent version, a current version and a delete
-marker in the active bucket, asserting that every version the snapshot holds
-stays readable, that its exclusive size is reported correctly, and that the
-blocks are reclaimed once the snapshot is deleted; S3 compatibility via the
-smoketest/s3 robot suite and the versioning subset of ceph/s3-tests; performance
-benchmarks asserting no regression with versioning off and O(1) write latency
-with it on.
+`maxVersions` boundaries); S3 compatibility via the smoketest/s3 robot suite and
+the versioning subset of ceph/s3-tests; performance benchmarks asserting no
+regression with versioning off and O(1) write latency with it on. The snapshot
+integration tests belong with the snapshot work and are deferred with it.
 
 Open questions tracked for implementation: the `maxVersions` default and cluster
 cap; obfuscation of the external versionId encoding, and how a pinned first version
@@ -378,8 +376,10 @@ under the previous generator; `PutBucketVersioning(Suspended)` on a never-versio
 bucket (align via s3-tests); whether `ListObjectVersions` against a snapshot is
 worth adding once the feature has landed; interaction with hsync/append writes
 (appends apply to the current version and create no new one);
-multipart uploads (the version is created at `CompleteMultipartUpload` commit; parts
-are invisible).
+multipart uploads — the version is created at `CompleteMultipartUpload` commit and
+parts stay invisible, but until that lands an MPU overwrite on a versioned bucket
+neither reclaims the previous version's blocks nor records a version for them, so
+those blocks leak; this has to be closed before multipart is declared supported.
 
 # References
 
