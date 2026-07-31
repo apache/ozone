@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -204,14 +205,15 @@ public class ListInfoSubcommand extends ScmSubcommand {
             .append(System.lineSeparator());
       } else {
         relatedPipelineNum = relatedPipelines.size();
-        relatedPipelines.forEach(
-            p -> pipelineListInfo.append(p.getId().getId().toString())
-                .append('/').append(p.getReplicationConfig().toString())
-                .append('/').append(p.getType().toString())
-                .append('/').append(p.getPipelineState().toString()).append('/')
-                .append(datanode.getID().equals(p.getLeaderId()) ?
-                    "Leader" : "Follower")
-                .append(System.lineSeparator()));
+        relatedPipelines.forEach(p -> {
+          pipelineListInfo.append(p.getId().getId().toString())
+              .append('/').append(p.getReplicationConfig().toString())
+              .append('/').append(p.getType().toString())
+              .append('/').append(p.getPipelineState().toString())
+              .append('/').append(datanode.getID().equals(p.getLeaderId()) ? "Leader" : "Follower")
+              .append('/').append(formatSupportedStorageTier(p.getSupportedStorageTier()))
+              .append(System.lineSeparator());
+        });
       }
     } else {
       pipelineListInfo
@@ -242,5 +244,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
       System.out.println("Used: " + dn.getUsed());
       System.out.printf("Percentage Used : %.2f%%%n%n", dn.getPercentUsed());
     }
+  }
+
+  private static String formatSupportedStorageTier(StorageTier tier) {
+    return tier == null ? "[]" : "[" + tier.getTierName() + "]";
   }
 }
