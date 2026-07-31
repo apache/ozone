@@ -88,6 +88,8 @@ enum Type {
   GetContainerChecksumInfo = 23;
   // Allows us to read a block
   ReadBlock = 24;
+  // Initializes a stream for writing data with PutBlock commited on close.
+  StreamInitWithPutBlock = 25;
 }
 
 
@@ -139,6 +141,7 @@ enum Result {
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
   CONTAINER_ID_MISMATCH = 48;
+  GET_SHORT_CIRCUIT_FD_FAILED = 49;
 }
 
 /**
@@ -197,8 +200,13 @@ message ContainerCommandRequestProto {
   optional   uint32 version = 24;
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
+
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
   optional   ReadBlockRequestProto readBlock = 28;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 100;
+  optional   uint64 callId = 101;
 }
 
 message ContainerCommandResponseProto {
@@ -232,6 +240,10 @@ message ContainerCommandResponseProto {
   optional   EchoResponseProto echo = 23;
   optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
   optional   ReadBlockResponseProto readBlock = 25;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 100;
+  optional   uint64 callId = 101;
 }
 
 message ContainerDataProto {
@@ -326,6 +338,7 @@ message BlockData {
 message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
+  optional bool containerAutoCreate = 3;
 }
 
 message PutBlockResponseProto {
@@ -342,10 +355,12 @@ message FinalizeBlockResponseProto  {
 
 message GetBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
+  optional bool requestShortCircuitAccess = 2 [default = false];
 }
 
 message GetBlockResponseProto  {
   required BlockData blockData = 1;
+  optional bool shortCircuitAccessGranted = 2 [default = false];
 }
 
 
@@ -441,6 +456,7 @@ message WriteChunkRequestProto  {
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
   optional PutBlockRequestProto block = 4;
+  optional bool containerAutoCreate = 5;
 }
 
 message WriteChunkResponseProto {

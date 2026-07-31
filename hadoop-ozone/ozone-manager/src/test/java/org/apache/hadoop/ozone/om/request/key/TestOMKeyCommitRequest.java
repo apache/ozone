@@ -274,7 +274,6 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNull(committedKey.getExpectedDataGeneration());
     // Generation should be changed
     assertNotEquals(closedKeyInfo.getGeneration(), committedKey.getGeneration());
     assertEquals(acls, committedKey.getAcls());
@@ -312,7 +311,6 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
     assertNotNull(committedKey);
-    assertNull(committedKey.getExpectedDataGeneration());
   }
 
   @Test
@@ -773,7 +771,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     // verify deleted key is unique generated
     String deletedKey = omMetadataManager.getOzoneKey(volumeName, omKeyInfo.getBucketName(), keyName);
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
     assertThat(rangeKVs.size()).isGreaterThan(0);
     Table.KeyValue<String, RepeatedOmKeyInfo> keyValue = rangeKVs.get(0);
@@ -875,7 +873,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     // verify deleted keys are stored in the deletedTable
     String deletedKey = omMetadataManager.getOzoneKey(volumeName, omKeyInfo.getBucketName(), keyName);
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
     assertThat(rangeKVs.size()).isGreaterThan(0);
     Table.KeyValue<String, RepeatedOmKeyInfo> keyValue = rangeKVs.get(0);

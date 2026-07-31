@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import static java.util.stream.Collectors.toList;
 
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +51,11 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private static final String PERCENT_FORMAT = "%.2f%%";
 
   @Override
+  protected void resetCommandState() {
+    reports.clear();
+  }
+
+  @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
@@ -58,7 +64,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
       // Only create JSON result object if JSON mode is enabled
       if (getOptions().isJson()) {
-        return toJson(report);
+        return toJson(hostName, report);
       }
       
       // For non-JSON mode, store the proto for later consolidation
@@ -89,20 +95,27 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       List<DatanodeDiskBalancerInfoProto> reportList = successNodes.stream()
           .map(reports::get)
           .collect(toList());
-      System.out.println(generateReport(reportList));
+      System.out.println(generateReport(successNodes, reportList));
     }
   }
 
-  private String generateReport(List<DatanodeDiskBalancerInfoProto> protos) {
-    protos.sort((a, b) ->
-        Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
+  private String generateReport(
+      List<String> successNodes, List<DatanodeDiskBalancerInfoProto> protos) {
+    List<Map.Entry<String, DatanodeDiskBalancerInfoProto>> entries = new ArrayList<>();
+    for (int i = 0; i < protos.size(); i++) {
+      entries.add(new AbstractMap.SimpleEntry<>(successNodes.get(i), protos.get(i)));
+    }
+    entries.sort((a, b) -> Double.compare(
+        b.getValue().getCurrentVolumeDensitySum(),
+        a.getValue().getCurrentVolumeDensitySum()));
 
     StringBuilder formatBuilder = new StringBuilder("Report result:%n");
     List<String> contentList = new ArrayList<>();
 
-    for (int i = 0; i < protos.size(); i++) {
-      DatanodeDiskBalancerInfoProto p = protos.get(i);
-      String dn = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(p.getNode());
+    for (int i = 0; i < entries.size(); i++) {
+      Map.Entry<String, DatanodeDiskBalancerInfoProto> entry = entries.get(i);
+      DatanodeDiskBalancerInfoProto p = entry.getValue();
+      String dn = formatDatanodeDisplayName(entry.getKey(), p.getNode());
 
       StringBuilder header = new StringBuilder();
       header.append("Datanode: ").append(dn).append(System.lineSeparator())
@@ -156,7 +169,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         formatBuilder.append("%n");
       }
 
-      if (i < protos.size() - 1) {
+      if (i < entries.size() - 1) {
         formatBuilder.append("-------%n%n");
       }
     }
@@ -198,9 +211,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
    * @param report the DiskBalancer report proto
    * @return JSON result map
    */
-  private Map<String, Object> toJson(DatanodeDiskBalancerInfoProto report) {
+  private Map<String, Object> toJson(String hostName, DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("datanode", DiskBalancerSubCommandUtil.getDatanodeHostAndIp(report.getNode()));
+    result.put("datanode", formatDatanodeDisplayName(hostName, report.getNode()));
     result.put("action", "report");
     result.put("status", "success");
     result.put("volumeDensity", formatPercent(report.getCurrentVolumeDensitySum()));

@@ -63,13 +63,13 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
+import org.apache.hadoop.hdds.scm.node.NodeTestUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.TestHelper;
@@ -177,7 +177,7 @@ class TestReconAndAdminContainerCLI {
     String volumeName = "vol1";
     String bucketName = "bucket1";
 
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(
         client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String keyNameR3 = "key1";
@@ -225,7 +225,7 @@ class TestReconAndAdminContainerCLI {
 
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.restartHddsDatanode(details, false);
-      TestNodeUtil.waitForDnToReachOpState(scmNodeManager, details, IN_SERVICE);
+      NodeTestUtil.waitForDnToReachOpState(scmNodeManager, details, IN_SERVICE);
     }
   }
 
@@ -254,19 +254,19 @@ class TestReconAndAdminContainerCLI {
     // First node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), 0, true);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline1)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), false);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline1)), false);
     }
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, initialState);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, finalState);
     // Every time a node goes into decommission,
     // a new replica-copy is made to another node.
@@ -281,19 +281,19 @@ class TestReconAndAdminContainerCLI {
     // Second node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), 0, true);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), false);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)), false);
     }
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, initialState);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, finalState);
 
     // There will be a replica copy for both maintenance and decommission.
@@ -305,16 +305,16 @@ class TestReconAndAdminContainerCLI {
     compareRMReportToReconResponse(overReplicatedState);
 
     scmClient.recommissionNodes(Arrays.asList(
-        TestNodeUtil.getDNHostAndPort(nodeToGoOffline1),
-        TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)));
+        NodeTestUtil.getDNHostAndPort(nodeToGoOffline1),
+        NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)));
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, IN_SERVICE);
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, IN_SERVICE);
 
-    TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
-    TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
+    NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
+    NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
@@ -345,7 +345,7 @@ class TestReconAndAdminContainerCLI {
 
     try {
       rmReport = scmClient.getReplicationManagerReport();
-      reconResponse = TestReconEndpointUtil
+      reconResponse = ReconEndpointTestUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
       assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
@@ -400,7 +400,7 @@ class TestReconAndAdminContainerCLI {
         RatisReplicationConfig.getInstance(replicationFactor));
 
     // Sync Recon with OM, to force it to get the new key entries.
-    TestReconEndpointUtil.triggerReconDbSyncWithOm(CONF);
+    ReconEndpointTestUtil.triggerReconDbSyncWithOm(CONF);
 
     List<Long> containerIDs = getContainerIdsForKey(omKeyInfo);
     // The list has only 1 containerID.
@@ -432,7 +432,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
+    DataTestUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())

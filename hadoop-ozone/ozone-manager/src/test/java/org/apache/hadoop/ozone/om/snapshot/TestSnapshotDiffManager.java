@@ -223,6 +223,8 @@ public class TestSnapshotDiffManager {
     codecRegistry = CodecRegistry.newBuilder()
         .addCodec(DiffReportEntry.class, getDiffReportEntryCodec())
         .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec())
+        .addCodec(OmKeyInfo.class, OmKeyInfo.getKeyTableCodec())
+        .addCodec(OmDirectoryInfo.class, OmDirectoryInfo.getCodec())
         .build();
   }
 
