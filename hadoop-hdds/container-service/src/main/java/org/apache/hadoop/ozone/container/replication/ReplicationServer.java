@@ -183,6 +183,12 @@ public class ReplicationServer {
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
+    public static final String PER_VOLUME_ENABLED_KEY =
+        PREFIX + ".per.volume.enabled";
+    public static final String PER_VOLUME_STREAMS_LIMIT_KEY =
+        PREFIX + ".per.volume.streams.limit";
+    public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 1;
+
     /**
      * The maximum number of replication commands a single datanode can execute
      * simultaneously.
@@ -224,6 +230,29 @@ public class ReplicationServer {
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
 
+    @Config(key = PER_VOLUME_ENABLED_KEY,
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        tags = {DATANODE},
+        description = "When true, push-based container replication uses a " +
+            "separate replication handler thread pool per data volume so " +
+            "that slow replication on one disk does not block replication " +
+            "on other disks. Pull replication and other replication tasks " +
+            "continue to use the global replication handler thread pool."
+    )
+    private boolean perVolumeEnabled = false;
+
+    @Config(key = PER_VOLUME_STREAMS_LIMIT_KEY,
+        type = ConfigType.INT,
+        defaultValue = "1",
+        reconfigurable = true,
+        tags = {DATANODE},
+        description = "The maximum number of concurrent push replication " +
+            "commands per data volume when per-volume replication thread " +
+            "pools are enabled."
+    )
+    private int perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
+
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
     }
@@ -257,6 +286,22 @@ public class ReplicationServer {
       this.replicationQueueLimit = limit;
     }
 
+    public boolean isPerVolumeEnabled() {
+      return perVolumeEnabled;
+    }
+
+    public void setPerVolumeEnabled(boolean enabled) {
+      this.perVolumeEnabled = enabled;
+    }
+
+    public int getPerVolumeStreamsLimit() {
+      return perVolumeStreamsLimit;
+    }
+
+    public void setPerVolumeStreamsLimit(int limit) {
+      this.perVolumeStreamsLimit = limit;
+    }
+
     @PostConstruct
     public void validate() {
       if (replicationMaxStreams < 1) {
@@ -278,6 +323,13 @@ public class ReplicationServer {
             outOfServiceFactor,
             clamped);
         outOfServiceFactor = clamped;
+      }
+
+      if (perVolumeStreamsLimit < 1) {
+        LOG.warn(PER_VOLUME_STREAMS_LIMIT_KEY + " must be greater than zero " +
+                "and was set to {}. Defaulting to {}",
+            perVolumeStreamsLimit, PER_VOLUME_STREAMS_LIMIT_DEFAULT);
+        perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
       }
     }
 
