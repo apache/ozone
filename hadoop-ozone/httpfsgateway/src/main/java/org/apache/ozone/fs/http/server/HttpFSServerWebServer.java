@@ -28,10 +28,14 @@ import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
 import org.apache.hadoop.security.authorize.AccessControlList;
@@ -72,6 +76,7 @@ public class HttpFSServerWebServer {
 
   private final HttpServer2 httpServer;
   private final String scheme;
+  private PrometheusMetricsSink prometheusMetricsSink;
 
   HttpFSServerWebServer(OzoneConfiguration conf, Configuration sslConf) throws
       Exception {
@@ -129,6 +134,10 @@ public class HttpFSServerWebServer {
         .setACL(new AccessControlList(conf.get(HTTP_ADMINS_KEY, " ")))
         .addEndpoint(endpoint)
         .build();
+
+    if (conf.getBoolean(HddsConfigKeys.HDDS_PROMETHEUS_ENABLED, true)) {
+      prometheusMetricsSink = BaseHttpServer.addPrometheusEndpoint(httpServer, conf, NAME);
+    }
   }
 
   /**
@@ -153,6 +162,10 @@ public class HttpFSServerWebServer {
 
   public void start() throws IOException {
     httpServer.start();
+    if (prometheusMetricsSink != null) {
+      DefaultMetricsSystem.instance()
+          .register("prometheus", "Hadoop metrics prometheus exporter", prometheusMetricsSink);
+    }
   }
 
   public void join() throws InterruptedException {
@@ -161,6 +174,9 @@ public class HttpFSServerWebServer {
 
   public void stop() throws Exception {
     httpServer.stop();
+    if (prometheusMetricsSink != null) {
+      DefaultMetricsSystem.instance().unregisterSource("prometheus");
+    }
   }
 
   public URL getUrl() {
