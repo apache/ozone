@@ -24,8 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -34,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -149,6 +153,173 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         response.getOMResponse().getStatus());
     return response;
+  }
+
+  private OMRequest deleteVersionRequest(Long versionId, boolean nullVersion) {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setModificationTime(Time.now());
+    if (versionId != null) {
+      keyArgs.setVersionId(versionId);
+    }
+    if (nullVersion) {
+      keyArgs.setNullVersion(true);
+    }
+    return OMRequest.newBuilder()
+        .setDeleteKeyRequest(DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs))
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  private OMClientResponse deleteVersionAt(Long versionId, boolean nullVersion,
+      long trxnLogIndex) throws Exception {
+    return new OMKeyDeleteRequest(deleteVersionRequest(versionId, nullVersion),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, trxnLogIndex);
+  }
+
+  private void seedNoncurrentVersion(long versionId, boolean nullVersion)
+      throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .setNullVersion(nullVersion)
+        .build();
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionId), version);
+  }
+
+  @Test
+  public void testPermanentDeleteRemovesOnlyTheAddressedVersion()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+    seedNoncurrentVersion(200L, false);
+
+    OMClientResponse response = deleteVersionAt(100L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    assertNull(noncurrentVersion(100L));
+    assertNotNull(noncurrentVersion(200L));
+    assertEquals(300L, currentVersion().getVersionId());
+  }
+
+  /**
+   * Permanent delete is the one delete on a versioned bucket that destroys
+   * data, so the version's blocks have to reach the deletedTable, which is the
+   * only path that ever reclaims them.
+   */
+  @Test
+  public void testPermanentDeleteSendsTheBlocksToTheDeletedTable()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersionWithBlocks(100L);
+
+    OMClientResponse response = deleteVersionAt(100L, false, 400L);
+    try (BatchOperation batch =
+             omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+
+    assertNull(omMetadataManager.getVersionedKeyTable().getSkipCache(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, 100L)));
+    assertFalse(deletedVersions().isEmpty(),
+        "the deleted version's blocks never reached the deletedTable");
+  }
+
+  /**
+   * A noncurrent version holding one block. A version with no blocks has
+   * nothing to reclaim and never reaches the deletedTable.
+   */
+  private void seedNoncurrentVersionWithBlocks(long versionId)
+      throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(version, 0L, 100L);
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionId), version);
+  }
+
+  /** Every record the deletedTable holds for this key. */
+  private List<OmKeyInfo> deletedVersions() throws Exception {
+    List<OmKeyInfo> deleted = new ArrayList<>();
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> entries =
+             omMetadataManager.getDeletedTable().iterator()) {
+      while (entries.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> entry = entries.next();
+        if (entry.getKey().contains(keyName)) {
+          deleted.addAll(entry.getValue().getOmKeyInfoList());
+        }
+      }
+    }
+    return deleted;
+  }
+
+  @Test
+  public void testPermanentDeleteReleasesQuota() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+
+    OmBucketInfo before = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    long usedNamespaceBefore = before.getUsedNamespace();
+
+    deleteVersionAt(100L, false, 400L);
+
+    OmBucketInfo after = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(usedNamespaceBefore - 1, after.getUsedNamespace());
+  }
+
+  @Test
+  public void testPermanentDeleteOfNullVersion() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, true);
+    seedNoncurrentVersion(200L, false);
+
+    OMClientResponse response = deleteVersionAt(null, true, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    assertNull(noncurrentVersion(100L));
+    assertNotNull(noncurrentVersion(200L));
+  }
+
+  @Test
+  public void testPermanentDeleteOfUnknownVersionIsNotFound() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+
+    OMClientResponse response = deleteVersionAt(999L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+        response.getOMResponse().getStatus());
+  }
+
+  /** Removing the current version has to promote a successor; that is T4.3. */
+  @Test
+  public void testPermanentDeleteOfCurrentVersionIsRejectedForNow()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+
+    OMClientResponse response = deleteVersionAt(300L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        response.getOMResponse().getStatus());
+    assertEquals(300L, currentVersion().getVersionId());
+    assertNotNull(noncurrentVersion(100L));
   }
 
   private OmKeyInfo currentVersion() throws Exception {
