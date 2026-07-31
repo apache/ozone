@@ -224,7 +224,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
    * (no stop-wait) keeps each restart short; combined with the long stale
    * interval the OPEN pipeline survives, so its node snapshot stays portless.
    * Also reflects the enablement in the SCM config so that
-   * {@code closePipelinesExposingNewPorts} does not skip portless detection.
+   * {@code closePipelinesMissingDataStreamPort} does not skip portless detection.
    */
   private void rollingRestartEnablingDataStream() throws Exception {
     for (int i = 0; i < cluster.getHddsDatanodes().size(); i++) {
@@ -234,7 +234,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
     }
     cluster.waitForClusterToBeReady();
     // Update the shared conf (picked up by a restarted SCM) and the currently
-    // running SCM so closePipelinesExposingNewPorts sees the feature enabled.
+    // running SCM so closePipelinesMissingDataStreamPort sees the feature enabled.
     conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     cluster.getStorageContainerManager().getConfiguration()
         .setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
@@ -297,7 +297,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       final PipelineManagerImpl pipelineManager =
           (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
       final BooleanSupplier streamingPipelineReady = () -> {
-        pipelineManager.scrubAndClosePipelinesExposingNewPorts();
+        pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
         return openRatisThreePipelines().stream()
             .anyMatch(TestOzoneFileSystemDataStreamEnablement::allNodesHaveDatastreamPort);
       };
@@ -357,7 +357,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       // Close the pipeline(s) exposing the new datastream port; a fresh
       // streaming-capable pipeline is created in their place by
       // BackgroundPipelineCreator.
-      pipelineManager.scrubAndClosePipelinesExposingNewPorts();
+      pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
       waitForStreamablePipeline();
 
       // The new pipeline serves a streaming write end-to-end.
@@ -404,7 +404,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       cluster.restartStorageContainerManager(true);
       waitForAllRegisteredNodesToHaveDatastreamPort();
       ((PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager())
-          .scrubAndClosePipelinesExposingNewPorts();
+          .scrubAndClosePipelinesMissingDataStreamPort();
       waitForStreamablePipeline();
 
       // Phase 2: datastream enabled -> every write streams, none fail.

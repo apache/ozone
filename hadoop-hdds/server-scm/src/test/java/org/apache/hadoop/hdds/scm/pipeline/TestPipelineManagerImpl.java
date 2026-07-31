@@ -1048,7 +1048,7 @@ public class TestPipelineManagerImpl {
       // ALLOCATED (non-open) portless -> skipped.
       final Pipeline allocated = addPipeline(pipelineManager, ALLOCATED, idsB);
 
-      pipelineManager.closePipelinesExposingNewPorts();
+      pipelineManager.closePipelinesMissingDataStreamPort();
 
       assertFalse(exists(pipelineManager, stale.getId()),
           "OPEN pipeline whose nodes expose new ports should be closed and deleted");
@@ -1070,7 +1070,7 @@ public class TestPipelineManagerImpl {
       }
       final Pipeline portless = addPipeline(pipelineManager, OPEN, nodes);
 
-      pipelineManager.closePipelinesExposingNewPorts();
+      pipelineManager.closePipelinesMissingDataStreamPort();
 
       assertTrue(exists(pipelineManager, portless.getId()),
           "portless pipeline must be kept while datastream is disabled");
@@ -1096,7 +1096,7 @@ public class TestPipelineManagerImpl {
       pipelineManager.getStateManager().addPipeline(
           ec.getProtobufMessage(ClientVersion.CURRENT_VERSION));
 
-      pipelineManager.closePipelinesExposingNewPorts();
+      pipelineManager.closePipelinesMissingDataStreamPort();
 
       assertTrue(exists(pipelineManager, ec.getId()),
           "EC pipeline must not be closed by datastream port scrubbing");
@@ -1120,7 +1120,7 @@ public class TestPipelineManagerImpl {
       }
       final Pipeline pending = addPipeline(pipelineManager, OPEN, nodes);
 
-      pipelineManager.closePipelinesExposingNewPorts();
+      pipelineManager.closePipelinesMissingDataStreamPort();
 
       assertTrue(exists(pipelineManager, pending.getId()),
           "pipeline whose registered nodes have not yet advertised the "
@@ -1142,7 +1142,7 @@ public class TestPipelineManagerImpl {
       final PipelineManagerImpl spy = spy(pipelineManager);
       doThrow(new IOException("boom")).when(spy).closePipeline(stale.getId());
       // The close failure is logged and swallowed; the loop does not throw.
-      spy.closePipelinesExposingNewPorts();
+      spy.closePipelinesMissingDataStreamPort();
       assertTrue(exists(pipelineManager, stale.getId()));
     }
   }
@@ -1152,7 +1152,7 @@ public class TestPipelineManagerImpl {
     // The background task scrubs then closes pipelines exposing new ports; on
     // an empty manager both are no-ops and must not throw.
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
-      pipelineManager.scrubAndClosePipelinesExposingNewPorts();
+      pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
     }
   }
 
@@ -1162,8 +1162,8 @@ public class TestPipelineManagerImpl {
       final PipelineManagerImpl spy = spy(pipelineManager);
       doThrow(new IOException("boom")).when(spy).scrubPipelines();
       // Scrub failure is logged and swallowed; the close pass still runs.
-      spy.scrubAndClosePipelinesExposingNewPorts();
-      verify(spy).closePipelinesExposingNewPorts();
+      spy.scrubAndClosePipelinesMissingDataStreamPort();
+      verify(spy).closePipelinesMissingDataStreamPort();
     }
   }
 }

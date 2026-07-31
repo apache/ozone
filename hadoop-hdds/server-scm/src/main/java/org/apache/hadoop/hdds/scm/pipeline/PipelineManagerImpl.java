@@ -183,8 +183,7 @@ public class PipelineManagerImpl implements PipelineManager {
             .setServiceName("BackgroundPipelineScrubber")
             .setIntervalInMillis(scrubberIntervalInMillis)
             .setWaitTimeInMillis(safeModeWaitMs)
-            .setPeriodicalTask(
-                pipelineManager::scrubAndClosePipelinesExposingNewPorts)
+            .setPeriodicalTask(pipelineManager::scrubAndClosePipelinesMissingDataStreamPort)
             .build();
 
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
@@ -564,16 +563,16 @@ public class PipelineManagerImpl implements PipelineManager {
    * registered nodes now advertise the RATIS_DATASTREAM port their stored node
    * snapshot lacks.
    */
-  public void scrubAndClosePipelinesExposingNewPorts() {
+  public void scrubAndClosePipelinesMissingDataStreamPort() {
     try {
       scrubPipelines();
     } catch (IOException e) {
       LOG.error("Unexpected error during pipeline scrubbing", e);
     }
-    closePipelinesExposingNewPorts();
+    closePipelinesMissingDataStreamPort();
   }
 
-  void closePipelinesExposingNewPorts() {
+  void closePipelinesMissingDataStreamPort() {
     if (!isDataStreamEnabled()) {
       return;
     }
@@ -585,9 +584,7 @@ public class PipelineManagerImpl implements PipelineManager {
       }
       try {
         final PipelineID id = pipeline.getId();
-        LOG.info("Closing RATIS pipeline {} whose nodes now advertise the "
-            + "datastream port so a datastream-capable pipeline can replace it",
-            id);
+        LOG.info("Closing RATIS pipeline {}", id);
         closePipeline(id);
         deletePipeline(id);
       } catch (IOException e) {
