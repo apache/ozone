@@ -2750,7 +2750,7 @@
     <profile>
       <id>aspectj-java8-10</id>
       <activation>
-        <jdk>[1.8,10]</jdk>
+        <jdk>[1.8,11)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java8.version}</aspectj.version>
@@ -2759,7 +2759,7 @@
     <profile>
       <id>aspectj-java11-20</id>
       <activation>
-        <jdk>[11,20]</jdk>
+        <jdk>[11,21)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java11.version}</aspectj.version>
@@ -2768,7 +2768,7 @@
     <profile>
       <id>aspectj-java21-24</id>
       <activation>
-        <jdk>[21,24]</jdk>
+        <jdk>[21,25)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
