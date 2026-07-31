@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -33,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -46,13 +46,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,11 +69,11 @@ import org.junit.jupiter.api.Test;
 class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   /** The version each source datanode reports as its own software version. */
-  private static final int DN_SOFTWARE_VERSION =
-      HDDSVersion.ZDU.serialize();
+  private static final int SOFTWARE_VERSION = HDDSVersion.SOFTWARE_VERSION.serialize();
 
   private ScmBlockLocationProtocol impl;
   private NodeManager nodeManager;
+  private ScmVersionManager versionManager;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private List<DatanodeDetails> nodes;
 
@@ -80,46 +82,35 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     impl = mock(ScmBlockLocationProtocol.class);
     StorageContainerManager scm = mock(StorageContainerManager.class);
     nodeManager = mock(NodeManager.class);
+    versionManager = mock(ScmVersionManager.class);
 
     nodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       DatanodeDetails dn = randomDatanodeDetails();
-      dn.setCurrentVersion(DN_SOFTWARE_VERSION);
+      dn.setCurrentVersion(SOFTWARE_VERSION);
       nodes.add(dn);
     }
 
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(
-            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        .setNodes(nodes)
-        .build();
-    AllocatedBlock block = new AllocatedBlock.Builder()
-        .setContainerBlockID(new ContainerBlockID(1L, 1L))
-        .setPipeline(pipeline)
-        .build();
+    Pipeline pipeline = buildPipeline(nodes);
+    AllocatedBlock block = blockOn(1L, pipeline);
 
-    List<AllocatedBlock> blocks = new ArrayList<>();
-    blocks.add(block);
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString())).thenReturn(blocks);
+        anyString(), any(), anyString())).thenReturn(Collections.singletonList(block));
     when(scm.getScmNodeManager()).thenReturn(nodeManager);
+    when(scm.getVersionManager()).thenReturn(versionManager);
     // Exercise the real min-across-nodes helper, driven by the getNode stubs.
-    lenient().when(nodeManager.getLowestApparentVersion(any(DatanodeDetails[].class)))
-        .thenCallRealMethod();
+    lenient().when(nodeManager.getLowestApparentVersion(any(DatanodeDetails[].class))).thenCallRealMethod();
 
-    // Default: every datanode finalized to ZDU.
+    // Default: ZDU is finalized and every datanode is at the software version.
+    when(versionManager.isAllowed(HDDSVersion.ZDU)).thenReturn(true);
     for (DatanodeDetails dn : nodes) {
-      setDatanodeApparentVersion(dn, HDDSVersion.ZDU);
+      setDatanodeApparentVersion(dn, HDDSVersion.SOFTWARE_VERSION);
     }
 
-    service = new ScmBlockLocationProtocolServerSideTranslatorPB(
-        impl, scm, mock(ProtocolMessageMetrics.class));
+    service = new ScmBlockLocationProtocolServerSideTranslatorPB(impl, scm, mock(ProtocolMessageMetrics.class));
   }
 
-  private void setDatanodeApparentVersion(DatanodeDetails dn,
-      ComponentVersion version) {
+  private void setDatanodeApparentVersion(DatanodeDetails dn, ComponentVersion version) {
     DatanodeInfo info = mock(DatanodeInfo.class);
     lenient().when(info.getLastKnownApparentVersion()).thenReturn(version);
     when(nodeManager.getNode(dn.getID())).thenReturn(info);
@@ -129,16 +120,14 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     return allocate(1).getBlocks(0).getPipeline().getMembersList();
   }
 
-  private AllocateScmBlockResponseProto allocate(int numBlocks)
-      throws Exception {
-    AllocateScmBlockRequestProto request =
-        AllocateScmBlockRequestProto.newBuilder()
-            .setSize(1024)
-            .setNumBlocks(numBlocks)
-            .setType(ReplicationType.RATIS)
-            .setFactor(ReplicationFactor.THREE)
-            .setOwner("owner")
-            .build();
+  private AllocateScmBlockResponseProto allocate(int numBlocks) throws Exception {
+    AllocateScmBlockRequestProto request = AllocateScmBlockRequestProto.newBuilder()
+        .setSize(1024)
+        .setNumBlocks(numBlocks)
+        .setType(ReplicationType.RATIS)
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("owner")
+        .build();
     return service.allocateScmBlock(request, ClientVersion.CURRENT.serialize());
   }
 
@@ -146,8 +135,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
-        .setReplicationConfig(
-            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(pipelineNodes)
         .build();
   }
@@ -159,14 +147,12 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
         .build();
   }
 
-  private void setAllocatedBlocks(List<AllocatedBlock> blocks)
-      throws Exception {
+  private void setAllocatedBlocks(List<AllocatedBlock> blocks) throws Exception {
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
         anyString(), any(), anyString())).thenReturn(blocks);
   }
 
-  private void assertAllMembersHaveVersion(int expected,
-      List<DatanodeDetailsProto> members) {
+  private void assertAllMembersHaveVersion(int expected, List<DatanodeDetailsProto> members) {
     assertEquals(nodes.size(), members.size());
     for (DatanodeDetailsProto member : members) {
       assertEquals(expected, member.getCurrentVersion());
@@ -175,62 +161,63 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   @Test
   void preFinalizedClusterClampsClientVersionDown() throws Exception {
-    // Datanodes still run ZDU software but have not finalized past
-    // STREAM_BLOCK_SUPPORT, so their apparent version is the older one.
+    // Before ZDU is finalized, datanodes report apparent versions from the
+    // HDDSLayoutFeature enum. Regardless of what they report, clients must be
+    // clamped to the last HDDSVersion before ZDU.
+    when(versionManager.isAllowed(HDDSVersion.ZDU)).thenReturn(false);
     for (DatanodeDetails dn : nodes) {
-      setDatanodeApparentVersion(dn, HDDSVersion.STREAM_BLOCK_SUPPORT);
+      setDatanodeApparentVersion(dn, HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION);
     }
 
-    assertAllMembersHaveVersion(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
-        allocateAndGetMembers());
+    assertAllMembersHaveVersion(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(), allocateAndGetMembers());
   }
 
   @Test
   void finalizedClusterForwardsRealVersion() throws Exception {
-    // Default setup: SCM and all datanodes at ZDU.
-    assertAllMembersHaveVersion(HDDSVersion.ZDU.serialize(),
-        allocateAndGetMembers());
+    assertAllMembersHaveVersion(SOFTWARE_VERSION, allocateAndGetMembers());
   }
 
   @Test
-  void unfinalizedDatanodeClampsToMinimum() throws Exception {
-    // SCM is finalized, but one straggler datanode is still at an older
-    // apparent version; the client must be clamped down to it.
-    setDatanodeApparentVersion(nodes.get(1),
-        HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+  void finalizedPipelineForwardsLowestApparentVersion() throws Exception {
+    // ZDU is finalized, but the pipeline mixes datanodes at different apparent
+    // versions (as during a later rolling upgrade). The lowest is forwarded so
+    // clients do not enable a feature an un-upgraded datanode cannot handle.
+    setDatanodeApparentVersion(nodes.get(1), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
 
-    assertAllMembersHaveVersion(
-        HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(),
-        allocateAndGetMembers());
+    assertAllMembersHaveVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(), allocateAndGetMembers());
   }
 
   @Test
   void missingDatanodeInfoFailsAllocation() throws Exception {
     when(nodeManager.getNode(nodes.get(2).getID())).thenReturn(null);
 
-    IllegalStateException e =
-        assertThrows(IllegalStateException.class, () -> allocate(1));
-    assertInstanceOf(NodeNotFoundException.class, e.getCause());
+    SCMException e = assertThrows(SCMException.class, () -> allocate(1));
+    assertEquals(SCMException.ResultCodes.NO_SUCH_DATANODE, e.getResult());
+  }
+
+  @Test
+  void emptyPipelineFailsAllocation() throws Exception {
+    setAllocatedBlocks(Collections.singletonList(blockOn(1L, buildPipeline(Collections.emptyList()))));
+
+    SCMException e = assertThrows(SCMException.class, () -> allocate(1));
+    assertEquals(SCMException.ResultCodes.NO_SUCH_DATANODE, e.getResult());
   }
 
   @Test
   void blocksSharingPipelineAllGetClampedVersion() throws Exception {
     // One straggler datanode clamps the shared pipeline's write version.
-    setDatanodeApparentVersion(nodes.get(1),
-        HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+    setDatanodeApparentVersion(nodes.get(1), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
 
     // Three blocks allocated on the same pipeline object; the memoized proto
     // must be returned for each block with the clamped version intact.
     Pipeline pipeline = buildPipeline(nodes);
-    setAllocatedBlocks(Arrays.asList(
-        blockOn(1L, pipeline), blockOn(2L, pipeline), blockOn(3L, pipeline)));
+    setAllocatedBlocks(Arrays.asList(blockOn(1L, pipeline), blockOn(2L, pipeline), blockOn(3L, pipeline)));
 
     AllocateScmBlockResponseProto response = allocate(3);
 
     assertEquals(3, response.getBlocksCount());
     for (int i = 0; i < response.getBlocksCount(); i++) {
-      assertAllMembersHaveVersion(
-          HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(),
+      assertAllMembersHaveVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(),
           response.getBlocks(i).getPipeline().getMembersList());
     }
 
@@ -243,47 +230,40 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   @Test
   void blocksOnDistinctPipelinesGetOwnVersion() throws Exception {
-    // A second, distinct pipeline whose datanodes are clamped to an older
-    // version than the default (ZDU) pipeline built in setUp().
+    // A second, distinct pipeline whose datanodes are at an older
+    // version than the software-version pipeline built in setUp().
     List<DatanodeDetails> otherNodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       DatanodeDetails dn = randomDatanodeDetails();
-      dn.setCurrentVersion(DN_SOFTWARE_VERSION);
+      dn.setCurrentVersion(SOFTWARE_VERSION);
       setDatanodeApparentVersion(dn, HDDSVersion.STREAM_BLOCK_SUPPORT);
       otherNodes.add(dn);
     }
 
     Pipeline finalized = buildPipeline(nodes);
     Pipeline straggler = buildPipeline(otherNodes);
-    setAllocatedBlocks(
-        Arrays.asList(blockOn(1L, finalized), blockOn(2L, straggler)));
+    setAllocatedBlocks(Arrays.asList(blockOn(1L, finalized), blockOn(2L, straggler)));
 
     AllocateScmBlockResponseProto response = allocate(2);
 
     assertEquals(2, response.getBlocksCount());
-    assertAllMembersHaveVersion(HDDSVersion.ZDU.serialize(),
-        response.getBlocks(0).getPipeline().getMembersList());
-    assertEquals(otherNodes.size(),
-        response.getBlocks(1).getPipeline().getMembersCount());
-    for (DatanodeDetailsProto member
-        : response.getBlocks(1).getPipeline().getMembersList()) {
-      assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
-          member.getCurrentVersion());
+    assertAllMembersHaveVersion(SOFTWARE_VERSION, response.getBlocks(0).getPipeline().getMembersList());
+    assertEquals(otherNodes.size(), response.getBlocks(1).getPipeline().getMembersCount());
+    for (DatanodeDetailsProto member : response.getBlocks(1).getPipeline().getMembersList()) {
+      assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(), member.getCurrentVersion());
     }
   }
 
   @Test
   void doesNotMutateSourcePipelineDatanodes() throws Exception {
-    for (DatanodeDetails dn : nodes) {
-      setDatanodeApparentVersion(dn, HDDSVersion.STREAM_BLOCK_SUPPORT);
-    }
+    setDatanodeApparentVersion(nodes.get(1), HDDSVersion.STREAM_BLOCK_SUPPORT);
 
     allocateAndGetMembers();
 
     // The in-memory DatanodeDetails (shared with SCM internal state) must keep
     // their real software version; only the outgoing proto is overridden.
     for (DatanodeDetails dn : nodes) {
-      assertEquals(DN_SOFTWARE_VERSION, dn.getCurrentVersion());
+      assertEquals(SOFTWARE_VERSION, dn.getCurrentVersion());
     }
   }
 }

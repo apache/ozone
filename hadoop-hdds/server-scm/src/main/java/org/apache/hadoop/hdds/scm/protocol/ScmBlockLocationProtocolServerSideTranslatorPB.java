@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -220,15 +222,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       Pipeline pipeline = block.getPipeline();
       HddsProtos.Pipeline pipelineProto = pipelineProtoCache.get(pipeline.getId());
       if (pipelineProto == null) {
-        try {
-          pipelineProto = withWriteVersion(
-              pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS),
-              computeClusterWriteVersion(pipeline));
-        } catch (NodeNotFoundException e) {
-          throw new IllegalStateException("Datanode not found in NodeManager "
-              + "while computing the write version for pipeline "
-              + pipeline.getId() + " during block allocation. Should not happen", e);
-        }
+        pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS,
+            computePipelineWriteVersion(pipeline));
         pipelineProtoCache.put(pipeline.getId(), pipelineProto);
       }
       builder.addBlocks(AllocateBlockResponse.newBuilder()
@@ -240,37 +235,34 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   /**
-   * Computes the version clients should use for writes to the given pipeline:
-   * the lowest apparent version among the pipeline's datanodes. During a rolling
-   * upgrade a pipeline may mix finalized and unfinalized datanodes: an
-   * unfinalized datanode runs the newer software but reports the older apparent
-   * version until it finalizes. Clients must not enable newer write-path
-   * features until every datanode handling their writes has finalized, so the
-   * minimum apparent version across the pipeline is used.
+   * Computes the version clients should use for writes to the given pipeline.
+   * Before ZDU is finalized, datanodes report apparent versions from the
+   * {@link HDDSLayoutFeature} enum, which clients cannot compare against the
+   * {@link HDDSVersion} enum they use. In that state we advertise the last
+   * {@link HDDSVersion} before {@code ZDU} so clients keep pre-ZDU write behavior
+   * until the cluster finalizes. Once ZDU is finalized every apparent version is
+   * an {@link HDDSVersion} and safe to share: we return the lowest one across the
+   * pipeline, so during a later rolling upgrade clients do not enable a newer
+   * write-path feature until every datanode in the pipeline has finalized.
    */
-  private int computeClusterWriteVersion(Pipeline pipeline) throws NodeNotFoundException {
-    return scm.getScmNodeManager()
-        .getLowestApparentVersion(pipeline.getNodes().toArray(new DatanodeDetails[0]))
-        .serialize();
-  }
-
-  /**
-   * Returns a copy of the pipeline proto with every member's currentVersion
-   * overridden with the computed pipeline write version. The override is applied
-   * only to the outgoing proto sent to the client; the in-memory pipeline and
-   * its {@link DatanodeDetails} objects (shared with SCM internal state) are
-   * left untouched, so persistence and admin paths keep the real datanode
-   * version. Member order is preserved, keeping {@code memberOrders} and
-   * {@code memberReplicaIndexes} indices valid.
-   */
-  private static HddsProtos.Pipeline withWriteVersion(
-      HddsProtos.Pipeline proto, int writeVersion) {
-    HddsProtos.Pipeline.Builder builder = proto.toBuilder();
-    for (int i = 0; i < builder.getMembersCount(); i++) {
-      builder.setMembers(i,
-          builder.getMembers(i).toBuilder().setCurrentVersion(writeVersion));
+  private ComponentVersion computePipelineWriteVersion(Pipeline pipeline) throws SCMException {
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    if (nodes.isEmpty()) {
+      throw new SCMException("Cannot determine the write version for pipeline "
+          + pipeline.getId() + " because it has no datanodes",
+          SCMException.ResultCodes.NO_SUCH_DATANODE);
     }
-    return builder.build();
+    if (!scm.getVersionManager().isAllowed(HDDSVersion.ZDU)) {
+      return HDDSVersion.STREAM_BLOCK_SUPPORT; // last HDDSVersion before ZDU
+    }
+    try {
+      return scm.getScmNodeManager()
+          .getLowestApparentVersion(nodes.toArray(new DatanodeDetails[0]));
+    } catch (NodeNotFoundException e) {
+      throw new SCMException("Datanode not found while computing the write version "
+          + "for pipeline " + pipeline.getId() + " during block allocation", e,
+          SCMException.ResultCodes.NO_SUCH_DATANODE);
+    }
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(
