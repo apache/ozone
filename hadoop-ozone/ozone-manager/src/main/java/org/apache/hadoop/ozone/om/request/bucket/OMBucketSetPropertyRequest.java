@@ -176,17 +176,23 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       //Check Versioning to update
       Boolean versioning = omBucketArgs.getIsVersionEnabled();
       BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
-      if (newVersioningStatus == null && versioning != null) {
-        // Legacy flag from older clients: enabling always maps to ENABLED;
-        // disabling maps to SUSPENDED once versioning has ever been enabled
-        // (the S3 state machine forbids returning to UNVERSIONED).
-        if (versioning) {
-          newVersioningStatus = BucketVersioningStatus.ENABLED;
-        } else {
-          newVersioningStatus =
-              dbBucketInfo.getVersioningStatus() == BucketVersioningStatus.UNVERSIONED
-                  ? BucketVersioningStatus.UNVERSIONED : BucketVersioningStatus.SUSPENDED;
-        }
+      if (versioning != null) {
+        // Apply the legacy flag on its own; setVersioningStatus below overrides
+        // it when a status is also being set.
+        bucketInfoBuilder.setIsVersionEnabled(versioning);
+      }
+      if (newVersioningStatus == null && versioning != null
+          && dbBucketInfo.hasVersioningStatus()) {
+        // Legacy flag from an older client against a bucket that already has an
+        // S3 versioning status: keep the two consistent. Disabling maps to
+        // SUSPENDED, since the S3 state machine forbids returning to
+        // UNVERSIONED once versioning has been enabled.
+        //
+        // On a bucket without a status the flag is left alone: it selects the
+        // legacy in-record block version list, and an old client must not be
+        // able to opt a bucket into S3 versioning semantics.
+        newVersioningStatus = versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
       }
       if (newVersioningStatus != null) {
         if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
