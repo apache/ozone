@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -67,10 +68,12 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -392,6 +395,77 @@ public class TestSCMClientProtocolServer {
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
     }
     verify(finalizationManager, never()).finalizeUpgrade();
+  }
+
+  @Test
+  public void testForceFinalizeSkipsPeerVersionCheck() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
+
+    try (SCMClientProtocolServer testServer =
+             peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(matching, older);
+      testServer.forceFinalizeUpgrade();
+    }
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testForceFinalizeSkipsUnreachablePeer() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
+    when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
+
+    try (SCMClientProtocolServer testServer =
+             peerCheckServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(unreachable);
+      // With force the peer version check is skipped, so an unreachable peer does not prevent
+      // finalization and its version is never queried.
+      testServer.forceFinalizeUpgrade();
+    }
+    verify(unreachable, never()).getPeerUpgradeStatus();
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testForceFinalizeSkipsDatanodeVersionCheck() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(3)
+        .setTotalHealthyDatanodes(3)
+        .setMinApparentVersion(HDDSVersion.DEFAULT_VERSION.serialize())
+        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setAllSoftwareVersionsMatchScm(false)
+        .build();
+    try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager,
+        Collections.emptyList(), datanodeCounts)) {
+      testServer.forceFinalizeUpgrade();
+      verify(finalizationManager).finalizeUpgrade();
+    }
+  }
+
+  @Test
+  public void testForceFinalizeAuditRecordsForceFlag() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    // Drive the failure audit path (logged at ERROR, captured by the default log4j2 config) so the
+    // recorded audit map can be inspected.
+    doThrow(new RuntimeException("test")).when(finalizationManager).finalizeUpgrade();
+
+    LogCapturer auditLog = LogCapturer.log4j2("SCMAudit");
+    try (SCMClientProtocolServer testServer = peerCheckServer(finalizationManager, Collections.emptyList())) {
+      assertThrows(RuntimeException.class, testServer::forceFinalizeUpgrade);
+    } finally {
+      auditLog.stopCapturing();
+    }
+
+    String output = auditLog.getOutput();
+    assertTrue(output.contains(SCMAction.FINALIZE_SCM_UPGRADE.getAction()),
+        "audit log should record the finalize action: " + output);
+    assertTrue(output.contains("\"force\":\"true\""),
+        "audit log should record that force was passed: " + output);
   }
 
   private SCMClientProtocolServer peerCheckServer(

@@ -606,6 +606,7 @@ message QueryUpgradeStatusResponseProto {
 }
 
 message FinalizeUpgradeRequestProto {
+  optional bool force = 1 [default = false];
 }
 
 message FinalizeUpgradeResponseProto {

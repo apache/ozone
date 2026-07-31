@@ -519,6 +519,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   void finalizeUpgrade() throws IOException;
 
+  /**
+   * Same as {@link #finalizeUpgrade()}, but SCM skips the peer SCM and datanode software version
+   * checks before finalizing. Use this to finalize when a peer or datanode is intentionally down or
+   * on a different version.
+   *
+   * @throws IOException If any error occurs.
+   */
+  void forceFinalizeUpgrade() throws IOException;
+
   @Deprecated
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)

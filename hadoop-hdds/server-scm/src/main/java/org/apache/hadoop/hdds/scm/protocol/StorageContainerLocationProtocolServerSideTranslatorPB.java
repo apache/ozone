@@ -774,7 +774,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setQueryUpgradeStatusResponse(getQueryUpgradeStatus(request.getQueryUpgradeStatusRequest()))
             .build();
       case FinalizeUpgrade:
-        impl.finalizeUpgrade();
+        if (request.getFinalizeUpgradeRequest().getForce()) {
+          impl.forceFinalizeUpgrade();
+        } else {
+          impl.finalizeUpgrade();
+        }
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)

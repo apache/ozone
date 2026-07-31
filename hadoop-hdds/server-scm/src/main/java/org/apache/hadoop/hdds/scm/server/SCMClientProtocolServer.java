@@ -1170,11 +1170,24 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    final Map<String, String> auditMap = Collections.emptyMap();
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    final Map<String, String> auditMap = Collections.singletonMap("force", String.valueOf(force));
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
-      validatePeerScmVersionsBeforeFinalize();
-      validateDatanodeVersionsBeforeFinalize();
+      if (force) {
+        LOG.warn("Forcing upgrade finalization by skipping SCM peer and datanode software version checks");
+      } else {
+        validatePeerScmVersionsBeforeFinalize();
+        validateDatanodeVersionsBeforeFinalize();
+      }
       scm.getFinalizationManager().finalizeUpgrade();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
     } catch (Exception ex) {

@@ -1199,8 +1199,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
     FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
-        .build();
+        .setForce(force).build();
     submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req));
   }
 

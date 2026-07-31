@@ -77,6 +77,18 @@ public class TestOMStartFinalizeUpgradeRequest extends OMKeyRequestTests {
 
     // SCM must have been asked to begin finalization.
     verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmContainerLocationProtocol, never()).forceFinalizeUpgrade();
+  }
+
+  @Test
+  public void testForcePreExecuteCallsScmForceFinalizeUpgrade() throws IOException {
+    OMStartFinalizeUpgradeRequest request = new OMStartFinalizeUpgradeRequest(buildRequest(true));
+
+    request.preExecute(ozoneManager);
+
+    // A forced request must route to SCM's force path so SCM skips its own version checks.
+    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
+    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
@@ -282,12 +294,13 @@ public class TestOMStartFinalizeUpgradeRequest extends OMKeyRequestTests {
           .thenReturn(unreachableClient);
 
       // With force=true the peer version check is skipped, so an unreachable peer does not
-      // prevent finalization and SCM is still asked to begin finalizing.
+      // prevent finalization and SCM is still asked to force finalization (skipping its own checks).
       new OMStartFinalizeUpgradeRequest(buildRequest(true)).preExecute(ozoneManager);
     }
 
     verify(unreachableClient, never()).getPeerUpgradeStatus();
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
+    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
@@ -302,12 +315,13 @@ public class TestOMStartFinalizeUpgradeRequest extends OMKeyRequestTests {
           .thenReturn(olderClient);
 
       // With force=true the peer version check is skipped, so a peer running a different software
-      // version does not prevent finalization and SCM is still asked to begin finalizing.
+      // version does not prevent finalization and SCM is still asked to force finalization.
       new OMStartFinalizeUpgradeRequest(buildRequest(true)).preExecute(ozoneManager);
     }
 
     verify(olderClient, never()).getPeerUpgradeStatus();
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
+    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
   }
 
   private static OMNodeDetails buildPeer(String nodeId) {
