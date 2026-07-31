@@ -645,6 +645,15 @@ public class SnapshotDefragService extends BackgroundService
     Pair<Boolean, Integer> needsDefragVersionPair = needsDefragmentation(snapshotInfo);
     if (!needsDefragVersionPair.getLeft()) {
       snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
+      int currentVersion = needsDefragVersionPair.getValue();
+      if (currentVersion > 0) {
+        try {
+          omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, currentVersion - 1);
+        } catch (IOException | IllegalArgumentException e) {
+          LOG.error("Failed to delete old checkpoint directories for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), e);
+        }
+      }
       return false;
     }
     LOG.info("Defragmenting snapshot: {} (ID: {})", snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
