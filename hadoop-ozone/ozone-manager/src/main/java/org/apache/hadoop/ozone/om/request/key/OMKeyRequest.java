@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.NoncurrentVersions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -945,6 +946,28 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
 
     return bytesUsed;
+  }
+
+  /**
+   * Returns the newest noncurrent version of the given key as a
+   * (dbKey, keyInfo) pair, or null if the key has no noncurrent version.
+   */
+  protected Pair<String, OmKeyInfo> getNewestNoncurrentVersion(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, String keyName) throws IOException {
+    return NoncurrentVersions.newestMatching(omMetadataManager, volumeName,
+        bucketName, keyName, keyInfo -> true);
+  }
+
+  /**
+   * Returns the key's null version as a (dbKey, keyInfo) pair, or null if the
+   * key has no noncurrent null version. A key has at most one.
+   */
+  protected Pair<String, OmKeyInfo> getNoncurrentNullVersion(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, String keyName) throws IOException {
+    return NoncurrentVersions.nullVersion(omMetadataManager, volumeName,
+        bucketName, keyName);
   }
 
   /**

@@ -197,6 +197,17 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
             volumeName, bucketName, keyName, versionId), version);
   }
 
+  /** A noncurrent version that only exists in the table cache, not in the DB. */
+  private void cacheOnlyNoncurrentVersion(long versionId) throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .build();
+    omMetadataManager.getVersionedKeyTable().addCacheEntry(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionId), version, 350L);
+  }
+
   @Test
   public void testPermanentDeleteRemovesOnlyTheAddressedVersion()
       throws Exception {
@@ -313,19 +324,114 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
         response.getOMResponse().getStatus());
   }
 
-  /** Removing the current version has to promote a successor; that is T4.3. */
   @Test
-  public void testPermanentDeleteOfCurrentVersionIsRejectedForNow()
+  public void testDeletingCurrentVersionPromotesTheNextNewest()
       throws Exception {
     setupVersionedBucket();
     seedCurrentVersion(300L);
     seedNoncurrentVersion(100L, false);
+    seedNoncurrentVersion(200L, false);
 
     OMClientResponse response = deleteVersionAt(300L, false, 400L);
-    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         response.getOMResponse().getStatus());
-    assertEquals(300L, currentVersion().getVersionId());
+
+    // the newest remaining version takes over, unchanged
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertEquals(200L, current.getVersionId());
+    assertFalse(current.isDeleteMarker());
+    // and no longer counts as noncurrent
+    assertNull(noncurrentVersion(200L));
     assertNotNull(noncurrentVersion(100L));
+  }
+
+  /**
+   * Promotion is positional: the record moves tables and is not rewritten, so
+   * a version keeps the identity it was created with. Comparing the whole
+   * record catches a promotion that rebuilds it - a refreshed updateID or
+   * modification time would silently change what the version means.
+   */
+  @Test
+  public void testPromotedVersionTravelsUnchanged() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    // with blocks, so the location list is part of what has to survive
+    seedNoncurrentVersionWithBlocks(200L);
+    OmKeyInfo before = noncurrentVersion(200L);
+
+    deleteVersionAt(300L, false, 400L);
+
+    assertEquals(before, currentVersion());
+  }
+
+  /**
+   * A version written by a transaction that the double buffer has not flushed
+   * yet lives only in the table cache. Promotion has to see it, otherwise an
+   * older version takes over and the newest one is orphaned.
+   */
+  @Test
+  public void testPromotionSeesVersionsStillInCache() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+    cacheOnlyNoncurrentVersion(200L);
+
+    deleteVersionAt(300L, false, 400L);
+
+    assertEquals(200L, currentVersion().getVersionId());
+    assertNotNull(noncurrentVersion(100L));
+  }
+
+  /**
+   * The mirror case: a version removed by an unflushed transaction is a
+   * tombstone in the cache while the DB still holds it. Promotion must not
+   * bring it back.
+   */
+  @Test
+  public void testPromotionSkipsVersionsTombstonedInCache() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+    seedNoncurrentVersion(200L, false);
+    // 200 is deleted but not flushed yet
+    omMetadataManager.getVersionedKeyTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, 200L)),
+        CacheValue.get(350L));
+
+    deleteVersionAt(300L, false, 400L);
+
+    assertEquals(100L, currentVersion().getVersionId());
+  }
+
+  @Test
+  public void testDeletingTheOnlyVersionRemovesTheKey() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+
+    OMClientResponse response = deleteVersionAt(300L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    assertNull(currentVersion());
+  }
+
+  /** Deleting a current delete marker is how S3 restores an object. */
+  @Test
+  public void testDeletingCurrentMarkerRestoresTheObject() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L, true);
+    seedNoncurrentVersion(100L, false);
+
+    OMClientResponse response = deleteVersionAt(300L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertEquals(100L, current.getVersionId());
+    assertFalse(current.isDeleteMarker());
   }
 
   private OmKeyInfo currentVersion() throws Exception {
