@@ -3060,6 +3060,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setDefaultReplicationConfig(
                 realBucket.getDefaultReplicationConfig())
             .setIsVersionEnabled(realBucket.getIsVersionEnabled())
+            // Only when the real bucket actually carries a status: copying the
+            // value getVersioningStatus() derives for a legacy bucket would give
+            // the link an explicit status the real bucket does not have.
+            .setVersioningStatus(realBucket.hasVersioningStatus()
+                ? realBucket.getVersioningStatus() : null)
             .setStorageType(realBucket.getStorageType())
             .setQuotaInBytes(realBucket.getQuotaInBytes())
             .setQuotaInNamespace(realBucket.getQuotaInNamespace())
