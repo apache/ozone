@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_VERSIONED_KEY_SEPARATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
@@ -664,7 +665,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public String getVersionedOzoneKeyPrefix(String volume, String bucket, String key) {
-    return getOzoneKey(volume, bucket, key) + OM_KEY_PREFIX;
+    return getOzoneKey(volume, bucket, key) + OM_VERSIONED_KEY_SEPARATOR;
   }
 
   @Override

@@ -182,9 +182,11 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
 
   /**
    * Prefix under which all noncurrent versions of the given key are stored in
-   * the versionedKeyTable. Since key names may themselves contain the
-   * separator, iterating consumers must check that the remainder after this
-   * prefix is exactly one fixed-width versionId suffix.
+   * the versionedKeyTable. The key name is separated from the versionId suffix
+   * by OM_VERSIONED_KEY_SEPARATOR rather than OM_KEY_PREFIX, so that a key's
+   * versions stay contiguous under this prefix and sort before any key nested
+   * under it: seeking this prefix yields exactly that key's versions, newest
+   * first.
    */
   String getVersionedOzoneKeyPrefix(String volume, String bucket, String key);
 
