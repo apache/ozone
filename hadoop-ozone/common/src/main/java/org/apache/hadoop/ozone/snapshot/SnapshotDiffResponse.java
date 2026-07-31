@@ -189,12 +189,16 @@ public class SnapshotDiffResponse {
     SST_FILE_DELTA_DAG_WALK,
     SST_FILE_DELTA_FULL_DIFF,
     OBJECT_ID_MAP_GEN_OBS,
+    @Deprecated
     OBJECT_ID_MAP_GEN_FSO,
     DIFF_REPORT_GEN,
-    PATH_RESOLUTION_FSO;
+    PATH_RESOLUTION_FSO,
+    OBJECT_ID_MAP_GEN_FSO_FILE,
+    OBJECT_ID_MAP_GEN_FSO_DIR;
 
     public boolean hasProgress() {
-      return this == OBJECT_ID_MAP_GEN_OBS || this == OBJECT_ID_MAP_GEN_FSO;
+      return this == OBJECT_ID_MAP_GEN_OBS || this == OBJECT_ID_MAP_GEN_FSO || this == OBJECT_ID_MAP_GEN_FSO_FILE
+          || this == OBJECT_ID_MAP_GEN_FSO_DIR;
     }
 
     public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {

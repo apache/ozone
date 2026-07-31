@@ -1342,6 +1342,18 @@
               {
                 "name": "DIFF_REPORT_GEN",
                 "integer": 5
+              },
+              {
+                "name": "PATH_RESOLUTION_FSO",
+                "integer": 6
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_FSO_FILE",
+                "integer": 7
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_FSO_DIR",
+                "integer": 8
               }
             ]
           },

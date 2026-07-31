@@ -493,7 +493,7 @@ public class TestOzoneManagerRequestHandler {
 
     SnapshotDiffResponse diffResponse =
         new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 60000L);
-    diffResponse.setSubStatus(SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO);
+    diffResponse.setSubStatus(SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR);
     diffResponse.setProgressPercent(50.0);
     Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
             Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
@@ -513,7 +513,7 @@ public class TestOzoneManagerRequestHandler {
         handler.handleReadRequest(request).getSnapshotDiffResponse();
     Assertions.assertTrue(proto.hasSubStatus());
     Assertions.assertEquals(
-        OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO,
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR,
         proto.getSubStatus());
     Assertions.assertEquals(50.0, proto.getProgressPercent(), 1e-9);
   }

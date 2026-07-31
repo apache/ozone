@@ -62,7 +62,8 @@ class TestSnapshotDiffResponse {
   }
 
   @ParameterizedTest
-  @EnumSource(value = SubStatus.class, names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO"})
+  @EnumSource(value = SubStatus.class, names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO",
+      "OBJECT_ID_MAP_GEN_FSO_FILE", "OBJECT_ID_MAP_GEN_FSO_DIR"})
   void testInProgressWithMapGenSubStatusIncludesProgress(SubStatus subStatus) {
     SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(),
         JobStatus.IN_PROGRESS, 1000L, true);
@@ -78,7 +79,8 @@ class TestSnapshotDiffResponse {
 
   @ParameterizedTest
   @EnumSource(value = SubStatus.class,
-      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO"},
+      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_FILE",
+          "OBJECT_ID_MAP_GEN_FSO_DIR"},
       mode = Mode.EXCLUDE)
   void testInProgressWithNonMapGenSubStatusRendersSubStatusButNotProgress(SubStatus subStatus) {
     SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(), JobStatus.IN_PROGRESS, 1000L, true);

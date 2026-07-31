@@ -1681,7 +1681,8 @@ public class TestSnapshotDiffManager {
 
   @ParameterizedTest
   @EnumSource(value = SnapshotDiffResponse.SubStatus.class,
-      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO"})
+      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_DIR",
+          "OBJECT_ID_MAP_GEN_FSO_FILE"})
   public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails(
       SnapshotDiffResponse.SubStatus subStatus) throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();

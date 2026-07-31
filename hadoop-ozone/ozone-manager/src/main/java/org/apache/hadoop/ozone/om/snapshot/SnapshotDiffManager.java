@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -60,7 +61,8 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.NO
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.DIFF_REPORT_GEN;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_FILE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO;
 
@@ -1247,7 +1249,9 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           fsTable.getName(), deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
     }
     recordActivity(jobKey,
-        fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO : OBJECT_ID_MAP_GEN_OBS);
+        fsTable.getName().equals(FILE_TABLE) ? OBJECT_ID_MAP_GEN_FSO_FILE
+            : fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO_DIR
+            : OBJECT_ID_MAP_GEN_OBS);
     addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(Pair::getLeft).collect(Collectors.toList()),
         !skipNativeDiff, oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
         newParentIds, tablePrefixes, jobKey, jobId);
@@ -1279,8 +1283,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     String sstFileReaderLowerBound = tablePrefix;
     String sstFileReaderUpperBound = null;
     double stepIncreasePct = 0.1;
-    double[] checkpoint = new double[1];
-    checkpoint[0] = stepIncreasePct;
+    double checkpoint = stepIncreasePct;
     if (Strings.isNotEmpty(tablePrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
@@ -1294,9 +1297,9 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         String key = kvs.getKey();
         if (totalEstimatedKeysToProcess > 0) {
           double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
-          if (progressPct >= checkpoint[0]) {
+          if (progressPct >= checkpoint) {
             updateProgress(jobKey, progressPct);
-            checkpoint[0] += stepIncreasePct;
+            checkpoint += stepIncreasePct;
           }
         }
 
@@ -1334,6 +1337,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         }
       }
     }
+    updateProgress(jobKey, 1.0);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Generated object ID map for table '{}', keys scanned: {}, elapsed: {}ms, jobId: {}",
           fsTable.getName(), keysProcessed.get(), Time.monotonicNow() - objectIdMapStart, jobId);
