@@ -598,6 +598,10 @@ enum Status {
     ETAG_NOT_AVAILABLE = 100;
 
     ATOMIC_WRITE_CONFLICT = 101;
+
+    // The addressed version exists but is a delete marker. Distinct from
+    // KEY_NOT_FOUND: the S3 Gateway maps it to 405, not 404.
+    KEY_IS_DELETE_MARKER = 102;
 }
 
 /**
@@ -1141,6 +1145,14 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // S3-compatible object versioning: addresses one specific version of the key
+    // instead of its current version. nullVersion selects the key's null version
+    // slot, which cannot be addressed by id because a null version carries a
+    // normally generated versionId like any other version. At most one of the
+    // two may be set.
+    optional uint64 versionId = 25;
+    optional bool nullVersion = 26;
 }
 
 message KeyLocation {

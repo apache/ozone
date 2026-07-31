@@ -281,5 +281,11 @@ public class OMException extends IOException {
     ETAG_NOT_AVAILABLE,
 
     ATOMIC_WRITE_CONFLICT,
+
+    /**
+     * The addressed version exists but is a delete marker. Kept distinct from
+     * KEY_NOT_FOUND because S3 answers 405 rather than 404 for it.
+     */
+    KEY_IS_DELETE_MARKER,
   }
 }
