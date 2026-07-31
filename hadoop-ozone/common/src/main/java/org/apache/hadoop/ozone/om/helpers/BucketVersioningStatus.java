@@ -52,11 +52,6 @@ public enum BucketVersioningStatus {
     }
   }
 
-  /** Maps the legacy isVersionEnabled flag of buckets without an explicit status. */
-  public static BucketVersioningStatus fromVersionEnabledFlag(boolean isVersionEnabled) {
-    return isVersionEnabled ? ENABLED : UNVERSIONED;
-  }
-
   /** The legacy isVersionEnabled flag value kept in sync with this status. */
   public boolean toVersionEnabledFlag() {
     return this == ENABLED;

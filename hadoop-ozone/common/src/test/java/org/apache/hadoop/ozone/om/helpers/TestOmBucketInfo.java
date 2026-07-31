@@ -56,9 +56,11 @@ public class TestOmBucketInfo {
   }
 
   @Test
-  public void versioningStatusDerivedFromLegacyFlag() {
+  public void legacyFlagDoesNotImplyAnS3VersioningStatus() {
     // Records written before the versioningStatus field existed deserialize
-    // unchanged: the status is derived from the legacy isVersionEnabled flag.
+    // unchanged and keep carrying the legacy flag alone. The legacy flag
+    // selects the in-record block version list, which is a different feature
+    // from S3 versioning, so it must not be promoted to a status.
     OzoneManagerProtocolProtos.BucketInfo oldRecord =
         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
             .setVolumeName("vol1")
@@ -67,6 +69,7 @@ public class TestOmBucketInfo {
             .setStorageType(HddsProtos.StorageTypeProto.DISK)
             .build();
     OmBucketInfo bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertFalse(bucket.hasVersioningStatus());
     assertEquals(BucketVersioningStatus.UNVERSIONED,
         bucket.getVersioningStatus());
     assertFalse(bucket.getIsVersionEnabled());
@@ -74,9 +77,13 @@ public class TestOmBucketInfo {
 
     oldRecord = oldRecord.toBuilder().setIsVersionEnabled(true).build();
     bucket = OmBucketInfo.getFromProtobuf(oldRecord);
-    assertEquals(BucketVersioningStatus.ENABLED,
+    assertFalse(bucket.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
         bucket.getVersioningStatus());
     assertTrue(bucket.getIsVersionEnabled());
+    // the absent status survives the round trip, so a re-serialized legacy
+    // record is still distinguishable from an S3-versioned one
+    assertFalse(bucket.getProtobuf().hasVersioningStatus());
     assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
   }
 
@@ -104,40 +111,33 @@ public class TestOmBucketInfo {
         .setBucketName("bucket")
         .setVolumeName("vol1");
 
-    // default is UNVERSIONED
+    // no status set at all
+    assertFalse(builder.build().hasVersioningStatus());
     assertEquals(BucketVersioningStatus.UNVERSIONED,
         builder.build().getVersioningStatus());
 
-    // legacy true -> ENABLED
+    // the legacy flag sets only itself: no status is derived from it
     builder.setIsVersionEnabled(true);
-    assertEquals(BucketVersioningStatus.ENABLED,
+    assertFalse(builder.build().hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
         builder.build().getVersioningStatus());
     assertTrue(builder.build().getIsVersionEnabled());
 
-    // explicit SUSPENDED forces the legacy flag to false
+    // an explicit status is authoritative and drives the legacy flag
     builder.setVersioningStatus(BucketVersioningStatus.SUSPENDED);
+    assertTrue(builder.build().hasVersioningStatus());
     assertEquals(BucketVersioningStatus.SUSPENDED,
         builder.build().getVersioningStatus());
     assertFalse(builder.build().getIsVersionEnabled());
 
-    // legacy false does not clobber an explicitly SUSPENDED status
-    builder.setIsVersionEnabled(false);
-    assertEquals(BucketVersioningStatus.SUSPENDED,
-        builder.build().getVersioningStatus());
+    // ENABLED shows up as true to clients that only know the legacy flag
+    builder.setVersioningStatus(BucketVersioningStatus.ENABLED);
+    assertTrue(builder.build().getIsVersionEnabled());
 
     // a null status is a no-op (records without the new field)
     builder.setVersioningStatus(null);
-    assertEquals(BucketVersioningStatus.SUSPENDED,
+    assertEquals(BucketVersioningStatus.ENABLED,
         builder.build().getVersioningStatus());
-
-    // legacy false on a never-enabled bucket stays UNVERSIONED
-    OmBucketInfo unversioned = OmBucketInfo.newBuilder()
-        .setBucketName("bucket")
-        .setVolumeName("vol1")
-        .setIsVersionEnabled(false)
-        .build();
-    assertEquals(BucketVersioningStatus.UNVERSIONED,
-        unversioned.getVersioningStatus());
   }
 
   @Test
