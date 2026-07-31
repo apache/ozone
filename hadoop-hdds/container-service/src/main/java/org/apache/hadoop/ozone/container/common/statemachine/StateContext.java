@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeStat
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus.CommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
@@ -767,6 +768,10 @@ public class StateContext {
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
             command, command.getTerm(), currentTerm);
+        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
+            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
       }
     } finally {
       lock.unlock();
@@ -784,14 +789,19 @@ public class StateContext {
       if (commandQueue.size() >= maxCommandQueueLimit) {
         LOG.warn("Ignore command as command queue crosses max limit {}.",
             maxCommandQueueLimit);
+        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
+            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+          addCmdStatus(command);
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
         return;
       }
       updateTermOfLeaderSCM(command);
       commandQueue.add(command);
+      addCmdStatus(command);
     } finally {
       lock.unlock();
     }
-    this.addCmdStatus(command);
   }
 
   public EnumCounters<SCMCommandProto.Type> getCommandQueueSummary() {
@@ -848,6 +858,14 @@ public class StateContext {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
+              .setCmdId(cmd.getId())
+              .setStatus(Status.PENDING)
+              .setType(cmd.getType())
+              .build());
+    } else if (cmd.getType() == SCMCommandProto.Type.replicateContainerCommand
+        || cmd.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+      addCmdStatus(cmd.getId(),
+          CommandStatusBuilder.newBuilder()
               .setCmdId(cmd.getId())
               .setStatus(Status.PENDING)
               .setType(cmd.getType())

@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +31,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.ReplicationStatus;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.Event;
@@ -47,10 +51,12 @@ public class TestCommandStatusReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestCommandStatusReportHandler.class);
   private CommandStatusReportHandler cmdStatusReportHandler;
+  private ReplicationStatus replicationStatus;
 
   @BeforeEach
   public void setup() {
     cmdStatusReportHandler = new CommandStatusReportHandler();
+    replicationStatus = null;
   }
 
   @Test
@@ -81,11 +87,31 @@ public class TestCommandStatusReportHandler implements EventPublisher {
         dn, report);
   }
 
+  @Test
+  public void replicationFailureFiresReplicationStatusEvent() {
+    CommandStatus failedReplication = CommandStatus.newBuilder()
+        .setCmdId(HddsIdFactory.getLongId())
+        .setStatus(CommandStatus.Status.FAILED)
+        .setType(Type.replicateContainerCommand)
+        .build();
+
+    cmdStatusReportHandler.onMessage(
+        getStatusReport(Collections.singletonList(failedReplication)), this);
+    assertNotNull(replicationStatus);
+    assertEquals(1, replicationStatus.getCmdStatus().size());
+    assertEquals(CommandStatus.Status.FAILED,
+        replicationStatus.getCmdStatus().get(0).getStatus());
+  }
+
   @Override
+  @SuppressWarnings("unchecked")
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void
       fireEvent(EVENT_TYPE event, PAYLOAD payload) {
     LOG.info("firing event of type {}, payload {}", event.getName(), payload
         .toString());
+    if (event == SCMEvents.REPLICATION_STATUS) {
+      replicationStatus = (ReplicationStatus) payload;
+    }
   }
 
   private List<CommandStatus> getCommandStatusList() {
