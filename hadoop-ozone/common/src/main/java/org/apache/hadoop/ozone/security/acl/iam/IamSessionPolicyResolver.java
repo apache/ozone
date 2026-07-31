@@ -309,7 +309,12 @@ public final class IamSessionPolicyResolver {
             ERROR_PREFIX + "Invalid Condition operator value structure - " + operatorValue, MALFORMED_POLICY_DOCUMENT);
       }
 
-      final String keyName = operatorValue.fieldNames().hasNext() ? operatorValue.fieldNames().next() : null;
+      if (operatorValue.size() != 1) {
+        throw new OMException(
+            ERROR_PREFIX + "Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+      }
+
+      final String keyName = operatorValue.fieldNames().next();
       if (!"s3:prefix".equalsIgnoreCase(keyName)) {
         throw new OMException(ERROR_PREFIX + "Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
       }

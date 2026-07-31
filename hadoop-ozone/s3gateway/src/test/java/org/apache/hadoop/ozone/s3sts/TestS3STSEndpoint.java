@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.time.Instant;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Form;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
@@ -68,6 +69,8 @@ public class TestS3STSEndpoint {
   private S3STSEndpoint endpoint;
   private ObjectStore objectStore;
   private AuditLogger auditLogger;
+  private MultivaluedHashMap<String, String> queryParameters;
+  private Form formParameters;
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
   private static final String ROLE_SESSION_NAME = "test-session";
   private static final String ROLE_USER_ARN = "arn:aws:sts::123456789012:assumed-role/test-role/" + ROLE_SESSION_NAME;
@@ -87,7 +90,9 @@ public class TestS3STSEndpoint {
     final UriInfo uriInfo = mock(UriInfo.class);
     when(context.getUriInfo()).thenReturn(uriInfo);
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
-    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    queryParameters = new MultivaluedHashMap<>();
+    when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
+    formParameters = new Form();
 
     // Stub assumeRole to return deterministic credentials.
     objectStore = mock(ObjectStore.class);
@@ -115,6 +120,184 @@ public class TestS3STSEndpoint {
         .setStringToSign("dummy-string")
         .build();
     endpoint.setSignatureInfo(signatureInfo);
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsUnsupportedParameterForGetMethod() throws Exception {
+    setAssumeRoleQueryParameters("PolicyArns.member.1", "arn:aws:iam::123456789012:policy/test-policy");
+
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(501, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "UnsupportedOperation",
+        "AssumeRole optional parameter(s) not implemented: PolicyArns.member.1");
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsUnsupportedParameterForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
+    formParameters.param("ExternalId", "external-id");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(501, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "UnsupportedOperation",
+        "AssumeRole optional parameter(s) not implemented: ExternalId");
+  }
+
+  @Test
+  public void testStsAssumeRoleAllowsSupportedParametersForGetMethod() {
+    setAssumeRoleQueryParameters(
+        "Action", "AssumeRole",
+        "RoleArn", ROLE_ARN,
+        "RoleSessionName", ROLE_SESSION_NAME,
+        "DurationSeconds", "3600",
+        "Version", "2011-06-15");
+
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
+  }
+
+  @Test
+  public void testStsAssumeRoleAllowsSignatureParametersForGetMethod() {
+    setAssumeRoleQueryParameters(
+        "Action", "AssumeRole",
+        "RoleArn", ROLE_ARN,
+        "RoleSessionName", ROLE_SESSION_NAME,
+        "DurationSeconds", "3600",
+        "Version", "2011-06-15",
+        "X-Amz-Algorithm", "AWS4-HMAC-SHA256",
+        "X-Amz-Credential", "test-user/20260101/us-east-1/sts/aws4_request",
+        "X-Amz-Date", "20260101T000000Z",
+        "X-Amz-Expires", "3600",
+        "X-Amz-SignedHeaders", "host",
+        "X-Amz-Signature", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsUnknownParameterForGetMethod() throws Exception {
+    setAssumeRoleQueryParameters("TotallyUnknownParam", "x");
+
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "Unsupported AssumeRole parameter(s): TotallyUnknownParam");
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsUnknownParameterForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
+    formParameters.param("TotallyUnknownParam", "y");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "Unsupported AssumeRole parameter(s): TotallyUnknownParam");
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsBlankParameterNameForGetMethod() throws Exception {
+    setAssumeRoleQueryParameters("", "x");
+
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "Unsupported AssumeRole parameter(s): ");
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsBlankParameterNameForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
+    formParameters.param("", "x");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "Unsupported AssumeRole parameter(s): ");
+  }
+
+  @Test
+  public void testStsAssumeRoleIgnoresUnknownQueryStringParameterForPostMethod() {
+    queryParameters.add("foo", "bar");
+
+    // For POST requests, only body (form) parameters should be validated.
+    // Query string parameters should not affect validation results.
+    setBaseAssumeRoleFormParameters();
+    final Response response = endpoint.post(formParameters);
+    response.close();
+
+    assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsUnsupportedSigningParametersForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
+    formParameters.param("AWSAccessKeyId", "test-user");
+    formParameters.param("Signature", "signature");
+    formParameters.param("Expires", "3600");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "Unsupported AssumeRole parameter(s): AWSAccessKeyId, Expires, Signature");
   }
 
   @Test
@@ -157,8 +340,9 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForPostMethod() throws Exception {
+    setBaseAssumeRoleFormParameters();
     //noinspection resource
-    final Response response = endpoint.post("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.post(formParameters);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -203,6 +387,22 @@ public class TestS3STSEndpoint {
     final Document doc = parseXml(errorMessage);
     final Element root = doc.getDocumentElement();
     assertEquals("UnknownOperationException", root.getLocalName());
+  }
+
+  @Test
+  public void testStsNullFormForPostMethod() throws Exception {
+    final Response response = endpoint.post(null);
+
+    assertEquals(400, response.getStatus());
+    verifyNoInteractions(auditLogger);
+    final String errorMessage = (String) response.getEntity();
+    assertEquals("<UnknownOperationException/>", errorMessage);
+
+    final Document doc = parseXml(errorMessage);
+    final Element root = doc.getDocumentElement();
+    assertEquals("UnknownOperationException", root.getLocalName());
+
+    response.close();
   }
 
   @Test
@@ -561,6 +761,29 @@ public class TestS3STSEndpoint {
     assertTrue(message.contains("Invalid character '/' in RoleSessionName"));
     assertTrue(message.contains(
         "'policy' failed to satisfy constraint: Member must have length less than or equal to 2048"));
+  }
+
+  private void setAssumeRoleQueryParameters(String... nameValuePairs) {
+    queryParameters.clear();
+    for (int i = 0; i < nameValuePairs.length; i += 2) {
+      queryParameters.add(nameValuePairs[i], nameValuePairs[i + 1]);
+    }
+  }
+
+  private void setBaseAssumeRoleFormParameters() {
+    setAssumeRoleFormParameters(
+        "Action", "AssumeRole",
+        "RoleArn", ROLE_ARN,
+        "RoleSessionName", ROLE_SESSION_NAME,
+        "DurationSeconds", "3600",
+        "Version", "2011-06-15");
+  }
+
+  private void setAssumeRoleFormParameters(String... nameValuePairs) {
+    formParameters = new Form();
+    for (int i = 0; i < nameValuePairs.length; i += 2) {
+      formParameters.param(nameValuePairs[i], nameValuePairs[i + 1]);
+    }
   }
 
   private static Document parseXml(String xml) throws Exception {

@@ -139,6 +139,36 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testMultipleConditionKeysWithPrefixFirstThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"x\", \"aws:SourceIp\": \"1.2.3.4\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testMultipleConditionKeysWithUnsupportedKeyFirstThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"aws:SourceIp\": \"1.2.3.4\", \"s3:prefix\": \"x\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
   public void testUnsupportedEffectThrows() {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +

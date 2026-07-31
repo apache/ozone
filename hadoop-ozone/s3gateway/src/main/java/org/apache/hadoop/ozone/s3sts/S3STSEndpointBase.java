@@ -23,6 +23,8 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -132,5 +134,13 @@ public class S3STSEndpointBase implements Auditor {
 
   protected Map<String, String> getAuditParameters() {
     return AuditUtils.getAuditParameters(context);
+  }
+
+  protected MultivaluedMap<String, String> getQueryParameters() {
+    if (context == null || context.getUriInfo() == null) {
+      return new MultivaluedHashMap<>();
+    }
+    final MultivaluedMap<String, String> params = context.getUriInfo().getQueryParameters();
+    return params == null ? new MultivaluedHashMap<>() : params;
   }
 }
