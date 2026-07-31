@@ -37,7 +37,8 @@ import org.junit.jupiter.api.Test;
 class TestSnapDiffDependencyGraph {
 
   @Test
-  void testParentCreateBeforeChildCreate() {
+  void testAncestorCreateBeforeDescendantCreateOnPathPrefix() {
+    // CREATE parent/child requires CREATE parent first (to-snapshot prefix).
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(2L, 1L, CREATE, "parent/child"),
         entry(1L, 0L, CREATE, "parent"));
@@ -48,7 +49,8 @@ class TestSnapDiffDependencyGraph {
   }
 
   @Test
-  void testChildDeleteBeforeParentDelete() {
+  void testDescendantDeleteBeforeAncestorDeleteOnPathPrefix() {
+    // DELETE parent/child requires DELETE parent/child before DELETE parent.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "parent"),
         entry(2L, 1L, DELETE, "parent/child"));
@@ -99,7 +101,58 @@ class TestSnapDiffDependencyGraph {
   }
 
   @Test
-  void testRenameBeforeDeleteParentDirectory() {
+  void testDescendantDeleteBeforeAncestorRenameOnPathPrefix() {
+    // DELETE A/child must precede RENAME A -> B (A is a strict prefix of A/child).
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 1L, DELETE, "A/child"));
+
+    List<DiffType> orderedTypes = toDiffTypes(sort(entries));
+    assertEquals(Arrays.asList(DELETE, RENAME), orderedTypes);
+  }
+
+  @Test
+  void testDescendantDeleteBeforeDeepAncestorRenameOnPathPrefix() {
+    // file1 at A/B/C/file1 is deleted; ancestor A/B is renamed to D/B; A is
+    // deleted. Intermediate directory C is omitted from the report. The delete
+    // must precede the ancestor rename because A/B/C/file1 is under A/B.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(2L, 4L, RENAME, "A/B", "D/B"),
+        entry(5L, 4L, DELETE, "A/B/C/file1"),
+        entry(1L, 0L, DELETE, "A"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, DELETE, "A/B/C/file1"),
+        indexOf(ordered, RENAME, "A/B"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A/B"),
+        indexOf(ordered, DELETE, "A"));
+  }
+
+  @Test
+  void testDescendantDeleteBeforeDeepAncestorDeleteOnPathPrefix() {
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "A"),
+        entry(3L, 2L, DELETE, "A/B/C/file1"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, DELETE, "A/B/C/file1"),
+        indexOf(ordered, DELETE, "A"));
+  }
+
+  @Test
+  void testAncestorCreateBeforeDeepDescendantCreateOnPathPrefix() {
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(3L, 2L, CREATE, "A/B/C"),
+        entry(1L, 0L, CREATE, "A"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, CREATE, "A"),
+        indexOf(ordered, CREATE, "A/B/C"));
+  }
+
+  @Test
+  void testDescendantNonDeleteBeforeAncestorDeleteOnPathPrefix() {
+    // RENAME A/B -> C/B must precede DELETE A (A is a strict prefix of A/B).
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "A"),
         entry(2L, 1L, RENAME, "A/B", "C/B"));
@@ -109,7 +162,55 @@ class TestSnapDiffDependencyGraph {
   }
 
   @Test
+  void testRenameAfterTargetParentCreatedAndBeforeSourceParentDeleted() {
+    // RENAME A/B -> C/B needs CREATE C first (to-snapshot prefix on C/B),
+    // then must precede DELETE A (from-snapshot prefix on A/B).
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        renameEntry(2L, 1L, 3L, "A/B", "C/B"),
+        entry(3L, 0L, CREATE, "C"),
+        entry(1L, 0L, DELETE, "A"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, CREATE, "C"),
+        indexOf(ordered, RENAME, "A/B"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A/B"),
+        indexOf(ordered, DELETE, "A"));
+  }
+
+  @Test
+  void testRenameChainFreesPathBeforeReuse() {
+    // N (objectId 2) is renamed P2 -> P3, freeing P2. M (objectId 1) is renamed
+    // P1 -> P2, occupying P2. The rename that frees P2 must be applied before
+    // the rename that occupies it. M's rename is listed first to expose the
+    // missing chain edge.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "P1", "P2"),
+        entry(2L, 0L, RENAME, "P2", "P3"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, RENAME, "P2"),
+        indexOf(ordered, RENAME, "P1"));
+  }
+
+  @Test
+  void testGetOrderedEntriesIsIdempotent() {
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(2L, 1L, CREATE, "parent/child"),
+        entry(1L, 0L, CREATE, "parent"));
+
+    SnapDiffDependencyGraph graph = new SnapDiffDependencyGraph(entries);
+    List<SnapDiffDependencyEntry> first = graph.getOrderedEntries();
+    List<SnapDiffDependencyEntry> second = graph.getOrderedEntries();
+
+    assertEquals(first, second);
+    assertEquals(Arrays.asList(CREATE, CREATE), toDiffTypes(second));
+    assertEquals("parent", second.get(0).getSourcePath());
+    assertEquals("parent/child", second.get(1).getSourcePath());
+  }
+
+  @Test
   void testModifyAndRenameForSameObjectKeepDependencyOrder() {
+    // CREATE parent via to-snapshot prefix; MODIFY/RENAME order via intra-object rule.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(2L, 1L, MODIFY, "parent/child"),
         entry(2L, 1L, RENAME, "parent/old-child", "parent/child"),
@@ -127,11 +228,7 @@ class TestSnapDiffDependencyGraph {
 
   @Test
   void testModifyAtSourcePathOrderedBeforeRename() {
-    // Object 2 is both modified and renamed. MODIFY is reported at the
-    // from-snapshot (pre-rename) path "parent/a.txt", and RENAME moves that
-    // same path to "parent/b.txt". The content change must be applied while
-    // the path is still "parent/a.txt", so MODIFY must precede RENAME.
-    // RENAME is listed first to expose the missing intra-object edge.
+    // Same objectId: MODIFY at the RENAME source path must precede the RENAME.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(2L, 1L, RENAME, "parent/a.txt", "parent/b.txt"),
         entry(2L, 1L, MODIFY, "parent/a.txt"));
@@ -142,9 +239,10 @@ class TestSnapDiffDependencyGraph {
 
   @Test
   void testTopologicalSortDetectsCycle() {
+    // Cross-object path swap: each RENAME must precede the other (rename chain).
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
-        entry(1L, 2L, CREATE, "a"),
-        entry(2L, 1L, CREATE, "b"));
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, RENAME, "B", "A"));
 
     assertThrows(IllegalStateException.class,
         () -> new SnapDiffDependencyGraph(entries).getOrderedEntries());
@@ -182,6 +280,33 @@ class TestSnapDiffDependencyGraph {
       DiffType diffType, String sourcePath, String targetPath) {
     return new SnapDiffDependencyEntry(objectId, parentObjectId,
         getDiffReportEntry(diffType, sourcePath, targetPath));
+  }
+
+  private static SnapDiffDependencyEntry renameEntry(long objectId,
+      long sourceParentObjectId, long targetParentObjectId, String sourcePath,
+      String targetPath) {
+    return new SnapDiffDependencyEntry(objectId, sourceParentObjectId,
+        targetParentObjectId, getDiffReportEntry(RENAME, sourcePath, targetPath));
+  }
+
+  private static int indexOf(List<SnapDiffDependencyEntry> ordered,
+      DiffType diffType, String sourcePath) {
+    for (int i = 0; i < ordered.size(); i++) {
+      SnapDiffDependencyEntry entry = ordered.get(i);
+      if (entry.getDiffType() == diffType
+          && sourcePath.equals(entry.getSourcePath())) {
+        return i;
+      }
+    }
+    throw new AssertionError(
+        "Entry not found: " + diffType + " " + sourcePath);
+  }
+
+  private static void assertBefore(List<SnapDiffDependencyEntry> ordered,
+      int firstIndex, int secondIndex) {
+    assertTrue(firstIndex < secondIndex,
+        "Expected index " + firstIndex + " before " + secondIndex
+            + " in " + toDiffTypes(ordered));
   }
 
   private static List<DiffType> toDiffTypes(

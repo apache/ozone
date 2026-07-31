@@ -25,17 +25,49 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 /**
  * Metadata for a classified snapshot diff entry used to build the dependency
  * graph for dependency-ordered report emission.
+ *
+ * <p>An entry carries both a source (from-snapshot) and a target (to-snapshot)
+ * parent object id. For most diff types these are identical, but a RENAME can
+ * move an object between parents, so the two ids may differ:
+ * <ul>
+ *   <li>The target parent drives to-snapshot hierarchy ordering (a parent must
+ *       be created/renamed before its children).</li>
+ *   <li>The source parent drives from-snapshot ordering (an entry must be
+ *       applied before its source parent is deleted).</li>
+ * </ul>
  */
 public final class SnapDiffDependencyEntry {
 
   private final long objectId;
-  private final long parentObjectId;
+  private final long sourceParentObjectId;
+  private final long targetParentObjectId;
   private final DiffReportEntry reportEntry;
 
+  // Lazily decoded path caches. The graph reads each path several times while
+  // building edges, so decoding once avoids repeated String allocation. These
+  // are derived from reportEntry and are not part of equals/hashCode.
+  private String sourcePath;
+  private String targetPath;
+  private boolean targetPathDecoded;
+
+  /**
+   * Creates an entry whose source and target parent are the same object.
+   * Suitable for CREATE, DELETE and MODIFY where the object does not move.
+   */
   public SnapDiffDependencyEntry(long objectId, long parentObjectId,
       DiffReportEntry reportEntry) {
+    this(objectId, parentObjectId, parentObjectId, reportEntry);
+  }
+
+  /**
+   * Creates an entry with distinct source and target parents. Use this for
+   * RENAME entries that move an object between parents.
+   */
+  public SnapDiffDependencyEntry(long objectId, long sourceParentObjectId,
+      long targetParentObjectId, DiffReportEntry reportEntry) {
     this.objectId = objectId;
-    this.parentObjectId = parentObjectId;
+    this.sourceParentObjectId = sourceParentObjectId;
+    this.targetParentObjectId = targetParentObjectId;
     this.reportEntry = Objects.requireNonNull(reportEntry, "reportEntry");
   }
 
@@ -43,8 +75,12 @@ public final class SnapDiffDependencyEntry {
     return objectId;
   }
 
-  public long getParentObjectId() {
-    return parentObjectId;
+  public long getSourceParentObjectId() {
+    return sourceParentObjectId;
+  }
+
+  public long getTargetParentObjectId() {
+    return targetParentObjectId;
   }
 
   public DiffReportEntry getReportEntry() {
@@ -56,14 +92,22 @@ public final class SnapDiffDependencyEntry {
   }
 
   public String getSourcePath() {
-    return new String(reportEntry.getSourcePath(), StandardCharsets.UTF_8);
+    String path = sourcePath;
+    if (path == null) {
+      path = new String(reportEntry.getSourcePath(), StandardCharsets.UTF_8);
+      sourcePath = path;
+    }
+    return path;
   }
 
   public String getTargetPath() {
-    if (reportEntry.getTargetPath() == null) {
-      return null;
+    if (!targetPathDecoded) {
+      byte[] bytes = reportEntry.getTargetPath();
+      targetPath = bytes == null
+          ? null : new String(bytes, StandardCharsets.UTF_8);
+      targetPathDecoded = true;
     }
-    return new String(reportEntry.getTargetPath(), StandardCharsets.UTF_8);
+    return targetPath;
   }
 
   public boolean isDelete() {
@@ -80,12 +124,14 @@ public final class SnapDiffDependencyEntry {
     }
     SnapDiffDependencyEntry that = (SnapDiffDependencyEntry) other;
     return objectId == that.objectId
-        && parentObjectId == that.parentObjectId
+        && sourceParentObjectId == that.sourceParentObjectId
+        && targetParentObjectId == that.targetParentObjectId
         && reportEntry.equals(that.reportEntry);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(objectId, parentObjectId, reportEntry);
+    return Objects.hash(objectId, sourceParentObjectId, targetParentObjectId,
+        reportEntry);
   }
 }
