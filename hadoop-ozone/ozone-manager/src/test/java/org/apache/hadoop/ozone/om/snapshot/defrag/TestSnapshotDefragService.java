@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
@@ -1153,7 +1152,7 @@ public class TestSnapshotDefragService {
       IOException defragException = new IOException("Defrag failed");
       if (previousSnapshotExists) {
         Mockito.doThrow(defragException).when(spyDefragService).performIncrementalDefragmentation(
-            any(), any(), anyInt(), any(), any(), any());
+            any(), any(), any(), any(), any());
       } else {
         Mockito.doThrow(defragException).when(spyDefragService).performFullDefragmentation(
             any(), any(), any());
