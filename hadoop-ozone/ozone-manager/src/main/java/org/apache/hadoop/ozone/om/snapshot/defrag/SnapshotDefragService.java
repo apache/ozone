@@ -574,19 +574,36 @@ public class SnapshotDefragService extends BackgroundService
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getActiveSnapshot(
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName())) {
       DBCheckpoint checkpoint = snapshot.get().getMetadataManager().getStore().getCheckpoint(tmpDefragDir, true);
-      try (OmMetadataManagerImpl metadataManagerBeforeTruncate =
-               createDefragCheckpointMetadataManager(checkpoint, false)) {
-        DBStore dbStore = metadataManagerBeforeTruncate.getStore();
-        for (String table : metadataManagerBeforeTruncate.listTableNames()) {
-          if (!incrementalColumnFamilies.contains(table)) {
-            dbStore.dropTable(table);
+      Path checkpointLocation = checkpoint.getCheckpointLocation();
+      boolean checkpointSuccessful = false;
+      try {
+        try (OmMetadataManagerImpl metadataManagerBeforeTruncate =
+                 createDefragCheckpointMetadataManager(checkpoint, false)) {
+          DBStore dbStore = metadataManagerBeforeTruncate.getStore();
+          for (String table : metadataManagerBeforeTruncate.listTableNames()) {
+            if (!incrementalColumnFamilies.contains(table)) {
+              dbStore.dropTable(table);
+            }
+          }
+        } catch (Exception e) {
+          throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
+        }
+        // This will recreate the column families in the checkpoint.
+        OmMetadataManagerImpl result = createDefragCheckpointMetadataManager(checkpoint, false);
+        checkpointSuccessful = true;
+        return result;
+      } finally {
+        if (!checkpointSuccessful && Files.exists(checkpointLocation)) {
+          try {
+            deleteDirectory(checkpointLocation);
+          } catch (IOException cleanupException) {
+            LOG.error("Failed to clean up checkpoint directory {} for snapshot: {} (ID: {}). " +
+                "Disk spacde may not be freed. Manual cleanup may be required.",
+                checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
+                cleanupException);
           }
         }
-      } catch (Exception e) {
-        throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
       }
-      // This will recreate the column families in the checkpoint.
-      return createDefragCheckpointMetadataManager(checkpoint, false);
     }
   }
 
