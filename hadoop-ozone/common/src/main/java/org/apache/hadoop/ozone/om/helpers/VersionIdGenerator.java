@@ -38,7 +38,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  *       versionedKeyTable ordering and version promotion depend on this;</li>
  *   <li>an id is assigned once when the version is created and never changes
  *       afterwards, so that external references stay valid;</li>
- *   <li>{@link #NULL_VERSION_ID} is reserved and is never generated.</li>
+ *   <li>{@link #UNSET_VERSION_ID} and {@link #FIRST_VERSION_ID} are reserved
+ *       and are never generated.</li>
  * </ul>
  *
  * <p>The first constraint binds one generator, not a sequence of them: the
@@ -52,16 +53,22 @@ import org.apache.hadoop.util.ReflectionUtils;
 public interface VersionIdGenerator {
 
   /**
-   * Reserved id of the null version slot, rendered as the literal "null" by
-   * the S3 layer. Never returned by a generator.
+   * Unset value of the optional versionId field, carried by records written
+   * before versioning existed. Reserved, and never returned by a generator.
+   *
+   * <p>This is not the id of the null version: a null version carries a
+   * normally generated id like any other version and is identified by the
+   * {@code isNullVersion} attribute instead. Pinning it to a fixed low value
+   * would misorder a null created between two versioned writes, which is the
+   * middle version of the key rather than its oldest.
    */
-  long NULL_VERSION_ID = 0L;
+  long UNSET_VERSION_ID = 0L;
 
   /**
-   * Reserved id of the pinned first version of a key, a separate slot from
-   * {@link #NULL_VERSION_ID}. Only assigned by generators that pin the first
-   * version of a key; it is smaller than any transaction index, so such a
-   * version sorts at the old end of the key's version sequence.
+   * Reserved id of the pinned first version of a key. Only assigned by
+   * generators that pin the first version of a key; it is smaller than any
+   * transaction index, so such a version sorts at the old end of the key's
+   * version sequence.
    */
   long FIRST_VERSION_ID = 1L;
 

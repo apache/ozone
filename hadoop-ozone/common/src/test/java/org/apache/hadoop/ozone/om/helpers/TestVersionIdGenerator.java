@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.helpers.VersionIdGenerator.FIRST_VERSION_ID;
-import static org.apache.hadoop.ozone.om.helpers.VersionIdGenerator.NULL_VERSION_ID;
+import static org.apache.hadoop.ozone.om.helpers.VersionIdGenerator.UNSET_VERSION_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -66,13 +66,13 @@ public class TestVersionIdGenerator {
   @MethodSource("generators")
   void generatedIdsNeverCollideWithReservedIds(VersionIdGenerator generator) {
     for (long index = FIRST_USABLE_INDEX; index < 100; index++) {
-      assertNotEquals(NULL_VERSION_ID, generator.generateVersionId(index, true));
-      assertNotEquals(NULL_VERSION_ID, generator.generateVersionId(index, false));
+      assertNotEquals(UNSET_VERSION_ID, generator.generateVersionId(index, true));
+      assertNotEquals(UNSET_VERSION_ID, generator.generateVersionId(index, false));
     }
     // A transaction index that lands on a reserved id is a misconfiguration of
     // the Ratis log rather than something to silently work around.
     assertThrows(IllegalArgumentException.class,
-        () -> generator.generateVersionId(NULL_VERSION_ID, true));
+        () -> generator.generateVersionId(UNSET_VERSION_ID, true));
     assertThrows(IllegalArgumentException.class,
         () -> generator.generateVersionId(FIRST_VERSION_ID, true));
   }
@@ -88,7 +88,7 @@ public class TestVersionIdGenerator {
 
   @Test
   void reservedIdsDoNotCollide() {
-    assertNotEquals(NULL_VERSION_ID, FIRST_VERSION_ID);
+    assertNotEquals(UNSET_VERSION_ID, FIRST_VERSION_ID);
   }
 
   @Test
@@ -125,8 +125,8 @@ public class TestVersionIdGenerator {
   }
 
   @Test
-  void pinnedFirstSentinelIsNotTheNullVersion() {
-    assertNotEquals(NULL_VERSION_ID,
+  void pinnedFirstSentinelIsNotTheUnsetId() {
+    assertNotEquals(UNSET_VERSION_ID,
         new PinnedFirstVersionIdGenerator().generateVersionId(7, false));
   }
 
