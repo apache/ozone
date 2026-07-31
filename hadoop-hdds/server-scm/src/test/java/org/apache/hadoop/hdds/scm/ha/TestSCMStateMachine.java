@@ -47,14 +47,13 @@ public class TestSCMStateMachine {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMMetrics metrics = SCMMetrics.create();
     when(scm.getMetrics()).thenReturn(metrics);
-    mockCloseForStateMachine(scm);
 
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    try (SCMStateMachine stateMachine = new SCMStateMachine(scm, buffer)) {
-      stateMachine.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
-    }
+    // The contents of the state machine are mocked, so SCMStateMachine#close is a no-op.
+    SCMStateMachine stateMachine = new SCMStateMachine(scm, buffer);
+    stateMachine.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
 
     assertTrue(metrics.getRatisEvents().contains("Configuration changed at term index"));
 
@@ -73,48 +72,35 @@ public class TestSCMStateMachine {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMMetrics metrics = SCMMetrics.create();
     when(scm.getMetrics()).thenReturn(metrics);
-    mockCloseForStateMachine(scm);
 
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    try (SCMStateMachine stateMachine = new SCMStateMachine(scm, buffer)) {
-      ScmInvoker<?> invoker = mock(ScmInvoker.class);
-      when(invoker.invokeLocal(any(), any())).thenThrow(
-          new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
-      stateMachine.registerInvoker(RequestType.FINALIZE, invoker);
+    // The contents of the state machine are mocked, so SCMStateMachine#close is a no-op.
+    SCMStateMachine stateMachine = new SCMStateMachine(scm, buffer);
+    ScmInvoker<?> invoker = mock(ScmInvoker.class);
+    when(invoker.invokeLocal(any(), any())).thenThrow(
+        new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
+    stateMachine.registerInvoker(RequestType.FINALIZE, invoker);
 
-      SCMRatisRequest request = SCMRatisRequest.of(
-          RequestType.FINALIZE, "finalize", new Class<?>[]{});
-      StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
-          .setLogData(request.encode().getContent())
-          .build();
-      LogEntryProto logEntry = LogEntryProto.newBuilder()
-          .setTerm(1)
-          .setIndex(1)
-          .setStateMachineLogEntry(smLogEntry)
-          .build();
-      TransactionContext trx = mock(TransactionContext.class);
-      when(trx.getStateMachineLogEntry()).thenReturn(smLogEntry);
-      when(trx.getLogEntry()).thenReturn(logEntry);
+    SCMRatisRequest request = SCMRatisRequest.of(
+        RequestType.FINALIZE, "finalize", new Class<?>[]{});
+    StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
+        .setLogData(request.encode().getContent())
+        .build();
+    LogEntryProto logEntry = LogEntryProto.newBuilder()
+        .setTerm(1)
+        .setIndex(1)
+        .setStateMachineLogEntry(smLogEntry)
+        .build();
+    TransactionContext trx = mock(TransactionContext.class);
+    when(trx.getStateMachineLogEntry()).thenReturn(smLogEntry);
+    when(trx.getLogEntry()).thenReturn(logEntry);
 
-      // terminate throws ExitException when system exit is disabled
-      assertThrows(ExitUtils.ExitException.class,
-          () -> stateMachine.applyTransaction(trx));
-    }
+    // terminate throws ExitException when system exit is disabled
+    assertThrows(ExitUtils.ExitException.class,
+        () -> stateMachine.applyTransaction(trx));
 
     metrics.unRegister();
-  }
-
-  /**
-   * Stub the SCM HA manager so SCMStateMachine.close() sees a stopped Ratis server and performs a
-   * clean shutdown instead of dereferencing null when the state machine is auto-closed.
-   */
-  private static void mockCloseForStateMachine(StorageContainerManager scm) {
-    SCMHAManager haManager = mock(SCMHAManager.class);
-    SCMRatisServer ratisServer = mock(SCMRatisServer.class);
-    when(scm.getScmHAManager()).thenReturn(haManager);
-    when(haManager.getRatisServer()).thenReturn(ratisServer);
-    when(ratisServer.isStopped()).thenReturn(true);
   }
 }
