@@ -1,0 +1,99 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.helpers;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.util.ReflectionUtils;
+
+/**
+ * Assigns the versionId of an object version when the version is committed.
+ *
+ * <p>Deployments differ in whether they need a version identity that can be
+ * constructed without listing, so the implementation is chosen per cluster
+ * through {@link OMConfigKeys#OZONE_OM_VERSIONING_VERSION_ID_GENERATOR}.
+ * Implementations must be public, have a public no-argument constructor, and
+ * satisfy the constraints that the versionedKeyTable layout and version
+ * promotion rely on:
+ *
+ * <ul>
+ *   <li>ids strictly increase within a key: for one generator, the id of a
+ *       version created later is always greater than the id of every version of
+ *       that key created before it, never equal and never smaller. The
+ *       versionedKeyTable ordering and version promotion depend on this;</li>
+ *   <li>an id is assigned once when the version is created and never changes
+ *       afterwards, so that external references stay valid;</li>
+ *   <li>{@link #UNSET_VERSION_ID} and {@link #FIRST_VERSION_ID} are reserved
+ *       and are never generated.</li>
+ * </ul>
+ *
+ * <p>The first constraint binds one generator, not a sequence of them: the
+ * generator is cluster-wide and may be changed on a running cluster, and the
+ * new one knows nothing of the ids the old one handed out.
+ * {@code VersionIdAllocator} enforces the constraint at commit time and refuses
+ * a write whose id does not come after the key's current version, so a change
+ * of generator fails loudly on affected keys instead of corrupting their
+ * version order.
+ */
+public interface VersionIdGenerator {
+
+  /**
+   * Unset value of the optional versionId field, carried by records written
+   * before versioning existed. Reserved, and never returned by a generator.
+   *
+   * <p>This is not the id of the null version: a null version carries a
+   * normally generated id like any other version and is identified by the
+   * {@code isNullVersion} attribute instead. Pinning it to a fixed low value
+   * would misorder a null created between two versioned writes, which is the
+   * middle version of the key rather than its oldest.
+   */
+  long UNSET_VERSION_ID = 0L;
+
+  /**
+   * Reserved id of the pinned first version of a key. Only assigned by
+   * generators that pin the first version of a key; it is smaller than any
+   * transaction index, so such a version sorts at the old end of the key's
+   * version sequence.
+   */
+  long FIRST_VERSION_ID = 1L;
+
+  /**
+   * Generates the versionId to freeze on a version being committed.
+   *
+   * @param transactionLogIndex index of the committing OM Ratis transaction
+   * @param hasCurrentVersion whether keyTable already holds a current version
+   *     of the key being committed. The write path looks the current version up
+   *     anyway, so generators that treat the first version of a key specially
+   *     need no read of their own.
+   * @return the versionId of the new version
+   */
+  long generateVersionId(long transactionLogIndex, boolean hasCurrentVersion);
+
+  /**
+   * Instantiates the generator configured for this cluster.
+   *
+   * @throws RuntimeException if the configured class cannot be instantiated
+   */
+  static VersionIdGenerator fromConfiguration(ConfigurationSource conf) {
+    Class<? extends VersionIdGenerator> generatorClass = conf.getClass(
+        OMConfigKeys.OZONE_OM_VERSIONING_VERSION_ID_GENERATOR,
+        OMConfigKeys.OZONE_OM_VERSIONING_VERSION_ID_GENERATOR_DEFAULT,
+        VersionIdGenerator.class);
+    return ReflectionUtils.newInstance(generatorClass, null);
+  }
+}
