@@ -4201,7 +4201,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException if download or cleanup fails
    */
   public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
-    if (!isRunning() || testInstallSnapshot) {
+    if (!isRunningOrBootstrapping() || testInstallSnapshot) {
       LOG.warn("OzoneManager is not in running state, state {}. Abort install snapshot from Leader.",
           omState);
       return null;
@@ -4247,6 +4247,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       cleanupCheckpoint(omDBCheckpoint);
     }
     return termIndex;
+  }
+
+  private boolean isRunningOrBootstrapping() {
+    return omState == State.RUNNING || omState == State.BOOTSTRAPPING;
   }
 
   private void cleanupCheckpoint(DBCheckpoint omDBCheckpoint) throws IOException {
