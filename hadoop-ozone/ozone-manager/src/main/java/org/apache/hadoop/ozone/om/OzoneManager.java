@@ -5042,7 +5042,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public void setCheckpointBackupInjector(FaultInjector injector) {
+  void setCheckpointBackupInjector(FaultInjector injector) {
     checkpointBackupInjector = injector;
   }
 

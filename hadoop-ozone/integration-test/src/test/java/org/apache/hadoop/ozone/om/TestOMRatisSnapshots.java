@@ -590,9 +590,9 @@ public class TestOMRatisSnapshots {
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
     assertNotNull(leaderCheckpointLocation);
     Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
-    assertTrue(omDbDir.toFile().mkdir());
+    Files.createDirectory(omDbDir);
     moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
-    Files.createDirectory(leaderCheckpointLocation.resolve(OM_SNAPSHOT_DIR));
+    Files.createDirectories(leaderCheckpointLocation.resolve(OM_SNAPSHOT_DIR));
 
     TransactionInfo leaderCheckpointTrxnInfo =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
@@ -630,6 +630,7 @@ public class TestOMRatisSnapshots {
           OM_DB_NAME + " was replaced rather than restored");
     } finally {
       followerOM.setCheckpointBackupInjector(null);
+      cluster.setupExitManagerForTesting();
     }
   }
 
