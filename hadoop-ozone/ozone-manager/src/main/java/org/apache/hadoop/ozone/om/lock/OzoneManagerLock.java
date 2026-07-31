@@ -26,10 +26,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.EnumMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.RandomAccess;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
@@ -163,7 +166,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     private OMLockDetails acquireSelected(Resource resource, boolean isRead, Iterable<String[]> keys) {
       return acquireImpl(resource, (r, startWaitingTimeNanos) -> {
-        for (ReentrantReadWriteLock lock : bulkGet(lockMap.get(r), keys)) {
+        for (ReentrantReadWriteLock lock : bulkGetForAcquire(lockMap.get(r), keys)) {
           acquireLock(r, isRead, lock, startWaitingTimeNanos);
         }
       });
@@ -206,10 +209,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     private OMLockDetails releaseSelected(Resource resource, boolean isRead, Iterable<String[]> keys) {
       return releaseImpl(resource, r -> {
-        final List<ReentrantReadWriteLock> list = bulkGet(lockMap.get(r), keys);
-        // Release locks in reverse order.
-        for (int i = list.size() - 1; i >= 0; i--) {
-          releaseLock(r, isRead, list.get(i));
+        for (ReentrantReadWriteLock lock : bulkGetForRelease(lockMap.get(r), keys)) {
+          releaseLock(r, isRead, lock);
         }
       });
     }
@@ -260,20 +261,48 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return SimpleStriped.readWriteLock(size, fair);
   }
 
-  static List<ReentrantReadWriteLock> bulkGet(Striped<ReentrantReadWriteLock> striped, Iterable<String[]> keys) {
-    final Iterable<ReentrantReadWriteLock> iterable = striped.bulkGet(
-        CollectionUtils.as(keys, CompositeKey::combineKeys)); // no copying
-    // although the return type of Striped.bulkGet(..) is Iterable, its implementation currently returns a List.
-    if (iterable instanceof List) {
-      return (List<ReentrantReadWriteLock>) iterable;
+  /** @return locks in ascending order for acquire. */
+  static Iterable<ReentrantReadWriteLock> bulkGetForAcquire(
+      Striped<ReentrantReadWriteLock> striped, Iterable<String[]> keys) {
+    return striped.bulkGet(CollectionUtils.as(keys, CompositeKey::combineKeys)); // no copying
+  }
+
+  /** @return locks in descending order for release. */
+  static Iterable<ReentrantReadWriteLock> bulkGetForRelease(
+      Striped<ReentrantReadWriteLock> striped, Iterable<String[]> keys) {
+    final Iterable<ReentrantReadWriteLock> iterable = bulkGetForAcquire(striped, keys);
+
+    // although the return type of Striped.bulkGet(..) is Iterable, its implementation currently returns an ArrayList.
+    if (iterable instanceof List && iterable instanceof RandomAccess) {
+      final List<ReentrantReadWriteLock> list = (List<ReentrantReadWriteLock>) iterable;
+      // return in descending order
+      return () -> new Iterator<ReentrantReadWriteLock>() {
+        private int i = list.size() - 1;
+
+        @Override
+        public boolean hasNext() {
+          return i >= 0;
+        }
+
+        @Override
+        public ReentrantReadWriteLock next() {
+          return list.get(i--);
+        }
+      };
     }
 
-    // fallback copying to a list
-    final List<ReentrantReadWriteLock> list = new LinkedList<>();
-    for (ReentrantReadWriteLock lock : iterable) {
-      list.add(lock);
+    // use Deque
+    final Deque<ReentrantReadWriteLock> deque;
+    if (iterable instanceof Deque) {
+      deque = (Deque<ReentrantReadWriteLock>) iterable;
+    } else {
+      // fallback copying to a list
+      deque = new LinkedList<>();
+      for (ReentrantReadWriteLock lock : iterable) {
+        deque.add(lock);
+      }
     }
-    return list;
+    return deque::descendingIterator;
   }
 
   /**
