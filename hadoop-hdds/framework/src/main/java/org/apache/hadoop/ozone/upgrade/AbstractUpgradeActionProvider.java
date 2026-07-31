@@ -80,8 +80,7 @@ public abstract class AbstractUpgradeActionProvider<T extends UpgradeAction<?>>
           LOG.info("Registering Upgrade Action : {}", action.name());
           upgradeActions.put(version, action);
         } catch (Exception e) {
-          LOG.error("Cannot instantiate Upgrade Action class {}",
-              clazz.getSimpleName(), e);
+          throw new IllegalStateException("Cannot instantiate Upgrade Action class " + clazz.getName(), e);
         }
       } else {
         LOG.warn("Found upgrade action class not of type {} : {}",
