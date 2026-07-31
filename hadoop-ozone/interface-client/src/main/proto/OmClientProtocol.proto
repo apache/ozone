@@ -609,6 +609,12 @@ enum Status {
 
     LIFECYCLE_CONFIGURATION_NOT_FOUND = 102;
     UPDATE_ID_NOT_MATCH = 103;
+
+    // The addressed version exists but is a delete marker. Kept distinct from
+    // KEY_NOT_FOUND so that the S3 Gateway can answer such a read with 405
+    // MethodNotAllowed rather than 404; the gateway mapping is added with the
+    // rest of the endpoints.
+    KEY_IS_DELETE_MARKER = 104;
 }
 
 /**
@@ -1158,6 +1164,15 @@ message KeyArgs {
     // not already. Set on every request that can create a version, and ignored
     // unless the bucket has versioning enabled when the request is applied.
     optional uint64 proposedVersionId = 25;
+
+    // S3-compatible object versioning: addresses one specific version of the key
+    // instead of its current version. Distinct from proposedVersionId above,
+    // which numbers a version being created rather than selecting an existing
+    // one. nullVersion selects the key's null version slot, which cannot be
+    // addressed by id because a null version carries a normally generated
+    // versionId like any other version. At most one of the two may be set.
+    optional uint64 versionId = 26;
+    optional bool nullVersion = 27;
 }
 
 message KeyLocation {
