@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteMarkerResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyVersionDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyResponse;
@@ -88,9 +90,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath)
-            // A delete on a versioned bucket creates a delete marker, and a
-            // marker is a version, so it needs an id proposed here on the OM
-            // that received the request. Unused on an unversioned bucket.
+            // A delete without a versionId on a versioned bucket creates a
+            // delete marker, and a marker is a version, so it needs an id
+            // proposed here on the OM that received the request. Unused on an
+            // unversioned bucket, and by a delete that addresses a version.
             .setProposedVersionId(
                 ozoneManager.getVersionIdAllocator().propose());
 
@@ -140,6 +143,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     // whether the request took the delete marker path, and so may have left
     // versionedKeyTable entries in the table cache for this transaction
     boolean insertingDeleteMarker = false;
+    // whether the request took the permanent version delete path, and so may
+    // have left versionedKeyTable entries in the table cache
+    boolean deletingVersion = false;
     long startNanos = Time.monotonicNowNanos();
     try {
       String objectKey =
@@ -158,7 +164,21 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      if (omBucketInfo.isS3VersioningEnabled()) {
+      if (keyArgs.hasVersionId() || keyArgs.getNullVersion()) {
+        // DELETE ?versionId= permanently removes one version. It is the only
+        // delete that destroys data on a versioned bucket.
+        if (!omBucketInfo.isS3VersioningEnabled()) {
+          throw new OMException("Bucket " + bucketName
+              + " does not have S3 versioning enabled",
+              NOT_SUPPORTED_OPERATION);
+        }
+        deletingVersion = true;
+        omClientResponse = deleteVersion(omMetadataManager, omBucketInfo,
+            omKeyInfo, keyArgs, volumeName, bucketName, keyName, trxnLogIndex,
+            omResponse);
+        // Noncurrent versions are invisible to plain reads, so removing one
+        // does not change the visible key count.
+      } else if (omBucketInfo.isS3VersioningEnabled()) {
         // A delete without a versionId removes no data: a delete marker
         // becomes the current version and the version it supersedes moves to
         // the versionedKeyTable. Like S3, the marker is inserted even when the
@@ -235,9 +255,16 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // touching the versionedKeyTable cache would otherwise leave an entry
       // behind that is in no DB and is never cleaned up.
       OMResponse errorResponse = createErrorOMResponse(omResponse, exception);
-      omClientResponse = insertingDeleteMarker
-          ? new OMKeyDeleteMarkerResponse(errorResponse, getBucketLayout())
-          : new OMKeyDeleteResponse(errorResponse, getBucketLayout());
+      if (insertingDeleteMarker) {
+        omClientResponse =
+            new OMKeyDeleteMarkerResponse(errorResponse, getBucketLayout());
+      } else if (deletingVersion) {
+        omClientResponse =
+            new OMKeyVersionDeleteResponse(errorResponse, getBucketLayout());
+      } else {
+        omClientResponse =
+            new OMKeyDeleteResponse(errorResponse, getBucketLayout());
+      }
       long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
       perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
@@ -275,6 +302,86 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  /**
+   * Permanently removes the addressed version: the only delete that destroys
+   * data on a versioned bucket. Only a noncurrent version is handled here -
+   * removing the current one has to hand the keyTable place over to the
+   * next-newest version, which is not supported yet.
+   *
+   * @param currentVersion the key's current version, or null if it has none
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private OMClientResponse deleteVersion(OMMetadataManager omMetadataManager,
+      OmBucketInfo omBucketInfo, OmKeyInfo currentVersion,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, String volumeName,
+      String bucketName, String keyName, long trxnLogIndex,
+      OMResponse.Builder omResponse) throws IOException {
+
+    boolean nullVersion = keyArgs.getNullVersion();
+    if (currentVersion != null && (nullVersion
+        ? currentVersion.isNullVersion()
+        : Long.valueOf(keyArgs.getVersionId()).equals(
+            currentVersion.getVersionId()))) {
+      throw new OMException(
+          "Permanently deleting the current version of key " + keyName
+              + " is not supported yet", NOT_SUPPORTED_OPERATION);
+    }
+
+    // Everything that can fail runs before the first cache entry is added, so
+    // that a failed request leaves no versionedKeyTable cache entry behind.
+    String versionedKey;
+    OmKeyInfo version;
+    if (nullVersion) {
+      versionedKey = null;
+      version = null;
+      String prefix = omMetadataManager
+          .getVersionedOzoneKeyPrefix(volumeName, bucketName, keyName);
+      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+               omMetadataManager.getVersionedKeyTable().iterator(prefix)) {
+        while (versions.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> entry = versions.next();
+          if (entry.getValue().isNullVersion()) {
+            versionedKey = entry.getKey();
+            version = entry.getValue();
+            break;
+          }
+        }
+      }
+    } else {
+      versionedKey = omMetadataManager.getVersionedOzoneKey(
+          volumeName, bucketName, keyName, keyArgs.getVersionId());
+      version = omMetadataManager.getVersionedKeyTable().get(versionedKey);
+    }
+    if (version == null) {
+      throw new OMException("Version not found for key " + keyName,
+          KEY_NOT_FOUND);
+    }
+
+    version = version.toBuilder().setUpdateID(trxnLogIndex).build();
+
+    omMetadataManager.getVersionedKeyTable().addCacheEntry(
+        new CacheKey<>(versionedKey), CacheValue.get(trxnLogIndex));
+
+    // A delete marker holds no blocks, so it releases namespace but no space.
+    long quotaReleased = sumBlockLengths(version);
+    boolean isVersionNonEmpty = !OmKeyInfo.isKeyEmpty(version);
+    omBucketInfo.decrUsedBytes(quotaReleased, isVersionNonEmpty);
+    omBucketInfo.decrUsedNamespace(1L, isVersionNonEmpty);
+
+    return new OMKeyVersionDeleteResponse(
+        omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+        version, versionedKey, omBucketInfo.copyObject());
+  }
+
+  /**
+   * Supersedes the key's current version with a delete marker: a record with
+   * no data blocks that makes plain reads of the key return KEY_NOT_FOUND
+   * while every existing version stays readable by versionId. The superseded
+   * current version becomes a noncurrent version; a record written before
+   * versioning was enabled carries no versionId and becomes the key's null
+   * version. When the key does not exist the marker is still inserted, as S3
+   * does.
+   */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OMClientResponse insertDeleteMarker(OzoneManager ozoneManager,
       OMMetadataManager omMetadataManager, OmBucketInfo omBucketInfo,
