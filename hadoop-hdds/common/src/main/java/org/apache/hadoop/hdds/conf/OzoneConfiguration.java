@@ -446,6 +446,36 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     delegatingProps = null;
   }
 
+  /**
+   * Sets {@code value} unless the property was already set explicitly
+   * (programmatically, from the command line, or from a {@code *-site.xml}).
+   * Values that come only from default resources ({@code *-default.xml}) are overridden.
+   * <p>
+   * Hadoop {@link Configuration#setIfUnset(String, String)} uses {@code get(name) == null},
+   * which never succeeds for keys present in default resources after HDDS-12777.
+   */
+  @Override
+  public synchronized void setIfUnset(String name, String value) {
+    if (!isExplicitlySet(name)) {
+      set(name, value);
+    }
+  }
+
+  private boolean isExplicitlySet(String name) {
+    String[] sources = getPropertySources(name);
+    if (sources == null) {
+      return false;
+    }
+    for (String source : sources) {
+      // Any source other than a *-default.xml (programmatically, command line,
+      // a *-site.xml, or a custom resource) counts as explicitly set.
+      if (source != null && !source.endsWith("-default.xml")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   protected final synchronized Properties getProps() {
     if (delegatingProps == null) {

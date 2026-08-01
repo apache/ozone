@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -299,6 +300,65 @@ public class TestOzoneConfiguration {
     assertEquals(val, configuration.get(key));
 
     assertNotEquals(val, new OzoneConfiguration().get(key));
+  }
+
+  @Test
+  public void setIfUnsetOverridesDefaultButKeepsExplicitValue() {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    OzoneConfiguration subject = new OzoneConfiguration();
+
+    // Default resources provide a value, so Hadoop's get(key) is non-null.
+    assertNotNull(subject.get(key));
+    String fromDefaults = subject.get(key);
+
+    subject.setIfUnset(key, "20");
+    assertEquals("20", subject.get(key));
+    assertNotEquals(fromDefaults, subject.get(key));
+
+    subject.set(key, "42");
+    subject.setIfUnset(key, "20");
+    assertEquals("42", subject.get(key));
+  }
+
+  @Test
+  public void setIfUnsetPreservesSiteXmlValue(@TempDir File tempDir)
+      throws IOException {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    File ozoneSite = new File(tempDir, "ozone-site.xml");
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        Files.newOutputStream(ozoneSite.toPath()), StandardCharsets.UTF_8))) {
+      startConfig(out);
+      appendProperty(out, key, "99");
+      endConfig(out);
+    }
+
+    OzoneConfiguration subject = new OzoneConfiguration();
+    subject.addResource(new Path(ozoneSite.getAbsolutePath()));
+    assertEquals("99", subject.get(key));
+
+    subject.setIfUnset(key, "20");
+    assertEquals("99", subject.get(key));
+  }
+
+  @Test
+  public void setIfUnsetPreservesCustomResourceValue(@TempDir File tempDir)
+      throws IOException {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    File custom = new File(tempDir, "custom-config.xml");
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        Files.newOutputStream(custom.toPath()), StandardCharsets.UTF_8))) {
+      startConfig(out);
+      appendProperty(out, key, "77");
+      endConfig(out);
+    }
+
+    OzoneConfiguration subject = new OzoneConfiguration();
+    subject.addResource(new Path(custom.getAbsolutePath()));
+    assertEquals("77", subject.get(key));
+
+    // A value from any non-default resource is explicit and must be preserved.
+    subject.setIfUnset(key, "20");
+    assertEquals("77", subject.get(key));
   }
 
   @Test
