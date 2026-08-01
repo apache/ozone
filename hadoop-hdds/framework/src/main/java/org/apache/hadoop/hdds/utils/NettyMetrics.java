@@ -81,17 +81,21 @@ public final class NettyMetrics implements MetricsSource {
 
   /**
    * Resolve the maximum direct memory using only public API, mirroring Netty's
-   * resolution order: the {@code io.netty.maxDirectMemory} system property, then
+   * resolution order: the netty {@code maxDirectMemory} system property, then
    * the {@code -XX:MaxDirectMemorySize} JVM flag, then the maximum heap size.
    * The JVM flag is read from the runtime input arguments (command line or
    * {@code JAVA_TOOL_OPTIONS}); a value set by other means falls back to the
    * maximum heap size.
+   * <p>
+   * The property is the shaded ({@code ratis-thirdparty}) one, since
+   * {@link #usedDirectMemory()} reads usage from the shaded allocator; using the
+   * unshaded {@code io.netty.maxDirectMemory} would mismatch the two.
    *
    * @return maximum direct memory in bytes
    */
   static long maxDirectMemory() {
     return resolveMaxDirectMemory(
-        Long.getLong("io.netty.maxDirectMemory", -1L),
+        Long.getLong("org.apache.ratis.thirdparty.io.netty.maxDirectMemory", -1L),
         ManagementFactory.getRuntimeMXBean().getInputArguments(),
         Runtime.getRuntime().maxMemory());
   }
