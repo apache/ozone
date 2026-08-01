@@ -57,12 +57,12 @@ public abstract class CompositeKey {
       }
       final TwoComponents that = (TwoComponents) obj;
       return this.hashCode == that.hashCode
-          && Objects.equals(this.first, that.first)
-          && Objects.equals(this.second, that.second);
+          && this.first.equals(that.first)
+          && this.second.equals(that.second);
     }
   }
 
-  private static class MultiComponents extends CompositeKey {
+  private static final class MultiComponents extends CompositeKey {
     private final int hashCode;
     private final Object[] components;
 
