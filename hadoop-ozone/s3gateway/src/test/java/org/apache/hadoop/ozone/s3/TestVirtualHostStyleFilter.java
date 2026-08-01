@@ -200,8 +200,8 @@ public class TestVirtualHostStyleFilter {
       "[::1,[::1",
   })
   public void testCheckHostWithoutPort(String host, String expected) {
-    assertEquals(expected,
-        new VirtualHostStyleFilter().checkHostWithoutPort(host));
+    assertThat(new VirtualHostStyleFilter().checkHostWithoutPort(host))
+        .isEqualTo(expected);
   }
 
   @Test
@@ -210,10 +210,31 @@ public class TestVirtualHostStyleFilter {
     virtualHostStyleFilter.setConfiguration(conf);
 
     // Host header without a port still resolves the bucket.
-    ContainerRequest containerRequest = createContainerRequest(
-        "mybucket.localhost", "/myfile", null, true);
-    virtualHostStyleFilter.filter(containerRequest);
+    ContainerRequestContext requestContext =
+        createRequestContext("mybucket.localhost", "/myfile");
+    virtualHostStyleFilter.filter(requestContext);
     URI expected = new URI("http://" + s3HttpAddr + "/mybucket/myfile");
-    assertEquals(expected, containerRequest.getRequestUri());
+    verify(requestContext).setRequestUri(new URI("http://" + s3HttpAddr), expected);
+  }
+
+  /**
+   * {@code ozone.s3g.domain.name} configured as an IPv6 literal must match an
+   * IPv6 Host header whether it is configured with or without brackets. Before
+   * normalization a bracketed config ({@code [::1]}) failed to match
+   * {@code Host: [::1]:9878}, which {@code getHost()} reduces to {@code ::1}.
+   */
+  @ParameterizedTest
+  @CsvSource(value = {"[::1]", "::1"})
+  public void testPathStyleWithIPv6Domain(String configuredDomain)
+      throws Exception {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, configuredDomain);
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    // Path-style request whose Host matches the IPv6 domain is left unchanged.
+    ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+    when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn("[::1]:9878");
+    virtualHostStyleFilter.filter(requestContext);
+    verify(requestContext, never()).setRequestUri(any(URI.class), any(URI.class));
   }
 }
