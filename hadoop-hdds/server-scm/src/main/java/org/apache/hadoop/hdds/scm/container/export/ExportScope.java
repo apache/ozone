@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
  */
 public final class ExportScope {
 
+  private static final String ANY = "ANY";
   private final LifeCycleState lifeCycleState;
   private final ContainerHealthState healthState;
   private final String value;
@@ -39,17 +40,10 @@ public final class ExportScope {
   }
 
   public static ExportScope of(LifeCycleState lifeCycleState, ContainerHealthState healthState) {
-    StringBuilder sb = new StringBuilder();
-    if (healthState != null) {
-      sb.append("health-").append(healthState.name());
-    }
-    if (lifeCycleState != null) {
-      if (sb.length() > 0) {
-        sb.append('_');
-      }
-      sb.append("lifecycle-").append(lifeCycleState.name());
-    }
-    return new ExportScope(lifeCycleState, healthState, sb.toString());
+    String health = healthState != null ? healthState.name() : ANY;
+    String lifecycle = lifeCycleState != null ? lifeCycleState.name() : ANY;
+    String value = "health-" + health + "_lifecycle-" + lifecycle;
+    return new ExportScope(lifeCycleState, healthState, value);
   }
 
   public LifeCycleState getLifeCycleState() {

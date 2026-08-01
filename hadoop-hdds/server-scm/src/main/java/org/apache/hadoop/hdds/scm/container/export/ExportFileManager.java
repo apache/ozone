@@ -31,8 +31,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +81,7 @@ final class ExportFileManager {
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
+  private static final int ARCHIVE_TIMESTAMP_LENGTH = 16;
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
@@ -127,13 +128,13 @@ final class ExportFileManager {
     exportDirectoryLock = null;
   }
 
-  File resolveArchiveFile(ExportScope scope, String fileTimestamp, String jobId) {
+  File resolveArchiveFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
     return new File(exportDirectory, String.format("container-ids-%s-%s%s%s%s",
-        scope.getValue(), fileTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId, EXPORT_ARCHIVE_SUFFIX));
+        scope.getValue(), archiveTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
   }
 
-  File resolveArchiveTempFile(ExportScope scope, String fileTimestamp, String jobId) {
-    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, fileTimestamp, jobId));
+  File resolveArchiveTempFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
+    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, archiveTimestamp, jobId));
   }
 
   /**
@@ -146,7 +147,8 @@ final class ExportFileManager {
     if (matches == null || matches.length == 0) {
       return Collections.emptyList();
     }
-    Arrays.sort(matches, Comparator.comparingLong(File::lastModified));
+    Arrays.sort(matches, Comparator.comparing(
+        file -> archiveTimestampFromArchiveFileName(file.getName())));
     List<String> archivePaths = new ArrayList<>(matches.length);
     for (File archive : matches) {
       archivePaths.add(archive.getAbsolutePath());
@@ -154,7 +156,17 @@ final class ExportFileManager {
     return archivePaths;
   }
 
-  static String jobIdFromArchiveFileName(String fileName) {
+  static String archiveTimestampFromArchiveFileName(String fileName) {
+    int jobIndex = fileName.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
+    if (jobIndex < ARCHIVE_TIMESTAMP_LENGTH + 1
+            || !fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)
+            || fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX)) {
+      return null;
+    }
+    return fileName.substring(jobIndex - ARCHIVE_TIMESTAMP_LENGTH, jobIndex);
+  }
+
+  static ExportJob.Id jobIdFromArchiveFileName(String fileName) {
     if (!fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)) {
       return null;
     }
@@ -164,7 +176,7 @@ final class ExportFileManager {
       return null;
     }
     String jobId = nameWithoutSuffix.substring(jobIndex + EXPORT_ARCHIVE_JOB_INFIX.length());
-    return isUuidDirectoryName(jobId) ? jobId : null;
+    return UUIDUtil.isValidUuidString(jobId) ? ExportJob.Id.of(jobId) : null;
   }
 
   void deleteExportTar(String tarPath) {
@@ -208,23 +220,15 @@ final class ExportFileManager {
     }
   }
 
-  static String exportJobDirName(String jobId) {
-    return EXPORT_JOB_DIR_PREFIX + jobId;
+  static String exportJobDirName(ExportJob.Id jobId) {
+    return EXPORT_JOB_DIR_PREFIX + jobId.getValue();
   }
 
-  private static String jobIdFromExportDirName(String dirName) {
+  private static ExportJob.Id jobIdFromExportDirName(String dirName) {
     if (!dirName.startsWith(EXPORT_JOB_DIR_PREFIX)) {
       return null;
     }
     String jobId = dirName.substring(EXPORT_JOB_DIR_PREFIX.length());
-    return isUuidDirectoryName(jobId) ? jobId : null;
-  }
-
-  private static boolean isUuidDirectoryName(String directoryName) {
-    try {
-      return directoryName.equals(UUID.fromString(directoryName).toString());
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return UUIDUtil.isValidUuidString(jobId) ? ExportJob.Id.of(jobId) : null;
   }
 }
