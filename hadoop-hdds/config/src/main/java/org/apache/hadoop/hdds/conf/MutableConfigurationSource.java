@@ -29,7 +29,7 @@ public interface MutableConfigurationSource
   /**
    * Sets {@code value} for {@code key} only if the key is not already set.
    * Default implementation treats any non-null {@link #get(String)} result as set.
-   * {@link org.apache.hadoop.hdds.conf.OzoneConfiguration} overrides this to allow
+   * {@code OzoneConfiguration} (in hdds-common) overrides this to allow
    * overriding values that come only from default resources.
    */
   default void setIfUnset(String key, String value) {
