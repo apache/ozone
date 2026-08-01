@@ -62,7 +62,7 @@ public class TestExportFileManager {
     ExportJob.Id jobId = ExportJob.Id.newId();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
     File archive = fileManager.resolveArchiveFile(scope, "20260101T120000Z", jobId);
-    assertTrue(archive.getName().contains("health-MISSING_lifecycle-ANY-20260101T120000Z"));
+    assertTrue(archive.getName().contains("health-MISSING_lifecycle-ANY_20260101T120000Z"));
     assertTrue(archive.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId.getValue()
         + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
@@ -78,16 +78,16 @@ public class TestExportFileManager {
   @Test
   public void testJobIdFromArchiveFileName() {
     String jobId = UUID.randomUUID().toString();
-    String fileName = "container-ids-health-MISSING_lifecycle-ANY-20260101T120000Z"
+    String fileName = "container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
         + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
     assertEquals(ExportJob.Id.of(jobId), ExportFileManager.jobIdFromArchiveFileName(fileName));
-    assertNull(ExportFileManager.jobIdFromArchiveFileName("container-ids-health-MISSING_lifecycle-ANY-20260101T120000Z"
+    assertNull(ExportFileManager.jobIdFromArchiveFileName("container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
         + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
 
   @Test
   public void testArchiveTimestampFromArchiveFileName() {
-    String fileName = "container-ids-health-MISSING_lifecycle-ANY-20260101T120000Z"
+    String fileName = "container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
         + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + UUID.randomUUID() + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
     assertEquals("20260101T120000Z", ExportFileManager.archiveTimestampFromArchiveFileName(fileName));
   }

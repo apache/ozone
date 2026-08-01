@@ -46,17 +46,17 @@ import org.slf4j.LoggerFactory;
  *
  * <p>While a job runs, shard text files are written under {@code export_{jobId}/}. The archive is
  * created only after all shards are written. The export manager writes
- * {@code container-ids-{scope}-{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
+ * {@code container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
  * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
  * never visible. {@link #lock()} uses {@code in_use.lock} to exclude concurrent writers.
  *
  * <pre>
  * {exportDirectory}/
  * ├── in_use.lock
- * ├── container-ids-{scope}-{timestamp}_job{jobId}.tar.gz
- * ├── container-ids-{scope}-{timestamp}_job{jobId}.tar.gz.tmp
+ * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz
+ * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp
  * └── export_{jobId}/
- *     ├── container-ids-{scope}-{timestamp}-part001.txt
+ *     ├── container-ids_{scope}_{metadataTimestamp}_part001.txt
  *     └── ...
  * </pre>
  *
@@ -129,7 +129,7 @@ final class ExportFileManager {
   }
 
   File resolveArchiveFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
-    return new File(exportDirectory, String.format("container-ids-%s-%s%s%s%s",
+    return new File(exportDirectory, String.format("container-ids_%s_%s%s%s%s",
         scope.getValue(), archiveTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
   }
 
