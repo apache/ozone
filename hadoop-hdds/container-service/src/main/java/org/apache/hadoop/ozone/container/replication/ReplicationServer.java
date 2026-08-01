@@ -190,20 +190,23 @@ public class ReplicationServer {
     public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 2;
 
     /**
-     * Maximum concurrent tasks on the global replication handler thread pool.
+     * Base size of the global replication handler executor and inbound
+     * replication server executor.
      */
     @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
-        description = "Maximum concurrent replication tasks on the global "
-            + "replication handler thread pool (before "
-            + "outofservice.limit.factor scaling). When "
+        description = "Sets both the base size of the global replication "
+            + "handler executor and the inbound replication server executor. "
+            + "The global executor is subject to outofservice.limit.factor "
+            + "scaling. When "
             + "hdds.datanode.replication.per.volume.enabled is false (default), "
-            + "all replication tasks use this pool. When per.volume.enabled is "
-            + "true, this pool handles non-push replication and push tasks "
-            + "that fall back from a missing per-volume pool; push concurrency "
-            + "per disk is governed by per.volume.streams.limit instead."
+            + "all source-side replication tasks use the global executor. "
+            + "When per.volume.enabled is true, per-volume executors handle "
+            + "normal source-side push tasks, while this limit still applies "
+            + "to non-push and fallback source tasks and target-side inbound "
+            + "push requests."
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 

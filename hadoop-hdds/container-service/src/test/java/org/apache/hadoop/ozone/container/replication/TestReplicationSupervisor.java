@@ -65,6 +65,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -1395,14 +1396,16 @@ public class TestReplicationSupervisor {
 
     CountDownLatch task1Started = new CountDownLatch(1);
     CountDownLatch task1Block = new CountDownLatch(1);
+    AtomicBoolean task1Interrupted = new AtomicBoolean();
     replicatorRef.set(task -> {
       if (task.getContainerId() == 1L) {
         task1Started.countDown();
         try {
-          assertTrue(task1Block.await(30, TimeUnit.SECONDS));
+          task1Block.await();
         } catch (InterruptedException ie) {
+          task1Interrupted.set(true);
           Thread.currentThread().interrupt();
-          throw new AssertionError(ie);
+          return;
         }
       }
       task.setStatus(DONE);
@@ -1430,6 +1433,7 @@ public class TestReplicationSupervisor {
 
       GenericTestUtils.waitFor((BooleanSupplier) () ->
           supervisor.getTotalInFlightReplications() == 0, 100, 5000);
+      assertTrue(task1Interrupted.get());
       task1Block.countDown();
 
       supervisor.addTask(createPushTask(2L));
