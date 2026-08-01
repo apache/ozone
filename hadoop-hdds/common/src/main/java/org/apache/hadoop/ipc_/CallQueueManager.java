@@ -43,10 +43,6 @@ public class CallQueueManager<E extends Schedulable>
     extends AbstractQueue<E> implements BlockingQueue<E> {
   public static final Logger LOG =
       LoggerFactory.getLogger(CallQueueManager.class);
-  // Number of checkpoints for empty queue.
-  private static final int CHECKPOINT_NUM = 20;
-  // Interval to check empty queue.
-  private static final long CHECKPOINT_INTERVAL_MS = 10;
 
   @SuppressWarnings("unchecked")
   static <E> Class<? extends BlockingQueue<E>> convertQueueClass(
@@ -84,14 +80,6 @@ public class CallQueueManager<E extends Schedulable>
     LOG.info("Using callQueue: {}, queueCapacity: {}, " +
         "scheduler: {}, ipcBackoff: {}.",
         backingClass, maxQueueSize, schedulerClass, clientBackOffEnabled);
-  }
-
-  CallQueueManager(BlockingQueue<E> queue, RpcScheduler scheduler,
-      boolean clientBackOffEnabled) {
-    this.putRef = new AtomicReference<BlockingQueue<E>>(queue);
-    this.takeRef = new AtomicReference<BlockingQueue<E>>(queue);
-    this.scheduler = scheduler;
-    this.clientBackOffEnabled = clientBackOffEnabled;
   }
 
   private static <T extends RpcScheduler> T createScheduler(
@@ -344,69 +332,6 @@ public class CallQueueManager<E extends Schedulable>
       throw new IllegalArgumentException("numLevels must be at least 1");
     }
     return retval;
-  }
-
-  /**
-   * Replaces active queue with the newly requested one and transfers
-   * all calls to the newQ before returning.
-   *
-   * @param schedulerClass input schedulerClass.
-   * @param queueClassToUse input queueClassToUse.
-   * @param maxSize input maxSize.
-   * @param ns input ns.
-   * @param conf input configuration.
-   */
-  public synchronized void swapQueue(
-      Class<? extends RpcScheduler> schedulerClass,
-      Class<? extends BlockingQueue<E>> queueClassToUse, int maxSize,
-      String ns, Configuration conf) {
-    int priorityLevels = parseNumLevels(ns, conf);
-    this.scheduler.stop();
-    RpcScheduler newScheduler = createScheduler(schedulerClass, priorityLevels,
-        ns, conf);
-    BlockingQueue<E> newQ = createCallQueueInstance(queueClassToUse,
-        priorityLevels, maxSize, ns, conf);
-
-    // Our current queue becomes the old queue
-    BlockingQueue<E> oldQ = putRef.get();
-
-    // Swap putRef first: allow blocked puts() to be unblocked
-    putRef.set(newQ);
-
-    // Wait for handlers to drain the oldQ
-    while (!queueIsReallyEmpty(oldQ)) {}
-
-    // Swap takeRef to handle new calls
-    takeRef.set(newQ);
-
-    this.scheduler = newScheduler;
-
-    LOG.info("Old Queue: " + stringRepr(oldQ) + ", " +
-      "Replacement: " + stringRepr(newQ));
-  }
-
-  /**
-   * Checks if queue is empty by checking at CHECKPOINT_NUM points with
-   * CHECKPOINT_INTERVAL_MS interval.
-   * This doesn't mean the queue might not fill up at some point later, but
-   * it should decrease the probability that we lose a call this way.
-   */
-  private boolean queueIsReallyEmpty(BlockingQueue<?> q) {
-    for (int i = 0; i < CHECKPOINT_NUM; i++) {
-      try {
-        Thread.sleep(CHECKPOINT_INTERVAL_MS);
-      } catch (InterruptedException ie) {
-        return false;
-      }
-      if (!q.isEmpty()) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private String stringRepr(Object o) {
-    return o.getClass().getName() + '@' + Integer.toHexString(o.hashCode());
   }
 
   @Override

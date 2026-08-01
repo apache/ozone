@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.V
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -68,6 +69,29 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        omRequest.getSetVolumePropertyRequest();
+    String volume = setVolumePropertyRequest.getVolumeName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volume);
+        auditMap.put(OzoneConsts.OWNER,
+            setVolumePropertyRequest.getOwnerName());
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.SET_OWNER, auditMap, ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
     return omRequest.toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilder)
         .build();
@@ -108,13 +132,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     String oldOwner = null;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
-      }
-
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
       OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList;
       OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList;

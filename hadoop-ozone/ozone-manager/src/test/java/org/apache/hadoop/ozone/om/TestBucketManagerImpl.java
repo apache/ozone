@@ -31,10 +31,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -459,5 +461,83 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertEquals(
         bucketInfo.getIsVersionEnabled(),
         storedLinkBucket.getIsVersionEnabled());
+  }
+
+  @Test
+  public void testListBucketsResolvesFsoAndObsLinkLayouts() throws Exception {
+    String volume = volumeName();
+    createSampleVol(volume);
+
+    ECReplicationConfig fsoReplication = new ECReplicationConfig(3, 2);
+    OmBucketInfo fsoSource = OmBucketInfo.newBuilder()
+        .setVolumeName(volume)
+        .setBucketName("fso-source")
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(fsoReplication))
+        .build();
+    writeClient.createBucket(fsoSource);
+
+    RatisReplicationConfig obsReplication =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    OmBucketInfo obsSource = OmBucketInfo.newBuilder()
+        .setVolumeName(volume)
+        .setBucketName("obs-source")
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(obsReplication))
+        .build();
+    writeClient.createBucket(obsSource);
+
+    OmBucketInfo fsoLink = OmBucketInfo.newBuilder()
+        .setVolumeName(volume)
+        .setBucketName("link-fso")
+        .setSourceVolume(volume)
+        .setSourceBucket("fso-source")
+        .build();
+    writeClient.createBucket(fsoLink);
+
+    OmBucketInfo obsLink = OmBucketInfo.newBuilder()
+        .setVolumeName(volume)
+        .setBucketName("link-obs")
+        .setSourceVolume(volume)
+        .setSourceBucket("obs-source")
+        .build();
+    writeClient.createBucket(obsLink);
+
+    OmBucketInfo fsoLinkInfo = writeClient.getBucketInfo(volume, "link-fso");
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED, fsoLinkInfo.getBucketLayout());
+    assertEquals(fsoReplication,
+        fsoLinkInfo.getDefaultReplicationConfig().getReplicationConfig());
+
+    OmBucketInfo obsLinkInfo = writeClient.getBucketInfo(volume, "link-obs");
+    assertEquals(BucketLayout.OBJECT_STORE, obsLinkInfo.getBucketLayout());
+    assertEquals(obsReplication,
+        obsLinkInfo.getDefaultReplicationConfig().getReplicationConfig());
+
+    List<OmBucketInfo> listedBuckets =
+        writeClient.listBuckets(volume, "", "", 100, false);
+
+    OmBucketInfo listedFsoLink = null;
+    OmBucketInfo listedObsLink = null;
+    for (OmBucketInfo listedBucket : listedBuckets) {
+      if ("link-fso".equals(listedBucket.getBucketName())) {
+        listedFsoLink = listedBucket;
+      } else if ("link-obs".equals(listedBucket.getBucketName())) {
+        listedObsLink = listedBucket;
+      }
+    }
+    assertNotNull(listedFsoLink, "link-fso not found in listBuckets response");
+    assertNotNull(listedObsLink, "link-obs not found in listBuckets response");
+
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED, listedFsoLink.getBucketLayout());
+    assertEquals(fsoReplication,
+        listedFsoLink.getDefaultReplicationConfig().getReplicationConfig());
+    assertEquals(volume, listedFsoLink.getSourceVolume());
+    assertEquals("fso-source", listedFsoLink.getSourceBucket());
+
+    assertEquals(BucketLayout.OBJECT_STORE, listedObsLink.getBucketLayout());
+    assertEquals(obsReplication,
+        listedObsLink.getDefaultReplicationConfig().getReplicationConfig());
+    assertEquals(volume, listedObsLink.getSourceVolume());
+    assertEquals("obs-source", listedObsLink.getSourceBucket());
   }
 }

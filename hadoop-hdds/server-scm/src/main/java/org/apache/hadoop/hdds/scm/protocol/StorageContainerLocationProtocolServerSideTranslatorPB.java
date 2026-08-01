@@ -1350,9 +1350,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainerCountResponseProto getContainerCount(
       StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
       request) throws IOException {
+    long containerCount = request.hasState()
+        ? impl.getContainerCount(request.getState())
+        : impl.getContainerCount();
 
     return GetContainerCountResponseProto.newBuilder()
-      .setContainerCount(impl.getContainerCount())
+      .setContainerCount(containerCount)
       .build();
   }
 

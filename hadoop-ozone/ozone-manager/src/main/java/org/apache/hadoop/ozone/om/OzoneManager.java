@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -50,6 +51,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -59,7 +61,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -221,6 +227,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -248,6 +255,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -257,12 +265,14 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -293,6 +303,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
@@ -305,6 +316,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -510,6 +522,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Used in MiniOzoneCluster testing
   private State omState;
   private Thread emptier;
+  private OzoneTrash ozoneTrash;
 
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
@@ -523,6 +536,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
+
+  private final OMServiceManager serviceManager;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -727,6 +742,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     readBlacklist = OzoneBlacklist.getReadonlyBlacklist(conf);
 
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
+
+    serviceManager = new OMServiceManager();
+
     instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
@@ -857,8 +875,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void warmUpEdekCache(final ExecutorService executor, final int delay, final int interval, int maxRetries) {
     Set<String> keys = new HashSet<>();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> iterator =
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>> iterator =
             metadataManager.getBucketTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
@@ -1432,6 +1449,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public NetworkTopology getClusterMap() {
+    return requireNonNull(getClusterMapAllowNull(),
+        "OM topology cache has not been initialized yet.");
+  }
+
+  public NetworkTopology getClusterMapAllowNull() {
     return scmTopologyClient.getClusterMap();
   }
 
@@ -1922,6 +1944,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public DeletingServiceMetrics getDeletionMetrics() {
     return omDeletionMetrics;
+  }
+
+  public OzoneTrash getOzoneTrash() {
+    return ozoneTrash;
   }
 
   /**
@@ -2445,8 +2471,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       FileSystem fs = SecurityUtil.doAsLoginUser(
           (PrivilegedExceptionAction<FileSystem>)
               () -> new TrashOzoneFileSystem(i));
-      this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-          getEmptier(), threadPrefix + "TrashEmptier");
+      this.ozoneTrash = new OzoneTrash(fs, conf, this);
+      this.emptier = new Thread(ozoneTrash.getEmptier(), threadPrefix + "TrashEmptier");
       this.emptier.setDaemon(true);
       this.emptier.start();
     }
@@ -2572,6 +2598,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisSnapshotProvider != null) {
         omRatisSnapshotProvider.close();
       }
+      serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
@@ -3099,8 +3126,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             volumeName, null, null);
       }
       metrics.incNumBucketLists();
-      return bucketManager.listBuckets(volumeName,
+      List<OmBucketInfo> buckets = bucketManager.listBuckets(volumeName,
           startKey, prefix, maxNumOfBuckets, hasSnapshot);
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache = new HashMap<>();
+      for (int i = 0; i < buckets.size(); i++) {
+        try {
+          buckets.set(i, enrichLinkBucketInfo(buckets.get(i), resolvedSourceCache));
+        } catch (IOException e) {
+          LOG.debug("Failed to enrich listBuckets entry for {}/{}; returning raw entry",
+              volumeName, buckets.get(i).getBucketName(), e);
+        }
+      }
+      return buckets;
     } catch (IOException ex) {
       metrics.incNumBucketListFails();
       auditSuccess = false;
@@ -3113,6 +3150,62 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
+  }
+
+  /**
+   * For link buckets, follows the link chain and overlays the source bucket's
+   * operational properties onto the link's {@link OmBucketInfo}. Non-link
+   * buckets and dangling links are returned unchanged.
+   */
+  private OmBucketInfo enrichLinkBucketInfo(OmBucketInfo bucketInfo)
+      throws IOException {
+    return enrichLinkBucketInfo(bucketInfo, null);
+  }
+
+  private OmBucketInfo enrichLinkBucketInfo(
+      OmBucketInfo bucketInfo,
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache)
+      throws IOException {
+    if (!bucketInfo.isLink()) {
+      return bucketInfo;
+    }
+    // We already know that `bucketInfo` is a linked one,
+    // so we skip one `getBucketInfo` and start with the known link.
+    ResolvedBucket resolvedBucket =
+        resolveBucketLink(Pair.of(
+                bucketInfo.getSourceVolume(),
+                bucketInfo.getSourceBucket()),
+            true);
+
+    // If it is a dangling link it means no real bucket exists,
+    // for example, it could have been deleted, but the links still present.
+    if (resolvedBucket.isDangling()) {
+      return bucketInfo;
+    }
+    OmBucketInfo realBucket = getResolvedSourceBucket(resolvedBucket, resolvedSourceCache);
+    return bucketInfo.withOperationalPropertiesFrom(realBucket);
+  }
+
+  private OmBucketInfo getResolvedSourceBucket(
+      ResolvedBucket resolvedBucket,
+      Map<Pair<String, String>, OmBucketInfo> resolvedSourceCache)
+      throws IOException {
+    Pair<String, String> sourceKey = Pair.of(
+        resolvedBucket.realVolume(),
+        resolvedBucket.realBucket());
+    if (resolvedSourceCache != null) {
+      OmBucketInfo cachedSource = resolvedSourceCache.get(sourceKey);
+      if (cachedSource != null) {
+        return cachedSource;
+      }
+    }
+    OmBucketInfo realBucket = bucketManager.getBucketInfo(
+        resolvedBucket.realVolume(),
+        resolvedBucket.realBucket());
+    if (resolvedSourceCache != null) {
+      resolvedSourceCache.put(sourceKey, realBucket);
+    }
+    return realBucket;
   }
 
   /**
@@ -3136,46 +3229,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketInfos();
 
-      OmBucketInfo bucketInfo = bucketManager.getBucketInfo(volume, bucket);
-
-      // No links - return the bucket info right away.
-      if (!bucketInfo.isLink()) {
-        return bucketInfo;
-      }
-      // Otherwise follow the links to find the real bucket.
-      // We already know that `bucketInfo` is a linked one,
-      // so we skip one `getBucketInfo` and start with the known link.
-      ResolvedBucket resolvedBucket =
-          resolveBucketLink(Pair.of(
-                  bucketInfo.getSourceVolume(),
-                  bucketInfo.getSourceBucket()),
-              true);
-
-      // If it is a dangling link it means no real bucket exists,
-      // for example, it could have been deleted, but the links still present.
-      if (!resolvedBucket.isDangling()) {
-        OmBucketInfo realBucket =
-            bucketManager.getBucketInfo(
-                resolvedBucket.realVolume(),
-                resolvedBucket.realBucket());
-        // Pass the real bucket metadata in the link bucket info.
-        return bucketInfo.toBuilder()
-            .setDefaultReplicationConfig(
-                realBucket.getDefaultReplicationConfig())
-            .setIsVersionEnabled(realBucket.getIsVersionEnabled())
-            .setStorageType(realBucket.getStorageType())
-            .setQuotaInBytes(realBucket.getQuotaInBytes())
-            .setQuotaInNamespace(realBucket.getQuotaInNamespace())
-            .setUsedBytes(realBucket.getUsedBytes())
-            .setSnapshotUsedBytes(realBucket.getSnapshotUsedBytes())
-            .setSnapshotUsedNamespace(realBucket.getSnapshotUsedNamespace())
-            .setUsedNamespace(realBucket.getUsedNamespace())
-            .addAllMetadata(realBucket.getMetadata())
-            .setBucketLayout(realBucket.getBucketLayout())
-            .build();
-      }
-      // If no real bucket exists, return the requested one's info.
-      return bucketInfo;
+      return enrichLinkBucketInfo(
+          bucketManager.getBucketInfo(volume, bucket));
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
@@ -3303,6 +3358,63 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  /**
+   * Gets the lifecycle configuration information.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @return OmLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    auditMap = buildAuditMap(resolvedBucket.realVolume());
+    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+
+    if (isAclEnabled) {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+          resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    }
+
+    boolean auditSuccess = true;
+    OMLockDetails omLockDetails = metadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket());
+    boolean lockAcquired = omLockDetails.isLockAcquired();
+    try {
+      return metadataManager.getLifecycleConfiguration(
+          resolvedBucket.realVolume(), resolvedBucket.realBucket());
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      throw ex;
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+            resolvedBucket.realVolume(), resolvedBucket.realBucket());
+      }
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap));
+      }
+    }
+  }
+
+  @Override
+  public GetLifecycleServiceStatusResponse getLifecycleServiceStatus() {
+    KeyLifecycleService keyLifecycleService = keyManager.getKeyLifecycleService();
+    if (keyLifecycleService == null) {
+      return GetLifecycleServiceStatusResponse.newBuilder()
+          .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
+              OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
+          .build();
+    }
+    return keyLifecycleService.status();
+  }
+
   private Map<String, String> buildAuditMap(String volume) {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
@@ -3413,6 +3525,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public String getHostname() {
     return omHostName;
+  }
+
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
   }
 
   @VisibleForTesting
@@ -3808,7 +3925,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+    try (TableIterator<String, Table.KeyValue<String, OmDBTenantState>>
         iterator = tenantStateTable.iterator()) {
 
       final List<TenantState> tenantStateList = new ArrayList<>();
@@ -4221,7 +4338,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
-      LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
+      if (OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(ex)) {
+        LOG.error(
+            "Failed to download snapshot from leader {}: local disk appears full or over quota "
+                + "on the OM ratis snapshot volume (see previous ERROR for path/usable space). "
+                + "Free disk or adjust {}, {}, or {} before bootstrap can succeed.",
+            leaderId,
+            OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+            OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
+            OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER);
+      } else {
+        LOG.error("Failed to download snapshot from Leader {}.", leaderId, ex);
+      }
       cleanupCheckpoint(omDBCheckpoint);
       return null;
     }
@@ -5312,6 +5440,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
+  public Map<String, String> getBucketTagging(final OmBucketArgs args)
+      throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return rcReader.get().getBucketTagging(args);
+    }
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
@@ -5750,6 +5887,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return reconfigurationHandler;
   }
 
+  public OMServiceManager getOMServiceManager() {
+    return serviceManager;
+  }
+
   /**
    * Wait until both buffers are flushed.  This is used in cases like
    * "follower bootstrap tarball creation" where the rocksDb for the active
@@ -5766,10 +5907,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily,
+      ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",

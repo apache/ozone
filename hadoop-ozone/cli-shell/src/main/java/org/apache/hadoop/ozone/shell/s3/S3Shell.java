@@ -23,7 +23,7 @@ import picocli.CommandLine.Command;
 /**
  * Shell for s3 related operations.
  */
-@Command(name = "ozone s3",
+@Command(name = "ozone s3", aliases = "s3",
     description = "Shell for S3 specific operations",
     subcommands = {
         GetS3SecretHandler.class,

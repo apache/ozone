@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -44,13 +43,15 @@ public interface RequestParameters {
     try {
       return Integer.parseInt(value);
     } catch (NumberFormatException e) {
-      throw translateException(e);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key, e);
     }
   }
 
-  default WebApplicationException translateException(RuntimeException e) {
-    return new WebApplicationException(e.getMessage(), S3ErrorTable.INVALID_ARGUMENT.getHttpCode());
-  }
+  /**
+   * @return true if the query parameter is present, even when its value is
+   * an empty string (eg. {@code delimiter=}).
+   */
+  boolean containsKey(String key);
 
   /** Additional methods for tests. */
   interface Mutable extends RequestParameters {
@@ -75,6 +76,11 @@ public interface RequestParameters {
     @Override
     public String get(String key) {
       return params.getFirst(key);
+    }
+
+    @Override
+    public boolean containsKey(String key) {
+      return params.containsKey(key);
     }
 
     @Override

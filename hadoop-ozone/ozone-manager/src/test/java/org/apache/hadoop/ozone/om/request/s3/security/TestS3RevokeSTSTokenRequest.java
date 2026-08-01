@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.SecretKeyTestClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestS3RevokeSTSTokenRequest {
 
-  private static final TestClock CLOCK = TestClock.newInstance();
+  private static final MockClock CLOCK = MockClock.newInstance();
 
   private STSTokenSecretManager stsTokenSecretManager;
   private SecretKeyClient secretKeyClient;

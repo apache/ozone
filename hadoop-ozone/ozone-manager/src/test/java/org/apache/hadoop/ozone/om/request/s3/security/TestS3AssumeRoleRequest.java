@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +87,7 @@ public class TestS3AssumeRoleRequest {
       "  }]\n" +
       "}";
 
-  private static final TestClock CLOCK = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+  private static final MockClock CLOCK = new MockClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
   private static final String OM_HOST = "om-host";
   private static final InetAddress LOOPBACK_IP = InetAddress.getLoopbackAddress();
   private static final Set<OzoneGrant> EMPTY_GRANTS = Collections.singleton(new OzoneGrant(emptySet(), emptySet()));

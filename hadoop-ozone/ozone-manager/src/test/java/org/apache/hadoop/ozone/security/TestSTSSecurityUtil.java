@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,7 +59,7 @@ public class TestSTSSecurityUtil {
   private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
   private final STSTokenSecretManager tokenSecretManager = new STSTokenSecretManager(secretKeyClient);
   private final UUID secretKeyId = secretKeyClient.getCurrentSecretKey().getId();
-  private final TestClock clock = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+  private final MockClock clock = new MockClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
 
   {
     ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);

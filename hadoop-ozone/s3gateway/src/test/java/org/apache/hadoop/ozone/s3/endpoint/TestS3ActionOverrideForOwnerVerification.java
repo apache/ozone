@@ -32,7 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -138,7 +137,6 @@ public class TestS3ActionOverrideForOwnerVerification {
       s3AuthRef.set(invocationOnMock.getArgument(0));
       return null;
     }).when(clientProtocol).setThreadLocalS3Auth(any(S3Auth.class));
-    doNothing().when(clientProtocol).setIsS3Request(true);
 
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getProxy()).thenReturn(clientProtocol);

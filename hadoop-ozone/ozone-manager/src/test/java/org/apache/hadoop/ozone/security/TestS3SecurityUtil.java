@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -57,7 +57,7 @@ import org.mockito.MockedStatic;
  */
 public class TestS3SecurityUtil {
   private static final byte[] ENCRYPTION_KEY = new byte[5];
-  private static final TestClock CLOCK = TestClock.newInstance();
+  private static final MockClock CLOCK = MockClock.newInstance();
   private static final String TEMP_ACCESS_KEY_ID = "temp-access-key-id";
 
   {

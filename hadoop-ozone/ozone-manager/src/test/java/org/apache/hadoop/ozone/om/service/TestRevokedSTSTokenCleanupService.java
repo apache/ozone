@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -55,12 +55,12 @@ import org.mockito.MockedStatic;
 public class TestRevokedSTSTokenCleanupService {
   private OzoneManager ozoneManager;
   private StringInMemoryTestTable<Long> revokedStsTokenTable;
-  private TestClock testClock;
+  private MockClock testClock;
   private OzoneConfiguration ozoneConfiguration;
 
   @BeforeEach
   public void setUp() {
-    testClock = TestClock.newInstance();
+    testClock = MockClock.newInstance();
     ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration = new OzoneConfiguration();
     final OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);

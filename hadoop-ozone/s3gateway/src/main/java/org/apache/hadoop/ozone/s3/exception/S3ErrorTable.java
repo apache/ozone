@@ -138,6 +138,10 @@ public enum S3ErrorTable {
       "BucketAlreadyExists", "The requested bucket name is not available" +
       " as it already exists.", HTTP_CONFLICT),
 
+  BUCKET_ALREADY_OWNED_BY_YOU(
+      "BucketAlreadyOwnedByYou", "Your previous request to create the named" +
+      " bucket succeeded and you already own it.", HTTP_CONFLICT),
+
   INVALID_TAG(
       "InvalidTag", "Your request contains tag input that is not valid.", HTTP_BAD_REQUEST),
 
@@ -166,6 +170,9 @@ public enum S3ErrorTable {
 
   PAYLOAD_TOO_LARGE(
       "PayloadTooLarge", "Your request body size was too large.", HTTP_BAD_REQUEST),
+
+  NO_SUCH_LIFECYCLE_CONFIGURATION("NoSuchLifecycleConfiguration",
+      "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND),
 
   X_AMZ_CONTENT_SHA256_MISMATCH(
       "XAmzContentSHA256Mismatch", "The provided 'x-amz-content-sha256' header does " +

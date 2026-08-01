@@ -58,6 +58,7 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // Call parent preExecute to perform ACL check
     final OMRequest omRequest = super.preExecute(ozoneManager);
 
     final long modificationTime = Time.now();

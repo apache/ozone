@@ -1,0 +1,10 @@
+The user asked: "%s"
+
+This question cannot be answered using the available Ozone Recon API endpoints.
+
+Provide a helpful response that:
+1. Politely explains that you can only answer questions about Ozone Recon cluster data
+2. Briefly mentions the types of information you can provide (containers, keys, datanodes, pipelines, cluster state, etc.)
+3. Suggests how they might rephrase their question if it's related to Ozone
+
+Keep the response friendly and concise.

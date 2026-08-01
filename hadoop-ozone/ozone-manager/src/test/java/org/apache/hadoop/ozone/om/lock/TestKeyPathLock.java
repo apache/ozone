@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
  */
-class TestKeyPathLock extends TestOzoneManagerLock {
+class TestKeyPathLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
@@ -216,7 +216,7 @@ class TestKeyPathLock extends TestOzoneManagerLock {
     // Waiting for all the threads to be instantiated/to reach
     // acquireWriteLock.
     countDown.countDown();
-    assertEquals(1, lock.getCurrentLocks().size());
+    assertEquals(1, lock.getCurrentLockSizeForTesting());
 
     lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());

@@ -74,7 +74,6 @@ public class S3STSEndpointBase implements Auditor {
     }
     ClientProtocol clientProtocol = getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
-    clientProtocol.setIsS3Request(true);
   }
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,

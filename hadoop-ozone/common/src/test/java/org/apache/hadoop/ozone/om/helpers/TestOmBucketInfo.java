@@ -98,6 +98,56 @@ public class TestOmBucketInfo {
   }
 
   @Test
+  public void testWithOperationalPropertiesFromPreservesLinkIdentity() {
+    ECReplicationConfig sourceReplication = new ECReplicationConfig(3, 2);
+    OmBucketInfo source = OmBucketInfo.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("source")
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setStorageType(StorageType.SSD)
+        .setIsVersionEnabled(true)
+        .setQuotaInBytes(1000)
+        .setQuotaInNamespace(10)
+        .setUsedBytes(500)
+        .setUsedNamespace(5)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(sourceReplication))
+        .addAllMetadata(Collections.singletonMap("sourceKey", "sourceValue"))
+        .build();
+
+    OmBucketInfo link = OmBucketInfo.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("link")
+        .setSourceVolume("vol1")
+        .setSourceBucket("source")
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setCreationTime(123L)
+        .setModificationTime(456L)
+        .addAllMetadata(Collections.singletonMap("linkKey", "linkValue"))
+        .build();
+
+    OmBucketInfo resolvedLink = link.withOperationalPropertiesFrom(source);
+
+    assertEquals("link", resolvedLink.getBucketName());
+    assertEquals("vol1", resolvedLink.getVolumeName());
+    assertEquals("vol1", resolvedLink.getSourceVolume());
+    assertEquals("source", resolvedLink.getSourceBucket());
+    assertEquals(123L, resolvedLink.getCreationTime());
+    assertEquals(456L, resolvedLink.getModificationTime());
+
+    assertEquals(BucketLayout.OBJECT_STORE, resolvedLink.getBucketLayout());
+    assertEquals(StorageType.SSD, resolvedLink.getStorageType());
+    assertTrue(resolvedLink.getIsVersionEnabled());
+    assertEquals(1000, resolvedLink.getQuotaInBytes());
+    assertEquals(10, resolvedLink.getQuotaInNamespace());
+    assertEquals(500, resolvedLink.getUsedBytes());
+    assertEquals(5, resolvedLink.getUsedNamespace());
+    assertEquals(sourceReplication,
+        resolvedLink.getDefaultReplicationConfig().getReplicationConfig());
+    assertEquals("sourceValue", resolvedLink.getMetadata().get("sourceKey"));
+    assertEquals("linkValue", resolvedLink.getMetadata().get("linkKey"));
+  }
+
+  @Test
   public void getProtobufMessageEC() {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")

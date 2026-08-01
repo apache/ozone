@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSTSTokenSecretManager {
   private STSTokenSecretManager secretManager;
-  private TestClock clock;
+  private MockClock clock;
 
   private static final String TEMP_ACCESS_KEY = "temp-access-key";
   private static final String ORIGINAL_ACCESS_KEY = "original-access-key";
@@ -75,7 +75,7 @@ public class TestSTSTokenSecretManager {
     when(mockSecretKeyClient.getCurrentSecretKey()).thenReturn(mockSecretKey);
 
     secretManager = new STSTokenSecretManager(mockSecretKeyClient);
-    clock = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+    clock = new MockClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
   }
 
   @Test
