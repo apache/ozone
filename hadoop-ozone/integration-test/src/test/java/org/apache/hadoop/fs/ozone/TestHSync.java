@@ -107,7 +107,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -390,7 +390,7 @@ public class TestHSync {
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo, cluster);
+    HddsDatanodeService dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo, cluster);
     chunkPath = dn.getDatanodeStateMachine()
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID()).
