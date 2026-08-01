@@ -124,10 +124,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     private ReentrantReadWriteLock getLockForTesting(Resource resource, String... keys) {
       final R r = Preconditions.assertInstanceOf(resource, tracker.getResourceClass());
-      final Object combinedKey = keys.length == 1 ? keys[0]
-          : keys.length == 2 ? CompositeKey.combineTwoKeys(keys[0], keys[1])
-          : CompositeKey.combineMultiKeys(keys);
-      return getLockWithCombinedKey(r, combinedKey);
+      return getLockWithCombinedKey(r, CompositeKey.combineKeys(keys));
     }
 
     private ReentrantReadWriteLock getLockWithCombinedKey(R r, Object combinedKey) {

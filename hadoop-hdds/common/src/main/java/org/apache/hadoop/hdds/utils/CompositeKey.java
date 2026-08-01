@@ -56,7 +56,8 @@ public abstract class CompositeKey {
         return false;
       }
       final TwoComponents that = (TwoComponents) obj;
-      return Objects.equals(this.first, that.first)
+      return this.hashCode == that.hashCode
+          && Objects.equals(this.first, that.first)
           && Objects.equals(this.second, that.second);
     }
   }
@@ -89,15 +90,16 @@ public abstract class CompositeKey {
         return false;
       }
       final MultiComponents that = (MultiComponents) obj;
-      return Arrays.equals(this.components, that.components);
+      return this.hashCode == that.hashCode
+          && Arrays.equals(this.components, that.components);
     }
   }
 
-  public static Object combineTwoKeys(Object first, Object second) {
+  public static CompositeKey combineTwoKeys(Object first, Object second) {
     return new TwoComponents(first, second);
   }
 
-  public static Object combineMultiKeys(Object[] components) {
+  public static CompositeKey combineMultiKeys(Object[] components) {
     return new MultiComponents(components);
   }
 
