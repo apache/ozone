@@ -678,6 +678,9 @@ public class TestOMRatisSnapshots {
       assertBootstrapOmJoinedRatisGroup(newNodeId);
     } finally {
       bootstrapFuture.cancel(true);
+      omLog.stopCapturing();
+      stateMachineLog.stopCapturing();
+      snapshotProviderLog.stopCapturing();
       executor.shutdownNow();
       if (cluster != null) {
         cluster.shutdown();
