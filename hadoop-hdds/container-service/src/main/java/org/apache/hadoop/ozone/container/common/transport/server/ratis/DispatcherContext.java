@@ -266,7 +266,7 @@ public final class DispatcherContext {
     }
 
     /**
-     * Sets the component version the client requested this write be executed at
+     * Sets the component version the client requested this write be executed at.
      *
      * @param version the write pipeline (component) version
      * @return Builder
