@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -649,8 +650,9 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public boolean hasEnoughSpace(Pipeline pipeline) {
+    StorageType storageType = getStorageTypeForPendingAllocation(pipeline);
     for (DatanodeDetails node : pipeline.getNodes()) {
-      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID())) {
+      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID(), storageType)) {
         return false;
       }
     }
@@ -659,9 +661,18 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+    StorageType storageType = getStorageTypeForPendingAllocation(pipeline);
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID, storageType);
     }
+  }
+
+  private StorageType getStorageTypeForPendingAllocation(Pipeline pipeline) {
+    StorageTier storageTier = pipeline.getSupportedStorageTier();
+    if (storageTier == null || storageTier == StorageTier.EMPTY) {
+      return null;
+    }
+    return storageTier.getUniformStorageType();
   }
 
   /**

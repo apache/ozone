@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -190,12 +191,32 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID);
 
   /**
+   * True if the node can accept another container of the given storage type.
+   */
+  default boolean hasSpaceForNewContainerAllocation(
+      DatanodeID datanodeID, StorageType storageType) {
+    return hasSpaceForNewContainerAllocation(datanodeID);
+  }
+
+  /**
    * Records a pending container allocation for a single DataNode identified by its ID.
    *
    * @param datanodeID  the ID of the DataNode receiving the allocation
    * @param containerID the container being allocated
    */
   void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
+
+  /**
+   * Records a pending container allocation for a single DataNode identified by its ID.
+   *
+   * @param datanodeID  the ID of the DataNode receiving the allocation
+   * @param containerID the container being allocated
+   * @param storageType the storage type selected for the allocation
+   */
+  default void recordPendingAllocationForDatanode(
+      DatanodeID datanodeID, ContainerID containerID, StorageType storageType) {
+    recordPendingAllocationForDatanode(datanodeID, containerID);
+  }
 
   /**
    * Return the node stat of the specified datanode.

@@ -29,6 +29,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -351,9 +352,18 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+    StorageType storageType = getStorageTypeForPendingAllocation(pipeline);
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID, storageType);
     }
+  }
+
+  private StorageType getStorageTypeForPendingAllocation(Pipeline pipeline) {
+    StorageTier storageTier = pipeline.getSupportedStorageTier();
+    if (storageTier == null || storageTier == StorageTier.EMPTY) {
+      return null;
+    }
+    return storageTier.getUniformStorageType();
   }
 
   @Override

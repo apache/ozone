@@ -1034,21 +1034,28 @@ public class TestPipelineManagerImpl {
         .setNodes(ImmutableList.of(dn1, dn2, dn3))
         .setState(OPEN)
         .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
+        .setSupportedStorageTier(StorageTier.DISK)
         .build();
 
     // Case 1: All nodes have enough space.
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn1.getID(), StorageType.DISK);
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn2.getID(), StorageType.DISK);
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn3.getID(), StorageType.DISK);
     assertTrue(pipelineManager.hasEnoughSpace(pipeline));
 
     // Case 2: One node does not have enough space — pipeline should be rejected.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn1.getID(), StorageType.DISK);
     assertFalse(pipelineManager.hasEnoughSpace(pipeline));
 
     // Case 3: All nodes do not have enough space.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn2.getID(), StorageType.DISK);
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(
+        dn3.getID(), StorageType.DISK);
     assertFalse(pipelineManager.hasEnoughSpace(pipeline));
   }
 
