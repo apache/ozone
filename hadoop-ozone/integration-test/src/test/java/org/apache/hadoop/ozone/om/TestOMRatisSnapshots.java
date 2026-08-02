@@ -609,8 +609,8 @@ public class TestOMRatisSnapshots {
 
   /**
    * Regression test for bootstrap when leader logs are purged: checkpoint install
-   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API,
-   * and bootstrap must complete so the new OM joins the Ratis group.
+   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API
+   * and complete successfully.
    */
   @Test
   public void testBootstrapInstallSnapshotDuringBootstrapping() throws Exception {
@@ -696,6 +696,9 @@ public class TestOMRatisSnapshots {
     assertThat(snapshotProviderLog.getOutput())
         .as("checkpoint download should start after install is accepted")
         .contains("Prepare to download the snapshot from leader OM");
+    assertThat(snapshotProviderLog.getOutput())
+        .as("checkpoint tarball should be assembled on the bootstrapping OM")
+        .contains("DB snapshot transfer is complete.");
   }
 
   private void assertBootstrapOmJoinedRatisGroup(String newNodeId) {
