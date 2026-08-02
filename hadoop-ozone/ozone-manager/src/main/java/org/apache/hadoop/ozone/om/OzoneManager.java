@@ -4202,8 +4202,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
     if (!isRunningOrBootstrapping() || testInstallSnapshot) {
-      LOG.warn("OzoneManager is not in running state, state {}. Abort install snapshot from Leader.",
-          omState);
+      LOG.warn("OzoneManager is not in running state nor bootstrapping, state {}. "
+          + "Abort install snapshot from Leader.", omState);
       return null;
     }
 

@@ -103,6 +103,7 @@ public class TestOMRatisSnapshots {
   private static final int BOOTSTRAP_LOG_PURGE_GAP = 5;
   private static final long BOOTSTRAP_TARGET_LOG_INDEX = 200;
   private static final int BOOTSTRAP_INSTALL_START_DEADLINE_MS = 30_000;
+  private static final int BOOTSTRAP_COMPLETION_DEADLINE_MS = 60_000;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -608,8 +609,8 @@ public class TestOMRatisSnapshots {
 
   /**
    * Regression test for bootstrap when leader logs are purged: checkpoint install
-   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API.
-   * Stops once download starts so the test targets the BOOTSTRAPPING guard only.
+   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API,
+   * and bootstrap must complete so the new OM joins the Ratis group.
    */
   @Test
   public void testBootstrapInstallSnapshotDuringBootstrapping() throws Exception {
@@ -673,6 +674,8 @@ public class TestOMRatisSnapshots {
 
     try {
       waitForBootstrapCheckpointInstallToStart(omLog, snapshotProviderLog);
+      bootstrapFuture.get(BOOTSTRAP_COMPLETION_DEADLINE_MS, TimeUnit.MILLISECONDS);
+      assertBootstrapOmJoinedRatisGroup(newNodeId);
     } finally {
       bootstrapFuture.cancel(true);
       executor.shutdownNow();
@@ -690,6 +693,18 @@ public class TestOMRatisSnapshots {
     assertThat(snapshotProviderLog.getOutput())
         .as("checkpoint download should start after install is accepted")
         .contains("Prepare to download the snapshot from leader OM");
+  }
+
+  private void assertBootstrapOmJoinedRatisGroup(String newNodeId) {
+    OzoneManager newOm = cluster.getOzoneManager(newNodeId);
+    assertNotNull(newOm, "Bootstrapped OM should be registered on the cluster");
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      assertTrue(om.doesPeerExist(newNodeId),
+          "New OM node " + newNodeId + " not present in peer list of OM " + om.getOMNodeId());
+      assertTrue(om.getOmRatisServer().doesPeerExist(newNodeId),
+          "New OM node " + newNodeId + " not present in Ratis peer list of OM "
+              + om.getOMNodeId());
+    }
   }
 
   private void waitForBootstrapCheckpointInstallToStart(
