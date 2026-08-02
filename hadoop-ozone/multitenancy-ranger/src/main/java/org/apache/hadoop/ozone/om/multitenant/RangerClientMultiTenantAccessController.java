@@ -173,8 +173,6 @@ public class RangerClientMultiTenantAccessController implements
     }
   }
 
-
-
   /**
    * Returns true if the RangerServiceException indicates a not-found condition
    * (HTTP 404). Used to implement tolerant delete operations.
@@ -184,22 +182,25 @@ public class RangerClientMultiTenantAccessController implements
         && e.getStatus().getStatusCode() == HTTP_STATUS_CODE_NOT_FOUND;
   }
 
+  /**
+   * Returns true if the RangerServiceException indicates the role did not
+   * exist at delete time, handling the Ranger 2.8 compatibility quirk.
+   */
   private static boolean isRoleNotFoundException(RangerServiceException e) {
     if (isNotFoundException(e)) {
       return true;
     }
-
-    if (e.getStatus() == null || e.getStatus().getStatusCode() != HTTP_STATUS_CODE_BAD_REQUEST) {
+    if (e.getStatus() == null
+        || e.getStatus().getStatusCode() != HTTP_STATUS_CODE_BAD_REQUEST) {
       return false;
     }
-
     String message = e.getMessage();
     if (message == null) {
       return false;
     }
-
-    // Ranger 2.8 returns HTTP 400 instead of 404 when deleting a role that does not exist.
-    // RangerServiceException exposes no structured Ranger error code, so inspect normalized response text as a workaround.
+    // Ranger 2.8 returns HTTP 400 instead of 404 when deleting a role that
+    // does not exist. RangerServiceException exposes no structured Ranger
+    // error code, so inspect normalized response text as a workaround.
     String lowerMessage = message.toLowerCase(Locale.ROOT);
     return lowerMessage.contains("role with name")
         && lowerMessage.contains("does not exist");
@@ -212,7 +213,8 @@ public class RangerClientMultiTenantAccessController implements
   @Override
   public Policy createPolicy(Policy policy) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending create request for policy {} to Ranger.", policy.getName());
+      LOG.debug("Sending create request for policy {} to Ranger.",
+          policy.getName());
     }
     RangerPolicy rangerPolicy;
     try {
@@ -288,7 +290,8 @@ public class RangerClientMultiTenantAccessController implements
       // If the policy does not exist, silently return.
       // This makes tenant deletion tolerant of partial previous state.
       if (isNotFoundException(e)) {
-        LOG.warn("Policy {} not found in Ranger during delete - assuming already deleted.", policyName);
+        LOG.warn("Policy {} not found in Ranger during delete - assuming already deleted.",
+            policyName);
         return;
       }
       decodeRSEStatusCodes(e);
@@ -303,11 +306,13 @@ public class RangerClientMultiTenantAccessController implements
   @Override
   public Role createRole(Role role) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending create request for role {} to Ranger.", role.getName());
+      LOG.debug("Sending create request for role {} to Ranger.",
+          role.getName());
     }
     final RangerRole rangerRole;
     try {
-      rangerRole = client.createRole(rangerServiceName, toRangerRole(role, shortName));
+      rangerRole = client.createRole(rangerServiceName,
+          toRangerRole(role, shortName));
     } catch (RangerServiceException e) {
       decodeRSEStatusCodes(e);
       throw new IOException(e);
@@ -352,13 +357,18 @@ public class RangerClientMultiTenantAccessController implements
   @Override
   public void deleteRole(String roleName) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending delete request for role {} to Ranger.", roleName);
+      LOG.debug("Sending delete request for role {} to Ranger.",
+          roleName);
     }
     try {
       client.deleteRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
+      // If the role does not exist, silently return.
+      // This makes tenant deletion tolerant of partial previous state,
+      // e.g. when one role was deleted but another was not.
       if (isRoleNotFoundException(e)) {
-        LOG.warn("Role {} not found in Ranger during delete - assuming already deleted.", roleName);
+        LOG.warn("Role {} not found in Ranger during delete - assuming already deleted.",
+            roleName);
         return;
       }
       decodeRSEStatusCodes(e);
@@ -519,7 +529,7 @@ public class RangerClientMultiTenantAccessController implements
     for (Map.Entry<String, Collection<Acl>> userAcls:
         policy.getUserAcls().entrySet()) {
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-      item.setUsers(Collections.singletonList(userAcls.getKey()));
+      item.setUsers(new ArrayList<>(Collections.singletonList(userAcls.getKey())));
 
       // Use mutable ArrayList for accesses.
       List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
@@ -538,7 +548,7 @@ public class RangerClientMultiTenantAccessController implements
     for (Map.Entry<String, Collection<Acl>> roleAcls:
         policy.getRoleAcls().entrySet()) {
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-      item.setRoles(Collections.singletonList(roleAcls.getKey()));
+      item.setRoles(new ArrayList<>(Collections.singletonList(roleAcls.getKey())));
 
       // Use mutable ArrayList for accesses.
       List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
