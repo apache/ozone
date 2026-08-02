@@ -29,10 +29,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.security.authentication.util.KerberosName;
@@ -44,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
+
 
 @Unhealthy("Requires a Ranger endpoint")
 class TestRangerClientMultiTenantAccessController extends MultiTenantAccessControllerTests {
@@ -175,3 +180,95 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     assertThrows(IOException.class, () -> accessController.createRole(role));
   }
 }
+
+class TestRangerClientMultiTenantAccessControllerExceptionMapping {
+ 
+  private static final String SERVICE_NAME = "cm_ozone";
+  private static final String SHORT_NAME = "ozone";
+  private static final String ROLE_NAME = "tenant1-UserRole";
+  private static final String POLICY_NAME = "tenant1-VolumeAccess";
+ 
+  private RangerClient rangerClient;
+  private RangerClientMultiTenantAccessController controller;
+ 
+  @BeforeEach
+  void setup() throws IllegalAccessException {
+    rangerClient = mock(RangerClient.class);
+ 
+    // The controller has no test-friendly constructor (it requires a live
+    // Kerberos/Ranger ConfigurationSource). Mockito's CALLS_REAL_METHODS
+    // mode builds the instance without invoking the constructor, so the
+    // real (non-mocked) method bodies under test still run; only the
+    // fields the methods depend on are injected via reflection below.
+    controller = mock(RangerClientMultiTenantAccessController.class,
+        CALLS_REAL_METHODS);
+    FieldUtils.writeField(controller, "client", rangerClient, true);
+    FieldUtils.writeField(controller, "rangerServiceName", SERVICE_NAME, true);
+    FieldUtils.writeField(controller, "shortName", SHORT_NAME, true);
+  }
+ 
+  private static RangerServiceException mockException(
+      ClientResponse.Status status, String message) {
+    RangerServiceException e = mock(RangerServiceException.class);
+    org.mockito.Mockito.when(e.getStatus()).thenReturn(status);
+    org.mockito.Mockito.when(e.getMessage()).thenReturn(message);
+    return e;
+  }
+ 
+  @Test
+  void deleteRoleSwallowsPlain404() throws Exception {
+    RangerServiceException notFound =
+        mockException(ClientResponse.Status.NOT_FOUND, "role not found");
+    doThrow(notFound).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+ 
+    assertDoesNotThrow(() -> controller.deleteRole(ROLE_NAME));
+    verify(rangerClient, times(1))
+        .deleteRole(ROLE_NAME, SHORT_NAME, SERVICE_NAME);
+  }
+ 
+  @Test
+  void deleteRoleSwallowsRanger28FourHundredNotFoundQuirk() throws Exception {
+    RangerServiceException notFound400 = mockException(
+        ClientResponse.Status.BAD_REQUEST,
+        "Role with name " + ROLE_NAME + " does not exist");
+    doThrow(notFound400).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+ 
+    assertDoesNotThrow(() -> controller.deleteRole(ROLE_NAME));
+  }
+ 
+  @Test
+  void deleteRolePropagatesUnrelatedFourHundred() throws Exception {
+    RangerServiceException stillReferenced = mockException(
+        ClientResponse.Status.BAD_REQUEST,
+        "Role " + ROLE_NAME + " could not be deleted as it is referenced "
+            + "in one or more policies");
+    doThrow(stillReferenced).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+ 
+    assertThrows(IOException.class, () -> controller.deleteRole(ROLE_NAME));
+  }
+ 
+  @Test
+  void deletePolicySwallows404() throws Exception {
+    RangerServiceException notFound =
+        mockException(ClientResponse.Status.NOT_FOUND, "policy not found");
+    doThrow(notFound).when(rangerClient)
+        .deletePolicy(anyString(), anyString());
+ 
+    assertDoesNotThrow(() -> controller.deletePolicy(POLICY_NAME));
+  }
+ 
+  @Test
+  void deletePolicyDoesNotInheritRoleFourHundredTolerance() throws Exception {
+    RangerServiceException badRequest = mockException(
+        ClientResponse.Status.BAD_REQUEST,
+        "Policy with name " + POLICY_NAME + " does not exist");
+    doThrow(badRequest).when(rangerClient)
+        .deletePolicy(anyString(), anyString());
+ 
+    assertThrows(IOException.class, () -> controller.deletePolicy(POLICY_NAME));
+  }
+}
+ 
