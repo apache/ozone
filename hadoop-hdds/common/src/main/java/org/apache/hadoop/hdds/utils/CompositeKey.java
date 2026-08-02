@@ -38,9 +38,9 @@ public abstract class CompositeKey {
     private final Object second;
 
     private TwoComponents(Object first, Object second) {
-      this.hashCode = hash(hash(1, first), second);
       this.first = Objects.requireNonNull(first, "first == null");
       this.second = Objects.requireNonNull(second, "second == null");
+      this.hashCode = hash(hash(1, first), second);
     }
 
     @Override
