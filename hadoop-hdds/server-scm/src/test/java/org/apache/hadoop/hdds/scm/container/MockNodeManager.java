@@ -485,13 +485,14 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public void recordPendingAllocationForDatanode(
-      DatanodeID datanodeID, ContainerID containerID, StorageType storageType) {
+      DatanodeID datanodeID, ContainerID containerID,
+      StorageType pendingStorageType) {
     DatanodeDetails dd = nodeMetricMap.keySet().stream()
         .filter(d -> d.getID().equals(datanodeID))
         .findFirst().orElse(null);
     DatanodeInfo info = getDatanodeInfo(dd);
     pendingContainerTracker.recordPendingAllocationForDatanode(
-        info, containerID, storageType);
+        info, containerID, pendingStorageType);
   }
 
   /**
@@ -995,7 +996,7 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public boolean hasSpaceForNewContainerAllocation(
-      DatanodeID datanodeID, StorageType storageType) {
+      DatanodeID datanodeID, StorageType pendingStorageType) {
     DatanodeDetails dd = nodeMetricMap.keySet().stream()
         .filter(d -> d.getID().equals(datanodeID))
         .findFirst().orElse(null);
@@ -1004,7 +1005,7 @@ public class MockNodeManager implements NodeManager {
       return false;
     }
     return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(
-        info, storageType);
+        info, pendingStorageType);
   }
 
   /**
