@@ -84,3 +84,75 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
   }
 
 }
+
+  @Test
+  public void testDeleteRoleAbsentRoleRanger28Workaround() throws Exception {
+    // Ranger 2.8 returns HTTP 400 with "does not exist" message when role is missing.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rse.getStatus()).thenReturn(ClientResponse.Status.BAD_REQUEST);
+    when(rse.getMessage()).thenReturn("Role with name 'tenant-role' does not exist");
+
+    doThrow(rse).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+
+    // Should pass silently (idempotent / tolerant delete)
+    assertDoesNotThrow(() -> accessController.deleteRole("tenant-role"));
+  }
+
+  @Test
+  public void testDeleteRoleAbsentRoleCaseInsensitive() throws Exception {
+    // Verify Locale.ROOT case-normalization handles uppercase/mixed-case responses.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rse.getStatus()).thenReturn(ClientResponse.Status.BAD_REQUEST);
+    when(rse.getMessage()).thenReturn("ROLE WITH NAME 'tenant-role' DOES NOT EXIST");
+
+    doThrow(rse).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+
+    assertDoesNotThrow(() -> accessController.deleteRole("tenant-role"));
+  }
+
+  @Test
+  public void testDeleteRoleUnrelated400Propagates() throws Exception {
+    // Unrelated HTTP 400 (e.g., role is still assigned to an active policy) MUST propagate.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rse.getStatus()).thenReturn(ClientResponse.Status.BAD_REQUEST);
+    when(rse.getMessage()).thenReturn("Role 'tenant-role' is currently in use by policy 'p1'");
+
+    doThrow(rse).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+
+    assertThrows(IOException.class, () -> accessController.deleteRole("tenant-role"));
+  }
+
+  @Test
+  public void testDeleteRoleGenuine404TreatedAsIdempotent() throws Exception {
+    // Standard HTTP 404 for missing role should pass silently.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rse.getStatus()).thenReturn(ClientResponse.Status.NOT_FOUND);
+
+    doThrow(rse).when(rangerClient)
+        .deleteRole(anyString(), anyString(), anyString());
+
+    assertDoesNotThrow(() -> accessController.deleteRole("tenant-role"));
+  }
+
+  @Test
+  public void testCreatePolicyFailFastOnDuplicate() throws Exception {
+    // Verify createPolicy fails fast on exception instead of attempting GET/reconciliation.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rangerClient.createPolicy(any())).thenThrow(rse);
+
+    Policy policy = new Policy.Builder().setName("tenant-policy").build();
+    assertThrows(IOException.class, () -> accessController.createPolicy(policy));
+  }
+
+  @Test
+  public void testCreateRoleFailFastOnDuplicate() throws Exception {
+    // Verify createRole fails fast on exception instead of attempting GET/reconciliation.
+    RangerServiceException rse = mock(RangerServiceException.class);
+    when(rangerClient.createRole(anyString(), any())).thenThrow(rse);
+
+    Role role = new Role.Builder().setName("tenant-role").build();
+    assertThrows(IOException.class, () -> accessController.createRole(role));
+  }
