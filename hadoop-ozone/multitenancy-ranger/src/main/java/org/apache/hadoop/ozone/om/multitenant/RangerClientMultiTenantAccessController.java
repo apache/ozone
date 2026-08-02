@@ -139,13 +139,6 @@ public class RangerClientMultiTenantAccessController implements
       // set back the expected login user
       UserGroupInformation.setLoginUser(loginUser);
     }
-
-    // Whether or not the Ranger credentials are valid is unknown right after
-    // RangerClient initialization here. Because RangerClient does not perform
-    // any authentication at this point just yet.
-    //
-    // If the credentials are invalid, RangerClient later throws 401 in every
-    // single request to Ranger.
   }
 
   /**
@@ -198,9 +191,6 @@ public class RangerClientMultiTenantAccessController implements
     if (message == null) {
       return false;
     }
-    // Ranger 2.8 returns HTTP 400 instead of 404 when deleting a role that
-    // does not exist. RangerServiceException exposes no structured Ranger
-    // error code, so inspect normalized response text as a workaround.
     String lowerMessage = message.toLowerCase(Locale.ROOT);
     return lowerMessage.contains("role with name")
         && lowerMessage.contains("does not exist");
@@ -287,8 +277,6 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deletePolicy(rangerServiceName, policyName);
     } catch (RangerServiceException e) {
-      // If the policy does not exist, silently return.
-      // This makes tenant deletion tolerant of partial previous state.
       if (isNotFoundException(e)) {
         LOG.warn("Policy {} not found in Ranger during delete - assuming already deleted.",
             policyName);
@@ -342,8 +330,6 @@ public class RangerClientMultiTenantAccessController implements
       LOG.debug("Sending update request for role ID {} to Ranger.",
           roleId);
     }
-    // TODO: Check if createdByUser is even needed for updateRole request.
-    //  If not, remove the createdByUser param and set it after.
     final RangerRole rangerRole;
     try {
       rangerRole = client.updateRole(roleId, toRangerRole(role, shortName));
@@ -363,9 +349,6 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deleteRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
-      // If the role does not exist, silently return.
-      // This makes tenant deletion tolerant of partial previous state,
-      // e.g. when one role was deleted but another was not.
       if (isRoleNotFoundException(e)) {
         LOG.warn("Role {} not found in Ranger during delete - assuming already deleted.",
             roleName);
@@ -385,8 +368,7 @@ public class RangerClientMultiTenantAccessController implements
       decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
-    // If the login user doesn't have sufficient privilege, policyVersion
-    // field could be null in RangerService.
+    // If the login user doesn't have sufficient privilege, policyVersion field could be null in RangerService.
     final Long policyVersion = rangerOzoneService.getPolicyVersion();
     return policyVersion == null ? -1L : policyVersion;
   }
