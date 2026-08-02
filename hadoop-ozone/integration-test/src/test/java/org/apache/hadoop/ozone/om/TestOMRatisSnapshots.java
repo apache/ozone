@@ -690,6 +690,9 @@ public class TestOMRatisSnapshots {
     assertThat(omLog.getOutput())
         .as("checkpoint install must not be aborted during BOOTSTRAPPING")
         .doesNotContain("Abort install snapshot from Leader");
+    assertThat(omLog.getOutput())
+        .as("checkpoint installation should finish")
+        .contains("Install Checkpoint is finished");
     assertThat(snapshotProviderLog.getOutput())
         .as("checkpoint download should start after install is accepted")
         .contains("Prepare to download the snapshot from leader OM");
