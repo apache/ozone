@@ -75,6 +75,11 @@ public final class S3Consts {
 
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  /**
+   * Prefix for internal metadata keys that store remapped user x-amz-meta values
+   * colliding with system headers. Users must not set metadata keys with this prefix.
+   */
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
 
@@ -160,6 +165,7 @@ public final class S3Consts {
     public static final String UPLOAD_ID = "uploadId";
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
+    public static final String LIFECYCLE = "lifecycle";
 
     private QueryParams() {
       // no instances

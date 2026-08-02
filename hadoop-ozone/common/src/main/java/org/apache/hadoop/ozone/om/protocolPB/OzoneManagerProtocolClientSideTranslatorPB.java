@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
@@ -124,6 +125,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
@@ -144,6 +146,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -155,6 +160,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -220,6 +226,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
@@ -2761,6 +2768,73 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    GetLifecycleConfigurationRequest.Builder req =
+        GetLifecycleConfigurationRequest.newBuilder();
+    req.setVolumeName(volumeName);
+    req.setBucketName(bucketName);
+
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleConfiguration)
+        .setGetLifecycleConfigurationRequest(req)
+        .build();
+
+    GetLifecycleConfigurationResponse resp = handleError(submitRequest(
+        omRequest)).getGetLifecycleConfigurationResponse();
+
+    return OmLifecycleConfiguration.getFromProtobuf(
+        resp.getLifecycleConfiguration());
+  }
+
+  @Override
+  public GetLifecycleServiceStatusResponse getLifecycleServiceStatus() throws IOException {
+    OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+        getLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+            .newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleServiceStatus)
+        .setGetLifecycleServiceStatusRequest(getLifecycleServiceStatusRequest)
+        .build();
+
+    return handleError(submitRequest(omRequest))
+        .getGetLifecycleServiceStatusResponse();
+  }
+
+  @Override
+  public void setLifecycleConfiguration(
+      OmLifecycleConfiguration omLifecycleConfiguration) throws IOException {
+    SetLifecycleConfigurationRequest.Builder req =
+        SetLifecycleConfigurationRequest.newBuilder();
+    LifecycleConfiguration lifecycleConfiguration =
+        omLifecycleConfiguration.getProtobuf();
+    req.setLifecycleConfiguration(lifecycleConfiguration);
+
+    OMRequest omRequest =
+        createOMRequest(Type.SetLifecycleConfiguration)
+            .setSetLifecycleConfigurationRequest(req)
+            .build();
+
+    OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException {
+    DeleteLifecycleConfigurationRequest.Builder req =
+        DeleteLifecycleConfigurationRequest.newBuilder();
+    req.setVolumeName(volumeName);
+    req.setBucketName(bucketName);
+
+    OMRequest omRequest = createOMRequest(Type.DeleteLifecycleConfiguration)
+        .setDeleteLifecycleConfigurationRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
   public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
@@ -2797,6 +2871,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
         .setPutBucketTaggingRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void suspendLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(true).build();
+
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void resumeLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(false).build();
+
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
         .build();
 
     handleError(submitRequest(omRequest));

@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -105,12 +106,15 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      if (getHostOnly(address).equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> scmBindHost = HddsUtils.getHostName(address);
+      if (scmBindHost.isPresent()
+          && scmBindHost.get().equals(OZONE_SCM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> scmHost = HddsUtils.getHostNameFromConfigKeys(conf,
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-        if (scmHost.isPresent()) {
-          return scmHost.get() + ":" + getPort(address);
+        OptionalInt scmPort = HddsUtils.getHostPort(address);
+        if (scmHost.isPresent() && scmPort.isPresent()) {
+          return HddsUtils.getHostPortString(scmHost.get(), scmPort.getAsInt());
         }
       }
       return address;
@@ -125,11 +129,14 @@ public class BaseInsightSubCommand {
       }
 
       // Fallback to RPC hostname
-      if (getHostOnly(address).equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
+      Optional<String> omBindHost = HddsUtils.getHostName(address);
+      if (omBindHost.isPresent()
+          && omBindHost.get().equals(OZONE_OM_HTTP_BIND_HOST_DEFAULT)) {
         Optional<String> omHost = HddsUtils.getHostNameFromConfigKeys(conf,
             OMConfigKeys.OZONE_OM_ADDRESS_KEY);
-        if (omHost.isPresent()) {
-          return omHost.get() + ":" + getPort(address);
+        OptionalInt omPort = HddsUtils.getHostPort(address);
+        if (omHost.isPresent() && omPort.isPresent()) {
+          return HddsUtils.getHostPortString(omHost.get(), omPort.getAsInt());
         }
       }
       return address;
@@ -138,22 +145,6 @@ public class BaseInsightSubCommand {
       throw new IllegalArgumentException(
           "Component type is not supported: " + componentType);
     }
-  }
-
-  /**
-   * Extract hostname from address string.
-   * e.g. Input: "0.0.0.0:9876" -> Output: "0.0.0.0"
-   */
-  private String getHostOnly(String address) {
-    return address.split(":", 2)[0];
-  }
-
-  /**
-   * Extract port from address string.
-   * e.g. Input: "0.0.0.0:9876" -> Output: "9876"
-   */
-  private String getPort(String address) {
-    return address.split(":", 2)[1];
   }
 
   public Map<String, InsightPoint> createInsightPoints(

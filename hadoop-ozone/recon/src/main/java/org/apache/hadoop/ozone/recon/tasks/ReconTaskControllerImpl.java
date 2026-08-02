@@ -617,6 +617,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Track reprocess submission
     controllerMetrics.incrTotalReprocessSubmittedToQueue();
 
+    if (reason == ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD) {
+      lastRetryTimestamp.set(0);
+    }
+
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
     if (null != reInitializationResult) {
       return reInitializationResult;
@@ -746,9 +750,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Create temporary directory for checkpoint
     String parentPath = cleanTempCheckPointPath(omMetaManager);
     
-    // Create checkpoint
+    // Create checkpoint. getCheckpoint returns null when RocksDB fails to snapshot
+    // (e.g. a manually placed OM DB that is incomplete or corrupt).
     DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint(parentPath, true);
-    
+    if (checkpoint == null) {
+      throw new IOException("Failed to create OM DB checkpoint at " + parentPath
+          + "; the on-disk OM DB may be incomplete or corrupt.");
+    }
+
     return omMetaManager.createCheckpointReconMetadataManager(configuration, checkpoint);
   }
 
@@ -840,7 +849,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Reset retry counters - for testing purposes.
    */
   @VisibleForTesting
-  void resetRetryCounters() {
+  public void resetRetryCounters() {
     eventProcessRetryCount.set(0);
     lastRetryTimestamp.set(0);
   }
@@ -868,8 +877,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   private void cleanupPreExistingCheckpoints() {
     try {
-      if (currentOMMetadataManager == null) {
-        LOG.debug("No current OM metadata manager, skipping pre-existing checkpoint cleanup");
+      if (currentOMMetadataManager == null || currentOMMetadataManager.getStore() == null) {
+        LOG.debug("No current OM metadata manager or store, skipping pre-existing checkpoint cleanup");
         return;
       }
       

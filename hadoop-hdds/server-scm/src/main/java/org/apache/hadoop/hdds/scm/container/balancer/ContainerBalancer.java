@@ -17,10 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,11 +33,16 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.StatefulService;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -470,6 +480,27 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
               " than ozone.scm.container.size");
     }
 
+    if (conf.getMaxSizeEnteringTarget() > conf.getMaxSizeToMovePerIteration()) {
+      LOG.warn("hdds.container.balancer.size.entering.target.max {} should be "
+              + "less than or equal to hdds.container.balancer.size.moved.max"
+              + ".per.iteration {}",
+          conf.getMaxSizeEnteringTarget(), conf.getMaxSizeToMovePerIteration());
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.entering.target.max should be less "
+              + "than or equal to hdds.container.balancer.size.moved.max.per"
+              + ".iteration");
+    }
+    if (conf.getMaxSizeLeavingSource() > conf.getMaxSizeToMovePerIteration()) {
+      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should be "
+              + "less than or equal to hdds.container.balancer.size.moved.max"
+              + ".per.iteration {}",
+          conf.getMaxSizeLeavingSource(), conf.getMaxSizeToMovePerIteration());
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.leaving.source.max should be less "
+              + "than or equal to hdds.container.balancer.size.moved.max.per"
+              + ".iteration");
+    }
+
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
     long refreshPeriod = duConf.getRefreshPeriod().toMillis();
@@ -510,6 +541,133 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
 
     validateNodeList(conf.getIncludeNodes(), "included");
     validateNodeList(conf.getExcludeNodes(), "excluded");
+    validateIncludeExcludeLists(conf);
+    validateIncludeContainersExist(conf);
+    validateEligibleDatanodePool(conf);
+  }
+
+  /**
+   * Rejects include lists that are fully covered by the corresponding exclude
+   * lists, which would leave no datanodes or containers to balance.
+   */
+  private void validateIncludeExcludeLists(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
+    Set<String> includeNodes = conf.getIncludeNodes();
+    Set<String> excludeNodes = conf.getExcludeNodes();
+    if (!includeNodes.isEmpty() && !excludeNodes.isEmpty()) {
+      boolean allIncludedNodesExcluded = true;
+      for (String includedNode : includeNodes) {
+        if (!isIncludedNodeExcluded(includedNode, excludeNodes)) {
+          allIncludedNodesExcluded = false;
+          break;
+        }
+      }
+      if (allIncludedNodesExcluded) {
+        throw new InvalidContainerBalancerConfigurationException(
+            "include-datanodes is a subset of exclude-datanodes, no datanode can participate in balancing.");
+      }
+    }
+
+    Set<ContainerID> includeContainers = conf.getIncludeContainers();
+    Set<ContainerID> excludeContainers = conf.getExcludeContainers();
+    if (!includeContainers.isEmpty() && excludeContainers.containsAll(includeContainers)) {
+      throw new InvalidContainerBalancerConfigurationException(
+          "include-containers is a subset of exclude-containers, no container can be selected for balancing.");
+    }
+  }
+
+  private boolean isIncludedNodeExcluded(String includedNode, Set<String> excludeNodes) {
+    if (excludeNodes.contains(includedNode)) {
+      return true;
+    }
+    for (DatanodeDetails dn : scm.getScmNodeManager().getNodesByAddress(includedNode)) {
+      if (excludeNodes.contains(dn.getHostName()) || excludeNodes.contains(dn.getIpAddress())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Rejects non-empty include-containers lists when any listed container ID
+   * does not exist in SCM.
+   */
+  private void validateIncludeContainersExist(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
+    Set<ContainerID> includeContainers = conf.getIncludeContainers();
+    if (includeContainers.isEmpty()) {
+      return;
+    }
+
+    ContainerManager containerManager = scm.getContainerManager();
+    List<ContainerID> missingContainers = new ArrayList<>();
+    for (ContainerID containerID : includeContainers) {
+      try {
+        containerManager.getContainer(containerID);
+      } catch (ContainerNotFoundException e) {
+        missingContainers.add(containerID);
+      }
+    }
+
+    if (!missingContainers.isEmpty()) {
+      throw new InvalidContainerBalancerConfigurationException(
+          "Container Balancer cannot start: included container ID(s) " + missingContainers
+              + " do not exist in SCM.");
+    }
+  }
+
+  /**
+   * Validates that enough healthy, in-service datanodes are eligible and that
+   * {@link ContainerBalancerConfiguration#getMaxDatanodesRatioToInvolvePerIteration()}
+   * allows at least one source and one target datanode per iteration.
+   */
+  private void validateEligibleDatanodePool(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
+    int eligibleCount = countEligibleDatanodes(conf);
+    if (eligibleCount < 2) {
+      throw new InvalidContainerBalancerConfigurationException(String.format(
+          "Container Balancer found %d eligible datanode(s) but requires at least 2.",
+          eligibleCount));
+    }
+    int maxDatanodesToInvolve = conf.computeMaxDatanodesToInvolvePerIteration(eligibleCount);
+    if (maxDatanodesToInvolve < 2) {
+      throw new InvalidContainerBalancerConfigurationException(String.format(
+          "max-datanodes-percentage-to-involve-per-iteration=%d allows at most "
+              + "%d datanode(s) per iteration with %d eligible datanode(s), "
+              + "but at least 2 are required for a source and target datanode "
+              + "pair.",
+          conf.getMaxDatanodesPercentageToInvolvePerIteration(),
+          maxDatanodesToInvolve, eligibleCount));
+    }
+  }
+
+  /**
+   * Counts healthy, in-service datanodes that can participate in balancing after
+   * applying include/exclude datanode configuration.
+   */
+  private int countEligibleDatanodes(ContainerBalancerConfiguration conf) {
+    Set<String> excludeNodes = conf.getExcludeNodes();
+    Set<String> includeNodes = conf.getIncludeNodes();
+    List<DatanodeInfo> healthyNodes = scm.getScmNodeManager().getNodes(IN_SERVICE, HEALTHY);
+    int eligibleCount = 0;
+    for (DatanodeDetails datanode : healthyNodes) {
+      if (!shouldExcludeDatanode(datanode, excludeNodes, includeNodes)) {
+        eligibleCount++;
+      }
+    }
+    return eligibleCount;
+  }
+
+  static boolean shouldExcludeDatanode(DatanodeDetails datanode,
+      Set<String> excludeNodes, Set<String> includeNodes) {
+    if (excludeNodes.contains(datanode.getHostName()) ||
+        excludeNodes.contains(datanode.getIpAddress())) {
+      return true;
+    } else if (!includeNodes.isEmpty()) {
+      return !includeNodes.contains(datanode.getHostName()) &&
+          !includeNodes.contains(datanode.getIpAddress());
+    }
+    return false;
   }
 
   public ContainerBalancerMetrics getMetrics() {

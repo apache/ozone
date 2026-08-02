@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
@@ -30,13 +29,12 @@ public interface IOzoneManagerLock {
   OMLockDetails acquireReadLock(Resource resource,
                                 String... resources);
 
-  OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> resources);
+  OMLockDetails acquireReadLocks(Resource resource, Iterable<String[]> keys);
 
   OMLockDetails acquireWriteLock(Resource resource,
                                  String... resources);
 
-  OMLockDetails acquireWriteLocks(Resource resource,
-                                 Collection<String[]> resources);
+  OMLockDetails acquireWriteLocks(Resource resource, Iterable<String[]> keys);
 
   OMLockDetails acquireResourceWriteLock(Resource resource);
 
@@ -47,16 +45,14 @@ public interface IOzoneManagerLock {
   OMLockDetails releaseWriteLock(Resource resource,
                         String... resources);
 
-  OMLockDetails releaseWriteLocks(Resource resource,
-                                 Collection<String[]> resources);
+  OMLockDetails releaseWriteLocks(Resource resource, Iterable<String[]> keys);
 
   OMLockDetails releaseResourceWriteLock(Resource resource);
 
   OMLockDetails releaseReadLock(Resource resource,
                                 String... resources);
 
-  OMLockDetails releaseReadLocks(Resource resource,
-                                Collection<String[]> resources);
+  OMLockDetails releaseReadLocks(Resource resource, Iterable<String[]> keys);
 
   @VisibleForTesting
   int getReadHoldCount(Resource resource,

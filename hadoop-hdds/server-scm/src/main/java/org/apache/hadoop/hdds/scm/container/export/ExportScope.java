@@ -23,11 +23,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 /**
  * Container listing filters for an export job.
  * An export job filters containers by {@link ContainerHealthState}, {@link LifeCycleState} or both.
- * Example TAR name:
- * {@code container-ids-health-MISSING_lifecycle-OPEN-20260101T120000Z-{jobId}.tar}
+ * Example archive name:
+ * {@code container-ids_health-MISSING_lifecycle-OPEN_20260101T120000Z_job{jobId}.tar.gz}
  */
 public final class ExportScope {
 
+  private static final String ANY = "ANY";
   private final LifeCycleState lifeCycleState;
   private final ContainerHealthState healthState;
   private final String value;
@@ -39,17 +40,10 @@ public final class ExportScope {
   }
 
   public static ExportScope of(LifeCycleState lifeCycleState, ContainerHealthState healthState) {
-    StringBuilder sb = new StringBuilder();
-    if (healthState != null) {
-      sb.append("health-").append(healthState.name());
-    }
-    if (lifeCycleState != null) {
-      if (sb.length() > 0) {
-        sb.append('_');
-      }
-      sb.append("lifecycle-").append(lifeCycleState.name());
-    }
-    return new ExportScope(lifeCycleState, healthState, sb.toString());
+    String health = healthState != null ? healthState.name() : ANY;
+    String lifecycle = lifeCycleState != null ? lifeCycleState.name() : ANY;
+    String value = "health-" + health + "_lifecycle-" + lifecycle;
+    return new ExportScope(lifeCycleState, healthState, value);
   }
 
   public LifeCycleState getLifeCycleState() {
