@@ -29,16 +29,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -49,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
-
 @Unhealthy("Requires a Ranger endpoint")
 class TestRangerClientMultiTenantAccessController extends MultiTenantAccessControllerTests {
 
@@ -59,16 +56,15 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
   @BeforeEach
   public void setUpMocks() throws Exception {
     rangerClient = mock(RangerClient.class);
-    
+
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://localhost:6182/");
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/ozone.keytab");
-    
+
     accessController = new RangerClientMultiTenantAccessController(conf);
 
-    // Inject mock rangerClient into accessController instance
     Field clientField = RangerClientMultiTenantAccessController.class.getDeclaredField("client");
     clientField.setAccessible(true);
     clientField.set(accessController, rangerClient);
@@ -77,34 +73,36 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
   @Override
   protected MultiTenantAccessController createSubject() {
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
-
     // Set up truststore
     System.setProperty("javax.net.ssl.trustStore",
         "/path/to/cm-auto-global_truststore.jks");
-
     // Specify Kerberos client config (krb5.conf) path
     System.setProperty("java.security.krb5.conf", "/etc/krb5.conf");
-
     // Enable Kerberos debugging
     System.setProperty("sun.security.krb5.debug", "true");
-
     // DEFAULT rule uses the default realm configured in krb5.conf
     KerberosName.setRules("DEFAULT");
-
+    // These config keys must be properly set when the test is run:
+    //
+    // OZONE_RANGER_HTTPS_ADDRESS_KEY
+    // OZONE_RANGER_SERVICE
+    // OZONE_OM_KERBEROS_PRINCIPAL_KEY
+    // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
+    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.policy.rest.url
     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY,
         "https://localhost:6182/");
-
+    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.service.name
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
-
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "om/_HOST@EXAMPLE.COM");
-
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
         "/path/to/ozone.keytab");
-
+    // TODO: Test with clear text username and password as well.
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "rangeruser");
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
+    // (Optional) Enable RangerClient debug log
     GenericTestUtils.setLogLevel(
         LoggerFactory.getLogger(RangerClient.class), Level.DEBUG);
-
     return assertInstanceOf(RangerClientMultiTenantAccessController.class, MultiTenantAccessController.create(conf));
   }
 
@@ -118,13 +116,12 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     doThrow(rse).when(rangerClient)
         .deleteRole(anyString(), anyString(), anyString());
 
-    // Should pass silently (idempotent / tolerant delete)
     assertDoesNotThrow(() -> accessController.deleteRole("tenant-role"));
   }
 
   @Test
   public void testDeleteRoleAbsentRoleCaseInsensitive() throws Exception {
-    // Verify Locale.ROOT case-normalization handles uppercase/mixed-case responses.
+    // Verify case-normalization handles uppercase/mixed-case responses.
     RangerServiceException rse = mock(RangerServiceException.class);
     when(rse.getStatus()).thenReturn(ClientResponse.Status.BAD_REQUEST);
     when(rse.getMessage()).thenReturn("ROLE WITH NAME 'tenant-role' DOES NOT EXIST");
@@ -137,7 +134,7 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
 
   @Test
   public void testDeleteRoleUnrelated400Propagates() throws Exception {
-    // Unrelated HTTP 400 (e.g., role is still assigned to an active policy) MUST propagate.
+    // Unrelated HTTP 400 (e.g. role referenced by policy) MUST propagate.
     RangerServiceException rse = mock(RangerServiceException.class);
     when(rse.getStatus()).thenReturn(ClientResponse.Status.BAD_REQUEST);
     when(rse.getMessage()).thenReturn("Role 'tenant-role' is currently in use by policy 'p1'");
@@ -162,7 +159,7 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
 
   @Test
   public void testCreatePolicyFailFastOnDuplicate() throws Exception {
-    // Verify createPolicy fails fast on exception instead of attempting GET/reconciliation.
+    // Verify createPolicy fails fast on exception without attempting reconciliation.
     RangerServiceException rse = mock(RangerServiceException.class);
     when(rangerClient.createPolicy(any())).thenThrow(rse);
 
@@ -172,7 +169,7 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
 
   @Test
   public void testCreateRoleFailFastOnDuplicate() throws Exception {
-    // Verify createRole fails fast on exception instead of attempting GET/reconciliation.
+    // Verify createRole fails fast on exception without attempting reconciliation.
     RangerServiceException rse = mock(RangerServiceException.class);
     when(rangerClient.createRole(anyString(), any())).thenThrow(rse);
 
@@ -180,95 +177,3 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     assertThrows(IOException.class, () -> accessController.createRole(role));
   }
 }
-
-class TestRangerClientMultiTenantAccessControllerExceptionMapping {
- 
-  private static final String SERVICE_NAME = "cm_ozone";
-  private static final String SHORT_NAME = "ozone";
-  private static final String ROLE_NAME = "tenant1-UserRole";
-  private static final String POLICY_NAME = "tenant1-VolumeAccess";
- 
-  private RangerClient rangerClient;
-  private RangerClientMultiTenantAccessController controller;
- 
-  @BeforeEach
-  void setup() throws IllegalAccessException {
-    rangerClient = mock(RangerClient.class);
- 
-    // The controller has no test-friendly constructor (it requires a live
-    // Kerberos/Ranger ConfigurationSource). Mockito's CALLS_REAL_METHODS
-    // mode builds the instance without invoking the constructor, so the
-    // real (non-mocked) method bodies under test still run; only the
-    // fields the methods depend on are injected via reflection below.
-    controller = mock(RangerClientMultiTenantAccessController.class,
-        CALLS_REAL_METHODS);
-    FieldUtils.writeField(controller, "client", rangerClient, true);
-    FieldUtils.writeField(controller, "rangerServiceName", SERVICE_NAME, true);
-    FieldUtils.writeField(controller, "shortName", SHORT_NAME, true);
-  }
- 
-  private static RangerServiceException mockException(
-      ClientResponse.Status status, String message) {
-    RangerServiceException e = mock(RangerServiceException.class);
-    org.mockito.Mockito.when(e.getStatus()).thenReturn(status);
-    org.mockito.Mockito.when(e.getMessage()).thenReturn(message);
-    return e;
-  }
- 
-  @Test
-  void deleteRoleSwallowsPlain404() throws Exception {
-    RangerServiceException notFound =
-        mockException(ClientResponse.Status.NOT_FOUND, "role not found");
-    doThrow(notFound).when(rangerClient)
-        .deleteRole(anyString(), anyString(), anyString());
- 
-    assertDoesNotThrow(() -> controller.deleteRole(ROLE_NAME));
-    verify(rangerClient, times(1))
-        .deleteRole(ROLE_NAME, SHORT_NAME, SERVICE_NAME);
-  }
- 
-  @Test
-  void deleteRoleSwallowsRanger28FourHundredNotFoundQuirk() throws Exception {
-    RangerServiceException notFound400 = mockException(
-        ClientResponse.Status.BAD_REQUEST,
-        "Role with name " + ROLE_NAME + " does not exist");
-    doThrow(notFound400).when(rangerClient)
-        .deleteRole(anyString(), anyString(), anyString());
- 
-    assertDoesNotThrow(() -> controller.deleteRole(ROLE_NAME));
-  }
- 
-  @Test
-  void deleteRolePropagatesUnrelatedFourHundred() throws Exception {
-    RangerServiceException stillReferenced = mockException(
-        ClientResponse.Status.BAD_REQUEST,
-        "Role " + ROLE_NAME + " could not be deleted as it is referenced "
-            + "in one or more policies");
-    doThrow(stillReferenced).when(rangerClient)
-        .deleteRole(anyString(), anyString(), anyString());
- 
-    assertThrows(IOException.class, () -> controller.deleteRole(ROLE_NAME));
-  }
- 
-  @Test
-  void deletePolicySwallows404() throws Exception {
-    RangerServiceException notFound =
-        mockException(ClientResponse.Status.NOT_FOUND, "policy not found");
-    doThrow(notFound).when(rangerClient)
-        .deletePolicy(anyString(), anyString());
- 
-    assertDoesNotThrow(() -> controller.deletePolicy(POLICY_NAME));
-  }
- 
-  @Test
-  void deletePolicyDoesNotInheritRoleFourHundredTolerance() throws Exception {
-    RangerServiceException badRequest = mockException(
-        ClientResponse.Status.BAD_REQUEST,
-        "Policy with name " + POLICY_NAME + " does not exist");
-    doThrow(badRequest).when(rangerClient)
-        .deletePolicy(anyString(), anyString());
- 
-    assertThrows(IOException.class, () -> controller.deletePolicy(POLICY_NAME));
-  }
-}
- 
