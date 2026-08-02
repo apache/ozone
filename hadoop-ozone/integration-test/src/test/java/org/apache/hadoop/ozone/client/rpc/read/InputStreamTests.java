@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -128,7 +128,7 @@ abstract class InputStreamTests {
     scm.getContainerManager().getContainers().forEach(container -> {
       if (container.isOpen()) {
         try {
-          TestHelper.waitForContainerClose(getCluster(), container.getContainerID());
+          OzoneTestHelper.waitForContainerClose(getCluster(), container.getContainerID());
         } catch (Exception e) {
           throw new RuntimeException(e);
         }

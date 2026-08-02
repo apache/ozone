@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -385,8 +386,26 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
+   * Whether this datanode's exposed ports differ from {@code other}'s.
+   * Compared as a set of name=value entries, since {@link Port#equals}
+   * ignores the port value.
+   *
+   * @param other another snapshot of this datanode
+   * @return true if the two port sets are not identical
+   */
+  public boolean portsChanged(DatanodeDetails other) {
+    return !portValues(this).equals(portValues(other));
+  }
+
+  private static Set<String> portValues(DatanodeDetails datanodeDetails) {
+    return datanodeDetails.getPorts().stream()
+        .map(port -> port.getName() + "=" + port.getValue())
+        .collect(Collectors.toSet());
+  }
+
+  /**
    * Helper method to get the Ratis port.
-   * 
+   *
    * @return Port
    */
   public Port getRatisPort() {
