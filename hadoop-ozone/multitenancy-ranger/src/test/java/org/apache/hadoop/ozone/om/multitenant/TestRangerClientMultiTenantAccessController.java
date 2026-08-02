@@ -21,19 +21,53 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.sun.jersey.api.client.ClientResponse;
+import java.io.IOException;
+import java.lang.reflect.Field;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ranger.RangerClient;
+import org.apache.ranger.RangerServiceException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 @Unhealthy("Requires a Ranger endpoint")
 class TestRangerClientMultiTenantAccessController extends MultiTenantAccessControllerTests {
+
+  private RangerClient rangerClient;
+  private RangerClientMultiTenantAccessController accessController;
+
+  @BeforeEach
+  public void setUpMocks() throws Exception {
+    rangerClient = mock(RangerClient.class);
+    
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
+    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://localhost:6182/");
+    conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/ozone.keytab");
+    
+    accessController = new RangerClientMultiTenantAccessController(conf);
+
+    // Inject mock rangerClient into accessController instance
+    Field clientField = RangerClientMultiTenantAccessController.class.getDeclaredField("client");
+    clientField.setAccessible(true);
+    clientField.set(accessController, rangerClient);
+  }
 
   @Override
   protected MultiTenantAccessController createSubject() {
@@ -52,18 +86,9 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     // DEFAULT rule uses the default realm configured in krb5.conf
     KerberosName.setRules("DEFAULT");
 
-    // These config keys must be properly set when the test is run:
-    //
-    // OZONE_RANGER_HTTPS_ADDRESS_KEY
-    // OZONE_RANGER_SERVICE
-    // OZONE_OM_KERBEROS_PRINCIPAL_KEY
-    // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
-
-    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.policy.rest.url
     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY,
         "https://localhost:6182/");
 
-    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.service.name
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
 
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
@@ -72,18 +97,11 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
         "/path/to/ozone.keytab");
 
-    // TODO: Test with clear text username and password as well.
-//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "rangeruser");
-//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
-
-    // (Optional) Enable RangerClient debug log
     GenericTestUtils.setLogLevel(
         LoggerFactory.getLogger(RangerClient.class), Level.DEBUG);
 
     return assertInstanceOf(RangerClientMultiTenantAccessController.class, MultiTenantAccessController.create(conf));
   }
-
-}
 
   @Test
   public void testDeleteRoleAbsentRoleRanger28Workaround() throws Exception {
@@ -156,3 +174,4 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
     Role role = new Role.Builder().setName("tenant-role").build();
     assertThrows(IOException.class, () -> accessController.createRole(role));
   }
+}
