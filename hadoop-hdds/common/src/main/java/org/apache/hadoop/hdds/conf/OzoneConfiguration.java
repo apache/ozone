@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -446,10 +447,16 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     delegatingProps = null;
   }
 
+  /** Ozone's built-in default resources; a value coming only from these may be overridden. */
+  private static final Set<String> DEFAULT_RESOURCES = getConfigurationResourceFiles().stream()
+      .filter(resource -> resource.endsWith("-default.xml"))
+      .collect(Collectors.toSet());
+
   /**
    * Sets {@code value} unless the property was already set explicitly
-   * (programmatically, from the command line, or from a {@code *-site.xml}).
-   * Values that come only from default resources ({@code *-default.xml}) are overridden.
+   * (programmatically, from the command line, from a {@code *-site.xml}, or from a
+   * user-provided resource). Values that come only from Ozone's built-in default
+   * resources ({@code *-default.xml}) are overridden.
    * <p>
    * Hadoop {@link Configuration#setIfUnset(String, String)} uses {@code get(name) == null},
    * which never succeeds for keys present in default resources after HDDS-12777.
@@ -467,9 +474,10 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
       return false;
     }
     for (String source : sources) {
-      // Any source other than a *-default.xml (programmatically, command line,
-      // a *-site.xml, or a custom resource) counts as explicitly set.
-      if (source != null && !source.endsWith("-default.xml")) {
+      // Explicit unless the value comes only from one of Ozone's built-in default
+      // resources. A user-provided resource is not in that set and is preserved,
+      // even if it happens to be named *-default.xml.
+      if (source != null && !DEFAULT_RESOURCES.contains(source)) {
         return true;
       }
     }

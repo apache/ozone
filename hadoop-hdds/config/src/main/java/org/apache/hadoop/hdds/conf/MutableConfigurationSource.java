@@ -78,5 +78,10 @@ public interface MutableConfigurationSource
     public void set(String key, String value) {
       wrapped.setIfUnset(key, value);
     }
+
+    @Override
+    public void setIfUnset(String key, String value) {
+      wrapped.setIfUnset(key, value);
+    }
   }
 }

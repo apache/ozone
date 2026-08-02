@@ -344,7 +344,9 @@ public class TestOzoneConfiguration {
   public void setIfUnsetPreservesCustomResourceValue(@TempDir File tempDir)
       throws IOException {
     final String key = OZONE_SCM_HANDLER_COUNT_KEY;
-    File custom = new File(tempDir, "custom-config.xml");
+    // Named *-default.xml on purpose: a user-provided resource is explicit even
+    // when its name matches the built-in default resource convention.
+    File custom = new File(tempDir, "custom-default.xml");
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         Files.newOutputStream(custom.toPath()), StandardCharsets.UTF_8))) {
       startConfig(out);
