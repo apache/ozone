@@ -403,15 +403,21 @@ public class ContainerManagerImpl implements ContainerManager {
 
   /**
    * Returns the container ID's matching with specified owner and storage tier.
-   * Containers with a null storage tier are treated as matching any tier
-   * (upgrade-compat with older containers that predate the storageTier field).
+   * A stored container with a null storage tier is treated as matching any
+   * tier (upgrade-compat with older containers that predate the storageTier
+   * field). The requested {@code storageTier} argument itself must not be
+   * null; callers must supply a concrete tier (defaulting to
+   * {@link org.apache.hadoop.hdds.client.StorageTier#getDefaultTier()} if
+   * the client did not request one).
    * @param pipeline pipeline
    * @param owner owner
-   * @param storageTier storageTier
+   * @param storageTier requested storageTier, must not be null
    * @return NavigableSet<ContainerID>
    */
   private NavigableSet<ContainerID> getContainersForOwnerAndStorageTier(
       Pipeline pipeline, String owner, StorageTier storageTier) throws IOException {
+    Objects.requireNonNull(storageTier,
+        "storageTier is required for container matching");
     NavigableSet<ContainerID> containerIDs =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     Iterator<ContainerID> containerIDIterator = containerIDs.iterator();
@@ -420,7 +426,7 @@ public class ContainerManagerImpl implements ContainerManager {
       try {
         ContainerInfo info = getContainer(cid);
         if (!info.getOwner().equals(owner) ||
-            (info.getStorageTier() != null && storageTier != null &&
+            (info.getStorageTier() != null &&
                 !info.getStorageTier().equals(storageTier))) {
           containerIDIterator.remove();
         }
