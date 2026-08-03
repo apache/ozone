@@ -271,6 +271,7 @@ public class ContainerManagerImpl implements ContainerManager {
     }
 
     containerStateManager.addContainer(containerInfoBuilder.build());
+    pipelineManager.recordPendingAllocation(pipeline, containerID);
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }

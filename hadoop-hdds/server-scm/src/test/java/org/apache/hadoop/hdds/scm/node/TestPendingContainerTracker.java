@@ -419,6 +419,25 @@ public class TestPendingContainerTracker {
         dnInfo, StorageType.SSD));
   }
 
+  @Test
+  public void testUnknownStorageTypePendingCountsAgainstTypedChecks() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize, StorageTypeProto.DISK));
+    dnInfo.updateStorageReports(reports);
+
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(0));
+
+    assertEquals(1,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.DISK));
+    assertEquals(1,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.SSD));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.DISK));
+  }
+
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
   }

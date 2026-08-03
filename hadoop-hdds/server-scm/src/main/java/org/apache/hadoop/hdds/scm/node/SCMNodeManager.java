@@ -1772,6 +1772,7 @@ public class SCMNodeManager implements NodeManager {
       final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.addContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
   }
 
   @Override
@@ -1779,6 +1780,14 @@ public class SCMNodeManager implements NodeManager {
                            final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.removeContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
+  }
+
+  private void removePendingAllocation(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerId);
   }
 
   /**

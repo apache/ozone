@@ -165,6 +165,8 @@ public class PendingContainerTracker {
 
     /**
      * Count pending containers of the given storage type.
+     * Unknown storage type entries are counted for typed checks because they
+     * may occupy the requested storage type.
      */
     synchronized int getCount(StorageType storageType) {
       if (checksAllStorageTypes(storageType)) {
@@ -177,7 +179,8 @@ public class PendingContainerTracker {
     private static int countByStorageType(
         Map<ContainerID, StorageType> window, StorageType storageType) {
       return (int) window.values().stream()
-          .filter(storageType::equals)
+          .filter(recordedStorageType ->
+              recordedStorageType == null || storageType.equals(recordedStorageType))
           .count();
     }
   }
