@@ -64,6 +64,10 @@ are often forgotten).
   NotImplemented. Combining FSO's directory/rename semantics with per-key version
   chains is disproportionately complex, and S3 tooling scenarios essentially use
   the OBS layout. FSO support can be evaluated as an independent follow-up.
+- **Coexistence with Ozone snapshots on the same bucket** — the version-aware
+  reclamation the combination needs is deferred past the first version, so OM
+  rejects the combination outright rather than leaving it to convention. The
+  snapshot section below states the enforcement and what lifts it.
 
 # Technical Description (Architecture and implementation details)
 
@@ -218,6 +222,23 @@ extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
 
 ## Interaction with Ozone snapshots
 
+**The first version does not allow both features on the same bucket.** The
+version-aware reclamation described in this section is deferred past it, and
+without that lookup the gap below is a data-loss path rather than a rough edge,
+so OM enforces the exclusion instead of documenting an expectation: snapshot
+creation is rejected on an ENABLED or SUSPENDED bucket, and enabling versioning
+or moving SUSPENDED → ENABLED is rejected while any snapshot exists in the
+bucket's path chain, following linked buckets to their source. SUSPENDED is
+covered along with ENABLED because a suspended bucket still holds noncurrent
+versions. ENABLED → SUSPENDED stays allowed, so a bucket that reached a mixed
+state before the checks existed can at least stop accumulating versions; for such
+buckets reclamation falls back to the conservative rule of holding deleted
+versions until every snapshot of that bucket is purged. Rejections return
+NOT_SUPPORTED_OPERATION with an explanatory message. An OM config key, false by
+default and documented as unsafe, lifts the checks so that integration tests for
+the work described below can be written against a real mixed bucket. The rest of
+this section is the design that lifts the restriction for good.
+
 A snapshot checkpoints the entire OM RocksDB, so versionedKeyTable is captured
 automatically along with the bucket's versioning status: a snapshot holds the
 complete version history as of its creation. Snapshot creation and deletion need
@@ -341,12 +362,13 @@ interaction is covered above. Buckets without versioning behave exactly as today
 
 # Plan
 
-Implemented as one umbrella Jira with ten tasks (33 sub-tasks, each roughly one
-PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → (T7 ∥ T8) → T9 → T10`
-(reclamation lands before the S3 endpoints, so versioning is never exposed without
-a way to reclaim versions). The snapshot interaction described above is deferred
-past this first phase: none of the tasks below carry it, and until it lands the two
-features are not expected to be used together on the same bucket.
+Implemented as one umbrella Jira with eleven tasks (36 sub-tasks, each roughly one
+PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → T7 → (T8 ∥ T9) → T10 → T11`
+(reclamation and the snapshot exclusion both land before the S3 endpoints, so
+versioning is never exposed without a way to reclaim versions, nor with snapshots
+left unguarded). The snapshot interaction described above is deferred past this
+first phase: none of the other tasks carry it, and T7 enforces the exclusion in OM
+until it lands.
 
 | Task | Scope |
 |---|---|
@@ -356,16 +378,18 @@ features are not expected to be used together on the same bucket.
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
 | T6 Reclamation | VersionCleanupService, `maxVersions` with the `TRIM` / `REJECT` policy, expired marker cleanup |
-| T7 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
-| T8 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
-| T9 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
-| T10 Wrap-up | upgrade validation, robot tests, benchmarks, docs |
+| T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions with linked-bucket recursion, dev-only opt-in config key, conservative reclamation for buckets already in a mixed state before the checks landed |
+| T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
+| T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
+| T10 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
+| T11 Wrap-up | upgrade validation, robot tests, benchmarks, docs |
 
 Testing follows three tracks: unit/integration tests per sub-task acceptance
 criteria (state machine, two-table atomicity, promotion, null-slot semantics,
-`maxVersions` boundaries); S3 compatibility via the smoketest/s3 robot suite and
-the versioning subset of ceph/s3-tests; performance benchmarks asserting no
-regression with versioning off and O(1) write latency with it on. The snapshot
+`maxVersions` boundaries, the full snapshot-exclusion rejection matrix); S3
+compatibility via the smoketest/s3 robot suite and the versioning subset of
+ceph/s3-tests; performance benchmarks asserting no regression with versioning off
+and O(1) write latency with it on. The snapshot
 integration tests belong with the snapshot work and are deferred with it.
 
 Open questions tracked for implementation: the `maxVersions` default and cluster
