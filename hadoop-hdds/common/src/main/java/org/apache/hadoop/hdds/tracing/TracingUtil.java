@@ -321,6 +321,11 @@ public final class TracingUtil {
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
+    return importAndCreateSpan(name, encodedParent, SpanKind.INTERNAL);
+  }
+
+  public static Span importAndCreateSpan(String name, String encodedParent,
+                                         SpanKind spanKind) {
     if (!hasUsableTracer()) {
       return Span.getInvalid();
     }
@@ -328,7 +333,10 @@ public final class TracingUtil {
       if (!canStartSpanWithoutParent()) {
         return Span.getInvalid();
       }
-      return tracer.spanBuilder(name).setNoParent().startSpan();
+      return tracer.spanBuilder(name)
+          .setNoParent()
+          .setSpanKind(spanKind)
+          .startSpan();
     }
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
@@ -577,12 +585,18 @@ public final class TracingUtil {
     Span parentSpan = Span.fromContext(currentContext);
 
     if (parentSpan.getSpanContext().isValid()) {
-      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+      return tracer.spanBuilder(spanName)
+          .setParent(currentContext)
+          .setSpanKind(spanKind)
+          .startSpan();
     }
     if (!canStartSpanWithoutParent()) {
       return Span.getInvalid();
     }
-    return tracer.spanBuilder(spanName).setNoParent().startSpan();
+    return tracer.spanBuilder(spanName)
+        .setNoParent()
+        .setSpanKind(spanKind)
+        .startSpan();
   }
 
   /**
