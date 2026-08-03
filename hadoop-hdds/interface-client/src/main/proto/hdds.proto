@@ -430,9 +430,16 @@ message UpgradeFinalizationStatus {
     repeated string messages = 2;
 }
 
+// Finalization status of a component or group of components.
+enum FinalizationStatus {
+    UNFINALIZED = 1;
+    FINALIZED = 2;
+    IN_PROGRESS = 3;
+}
+
 message UpgradeStatus {
-  optional bool hddsFinalized = 1;
-  optional bool scmFinalized = 2;
+  optional FinalizationStatus hddsFinalizationStatus = 1;
+  optional FinalizationStatus scmFinalizationStatus = 2;
   optional int32 numDatanodesFinalized = 3;
   optional int32 numDatanodesTotal = 4;
   optional uint32 scmApparentVersion = 5;

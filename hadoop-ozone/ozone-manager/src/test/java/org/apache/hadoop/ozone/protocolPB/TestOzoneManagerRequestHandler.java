@@ -474,15 +474,16 @@ public class TestOzoneManagerRequestHandler {
     OzoneManagerRequestHandler handler = getRequestHandler(10);
     OzoneManager ozoneManager = handler.getOzoneManager();
 
+    // Test verifies that the same upgrade status is passed through the response regardless of its values.
     HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(true)
-        .setHddsFinalized(false)
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
     OzoneManagerProtocolProtos.QueryUpgradeStatusResponse expected =
         OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
-            .setOmFinalized(true)
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
             .setHddsStatus(hddsStatus)
             .build();
     Mockito.when(ozoneManager.queryUpgradeStatus()).thenReturn(expected);

@@ -17,17 +17,23 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneManagerVersion.ZDU;
-
-import org.apache.hadoop.ozone.om.OzoneManager;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 
 /**
- * No-op upgrade action used only to verify that {@link OmUpgradeActionForVersion} is scanned by
- * {@link OMUpgradeActionProvider} in tests.
+ * Annotation used to "disallow" an API until the OM has finalized to the
+ * associated {@link OzoneManagerVersion}. Helps to keep the method logic
+ * and upgrade related cross-cutting concerns separate.
+ *
+ * <p>This is the {@link OzoneManagerVersion}-keyed counterpart of
+ * {@link DisallowedUntilLayoutVersion}, for features added after Zero Downtime Upgrade (ZDU) when
+ * {@link OMLayoutFeature} was frozen.
  */
-@OmUpgradeActionForVersion(version = ZDU)
-public class ZduOmUpgradeActionForTest implements OmUpgradeAction {
-  @Override
-  public void execute(OzoneManager arg) {
-  }
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface DisallowedUntilOmVersion {
+  OzoneManagerVersion value();
 }

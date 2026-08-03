@@ -157,7 +157,7 @@ public class TestFinalizeSubCommand {
 
   @Test
   public void testStatusCalledOnceWhenAlreadyFinalized() throws Exception {
-    when(omClient.queryUpgradeStatus()).thenReturn(finalizedStatus(3, 3));
+    when(omClient.queryUpgradeStatus()).thenReturn(finalizedStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
     assertEquals(0, cmd.call());
@@ -171,16 +171,16 @@ public class TestFinalizeSubCommand {
   @Test
   public void testWaitFlagPollsUntilFinalized() throws Exception {
     when(omClient.queryUpgradeStatus())
-        .thenReturn(inProgressStatus(0, 3))
-        .thenReturn(inProgressStatus(2, 3))
-        .thenReturn(finalizedStatus(3, 3));
+        .thenReturn(inProgressStatus())
+        .thenReturn(inProgressStatus())
+        .thenReturn(finalizedStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
     assertEquals(0, cmd.call());
 
     String output = outContent.toString(DEFAULT_ENCODING);
     // While polling, the shared basic status output is printed on each in-progress poll.
-    assertTrue(output.contains("Upgrade status:"));
+    assertTrue(output.contains("Upgrade finalization status:"));
     assertTrue(output.contains("Finalization complete."));
     verify(omClient, times(3)).queryUpgradeStatus();
   }
@@ -190,7 +190,7 @@ public class TestFinalizeSubCommand {
     // A transient query failure is reported to stderr and retried on the next poll, not fatal.
     when(omClient.queryUpgradeStatus())
         .thenThrow(new IOException("RPC timeout"))
-        .thenReturn(finalizedStatus(3, 3));
+        .thenReturn(finalizedStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
     assertEquals(0, cmd.call());
@@ -205,8 +205,9 @@ public class TestFinalizeSubCommand {
   @Test
   public void testWaitFlagInterruptIsHandledCleanly() throws Exception {
     // Make the poll interval long enough that the interrupt lands during the sleep (after the first poll).
+    // The test will exit well before this interval elapses.
     cmd.setPollIntervalMillis(60_000);
-    when(omClient.queryUpgradeStatus()).thenReturn(inProgressStatus(0, 3));
+    when(omClient.queryUpgradeStatus()).thenReturn(inProgressStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
 
@@ -241,8 +242,8 @@ public class TestFinalizeSubCommand {
     cmd.setPollIntervalMillis(60_000);
     // First invocation's poll: in progress (so it sleeps); second invocation's poll: finalized.
     when(omClient.queryUpgradeStatus())
-        .thenReturn(inProgressStatus(0, 3))
-        .thenReturn(finalizedStatus(3, 3));
+        .thenReturn(inProgressStatus())
+        .thenReturn(finalizedStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
 
@@ -292,15 +293,15 @@ public class TestFinalizeSubCommand {
     verbose = true;
     // Return one in-progress poll first so the verbose status is printed.
     when(omClient.queryUpgradeStatus())
-        .thenReturn(inProgressStatus(1, 2))
-        .thenReturn(finalizedStatus(2, 2));
+        .thenReturn(inProgressStatus())
+        .thenReturn(finalizedStatus());
 
     new CommandLine(cmd).parseArgs("--wait");
     assertEquals(0, cmd.call());
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("OM Finalized?"));
-    assertTrue(output.contains("SCM Finalized?"));
+    assertTrue(output.contains("OM:"));
+    assertTrue(output.contains("SCM:"));
     assertTrue(output.contains("OM Apparent Version:"));
     assertTrue(output.contains("SCM Apparent Version:"));
     assertTrue(output.contains("Min Datanode Apparent Version:"));
@@ -308,26 +309,34 @@ public class TestFinalizeSubCommand {
     assertTrue(output.contains("Finalization complete."));
   }
 
-  private static QueryUpgradeStatusResponse inProgressStatus(int dnFinalized, int dnTotal) {
+  /**
+   * @return An upgrade status with the whole cluster finalization status set to IN_PROGRESS. All other status fields
+   * are placeholders and not intended to be checked for exact values.
+   */
+  private static QueryUpgradeStatusResponse inProgressStatus() {
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(false)
-        .setClusterFinalized(false)
+        .setOmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
         .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
-            .setScmFinalized(false)
-            .setNumDatanodesFinalized(dnFinalized)
-            .setNumDatanodesTotal(dnTotal)
+            .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+            .setNumDatanodesFinalized(1)
+            .setNumDatanodesTotal(3)
             .build())
         .build();
   }
 
-  private static QueryUpgradeStatusResponse finalizedStatus(int dnFinalized, int dnTotal) {
+  /**
+   * @return An upgrade status with the whole cluster finalization status set to FINALIZED. All other status fields
+   * are placeholders and not intended to be checked for exact values.
+   */
+  private static QueryUpgradeStatusResponse finalizedStatus() {
     return QueryUpgradeStatusResponse.newBuilder()
-        .setOmFinalized(true)
-        .setClusterFinalized(true)
+        .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
         .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
-            .setScmFinalized(true)
-            .setNumDatanodesFinalized(dnFinalized)
-            .setNumDatanodesTotal(dnTotal)
+            .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setNumDatanodesFinalized(3)
+            .setNumDatanodesTotal(3)
             .build())
         .build();
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -32,9 +33,14 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.ratis.TestOzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -69,6 +75,35 @@ public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
     assertNull(progressKey);
     assertEquals(0, omMetrics.getFinalizationInProgress(),
         "metric should be 0 after finalizing");
+  }
+
+  /**
+   * A failed upgrade step (e.g. an upgrade action) surfaces as an UpgradeException,
+   * which is an IOException but not an OMException. exceptionToResponseStatus therefore
+   * maps it to INTERNAL_ERROR, and OzoneManagerStateMachine.processResponse terminates the
+   * process on INTERNAL_ERROR. The INTERNAL_ERROR -> terminate half of the chain is covered by
+   * {@link TestOzoneManagerStateMachine#testProcessResponseInternalErrorTerminates}.
+   */
+  @Test
+  public void testFinalizeFailureMapsToInternalError() throws IOException {
+    OMVersionManager omVersionManager = mock(OMVersionManager.class);
+    when(omVersionManager.getApparentVersion()).thenReturn(OzoneManagerVersion.DEFAULT_VERSION);
+    when(ozoneManager.getVersionManager()).thenReturn(omVersionManager);
+    when(ozoneManager.finalizeUpgrade(any())).thenThrow(
+        new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
+
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setClientId(ClientId.randomId().toString())
+        .build();
+    OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
+    ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
+    request.preExecute(ozoneManager);
+
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    OMResponse omResponse = response.getOMResponse();
+    assertFalse(omResponse.getSuccess());
+    assertEquals(Status.INTERNAL_ERROR, omResponse.getStatus());
   }
 
   private void submitRequest() throws IOException {

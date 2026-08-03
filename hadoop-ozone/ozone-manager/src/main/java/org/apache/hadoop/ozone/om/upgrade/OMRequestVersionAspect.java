@@ -31,18 +31,29 @@ import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 
 /**
- * 'Aspect' for OM Layout Feature API. All methods annotated with the
- * specific annotation will have pre-processing done here to check layout
- * version compatibility.
+ * 'Aspect' for OM component version API. All methods annotated with the
+ * specific annotation will have pre-processing done here to check version compatibility.
  */
 @Aspect
-public class OMLayoutFeatureAspect {
+public class OMRequestVersionAspect {
 
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
     ComponentVersion layoutFeature = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value();
+    checkFeatureAllowed(joinPoint, layoutFeature);
+  }
+
+  @Before("@annotation(DisallowedUntilOmVersion) && execution(* *(..))")
+  public void checkOmVersion(JoinPoint joinPoint) throws IOException {
+    ComponentVersion omVersion = ((MethodSignature) joinPoint.getSignature())
+        .getMethod().getAnnotation(DisallowedUntilOmVersion.class)
+        .value();
+    checkFeatureAllowed(joinPoint, omVersion);
+  }
+
+  private void checkFeatureAllowed(JoinPoint joinPoint, ComponentVersion version) throws IOException {
     OMVersionManager versionManager = null;
     final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
@@ -56,22 +67,22 @@ public class OMLayoutFeatureAspect {
       versionManager = ozoneManager.getVersionManager();
     } else {
       throw new IOException(
-          "Unable to resolve OMVersionManager for layout validation; "
+          "Unable to resolve OMVersionManager for version validation; "
               + "expected OzoneManagerRequestHandler or OMClientRequest.preExecute: "
               + joinPoint.toShortString());
     }
     // Throws an exception that must be propagated if the request is not allowed.
-    checkIsAllowed(joinPoint.getSignature().toShortString(), versionManager, layoutFeature);
+    checkIsAllowed(joinPoint.getSignature().toShortString(), versionManager, version);
   }
 
   private void checkIsAllowed(String operationName,
                               OMVersionManager omVersionManager,
-                              ComponentVersion layoutFeature) throws OMException {
-    if (!omVersionManager.isAllowed(layoutFeature)) {
+                              ComponentVersion version) throws OMException {
+    if (!omVersionManager.isAllowed(version)) {
       throw new OMException(String.format("Operation %s cannot be invoked " +
               "before finalization. It belongs to version %s. Current apparent version is %s",
           operationName,
-          layoutFeature,
+          version,
           omVersionManager.getApparentVersion()),
           NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
@@ -81,8 +92,8 @@ public class OMLayoutFeatureAspect {
    * Note: Without this, it occasionally throws NoSuchMethodError when running
    * the test.
    */
-  public static OMLayoutFeatureAspect aspectOf() {
-    return new OMLayoutFeatureAspect();
+  public static OMRequestVersionAspect aspectOf() {
+    return new OMRequestVersionAspect();
   }
 
 }

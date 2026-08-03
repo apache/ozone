@@ -140,7 +140,7 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
       ScmUpgradeAction upgradeAction = versionManager.getUpgradeActionsForTesting().get(DATANODE_SCHEMA_V2);
       assertInstanceOf(ScmOnFinalizeActionForDatanodeSchemaV2.class, upgradeAction);
       ScmUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(HDDSVersion.ZDU);
-      assertInstanceOf(ZduScmUpgradeActionForTest.class, zduAction);
+      assertInstanceOf(ClearFinalizingStateScmUpgradeAction.class, zduAction);
     }
 
     try (ScmVersionManager versionManager = createManager(HDDSVersion.SOFTWARE_VERSION.serialize(),
@@ -149,7 +149,7 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
       ScmUpgradeAction upgradeAction = versionManager.getUpgradeActionsForTesting().get(DATANODE_SCHEMA_V2);
       assertInstanceOf(ScmOnFinalizeActionForDatanodeSchemaV2.class, upgradeAction);
       ScmUpgradeAction zduAction = versionManager.getUpgradeActionsForTesting().get(HDDSVersion.ZDU);
-      assertInstanceOf(ZduScmUpgradeActionForTest.class, zduAction);
+      assertInstanceOf(ClearFinalizingStateScmUpgradeAction.class, zduAction);
     }
   }
 
