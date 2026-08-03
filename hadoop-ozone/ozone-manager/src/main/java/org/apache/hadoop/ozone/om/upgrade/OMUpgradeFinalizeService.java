@@ -117,7 +117,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
           }
 
           HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
-          if (upgradeStatus.getHddsFinalized()) {
+          if (upgradeStatus.getHddsFinalizationStatus() == HddsProtos.FinalizationStatus.FINALIZED) {
             LOG.info("The SCM Upgrade has been finalized. OM will now finalize. Run count {}", run);
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()

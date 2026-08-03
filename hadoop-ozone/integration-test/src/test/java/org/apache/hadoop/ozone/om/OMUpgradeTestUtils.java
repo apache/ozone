@@ -45,12 +45,10 @@ public final class OMUpgradeTestUtils {
       try {
         QueryUpgradeStatusResponse status = omClient.queryUpgradeStatus();
         HddsProtos.UpgradeStatus hdds = status.getHddsStatus();
-        LOG.info("Finalization status: omFinalized={}, scmFinalized={}, datanodes={}/{}",
-            status.getOmFinalized(), hdds.getScmFinalized(),
+        LOG.info("Finalization status: om={}, scm={}, datanodes={}/{}",
+            status.getOmFinalizationStatus(), hdds.getScmFinalizationStatus(),
             hdds.getNumDatanodesFinalized(), hdds.getNumDatanodesTotal());
-        return status.getOmFinalized()
-            && hdds.getScmFinalized()
-            && hdds.getNumDatanodesFinalized() == hdds.getNumDatanodesTotal();
+        return status.getClusterFinalizationStatus() == HddsProtos.FinalizationStatus.FINALIZED;
       } catch (IOException e) {
         fail(e.getMessage());
       }

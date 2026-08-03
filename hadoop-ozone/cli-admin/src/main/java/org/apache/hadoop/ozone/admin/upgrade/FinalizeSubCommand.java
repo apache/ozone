@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.FinalizationStatus;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
@@ -105,7 +106,7 @@ public class FinalizeSubCommand extends AbstractSubcommand implements Callable<I
 
       if (status != null) {
         // Finalization checks before sleeping, so an already-finalized cluster returns without waiting.
-        if (status.getClusterFinalized()) {
+        if (status.getClusterFinalizationStatus() == FinalizationStatus.FINALIZED) {
           out().println("Finalization complete.");
           return 0;
         }
