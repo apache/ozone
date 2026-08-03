@@ -212,6 +212,7 @@ import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -490,6 +491,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private ExitManager exitManager;
+  /** Test-only hook to fail a checkpoint-install DB backup part way through. */
+  private FaultInjector checkpointBackupInjector;
 
   private OzoneManagerPrepareState prepareState;
 
@@ -4506,10 +4509,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Path existingItem = dbDir.toPath().resolve(itemName);
           if (Files.exists(existingItem)) {
             Path backupTarget = dbBackupDir.toPath().resolve(itemName);
+            if (checkpointBackupInjector != null) {
+              checkpointBackupInjector.pause();
+            }
             Files.move(existingItem, backupTarget);
             backedUpItems.add(itemName);
           }
         }
+      } catch (IOException e) {
+        // Failing part way through leaves dbDir missing every item already moved into
+        // dbBackupDir. Put them back before propagating: the caller reloads the DB on
+        // this path, and RocksDB would otherwise re-create the missing om.db empty.
+        LOG.error("Failed to back up existing DB contents from {} to {}. " +
+                "Restoring from backup.",
+            dbDir, dbBackupDir, e);
+        restoreFromBackup(dbDir, dbBackupDir, backedUpItems);
+        throw e;
       }
     }
 
@@ -4571,38 +4586,54 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to move checkpoint data from {} to {}. " +
               "Restoring from backup.",
           checkpointLocation, dbDir, e);
-      // Rollback: restore only the items that were backed up
-      try {
-        // Delete only the items that were replaced
-        for (String itemName : backedUpItems) {
-          Path targetPath = dbDir.toPath().resolve(itemName);
-          if (Files.exists(targetPath)) {
-            if (Files.isDirectory(targetPath)) {
-              FileUtil.fullyDelete(targetPath.toFile());
-            } else {
-              Files.delete(targetPath);
-            }
-          }
-        }
-        // Restore from backup - only restore items that were backed up
-        if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
-          File[] backupContents = dbBackupDir.listFiles();
-          if (backupContents != null) {
-            for (File backupItem : backupContents) {
-              String itemName = backupItem.getName();
-              if (backedUpItems.contains(itemName)) {
-                Path targetPath = dbDir.toPath().resolve(itemName);
-                Files.move(backupItem.toPath(), targetPath);
-              }
-            }
-          }
-        }
-        Files.deleteIfExists(markerFile);
-      } catch (IOException ex) {
-        String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
-        exitManager.exitSystem(1, errorMsg, ex, LOG);
-      }
+      restoreFromBackup(dbDir, dbBackupDir, backedUpItems);
       throw e;
+    }
+  }
+
+  /**
+   * Rolls dbDir back to the state captured in dbBackupDir, restoring only the items
+   * recorded in backedUpItems and clearing the transient marker. Exits the OM if the
+   * restore itself fails, since dbDir is then neither the old state nor the checkpoint.
+   *
+   * @param dbDir target directory to restore into
+   * @param dbBackupDir backup directory holding the original state
+   * @param backedUpItems names of the items that were backed up
+   * @throws IOException if the exit manager declines to terminate the process
+   */
+  private void restoreFromBackup(File dbDir, File dbBackupDir, Set<String> backedUpItems)
+      throws IOException {
+    Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
+    // Rollback: restore only the items that were backed up
+    try {
+      // Delete only the items that were replaced
+      for (String itemName : backedUpItems) {
+        Path targetPath = dbDir.toPath().resolve(itemName);
+        if (Files.exists(targetPath)) {
+          if (Files.isDirectory(targetPath)) {
+            FileUtil.fullyDelete(targetPath.toFile());
+          } else {
+            Files.delete(targetPath);
+          }
+        }
+      }
+      // Restore from backup - only restore items that were backed up
+      if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
+        File[] backupContents = dbBackupDir.listFiles();
+        if (backupContents != null) {
+          for (File backupItem : backupContents) {
+            String itemName = backupItem.getName();
+            if (backedUpItems.contains(itemName)) {
+              Path targetPath = dbDir.toPath().resolve(itemName);
+              Files.move(backupItem.toPath(), targetPath);
+            }
+          }
+        }
+      }
+      Files.deleteIfExists(markerFile);
+    } catch (IOException ex) {
+      String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
+      exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
   }
 
@@ -5012,6 +5043,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
         visited, userGroupInformation, remoteAddress, hostName,
         allowDanglingBuckets, aclEnabled);
+  }
+
+  @VisibleForTesting
+  void setCheckpointBackupInjector(FaultInjector injector) {
+    checkpointBackupInjector = injector;
   }
 
   @VisibleForTesting
