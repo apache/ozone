@@ -511,7 +511,7 @@ public class TestContainerCommandReconciliation {
     // Check non-zero checksum after container close
     StorageContainerLocationProtocolClientSideTranslatorPB scmClient = cluster.getStorageContainerLocationClient();
     List<HddsProtos.SCMContainerReplicaProto> containerReplicas = scmClient.getContainerReplicas(containerID,
-        ClientVersion.CURRENT.serialize());
+        ClientVersion.CURRENT);
     assertEquals(3, containerReplicas.size());
     for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
@@ -545,7 +545,7 @@ public class TestContainerCommandReconciliation {
     scmClient.reconcileContainer(containerID);
     waitForDataChecksumsAtSCM(containerID, 1);
     // Check non-zero checksum after container reconciliation
-    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT.serialize());
+    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT);
     assertEquals(3, containerReplicas.size());
     for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
@@ -559,7 +559,7 @@ public class TestContainerCommandReconciliation {
     }
     cluster.waitForClusterToBeReady();
     waitForDataChecksumsAtSCM(containerID, 1);
-    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT.serialize());
+    containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT);
     assertEquals(3, containerReplicas.size());
     for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
@@ -571,7 +571,7 @@ public class TestContainerCommandReconciliation {
     GenericTestUtils.waitFor(() -> {
       try {
         Set<Long> dataChecksums = cluster.getStorageContainerLocationClient().getContainerReplicas(containerID,
-                ClientVersion.CURRENT.serialize()).stream()
+                ClientVersion.CURRENT).stream()
             .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
             .collect(Collectors.toSet());
         LOG.info("Waiting for {} total unique checksums from container {} to be reported to SCM. Currently {} unique" +

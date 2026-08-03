@@ -341,7 +341,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerID, int clientVersion) throws IOException {
+      long containerID, ClientVersion clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
@@ -563,7 +563,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState
       nodeState, HddsProtos.QueryScope queryScope, String poolName,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     // TODO : We support only cluster wide query right now. So ignoring checking
     // queryScope and poolName
     NodeQueryRequestProto.Builder builder = NodeQueryRequestProto.newBuilder()
@@ -1135,7 +1135,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, ClientVersion clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
@@ -1161,7 +1161,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion) throws IOException {
+      boolean mostUsed, int count, ClientVersion clientVersion) throws IOException {
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
             .setMostUsed(mostUsed)

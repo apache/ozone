@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -135,7 +136,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .setDataSize(requestedSize);
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
-        .map(info -> info.getProtobuf(getOmRequest().getVersion()))
+        .map(info -> info.getProtobuf(
+            ClientVersion.deserialize(getOmRequest().getVersion())))
         .collect(Collectors.toList()));
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
@@ -279,7 +281,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(
+              ClientVersion.deserialize(getOmRequest().getVersion()),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())

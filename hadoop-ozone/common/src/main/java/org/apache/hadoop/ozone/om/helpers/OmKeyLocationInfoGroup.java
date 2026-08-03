@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
@@ -125,7 +126,7 @@ public class OmKeyLocationInfoGroup {
   }
 
   public KeyLocationList getProtobuf(boolean ignorePipeline,
-      int clientVersion) {
+      ClientVersion clientVersion) {
     KeyLocationList.Builder builder = KeyLocationList.newBuilder()
         .setVersion(version).setIsMultipartKey(isMultipartKey);
     List<OzoneManagerProtocolProtos.KeyLocation> keyLocationList =

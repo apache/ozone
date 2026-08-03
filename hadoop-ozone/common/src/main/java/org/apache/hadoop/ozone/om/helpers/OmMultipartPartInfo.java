@@ -338,7 +338,7 @@ public final class OmMultipartPartInfo {
     if (keyLocationInfos == null || keyLocationInfos.isEmpty()) {
       throw new IllegalArgumentException("keyLocationList is required");
     }
-    return keyLocationInfos.get(0).getProtobuf(true, ClientVersion.CURRENT.serialize());
+    return keyLocationInfos.get(0).getProtobuf(true, ClientVersion.CURRENT);
   }
 
   private static List<OmKeyLocationInfoGroup> getKeyLocationInfosFromProto(

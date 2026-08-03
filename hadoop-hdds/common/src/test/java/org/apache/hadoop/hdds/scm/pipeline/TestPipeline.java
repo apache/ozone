@@ -47,13 +47,13 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createPipeline(3);
 
     HddsProtos.Pipeline proto =
-        subject.getProtobufMessage(DEFAULT_VERSION.serialize());
+        subject.getProtobufMessage(DEFAULT_VERSION);
     for (HddsProtos.DatanodeDetailsProto dn : proto.getMembersList()) {
       assertPorts(dn, V0_PORTS);
     }
 
     HddsProtos.Pipeline protoV1 = subject.getProtobufMessage(
-        VERSION_HANDLES_UNKNOWN_DN_PORTS.serialize());
+        VERSION_HANDLES_UNKNOWN_DN_PORTS);
     for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
       assertPorts(dn, ALL_PORTS);
     }
@@ -64,14 +64,14 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createPipeline(3);
 
     //when EC config is empty/null
-    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
+    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
 
 
     //when EC config is NOT empty
     subject = MockPipeline.createEcPipeline();
 
-    protobufMessage = subject.getProtobufMessage(1);
+    protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
     assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
 
@@ -80,7 +80,7 @@ public class TestPipeline {
   @Test
   public void testReplicaIndexesSerialisedCorrectly() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
-    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(1);
+    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
 
     for (DatanodeDetails dn : pipeline.getNodes()) {

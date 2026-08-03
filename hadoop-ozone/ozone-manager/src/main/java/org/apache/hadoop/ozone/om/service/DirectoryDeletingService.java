@@ -521,14 +521,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(true, ClientVersion.CURRENT.serialize()));
+          purgeFile.getProtobuf(true, ClientVersion.CURRENT));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be
     // traversed in next iteration to ensure cleanup all sub-children.
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
-          dir.getProtobuf(ClientVersion.CURRENT.serialize()));
+          dir.getProtobuf(ClientVersion.CURRENT));
     }
 
     return purgePathsRequest.build();

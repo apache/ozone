@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -229,7 +230,8 @@ public abstract class AbstractTestStorageDistributionEndpoint {
 
       List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
       List<HddsProtos.DatanodeUsageInfoProto> scmReports =
-          scm.getClientProtocolServer().getDatanodeUsageInfo(true, getNumDatanodes(), 1);
+          scm.getClientProtocolServer().getDatanodeUsageInfo(true, getNumDatanodes(),
+              ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS);
 
       long totalReserved = 0;
       long totalMinFreeSpace = 0;

@@ -268,7 +268,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private void addPipelineToManager(Pipeline pipeline)
       throws IOException {
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT.serialize());
+        ClientVersion.CURRENT);
     acquireWriteLock();
     try {
       stateManager.addPipeline(pipelineProto);
