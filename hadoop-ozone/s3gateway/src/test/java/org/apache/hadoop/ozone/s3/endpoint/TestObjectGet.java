@@ -259,12 +259,12 @@ public class TestObjectGet {
   }
 
   @Test
-  public void inheritRequestHeader() throws IOException, OS3Exception {
+  public void storedObjectHeadersOnGetAndHead() throws IOException, OS3Exception {
     setDefaultHeader();
+    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_NAME, CONTENT));
+    clearRequestHeaderMocks();
 
     Response response = get(rest, BUCKET_NAME, KEY_NAME);
-
-    // Content-Type is not inherited from the request; key1 has none stored.
     assertEquals("binary/octet-stream",
         response.getHeaderString("Content-Type"));
     assertEquals(CONTENT_LANGUAGE1,
@@ -277,11 +277,16 @@ public class TestObjectGet {
         response.getHeaderString("Content-Disposition"));
     assertEquals(CONTENT_ENCODING1,
         response.getHeaderString("Content-Encoding"));
+
+    assertEquals(CONTENT_ENCODING1,
+        rest.head(BUCKET_NAME, KEY_NAME).getHeaderString("Content-Encoding"));
   }
 
   @Test
   public void overrideResponseHeader() throws IOException, OS3Exception {
     setDefaultHeader();
+    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_NAME, CONTENT));
+    clearRequestHeaderMocks();
 
     MultivaluedMap<String, String> queryParameter = rest.getContext().getUriInfo().getQueryParameters();
     // overrider request header
@@ -409,6 +414,15 @@ public class TestObjectGet {
         .when(headers).getHeaderString("Content-Disposition");
     doReturn(CONTENT_ENCODING1)
         .when(headers).getHeaderString("Content-Encoding");
+  }
+
+  private void clearRequestHeaderMocks() {
+    doReturn(null).when(headers).getHeaderString("Content-Type");
+    doReturn(null).when(headers).getHeaderString("Content-Language");
+    doReturn(null).when(headers).getHeaderString("Expires");
+    doReturn(null).when(headers).getHeaderString("Cache-Control");
+    doReturn(null).when(headers).getHeaderString("Content-Disposition");
+    doReturn(null).when(headers).getHeaderString("Content-Encoding");
   }
 
   @Test

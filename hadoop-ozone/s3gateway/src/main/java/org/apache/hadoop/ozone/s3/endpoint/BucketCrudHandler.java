@@ -156,11 +156,11 @@ public class BucketCrudHandler extends BucketOperationHandler {
     try {
       context.getVolume().getBucket(bucketName).deleteLifecycleConfiguration();
     } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
-        throw S3ErrorTable.newError(
-            S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION, bucketName);
+      // DeleteBucketLifecycle is idempotent: deleting a missing config
+      // must still return 204, not 404 — same as normal key deletion.
+      if (ex.getResult() != OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
+        throw S3ErrorTable.newError(bucketName, ex);
       }
-      throw ex;
     }
   }
 

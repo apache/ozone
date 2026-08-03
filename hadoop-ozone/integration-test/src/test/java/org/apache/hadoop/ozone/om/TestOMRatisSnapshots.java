@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,12 +54,14 @@ import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -75,6 +78,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -96,7 +100,13 @@ import org.slf4j.event.Level;
  */
 public class TestOMRatisSnapshots {
   private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String BOOTSTRAP_OM_SERVICE_ID = "om-service-bootstrap";
   private static final int NUM_OF_OMS = 3;
+
+  private static final int BOOTSTRAP_LOG_PURGE_GAP = 5;
+  private static final long BOOTSTRAP_TARGET_LOG_INDEX = 200;
+  private static final int BOOTSTRAP_INSTALL_START_DEADLINE_MS = 30_000;
+  private static final int BOOTSTRAP_COMPLETION_DEADLINE_MS = 60_000;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -681,6 +691,134 @@ public class TestOMRatisSnapshots {
         "Candidate dir should be cleaned after failed download");
     // Clear injector
     followerOM.getOmSnapshotProvider().setInjector(null);
+  }
+
+  /**
+   * Regression test for bootstrap when leader logs are purged: checkpoint install
+   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API
+   * and complete successfully.
+   */
+  @Test
+  public void testBootstrapInstallSnapshotDuringBootstrapping() throws Exception {
+    IOUtils.closeQuietly(client);
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+
+    OzoneConfiguration bootstrapConf = new OzoneConfiguration();
+    bootstrapConf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
+    bootstrapConf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, BOOTSTRAP_LOG_PURGE_GAP);
+    bootstrapConf.setLong(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
+        SNAPSHOT_THRESHOLD);
+    bootstrapConf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
+        StorageUnit.KB);
+    bootstrapConf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
+        16, StorageUnit.KB);
+
+    OzoneManagerRatisServerConfig omRatisConf =
+        bootstrapConf.getObject(OzoneManagerRatisServerConfig.class);
+    omRatisConf.setLogAppenderWaitTimeMin(10);
+    bootstrapConf.setFromObject(omRatisConf);
+
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(bootstrapConf)
+        .setOMServiceId(BOOTSTRAP_OM_SERVICE_ID)
+        .setNumOfOzoneManagers(2)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+
+    client = OzoneClientFactory.getRpcClient(BOOTSTRAP_OM_SERVICE_ID, bootstrapConf);
+    objectStore = client.getObjectStore();
+    String bootstrapVolume = uniqueObjectName("volume");
+    String bootstrapBucket = uniqueObjectName("bucket");
+    objectStore.createVolume(bootstrapVolume);
+    OzoneVolume volume = objectStore.getVolume(bootstrapVolume);
+    volume.createBucket(bootstrapBucket,
+        BucketArgs.newBuilder().setBucketLayout(TEST_BUCKET_LAYOUT).build());
+    ozoneBucket = volume.getBucket(bootstrapBucket);
+
+    OzoneManager leader = cluster.getOMLeader();
+    writeKeysToIncreaseLogIndex(leader.getOmRatisServer(), BOOTSTRAP_TARGET_LOG_INDEX);
+    assertThat(leader.getRatisSnapshotIndex())
+        .as("leader should have purged early logs")
+        .isGreaterThan((long) BOOTSTRAP_LOG_PURGE_GAP);
+
+    LogCapturer omLog = LogCapturer.captureLogs(OzoneManager.class);
+    LogCapturer stateMachineLog =
+        LogCapturer.captureLogs(OzoneManagerStateMachine.class);
+    LogCapturer snapshotProviderLog =
+        LogCapturer.captureLogs(RDBSnapshotProvider.class);
+    String newNodeId = "omNode-bootstrap-ratis-snapshots";
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<?> bootstrapFuture = executor.submit(() -> {
+      try {
+        cluster.bootstrapOzoneManager(newNodeId);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    try {
+      waitForBootstrapCheckpointInstallToStart(omLog, snapshotProviderLog);
+      bootstrapFuture.get(BOOTSTRAP_COMPLETION_DEADLINE_MS, TimeUnit.MILLISECONDS);
+      assertBootstrapOmJoinedRatisGroup(newNodeId);
+    } finally {
+      bootstrapFuture.cancel(true);
+      omLog.stopCapturing();
+      stateMachineLog.stopCapturing();
+      snapshotProviderLog.stopCapturing();
+      executor.shutdownNow();
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+
+    assertThat(stateMachineLog.getOutput())
+        .as("Ratis should notify the bootstrapping OM to install a checkpoint")
+        .contains("Received install snapshot notification from OM leader");
+    assertThat(omLog.getOutput())
+        .as("checkpoint install must not be aborted during BOOTSTRAPPING")
+        .doesNotContain("Abort install snapshot from Leader");
+    assertThat(omLog.getOutput())
+        .as("checkpoint installation should finish")
+        .contains("Install Checkpoint is finished");
+    assertThat(snapshotProviderLog.getOutput())
+        .as("checkpoint download should start after install is accepted")
+        .contains("Prepare to download the snapshot from leader OM");
+    assertThat(snapshotProviderLog.getOutput())
+        .as("checkpoint tarball should be assembled on the bootstrapping OM")
+        .contains("DB snapshot transfer is complete.");
+  }
+
+  private void assertBootstrapOmJoinedRatisGroup(String newNodeId) {
+    OzoneManager newOm = cluster.getOzoneManager(newNodeId);
+    assertNotNull(newOm, "Bootstrapped OM should be registered on the cluster");
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      assertTrue(om.doesPeerExist(newNodeId),
+          "New OM node " + newNodeId + " not present in peer list of OM " + om.getOMNodeId());
+      assertTrue(om.getOmRatisServer().doesPeerExist(newNodeId),
+          "New OM node " + newNodeId + " not present in Ratis peer list of OM "
+              + om.getOMNodeId());
+    }
+  }
+
+  private void waitForBootstrapCheckpointInstallToStart(
+      LogCapturer omLog,
+      LogCapturer snapshotProviderLog)
+      throws InterruptedException, TimeoutException {
+    try {
+      GenericTestUtils.waitFor(() -> {
+        if (omLog.getOutput().contains("Abort install snapshot from Leader")) {
+          fail("Checkpoint install was aborted during BOOTSTRAPPING.");
+        }
+        return snapshotProviderLog.getOutput()
+            .contains("Prepare to download the snapshot from leader OM");
+      }, 200, BOOTSTRAP_INSTALL_START_DEADLINE_MS);
+    } catch (TimeoutException e) {
+      fail("Checkpoint download did not start within " + BOOTSTRAP_INSTALL_START_DEADLINE_MS
+          + "ms. OzoneManager log: " + omLog.getOutput()
+          + ", RDBSnapshotProvider log: " + snapshotProviderLog.getOutput());
+    }
   }
 
   /**

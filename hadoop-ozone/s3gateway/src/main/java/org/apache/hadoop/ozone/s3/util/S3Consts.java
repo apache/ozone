@@ -75,6 +75,11 @@ public final class S3Consts {
 
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  /**
+   * Prefix for internal metadata keys that store remapped user x-amz-meta values
+   * colliding with system headers. Users must not set metadata keys with this prefix.
+   */
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
 
@@ -144,6 +149,8 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    public static final String FETCH_OWNER = "fetch-owner";
+    public static final String LIST_TYPE = "list-type";
     // GetBucketLocation is not implemented
     public static final String LOCATION = "location";
     public static final String MARKER = "marker";

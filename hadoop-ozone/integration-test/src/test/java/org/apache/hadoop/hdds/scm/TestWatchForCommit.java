@@ -60,7 +60,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
@@ -248,7 +248,7 @@ public class TestWatchForCommit {
         assertEquals(1, xceiverClient.getRefcount());
         assertEquals(container1.getPipeline(), xceiverClient.getPipeline());
         Pipeline pipeline = xceiverClient.getPipeline();
-        TestHelper.createPipelineOnDatanode(pipeline, cluster);
+        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
         XceiverClientReply reply = xceiverClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(
                 container1.getContainerInfo().getContainerID(),
@@ -301,7 +301,7 @@ public class TestWatchForCommit {
         assertEquals(1, xceiverClient.getRefcount());
         assertEquals(container1.getPipeline(), xceiverClient.getPipeline());
         Pipeline pipeline = xceiverClient.getPipeline();
-        TestHelper.createPipelineOnDatanode(pipeline, cluster);
+        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
         XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
         XceiverClientReply reply = xceiverClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(
@@ -361,7 +361,7 @@ public class TestWatchForCommit {
         assertEquals(3, ratisClient.getCommitInfoMap().size());
         List<Pipeline> pipelineList = new ArrayList<>();
         pipelineList.add(pipeline);
-        TestHelper.waitForPipelineClose(pipelineList, cluster);
+        OzoneTestHelper.waitForPipelineClose(pipelineList, cluster);
         // just watch for a log index which in not updated in the commitInfo Map
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
@@ -377,12 +377,12 @@ public class TestWatchForCommit {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

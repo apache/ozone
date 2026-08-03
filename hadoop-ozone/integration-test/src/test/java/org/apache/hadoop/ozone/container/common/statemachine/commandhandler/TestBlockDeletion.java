@@ -79,7 +79,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -492,7 +492,7 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
@@ -622,7 +622,7 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {

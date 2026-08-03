@@ -205,6 +205,18 @@ public class FileChecksumBenchmark {
     }
 
     @Override
+    public XceiverClientSpi acquireClientForReadData(Pipeline pipeline,
+        boolean allowShortCircuit) throws IOException {
+      return acquireClientForReadData(pipeline);
+    }
+
+    @Override
+    public XceiverClientSpi acquireClient(Pipeline pipeline,
+        boolean topologyAware, boolean allowShortCircuit) throws IOException {
+      return acquireClient(pipeline, topologyAware);
+    }
+
+    @Override
     public void releaseClient(XceiverClientSpi client, boolean invalidate,
         boolean topologyAware) { }
 
