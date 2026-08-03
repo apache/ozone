@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -304,7 +305,7 @@ public class TestContainerToKeyMapping {
     // Create part 1 with a block in container 4
     OmKeyInfo part1Info = createOBSKeyInfo(
         mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID, CONTAINER_ID_4);
-    KeyInfo part1Proto = part1Info.getProtobuf(true, 0);
+    KeyInfo part1Proto = part1Info.getProtobuf(true, ClientVersion.DEFAULT_VERSION);
     PartKeyInfo partKeyInfo1 = PartKeyInfo.newBuilder()
         .setPartName(mpuKeyName + "/" + uploadId + "/part-1")
         .setPartNumber(1)
@@ -314,7 +315,7 @@ public class TestContainerToKeyMapping {
     // Create part 2 with a block in container 4
     OmKeyInfo part2Info = createOBSKeyInfo(
         mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID, CONTAINER_ID_4);
-    KeyInfo part2Proto = part2Info.getProtobuf(true, 0);
+    KeyInfo part2Proto = part2Info.getProtobuf(true, ClientVersion.DEFAULT_VERSION);
     PartKeyInfo partKeyInfo2 = PartKeyInfo.newBuilder()
         .setPartName(mpuKeyName + "/" + uploadId + "/part-2")
         .setPartNumber(2)

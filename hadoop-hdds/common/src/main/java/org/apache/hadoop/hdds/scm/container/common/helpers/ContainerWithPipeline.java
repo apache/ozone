@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Class wraps ozone container info.
@@ -53,7 +54,7 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
         Pipeline.getFromProtobuf(allocatedContainer.getPipeline()));
   }
 
-  public HddsProtos.ContainerWithPipeline getProtobuf(int clientVersion) {
+  public HddsProtos.ContainerWithPipeline getProtobuf(ClientVersion clientVersion) {
     return HddsProtos.ContainerWithPipeline.newBuilder()
         .setContainerInfo(getContainerInfo().getProtobuf())
         .setPipeline(getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))

@@ -113,6 +113,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -354,7 +355,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerId, int clientVersion) throws IOException {
+      long containerId, ClientVersion clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("containerId", String.valueOf(containerId));
@@ -677,7 +678,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
-      HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
+      HddsProtos.QueryScope queryScope, String poolName, ClientVersion clientVersion)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("opState", String.valueOf(opState));
@@ -1466,7 +1467,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, ClientVersion clientVersion) throws IOException {
 
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("address", address);
@@ -1511,7 +1512,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node, int clientVersion) {
+      DatanodeDetails node, ClientVersion clientVersion) {
     DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
     return usageInfo.toProto(clientVersion);
   }
@@ -1530,7 +1531,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion)
+      boolean mostUsed, int count, ClientVersion clientVersion)
       throws IOException, IllegalArgumentException {
 
     final Map<String, String> auditMap = Maps.newHashMap();

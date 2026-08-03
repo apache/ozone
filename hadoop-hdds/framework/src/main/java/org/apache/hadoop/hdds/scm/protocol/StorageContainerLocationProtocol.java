@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
@@ -122,7 +123,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerId, int clientVersion) throws IOException;
+      long containerId, ClientVersion clientVersion) throws IOException;
 
   /**
    * Ask SCM the location of a batch of containers. SCM responds with a group of
@@ -281,7 +282,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
-      String poolName, int clientVersion) throws IOException;
+      String poolName, ClientVersion clientVersion) throws IOException;
 
   HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
@@ -495,7 +496,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException;
+      String address, String uuid, ClientVersion clientVersion) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.
@@ -509,7 +510,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion) throws IOException;
+      boolean mostUsed, int count, ClientVersion clientVersion) throws IOException;
 
   @Deprecated
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)

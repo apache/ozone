@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -257,8 +258,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     }
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
-    rb.setKeyInfo(keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
-    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
+    rb.setKeyInfo(keyInfo.getNetworkProtobuf(
+        ClientVersion.deserialize(getOmRequest().getVersion()), true));
+    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(
+        ClientVersion.deserialize(getOmRequest().getVersion()), true));
     return rb.build();
   }
 

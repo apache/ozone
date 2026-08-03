@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.slf4j.Logger;
@@ -120,6 +121,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
 
   private SCMBlockLocationResponse processMessage(
       SCMBlockLocationRequest request) throws ServiceException {
+    final ClientVersion clientVersion = ClientVersion.deserialize(request.getVersion());
     SCMBlockLocationResponse.Builder response = createSCMBlockResponse(
         request.getCmdType(),
         request.getTraceID());
@@ -139,7 +141,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           }
         }
         response.setAllocateScmBlockResponse(allocateScmBlock(
-            request.getAllocateScmBlockRequest(), request.getVersion()));
+            request.getAllocateScmBlockRequest(), clientVersion));
         break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
@@ -155,12 +157,12 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         break;
       case SortDatanodes:
         response.setSortDatanodesResponse(sortDatanodes(
-            request.getSortDatanodesRequest(), request.getVersion()
+            request.getSortDatanodesRequest(), clientVersion
         ));
         break;
       case GetClusterTree:
         response.setGetClusterTreeResponse(
-            getClusterTree(request.getVersion()));
+            getClusterTree(clientVersion));
         break;
       default:
         // Should never happen
@@ -189,7 +191,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public AllocateScmBlockResponseProto allocateScmBlock(
-      AllocateScmBlockRequestProto request, int clientVersion)
+      AllocateScmBlockRequestProto request, ClientVersion clientVersion)
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
@@ -261,7 +263,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public SortDatanodesResponseProto sortDatanodes(
-      SortDatanodesRequestProto request, int clientVersion)
+      SortDatanodesRequestProto request, ClientVersion clientVersion)
       throws ServiceException {
     SortDatanodesResponseProto.Builder resp =
         SortDatanodesResponseProto.newBuilder();
@@ -280,7 +282,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     }
   }
 
-  public GetClusterTreeResponseProto getClusterTree(int clientVersion)
+  public GetClusterTreeResponseProto getClusterTree(ClientVersion clientVersion)
       throws IOException {
     GetClusterTreeResponseProto.Builder resp =
         GetClusterTreeResponseProto.newBuilder();

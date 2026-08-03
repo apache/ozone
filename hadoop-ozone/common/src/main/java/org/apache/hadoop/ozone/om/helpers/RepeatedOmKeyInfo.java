@@ -60,7 +60,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
-        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT.serialize(), isOpenKey),
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT, isOpenKey),
         RepeatedOmKeyInfo.class);
   }
 
@@ -151,7 +151,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   /**
    * @param compact true for persistence, false for network transmit
    */
-  public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
+  public RepeatedKeyInfo getProto(boolean compact, ClientVersion clientVersion) {
     return getProto(compact, clientVersion, true);
   }
 
@@ -160,7 +160,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
    * @param clientVersion the client version
    * @param isOpenKey true for openKeyTable, false for keyTable/deletedTable
    */
-  public RepeatedKeyInfo getProto(boolean compact, int clientVersion, boolean isOpenKey) {
+  public RepeatedKeyInfo getProto(boolean compact, ClientVersion clientVersion, boolean isOpenKey) {
     List<KeyInfo> list = new ArrayList<>();
     for (OmKeyInfo k : cloneOmKeyInfoList()) {
       list.add(k.getProtobuf(compact, clientVersion, isOpenKey));
