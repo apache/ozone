@@ -407,16 +407,10 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
-  public static final String PREPARE_MARKER_KEY = "#PREPAREDINFO";
-
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
-
-  // An on-disk marker file used to indicate that the OM is in prepare and
-  // should remain prepared even after a restart.
-  public static final String PREPARE_MARKER = "prepareMarker";
 
   public static final String OZONE_RATIS_SNAPSHOT_DIR = "snapshot";
 
