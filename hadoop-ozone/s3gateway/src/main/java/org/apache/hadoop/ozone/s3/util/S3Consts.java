@@ -149,6 +149,8 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    public static final String FETCH_OWNER = "fetch-owner";
+    public static final String LIST_TYPE = "list-type";
     // GetBucketLocation is not implemented
     public static final String LOCATION = "location";
     public static final String MARKER = "marker";
