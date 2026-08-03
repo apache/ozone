@@ -512,7 +512,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .build();
 
     ContainerInfo ci = mock(ContainerInfo.class);
-    when(ci.getContainerID()).thenReturn(1L);
+    when(ci.getContainerID()).thenReturn(containerID);
 
     // Setup SCM containerClient so that 1st call returns pipeline1 and
     // 2nd call returns pipeline2.
