@@ -97,6 +97,7 @@ final class ExportFileManager {
   void start() throws IOException {
     Files.createDirectories(Paths.get(exportDirectory));
     removeIncompleteWorkOnStartup();
+    lock();
   }
 
   void lock() throws IOException {

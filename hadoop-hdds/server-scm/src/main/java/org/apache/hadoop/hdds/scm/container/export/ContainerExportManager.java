@@ -31,11 +31,13 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +45,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -51,6 +56,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,19 +68,12 @@ import org.slf4j.LoggerFactory;
  * if RM has not yet evaluated a container.
  *
  * <p>Job status is kept in memory only. On SCM restart or leader failover, in-flight jobs are lost
- * and the operator must re-submit on the new leader. Completed TAR files are kept on disk while their
- * job status remains in {@code jobTracker}; when a terminal job is evicted past {@code maxTerminalJobs},
- * its TAR is deleted as well. After restart, {@code maxTerminalJobs} no longer applies to TAR files
- * already on disk because {@code jobTracker} is empty; those files remain until removed manually.
- * On startup, incomplete work ({@code {jobId}.in-progress} markers,
- * {@code export-{jobId}} work directories, and matching partial TAR files) is removed.
+ * and the operator must re-submit on the new leader. {@link ExportFileManager} removes incomplete
+ * work on startup and retains completed {@code .tar.gz} files for eviction rebuild.
  */
 public class ContainerExportManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerExportManager.class);
-
-  static final String IN_PROGRESS_MARKER_SUFFIX = ".in-progress";
-  static final String EXPORT_JOB_DIR_PREFIX = "export-";
 
   //TODO: make ozone.scm.container.export.max.terminal.jobs configurable.
   private static final int DEFAULT_MAX_TERMINAL_JOBS = 10;
@@ -82,27 +81,29 @@ public class ContainerExportManager {
 
   private static final DateTimeFormatter METADATA_TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
-  private static final DateTimeFormatter FILENAME_TIMESTAMP_FORMAT =
+  private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
 
   private final Map<ExportJob.Id, ExportJob> jobTracker = new ConcurrentHashMap<>();
+  private final Deque<String> completedArchivePaths = new ArrayDeque<>();
   private final AtomicReference<ExportJob.Id> runningJobId = new AtomicReference<>();
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
+  private final ExportFileManager fileManager;
   private final ExportMetrics metrics;
   private final BooleanSupplier isLeaderReady;
-  private final String exportDirectory;
   private final int defaultShardSize;
   private final int defaultPageSize;
   private final int maxTerminalJobs;
-  /** SCM node id, used in log messages and the export worker thread name. */
+  /** SCM node id, used in the export worker thread name. */
   private final String scmId;
 
   public ContainerExportManager(ContainerManager containerManager, BooleanSupplier isLeaderReady,
       OzoneConfiguration conf, String scmId) {
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
-    this.exportDirectory = Objects.requireNonNull(resolveExportDirectory(conf), "exportDirectory == null");
+    this.fileManager = new ExportFileManager(
+        Objects.requireNonNull(resolveExportDirectory(conf), "exportDirectory == null"));
     this.scmId = Objects.requireNonNull(scmId, "scmId == null");
     this.defaultShardSize = DEFAULT_SHARD_SIZE;
     this.defaultPageSize = DEFAULT_PAGE_SIZE;
@@ -116,7 +117,7 @@ public class ContainerExportManager {
       String scmId) {
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
-    this.exportDirectory = Objects.requireNonNull(exportDirectory, "exportDirectory == null");
+    this.fileManager = new ExportFileManager(Objects.requireNonNull(exportDirectory, "exportDirectory == null"));
     this.scmId = Objects.requireNonNull(scmId, "scmId == null");
     this.defaultShardSize = defaultShardSize;
     this.defaultPageSize = defaultPageSize;
@@ -137,14 +138,14 @@ public class ContainerExportManager {
    * Initializes the export directory. Must be called once before submitting jobs.
    */
   public void start() throws IOException {
-    Files.createDirectories(Paths.get(exportDirectory));
-    cleanupOrphanedExportArtifacts();
-    LOG.info("{}: ContainerExportManager started (dir={}, defaultShardSize={}, defaultPageSize={}, maxTerminalJobs={})",
-        scmId, exportDirectory, defaultShardSize, defaultPageSize, maxTerminalJobs);
+    fileManager.start();
+    reloadCompletedArchives();
+    LOG.info("ContainerExportManager started (dir={}, defaultShardSize={}, defaultPageSize={}, maxTerminalJobs={})",
+        fileManager.getExportDirectory(), defaultShardSize, defaultPageSize, maxTerminalJobs);
   }
 
   // TODO: make ozone.scm.container.export.dir configurable
-  // Set path separate from scm.db.dirs to avoid large export TAR I/O 
+  // Set path separate from scm.db.dirs to avoid large export archive I/O
   // contending with SCM metadata DB access as the disk fills.
   private static String resolveExportDirectory(OzoneConfiguration conf) {
     File scmDbDir = ServerUtils.getScmDbDir(conf);
@@ -177,9 +178,8 @@ public class ContainerExportManager {
     ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     Instant now = Instant.now();
     String metadataTimestamp = METADATA_TIMESTAMP_FORMAT.format(now);
-    String fileTimestamp = FILENAME_TIMESTAMP_FORMAT.format(now);
-    String tarFileName = String.format("container-ids-%s-%s-%s.tar", scope.getValue(), fileTimestamp, jobId.getValue());
-    String tarPath = exportDirectory + File.separator + tarFileName;
+    String archiveTimestamp = ARCHIVE_TIMESTAMP_FORMAT.format(now);
+    String tarPath = fileManager.resolveArchiveFile(scope, archiveTimestamp, jobId).getAbsolutePath();
 
     ExportJob job = new ExportJob(jobId, scope, metadataTimestamp, tarPath, start, sizing);
 
@@ -191,8 +191,8 @@ public class ContainerExportManager {
     }
 
     workerPool.submit(() -> executeExport(job));
-    LOG.info("{}: submitted container ID export job {} (scope={}, start={}, maxRows={}, pageSize={}, shardSize={})",
-        scmId, jobId, scope, start, sizing.getMaxRows(), sizing.getPageSize(), sizing.getShardSize());
+    LOG.info("Submitted container ID export job {} (scope={}, start={}, maxRows={}, pageSize={}, shardSize={})",
+        jobId, scope, start, sizing.getMaxRows(), sizing.getPageSize(), sizing.getShardSize());
     return jobId;
   }
 
@@ -208,15 +208,20 @@ public class ContainerExportManager {
   }
 
   public void shutdown() {
-    LOG.info("{}: shutting down ContainerExportManager", scmId);
+    LOG.info("Shutting down ContainerExportManager");
     workerPool.shutdownNow();
     try {
       if (!workerPool.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-        LOG.warn("{}: timed out waiting for export worker shutdown", scmId);
+        LOG.warn("Timed out waiting for export worker shutdown");
       }
     } catch (InterruptedException e) {
-      LOG.warn("{}: interrupted waiting for export worker shutdown", scmId);
+      LOG.warn("Interrupted waiting for export worker shutdown");
       Thread.currentThread().interrupt();
+    }
+    try {
+      fileManager.unlock();
+    } catch (IOException e) {
+      LOG.warn("Failed to unlock container export directory", e);
     }
     if (metrics != null) {
       metrics.unRegister();
@@ -235,123 +240,43 @@ public class ContainerExportManager {
     int excess = terminalJobs.size() - maxTerminalJobs;
     for (int i = 0; i < excess; i++) {
       ExportJob evicted = terminalJobs.get(i).getValue();
-      deleteExportTar(evicted);
+      removeCompletedArchive(evicted.getTarPath());
       jobTracker.remove(evicted.getId());
+    }
+    trimCompletedArchives();
+  }
+
+  private void reloadCompletedArchives() {
+    completedArchivePaths.clear();
+    completedArchivePaths.addAll(fileManager.listCompletedArchivePaths());
+    trimCompletedArchives();
+  }
+
+  private void trimCompletedArchives() {
+    while (completedArchivePaths.size() > maxTerminalJobs) {
+      removeCompletedArchive(completedArchivePaths.removeFirst());
     }
   }
 
-  private void deleteExportTar(ExportJob job) {
-    String tarPath = job.getTarPath();
+  private void removeCompletedArchive(String tarPath) {
     if (tarPath == null) {
       return;
     }
-    File tar = new File(tarPath);
-    if (tar.isFile() && FileUtils.deleteQuietly(tar)) {
-      LOG.debug("Removed container export TAR for evicted job {}: {}", job.getId(), tar.getName());
-    }
-  }
-
-  private void cleanupOrphanedExportArtifacts() {
-    File exportDir = new File(exportDirectory);
-    File[] children = exportDir.listFiles();
-    if (children == null) {
-      return;
-    }
-    for (File child : children) {
-      if (child.isFile() && child.getName().endsWith(IN_PROGRESS_MARKER_SUFFIX)) {
-        String jobId = child.getName().substring(
-            0, child.getName().length() - IN_PROGRESS_MARKER_SUFFIX.length());
-        if (isUuidDirectoryName(jobId)) {
-          removeIncompleteExportArtifacts(jobId);
-        }
-      }
-    }
-    for (File child : children) {
-      if (child.isDirectory()) {
-        String jobId = jobIdFromExportDirName(child.getName());
-        if (jobId == null) {
-          continue;
-        }
-        if (inProgressMarkerFile(jobId).exists()) {
-          removeIncompleteExportArtifacts(jobId);
-        } else {
-          FileUtils.deleteQuietly(child);
-        }
-      }
-    }
-  }
-
-  private static String exportJobDirName(String jobId) {
-    return EXPORT_JOB_DIR_PREFIX + jobId;
-  }
-
-  private static String jobIdFromExportDirName(String dirName) {
-    if (!dirName.startsWith(EXPORT_JOB_DIR_PREFIX)) {
-      return null;
-    }
-    String jobId = dirName.substring(EXPORT_JOB_DIR_PREFIX.length());
-    return isUuidDirectoryName(jobId) ? jobId : null;
-  }
-
-  private void removeIncompleteExportArtifacts(String jobId) {
-    LOG.info("Removing incomplete container export artifacts for job {}", jobId);
-    FileUtils.deleteQuietly(inProgressMarkerFile(jobId));
-    File tar = findTarForJobId(jobId);
-    if (tar != null) {
-      FileUtils.deleteQuietly(tar);
-      LOG.info("Removed incomplete container export TAR for job {}: {}", jobId, tar.getName());
-    }
-    File jobWorkDir = new File(exportDirectory, exportJobDirName(jobId));
-    if (jobWorkDir.isDirectory()) {
-      FileUtils.deleteQuietly(jobWorkDir);
-      LOG.info("Removed orphaned container export work directory: {}",
-          jobWorkDir.getAbsolutePath());
-    }
-  }
-
-  private File findTarForJobId(String jobId) {
-    File exportDir = new File(exportDirectory);
-    File[] matches = exportDir.listFiles(
-        (dir, fileName) -> fileName.endsWith("-" + jobId + ".tar"));
-    if (matches == null || matches.length == 0) {
-      return null;
-    }
-    return matches[0];
-  }
-
-  private File inProgressMarkerFile(String jobId) {
-    return new File(exportDirectory, jobId + IN_PROGRESS_MARKER_SUFFIX);
-  }
-
-  private void markExportInProgress(String jobId) throws IOException {
-    Files.createFile(inProgressMarkerFile(jobId).toPath());
-  }
-
-  private void clearExportInProgress(String jobId) {
-    FileUtils.deleteQuietly(inProgressMarkerFile(jobId));
-  }
-
-  private static boolean isUuidDirectoryName(String directoryName) {
-    try {
-      return directoryName.equals(UUID.fromString(directoryName).toString());
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    fileManager.deleteExportTar(tarPath);
+    completedArchivePaths.remove(tarPath);
+    jobTracker.entrySet().removeIf(e -> tarPath.equals(e.getValue().getTarPath()));
   }
 
   private void executeExport(ExportJob job) {
     String jobIdValue = job.getId().getValue();
-    Path jobDir = Paths.get(exportDirectory, exportJobDirName(jobIdValue));
-    Path workDir = jobDir.resolve("work");
-    File tarFile = new File(job.getTarPath());
+    Path jobDir = Paths.get(fileManager.getExportDirectory(), ExportFileManager.exportJobDirName(job.getId()));
+    File archiveFile = fileManager.resolveArchiveFile(job.getScope(), job.getTimestamp(), job.getId());
     job.setStartTimeNs(System.nanoTime());
     boolean succeeded = false;
-    Archiver.AppendableTar appendableTar = null;
 
     try {
-      Files.createDirectories(workDir);
+      Files.createDirectories(jobDir);
       job.setExecutionState(ExportJob.ExecutionState.RUNNING);
-      markExportInProgress(jobIdValue);
 
       ContainerID cursor = job.getStartContainerId();
       int fileIndex = 1;
@@ -368,7 +293,7 @@ public class ContainerExportManager {
             throw new InterruptedException("Export job " + jobIdValue + " cancelled");
           }
           if (!isLeaderReady.getAsBoolean()) {
-            throw new IOException(scmId + ": SCM lost leadership during export job " + jobIdValue);
+            throw new IOException("SCM lost leadership during export job " + jobIdValue);
           }
 
           int fetchCount = job.getPageSize();
@@ -389,10 +314,10 @@ public class ContainerExportManager {
           for (ContainerID containerId : page) {
             if (recordsInCurrentFile == 0) {
               writer = closeWriter(writer);
-              currentShardPath = workDir.resolve(job.shardFileName(fileIndex));
+              currentShardPath = jobDir.resolve(job.shardFileName(fileIndex));
               writer = Files.newBufferedWriter(currentShardPath, StandardCharsets.UTF_8);
               job.writeMetadataHeader(writer, fileIndex, containerId);
-              LOG.info("{}: export job {} created shard part{}", scmId, jobIdValue, fileIndex);
+              LOG.info("Export job {} created shard part{}", jobIdValue, fileIndex);
             }
 
             buf.append(containerId.getProtobuf().getId()).append('\n');
@@ -404,10 +329,6 @@ public class ContainerExportManager {
               writer.write(buf.toString());
               buf.setLength(0);
               writer = closeWriter(writer);
-              if (appendableTar == null) {
-                appendableTar = Archiver.openForAppend(tarFile);
-              }
-              appendShardToTar(appendableTar, currentShardPath, job, fileIndex);
               currentShardPath = null;
               recordsInCurrentFile = 0;
               fileIndex++;
@@ -425,47 +346,44 @@ public class ContainerExportManager {
         }
 
         writer = closeWriter(writer);
-        if (currentShardPath != null) {
-          if (appendableTar == null) {
-            appendableTar = Archiver.openForAppend(tarFile);
-          }
-          appendShardToTar(appendableTar, currentShardPath, job, fileIndex);
-        }
       } finally {
-        closeExportResources(writer, appendableTar);
+        closeWriter(writer);
       }
 
+      if (totalRows == 0) {
+        job.setTarPath(null);
+        job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
+        LOG.info("Export job {} completed with zero matching containers", jobIdValue);
+      } else {
+        writeArchive(job, jobDir, archiveFile);
+        job.setTarPath(archiveFile.getAbsolutePath());
+        job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
+        completedArchivePaths.addLast(archiveFile.getAbsolutePath());
+        LOG.info("Export job {} completed ({} rows, archive={}).",
+            jobIdValue, totalRows, archiveFile.getAbsolutePath());
+      }
       if (Files.exists(jobDir)) {
         FileUtils.deleteDirectory(jobDir.toFile());
       }
-      job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
-      if (totalRows == 0) {
-        job.setTarPath(null);
-        LOG.info("{}: export job {} completed with zero matching containers", scmId, jobIdValue);
-      } else {
-        LOG.info("{}: export job {} completed ({} rows, tar={}).",
-            scmId, jobIdValue, totalRows, tarFile.getAbsolutePath());
-      }
-      clearExportInProgress(jobIdValue);
       succeeded = true;
     } catch (InterruptedException e) {
       job.setExecutionState(ExportJob.ExecutionState.FAILED);
       job.setErrorMessage(e.getMessage());
-      cleanupFailedArtifacts(jobDir, tarFile, jobIdValue);
-      LOG.info("{}: export job {} was cancelled", scmId, jobIdValue);
+      fileManager.cleanupFailedJob(jobDir, archiveFile);
+      LOG.info("Export job {} was cancelled", jobIdValue);
       Thread.currentThread().interrupt();
     } catch (IOException | RuntimeException e) {
       succeeded = false;
       job.setExecutionState(ExportJob.ExecutionState.FAILED);
       job.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.toString());
-      cleanupFailedArtifacts(jobDir, tarFile, jobIdValue);
-      LOG.error("{}: export job {} failed", scmId, jobIdValue, e);
+      fileManager.cleanupFailedJob(jobDir, archiveFile);
+      LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
       runningJobId.compareAndSet(job.getId(), null);
       if (metrics != null) {
         if (succeeded) {
           metrics.incrExportJobsSucceeded();
-          long bytesWritten = tarFile.isFile() ? tarFile.length() : 0L;
+          long bytesWritten = archiveFile.isFile() ? archiveFile.length() : 0L;
           metrics.recordLastSuccessfulExport(job.getTotalRows(), bytesWritten);
         } else if (job.getExecutionState() == ExportJob.ExecutionState.FAILED) {
           metrics.incrExportJobsFailed();
@@ -478,46 +396,18 @@ public class ContainerExportManager {
     }
   }
 
-  private void appendShardToTar(Archiver.AppendableTar tar, Path shardPath, ExportJob job, int partIndex)
-      throws IOException {
-    tar.appendFile(shardPath.toFile(), job.shardEntryName(partIndex));
-    FileUtils.deleteQuietly(shardPath.toFile());
-  }
-
-  /** Remove partial work artifacts after a failed or cancelled export. */
-  private void cleanupFailedArtifacts(Path jobDir, File tarFile, String jobId) {
-    if (jobDir != null) {
-      FileUtils.deleteQuietly(jobDir.toFile());
+  private void writeArchive(ExportJob job, Path jobDir, File archiveFile) throws IOException {
+    File[] shards = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
+    if (shards == null || shards.length == 0) {
+      throw new IOException("No shard files found for export job " + job.getId());
     }
-    if (tarFile != null) {
-      FileUtils.deleteQuietly(tarFile);
-    }
-    clearExportInProgress(jobId);
-  }
-
-  private static void closeExportResources(BufferedWriter writer, Archiver.AppendableTar tar) throws IOException {
-    IOException failure = null;
-    if (writer != null) {
-      try {
-        writer.flush();
-        writer.close();
-      } catch (IOException ex) {
-        failure = ex;
+    Arrays.sort(shards, Comparator.comparing(File::getName));
+    try (AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(archiveFile);
+         GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
+         ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
+      for (File shard : shards) {
+        Archiver.includeFile(shard, shard.getName(), tarOut);
       }
-    }
-    if (tar != null) {
-      try {
-        tar.close();
-      } catch (IOException ex) {
-        if (failure == null) {
-          failure = ex;
-        } else {
-          failure.addSuppressed(ex);
-        }
-      }
-    }
-    if (failure != null) {
-      throw failure;
     }
   }
 

@@ -31,14 +31,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -101,21 +104,20 @@ public class TestContainerExportManager {
     assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
     assertEquals(4, status.getTotalRows());
     assertNotNull(status.getTarPath());
-    assertTrue(status.getTarPath().endsWith(".tar"));
-    File tarPath = new File(status.getTarPath());
-    assertTrue(tarPath.exists());
-    assertFalse(Files.exists(tempDir.toPath().resolve(
-        ContainerExportManager.EXPORT_JOB_DIR_PREFIX + jobId.getValue())));
+    assertTrue(status.getTarPath().endsWith(ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
+    File archive = new File(status.getTarPath());
+    assertTrue(archive.exists());
+    assertFalse(Files.exists(tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId))));
 
-    Path extractDir = Files.createTempDirectory("export-tar");
+    Path extractDir = Files.createTempDirectory("export-archive");
     try {
-      Archiver.extract(tarPath, extractDir);
+      extractGzTar(archive, extractDir);
       String part2Name;
       try (java.util.stream.Stream<Path> stream = Files.list(extractDir)) {
         part2Name = stream.map(path -> path.getFileName().toString())
             .filter(name -> name.endsWith("part002.txt"))
             .findFirst()
-            .orElseThrow(() -> new AssertionError("part002.txt not found in TAR"));
+            .orElseThrow(() -> new AssertionError("part002.txt not found in archive"));
       }
       assertTrue(Files.readAllLines(extractDir.resolve(part2Name)).contains(
           "# startContainerId=4"));
@@ -146,9 +148,8 @@ public class TestContainerExportManager {
       fail(status.getErrorMessage());
     }
     assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
-    assertTrue(status.getTarPath().endsWith(".tar"));
+    assertTrue(status.getTarPath().endsWith(ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
     assertTrue(new File(status.getTarPath()).exists());
-    assertFalse(new File(status.getTarPath().replace(".tar", ".txt")).exists());
   }
 
   @Test
@@ -178,7 +179,7 @@ public class TestContainerExportManager {
 
   @Test
   public void testExportScope() {
-    assertEquals("health-MISSING",
+    assertEquals("health-MISSING_lifecycle-ANY",
         ExportScope.of(null, ContainerHealthState.MISSING).getValue());
   }
 
@@ -257,9 +258,9 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testOrphanWorkDirRemovedOnStartup() throws Exception {
-    String jobId = UUID.randomUUID().toString();
-    Path orphan = tempDir.toPath().resolve(ContainerExportManager.EXPORT_JOB_DIR_PREFIX + jobId).resolve("work");
+  public void testOrphanJobDirRemovedOnStartup() throws Exception {
+    ExportJob.Id jobId = ExportJob.Id.newId();
+    Path orphan = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(orphan);
     exportManager.shutdown();
     exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
@@ -269,21 +270,20 @@ public class TestContainerExportManager {
 
   @Test
   public void testIncompleteExportArtifactsRemovedOnStartup() throws Exception {
-    String jobId = UUID.randomUUID().toString();
-    Path jobDir = tempDir.toPath().resolve(ContainerExportManager.EXPORT_JOB_DIR_PREFIX + jobId).resolve("work");
+    ExportJob.Id jobId = ExportJob.Id.newId();
+    Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(jobDir);
-    File partialTar = new File(tempDir, "container-ids-health-MISSING-20260101T000000Z-" + jobId + ".tar");
-    assertTrue(partialTar.createNewFile());
-    File inProgress = new File(tempDir, jobId + ContainerExportManager.IN_PROGRESS_MARKER_SUFFIX);
-    assertTrue(inProgress.createNewFile());
+    ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
+    ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
+    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "20260101T000000Z", jobId);
+    assertTrue(partialArchiveTemp.createNewFile());
 
     exportManager.shutdown();
     exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
         TEST_MAX_TERMINAL_JOBS, () -> true);
 
     assertFalse(Files.exists(jobDir));
-    assertFalse(partialTar.exists());
-    assertFalse(inProgress.exists());
+    assertFalse(partialArchiveTemp.exists());
   }
 
   @Test
@@ -309,19 +309,21 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testOrphanWorkDirWithoutMarkerDoesNotDeleteCompletedTar() throws Exception {
-    String jobId = UUID.randomUUID().toString();
-    File completedTar = new File(tempDir, "container-ids-health-MISSING-20260101T000000Z-" + jobId + ".tar");
+  public void testOrphanJobDirDoesNotDeleteCompletedTar() throws Exception {
+    ExportJob.Id jobId = ExportJob.Id.newId();
+    ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
+    ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
+    File completedTar = fileManager.resolveArchiveFile(scope, "20260101T000000Z", jobId);
     assertTrue(completedTar.createNewFile());
-    Path orphanWorkDir = tempDir.toPath().resolve(ContainerExportManager.EXPORT_JOB_DIR_PREFIX + jobId);
-    Files.createDirectories(orphanWorkDir.resolve("work"));
+    Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
+    Files.createDirectories(orphanJobDir);
 
     exportManager.shutdown();
     exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
         TEST_MAX_TERMINAL_JOBS, () -> true);
 
     assertTrue(completedTar.exists());
-    assertFalse(Files.exists(orphanWorkDir));
+    assertFalse(Files.exists(orphanJobDir));
   }
 
   @Test
@@ -350,5 +352,16 @@ public class TestContainerExportManager {
       return status != null && status.isTerminal();
     }, 100, 30_000);
     return exportManager.getExportStatus(jobId);
+  }
+
+  private static void extractGzTar(File archive, Path extractDir) throws Exception {
+    Files.createDirectories(extractDir);
+    try (InputStream in = new GZIPInputStream(Files.newInputStream(archive.toPath()));
+         ArchiveInputStream<TarArchiveEntry> tarIn = Archiver.untar(in)) {
+      TarArchiveEntry entry;
+      while ((entry = tarIn.getNextEntry()) != null) {
+        Archiver.extractEntry(entry, tarIn, entry.getSize(), extractDir, extractDir.resolve(entry.getName()));
+      }
+    }
   }
 }
