@@ -8115,6 +8115,12 @@
                 "name": "subStatus",
                 "type": "SubStatus",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "progressPercent",
+                "type": "double",
+                "optional": true
               }
             ]
           },

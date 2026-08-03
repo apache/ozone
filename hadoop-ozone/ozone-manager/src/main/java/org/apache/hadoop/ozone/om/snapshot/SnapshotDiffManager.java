@@ -1269,10 +1269,15 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       Optional<Set<Long>> newParentIds,
       TablePrefixInfo tablePrefixes, String jobKey,
       String jobId) throws IOException, RocksDBException {
-    updateProgress(jobKey, 0.0);
     if (deltaFiles.isEmpty()) {
+      updateProgress(jobKey, 1.0);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipped object ID map generation for table '{}' because there are no delta files, jobId: {}",
+            fsTable.getName(), jobId);
+      }
       return;
     }
+    updateProgress(jobKey, 0.0);
     long objectIdMapStart = Time.monotonicNow();
     AtomicLong keysProcessed = new AtomicLong(0);
     String tablePrefix = tablePrefixes.getTablePrefix(fsTable.getName());
@@ -1611,7 +1616,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapshotDiffJob.setKeysProcessedPct(pct * 100);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Completed processing {}% of keys for snapshot diff job {}", pct, jobKey);
+      LOG.debug("Completed processing {}% of keys for snapshot diff job {}",
+          snapshotDiffJob.getKeysProcessedPct(), jobKey);
     }
   }
 
