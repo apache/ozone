@@ -156,7 +156,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+    try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>>
              iterator = metadataManager.getVolumeTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();

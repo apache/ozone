@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
@@ -58,8 +59,8 @@ public class CompleteMultipartUploadRequestUnmarshaller
       PushbackInputStream pushbackStream = new PushbackInputStream(inputStream);
       int firstByte = pushbackStream.read();
       if (firstByte == -1) {
-        throw wrapOS3Exception(newError(INVALID_REQUEST)
-            .withMessage("You must specify at least one part"));
+        // An empty body is a malformed CompleteMultipartUpload request.
+        throw wrapOS3Exception(newError(MALFORMED_XML));
       }
       pushbackStream.unread(firstByte);
       return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, pushbackStream);

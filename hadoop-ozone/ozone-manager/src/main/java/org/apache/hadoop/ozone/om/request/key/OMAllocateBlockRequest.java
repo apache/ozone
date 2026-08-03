@@ -91,11 +91,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
-    ExcludeList excludeList = new ExcludeList();
-    if (allocateBlockRequest.hasExcludeList()) {
-      excludeList =
-          ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
-    }
+    final ExcludeList excludeList = !allocateBlockRequest.hasExcludeList() ? new ExcludeList()
+        : ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
 
     // TODO: Here we are allocating block with out any check for key exist in
     //  open table or not and also with out any authorization checks.
@@ -105,20 +102,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-    UserInfo userInfo = getOmRequest().getUserInfo();
+    UserInfo userInfo = getUserIfNotExists(ozoneManager);
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
-    List<OmKeyLocationInfo> omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-            ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
-            ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
-            ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(),
-            ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
-            keyArgs.getSortDatanodes(), userInfo);
+    final List<OmKeyLocationInfo> omKeyLocationInfoList = allocateBlock(repConfig, excludeList,
+        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -142,7 +133,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder()
+    return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }

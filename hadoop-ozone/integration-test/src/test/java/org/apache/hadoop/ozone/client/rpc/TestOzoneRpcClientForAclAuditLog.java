@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,7 +37,6 @@ import java.util.Arrays;
 import java.util.List;
 import net.jcip.annotations.NotThreadSafe;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -163,7 +163,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = ugi.getUserName();
     String adminName = ugi.getUserName();
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
@@ -211,7 +211,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = "bilbo";
     String adminName = "bilbo";
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)

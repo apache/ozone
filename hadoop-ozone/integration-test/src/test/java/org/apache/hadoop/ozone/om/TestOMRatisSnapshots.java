@@ -18,10 +18,11 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -141,8 +142,8 @@ public class TestOMRatisSnapshots {
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
 
-    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    volumeName = uniqueObjectName("volume");
+    bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner("user" + RandomStringUtils.secure().nextNumeric(5))

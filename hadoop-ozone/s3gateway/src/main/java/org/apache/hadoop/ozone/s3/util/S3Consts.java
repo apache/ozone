@@ -75,6 +75,11 @@ public final class S3Consts {
 
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  /**
+   * Prefix for internal metadata keys that store remapped user x-amz-meta values
+   * colliding with system headers. Users must not set metadata keys with this prefix.
+   */
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
 
@@ -115,6 +120,8 @@ public final class S3Consts {
 
   // Constants related to S3 Express / ListDirectoryBuckets
   public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  // Maximum number of buckets per ListBuckets response page.
+  public static final int MAX_BUCKETS_LIMIT = 10000;
   public static final String DEFAULT_S3_REGION = "us-east-1";
   public static final String S3_EXPRESS_SERVICE = "s3express";
 
@@ -142,10 +149,13 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    public static final String FETCH_OWNER = "fetch-owner";
+    public static final String LIST_TYPE = "list-type";
     // GetBucketLocation is not implemented
     public static final String LOCATION = "location";
     public static final String MARKER = "marker";
     public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
+    public static final String MAX_BUCKETS = "max-buckets";
     public static final String MAX_KEYS = "max-keys";
     public static final String MAX_PARTS = "max-parts";
     public static final String MAX_UPLOADS = "max-uploads";
@@ -157,6 +167,7 @@ public final class S3Consts {
     public static final String UPLOAD_ID = "uploadId";
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
+    public static final String LIFECYCLE = "lifecycle";
 
     private QueryParams() {
       // no instances
