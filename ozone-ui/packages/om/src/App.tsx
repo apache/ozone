@@ -16,12 +16,18 @@
  * limitations under the License.
  */
 
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { AppstoreOutlined } from '@ant-design/icons';
-import { AppLayout, Chip, IconButton, Sidebar, UtilityBar } from '@ozone-ui/shared';
+import { AppLayout, Chip, IconButton, NotFoundState, Sidebar, UtilityBar } from '@ozone-ui/shared';
 import { navItems, SIDEBAR_WIDTH } from './navigation';
 import OverviewPage from './pages/Overview/OverviewPage';
 import Placeholder from './pages/Placeholder';
+
+/** 404 page for unknown routes; the action returns to the Overview. */
+const NotFoundRoute = () => {
+  const navigate = useNavigate();
+  return <NotFoundState onAction={() => navigate('/')} />;
+};
 
 /** Product branding: the app name plus a chip showing the current host. */
 const BrandTitle = () => {
@@ -63,7 +69,7 @@ function App() {
         <Route path="/stacks" element={<Placeholder title="Stacks" />} />
         <Route path="/documentation" element={<Placeholder title="Documentation" />} />
         <Route path="/log-levels" element={<Placeholder title="Log levels" />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </AppLayout>
   );

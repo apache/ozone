@@ -16,8 +16,16 @@
  * limitations under the License.
  */
 
-import React, { useMemo, useState } from 'react';
-import { Button, Dropdown, message, type MenuProps, type TableColumnsType } from 'antd';
+import React, { Suspense, useMemo, useState } from 'react';
+import {
+  Button,
+  Dropdown,
+  Empty,
+  message,
+  Skeleton,
+  type MenuProps,
+  type TableColumnsType,
+} from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import { Card, Chip, DataTable, Icon, KeyValuePair, Section, SearchInput } from '@ozone-ui/shared';
 import {
@@ -29,8 +37,7 @@ import {
   type JvmParameterCategory,
   type RuntimeBean,
 } from '../../../api/overview';
-import { useJmxBean } from '../../../api/useJmx';
-import SectionBody from '../SectionBody';
+import { useSuspenseJmxBean } from '../../../api/useJmx';
 
 const highlightsGridStyle: React.CSSProperties = {
   display: 'grid',
@@ -95,13 +102,8 @@ const columns: TableColumnsType<JvmParameter> = [
   },
 ];
 
-/**
- * "Java Virtual Machine" section: a Highlights card plus the searchable,
- * filterable and paginated Parameters table. Sourced from the JVM runtime bean,
- * fetched lazily only when this section renders.
- */
-export const JvmSection: React.FC = () => {
-  const { data: runtime, isLoading, error, isEmpty } = useJmxBean<RuntimeBean>(JMX_QUERY.runtime);
+const JvmContent: React.FC = () => {
+  const { data: runtime, isEmpty } = useSuspenseJmxBean<RuntimeBean>(JMX_QUERY.runtime);
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<'All' | JvmParameterCategory>('All');
@@ -163,83 +165,89 @@ export const JvmSection: React.FC = () => {
     );
   };
 
-  return (
-    <Section title="Java Virtual Machine">
-      <SectionBody
-        loading={isLoading}
-        error={error ?? undefined}
-        isEmpty={isEmpty}
-        skeletonRows={4}
-      >
-        {runtime && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <Card title="Highlights">
-              <div style={highlightsGridStyle}>
-                {highlights.map((h) => (
-                  <KeyValuePair key={h.key} label={h.label} value={h.value} tooltip={h.tooltip} />
-                ))}
-              </div>
-            </Card>
+  if (isEmpty || !runtime) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No JMX data available" />;
+  }
 
-            <DataTable<JvmParameter>
-              title="Parameters"
-              columns={columns}
-              dataSource={rows}
-              rowKey="key"
-              size="middle"
-              paginated
-              defaultPageSize={10}
-              rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-              onRow={(record) => ({
-                onClick: () =>
-                  setSelectedRowKeys((keys) =>
-                    keys.includes(record.key)
-                      ? keys.filter((k) => k !== record.key)
-                      : [...keys, record.key]
-                  ),
-                style: { cursor: 'pointer' },
-              })}
-              filters={
-                <>
-                  <SearchInput
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search..."
-                    width={256}
-                  />
-                  <Dropdown menu={categoryMenu} trigger={['click']}>
-                    <span style={{ cursor: 'pointer' }}>
-                      <Chip color="neutral">
-                        {category === 'All' ? 'All' : category}
-                        <DownOutlined style={{ fontSize: 10 }} />
-                      </Chip>
-                    </span>
-                  </Dropdown>
-                  <Chip
-                    color="neutral"
-                    selected={showModules}
-                    onClick={() => setShowModules((v) => !v)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    Show JVM Modules
-                  </Chip>
-                </>
-              }
-              actions={
-                <Button
-                  icon={<Icon name="copy" size={16} />}
-                  onClick={copyArguments}
-                  aria-label="Copy JVM arguments"
-                >
-                  Copy Arguments
-                </Button>
-              }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <Card title="Highlights">
+        <div style={highlightsGridStyle}>
+          {highlights.map((h) => (
+            <KeyValuePair key={h.key} label={h.label} value={h.value} tooltip={h.tooltip} />
+          ))}
+        </div>
+      </Card>
+
+      <DataTable<JvmParameter>
+        title="Parameters"
+        columns={columns}
+        dataSource={rows}
+        rowKey="key"
+        size="middle"
+        paginated
+        defaultPageSize={10}
+        rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+        onRow={(record) => ({
+          onClick: () =>
+            setSelectedRowKeys((keys) =>
+              keys.includes(record.key)
+                ? keys.filter((k) => k !== record.key)
+                : [...keys, record.key]
+            ),
+          style: { cursor: 'pointer' },
+        })}
+        filters={
+          <>
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              width={256}
             />
-          </div>
-        )}
-      </SectionBody>
-    </Section>
+            <Dropdown menu={categoryMenu} trigger={['click']}>
+              <span style={{ cursor: 'pointer' }}>
+                <Chip color="neutral">
+                  {category === 'All' ? 'All' : category}
+                  <DownOutlined style={{ fontSize: 10 }} />
+                </Chip>
+              </span>
+            </Dropdown>
+            <Chip
+              color="neutral"
+              selected={showModules}
+              onClick={() => setShowModules((v) => !v)}
+              style={{ cursor: 'pointer' }}
+            >
+              Show JVM Modules
+            </Chip>
+          </>
+        }
+        actions={
+          <Button
+            icon={<Icon name="copy" size={16} />}
+            onClick={copyArguments}
+            aria-label="Copy JVM arguments"
+          >
+            Copy Arguments
+          </Button>
+        }
+      />
+    </div>
   );
 };
+
+/**
+ * "Java Virtual Machine" section: a Highlights card plus the searchable,
+ * filterable and paginated Parameters table. Sourced from the JVM runtime bean,
+ * fetched lazily only when this section renders.
+ */
+export const JvmSection: React.FC = () => (
+  <Section title="Java Virtual Machine">
+    <Suspense fallback={<Skeleton active paragraph={{ rows: 4 }} />}>
+      <JvmContent />
+    </Suspense>
+  </Section>
+);
 
 export default JvmSection;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { queryJmx } from './jmx';
 
 export interface JmxBeanState<T> {
@@ -24,6 +24,13 @@ export interface JmxBeanState<T> {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
+  /** The query succeeded but no MBean matched (`{ beans: [] }`). */
+  isEmpty: boolean;
+}
+
+export interface SuspenseJmxBeanState<T> {
+  /** The first matching MBean, or `undefined` when the query returned none. */
+  data?: T;
   /** The query succeeded but no MBean matched (`{ beans: [] }`). */
   isEmpty: boolean;
 }
@@ -43,6 +50,18 @@ export interface UseJmxBeanOptions {
 export const JMX_QUERY_KEY = 'jmx';
 
 /**
+ * TanStack Query options for a JMX query. Shared by the plain and suspense hooks
+ * (and usable with `useSuspenseQueries`) so every JMX read dedupes on the same
+ * `['jmx', qry]` key.
+ */
+export function jmxQueryOptions<T>(qry: string) {
+  return {
+    queryKey: [JMX_QUERY_KEY, qry] as const,
+    queryFn: () => queryJmx<T>(qry),
+  };
+}
+
+/**
  * Fetch a single JMX MBean (the first bean) for a section via TanStack Query.
  * Requests are de-duplicated by query key, so multiple sections depending on the
  * same MBean share one network call. Refresh by invalidating the `['jmx']` key.
@@ -51,8 +70,7 @@ export function useJmxBean<T>(qry: string, options: UseJmxBeanOptions = {}): Jmx
   const { refetchInterval = false, enabled = true } = options;
 
   const query = useQuery({
-    queryKey: [JMX_QUERY_KEY, qry],
-    queryFn: () => queryJmx<T>(qry),
+    ...jmxQueryOptions<T>(qry),
     refetchInterval,
     enabled,
   });
@@ -64,4 +82,14 @@ export function useJmxBean<T>(qry: string, options: UseJmxBeanOptions = {}): Jmx
     error: (query.error as Error | null) ?? null,
     isEmpty: query.isSuccess && (query.data?.length ?? 0) === 0,
   };
+}
+
+/**
+ * Suspense variant: suspends while loading and throws to the nearest error
+ * boundary on failure, so the caller renders assuming data is settled. Returns
+ * the first matching MBean (or `undefined` when the endpoint returned no beans).
+ */
+export function useSuspenseJmxBean<T>(qry: string): SuspenseJmxBeanState<T> {
+  const { data } = useSuspenseQuery(jmxQueryOptions<T>(qry));
+  return { data: data[0], isEmpty: data.length === 0 };
 }

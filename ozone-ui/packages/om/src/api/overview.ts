@@ -43,6 +43,7 @@ export const JMX_QUERY = {
 
 export interface OzoneManagerInfoBean {
   RpcPort: string;
+  Namespace: string;
   /**
    * OM Ratis peers, one row per node. Each row is a tuple
    * `[hostName, nodeId, ratisPort, role, leaderReadiness]` (see

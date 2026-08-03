@@ -44,6 +44,20 @@ export { default as Chip } from './components/Chip/Chip';
 export type { ChipProps, ChipColor, ChipVariant, ChipSize } from './components/Chip/Chip';
 export { default as Alert } from './components/Alert/Alert';
 export type { AlertProps } from './components/Alert/Alert';
+export {
+  default as ErrorState,
+  NetworkErrorState,
+  NotFoundState,
+  ServerErrorState,
+} from './components/ErrorState/ErrorState';
+export type { ErrorStateProps } from './components/ErrorState/ErrorState';
+export { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+export type { ErrorBoundaryProps } from './components/ErrorBoundary/ErrorBoundary';
+export { QueryErrorBoundary } from './components/ErrorBoundary/QueryErrorBoundary';
+export type {
+  QueryErrorBoundaryProps,
+  QueryErrorFallbackProps,
+} from './components/ErrorBoundary/QueryErrorBoundary';
 export { default as TextLink } from './components/TextLink/TextLink';
 export type { TextLinkProps } from './components/TextLink/TextLink';
 export { default as IconButton } from './components/IconButton/IconButton';

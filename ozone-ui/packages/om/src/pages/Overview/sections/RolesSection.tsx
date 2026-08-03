@@ -16,29 +16,17 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import type { TableColumnsType } from 'antd';
-import { Alert, Chip, DataTable, KeyValuePair, Section } from '@ozone-ui/shared';
+import React, { Suspense } from 'react';
+import { Skeleton, type TableColumnsType } from 'antd';
+import { Chip, DataTable, Section } from '@ozone-ui/shared';
 import {
   JMX_QUERY,
-  formatElapsed,
   parseRatisRoles,
-  type LeaderElectionCountBean,
-  type LeaderElectionElapsedBean,
   type OzoneManagerInfoBean,
   type RatisRole,
   type RatisServerBean,
 } from '../../../api/overview';
-import { useJmxBean } from '../../../api/useJmx';
-import SectionBody from '../SectionBody';
-
-/** Grid for the per-host details revealed when a role row is expanded. */
-const detailsGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-  gap: '16px 24px',
-  padding: '4px 8px 8px',
-};
+import { useSuspenseJmxBean } from '../../../api/useJmx';
 
 const columns: TableColumnsType<RatisRole> = [
   {
@@ -76,83 +64,22 @@ const columns: TableColumnsType<RatisRole> = [
   },
 ];
 
-/** "Ozone Manager Roles" HA table. Sourced from the OM ServerRuntime bean. */
-export const RolesSection: React.FC = () => {
-  const {
-    data: omInfo,
-    isLoading,
-    error,
-    isEmpty,
-  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
-  const ratisQuery = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer);
-  const electionCountQuery = useJmxBean<LeaderElectionCountBean>(JMX_QUERY.leaderElectionCount);
-  const electionElapsedQuery = useJmxBean<LeaderElectionElapsedBean>(
-    JMX_QUERY.leaderElectionElapsed
-  );
-
-  const ratis = ratisQuery.data;
-  const electionCount = electionCountQuery.data;
-  const electionElapsed = electionElapsedQuery.data;
-
-  // The primary bean (omInfo) drives the section's load/error/empty state; the
-  // secondary beans only enrich the expanded row, so surface their failures as a
-  // non-blocking partial-data warning rather than failing the whole section.
-  const partialError =
-    ratisQuery.isError || electionCountQuery.isError || electionElapsedQuery.isError;
+const RolesContent: React.FC = () => {
+  const { data: omInfo } = useSuspenseJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
+  const { data: ratis } = useSuspenseJmxBean<RatisServerBean>(JMX_QUERY.ratisServer);
 
   const roles = omInfo ? parseRatisRoles(omInfo.RatisRoles, ratis?.Id) : [];
 
-  // These details (RPC port, group id, leader-election metrics) are exposed only
-  // by the OM node serving the UI — so only the current node's row is
-  // expandable. Election count / elapsed time are hidden when absent or -1,
-  // mirroring the legacy OM UI.
-  const count = electionCount?.Count;
-  const elapsed = electionElapsed?.Value;
-  const showCount = count != null && count !== -1;
-  const showElapsed = elapsed != null && elapsed !== -1;
-
-  const renderHostDetails = () => (
-    <div style={detailsGridStyle}>
-      <KeyValuePair label="Remote Procedure Call Port" value={omInfo?.RpcPort ?? '—'} />
-      <KeyValuePair label="Group ID" value={ratis?.GroupId ?? '—'} />
-      {showCount && <KeyValuePair label="Election Count" value={String(count)} />}
-      {showElapsed && (
-        <KeyValuePair label="Last Election Elapsed Time" value={formatElapsed(elapsed)} />
-      )}
-    </div>
-  );
-
-  return (
-    <Section title="Ozone Manager Roles" description="High Availability">
-      <SectionBody
-        loading={isLoading}
-        error={error ?? undefined}
-        isEmpty={isEmpty}
-        skeletonRows={3}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {partialError && (
-            <Alert
-              type="warning"
-              showIcon
-              message="Some role details are unavailable"
-              description="The current node's RPC/group and leader-election metrics could not be loaded. Roles are shown from the OM info bean."
-            />
-          )}
-          <DataTable<RatisRole>
-            columns={columns}
-            dataSource={roles}
-            rowKey="key"
-            size="middle"
-            expandable={{
-              expandedRowRender: renderHostDetails,
-              rowExpandable: (record) => record.isCurrent,
-            }}
-          />
-        </div>
-      </SectionBody>
-    </Section>
-  );
+  return <DataTable<RatisRole> columns={columns} dataSource={roles} rowKey="key" size="middle" />;
 };
+
+/** "Ozone Manager Roles" HA table. Sourced from the OM ServerRuntime bean. */
+export const RolesSection: React.FC = () => (
+  <Section title="Ozone Manager Roles" description="High Availability">
+    <Suspense fallback={<Skeleton active paragraph={{ rows: 3 }} />}>
+      <RolesContent />
+    </Suspense>
+  </Section>
+);
 
 export default RolesSection;

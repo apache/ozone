@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { Suspense } from 'react';
+import { Empty, Skeleton } from 'antd';
 import { Card, KeyValuePair, Section } from '@ozone-ui/shared';
 import { JMX_QUERY, type OzoneManagerInfoBean } from '../../../api/overview';
-import { useJmxBean } from '../../../api/useJmx';
-import SectionBody from '../SectionBody';
+import { useSuspenseJmxBean } from '../../../api/useJmx';
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -28,34 +28,30 @@ const gridStyle: React.CSSProperties = {
   gap: '16px 24px',
 };
 
-/** "Metadata Volume Information" card. Sourced from the OM ServerRuntime bean. */
-export const MetadataVolumeSection: React.FC = () => {
-  const {
-    data: omInfo,
-    isLoading,
-    error,
-    isEmpty,
-  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
+const MetadataVolumeContent: React.FC = () => {
+  const { data: omInfo, isEmpty } = useSuspenseJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
+
+  if (isEmpty || !omInfo) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No JMX data available" />;
+  }
 
   return (
-    <Section title="Metadata Volume Information">
-      <Card>
-        <SectionBody
-          loading={isLoading}
-          error={error ?? undefined}
-          isEmpty={isEmpty}
-          skeletonRows={1}
-        >
-          {omInfo && (
-            <div style={gridStyle}>
-              <KeyValuePair label="RATIS LOG DIRECTORY" value={omInfo.RatisLogDirectory} copyable />
-              <KeyValuePair label="ROCKSDB DIRECTORY" value={omInfo.RocksDbDirectory} copyable />
-            </div>
-          )}
-        </SectionBody>
-      </Card>
-    </Section>
+    <div style={gridStyle}>
+      <KeyValuePair label="RATIS LOG DIRECTORY" value={omInfo.RatisLogDirectory} copyable />
+      <KeyValuePair label="ROCKSDB DIRECTORY" value={omInfo.RocksDbDirectory} copyable />
+    </div>
   );
 };
+
+/** "Metadata Volume Information" card. Sourced from the OM ServerRuntime bean. */
+export const MetadataVolumeSection: React.FC = () => (
+  <Section title="Metadata Volume Information">
+    <Card>
+      <Suspense fallback={<Skeleton active paragraph={{ rows: 1 }} />}>
+        <MetadataVolumeContent />
+      </Suspense>
+    </Card>
+  </Section>
+);
 
 export default MetadataVolumeSection;

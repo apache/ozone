@@ -19,7 +19,7 @@
 import React from 'react';
 import { Button } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader, Icon } from '@ozone-ui/shared';
+import { PageHeader, Icon, QueryErrorBoundary } from '@ozone-ui/shared';
 import { JMX_QUERY_KEY } from '../../api/useJmx';
 import InstanceDetailsSection from './sections/InstanceDetailsSection';
 import RolesSection from './sections/RolesSection';
@@ -28,9 +28,12 @@ import JvmSection from './sections/JvmSection';
 
 /**
  * OM Overview page. Each section fetches its own JMX MBean lazily via TanStack
- * Query; sections that share a query (the OM ServerRuntime bean feeds three of
- * them) are de-duplicated to a single request by query key. Refresh invalidates
- * the `['jmx']` cache so every visible query refetches.
+ * Query (with `useSuspenseQuery`); sections that share a query (the OM
+ * ServerRuntime bean feeds three of them) are de-duplicated to a single request
+ * by query key. Because every section reads from the one `/jmx` endpoint, a
+ * transport/server failure fails them all, so a single `QueryErrorBoundary`
+ * renders one page-level error state. Refresh invalidates the `['jmx']` cache so
+ * every visible query refetches.
  */
 export const OverviewPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -49,10 +52,14 @@ export const OverviewPage: React.FC = () => {
           </Button>
         }
       />
-      <InstanceDetailsSection />
-      <RolesSection />
-      <MetadataVolumeSection />
-      <JvmSection />
+      <QueryErrorBoundary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <InstanceDetailsSection />
+          <RolesSection />
+          <MetadataVolumeSection />
+          <JvmSection />
+        </div>
+      </QueryErrorBoundary>
     </div>
   );
 };

@@ -27,6 +27,7 @@ const ozoneManagerInfo = {
   name: 'Hadoop:service=OzoneManager,name=OzoneManagerInfo,component=ServerRuntime',
   modelerType: 'org.apache.hadoop.ozone.om.OzoneManager',
   RpcPort: '9862',
+  Namespace: 'ozone1783424901',
   // Array of [hostName, nodeId, ratisPort, role, leaderReadiness] tuples, matching
   // OMMXBean.getRatisRoles() (List<List<String>>) on a real OM.
   RatisRoles: [
