@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -42,6 +43,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -172,6 +174,14 @@ public class TestBasicOzoneFileSystems {
 
     // The rebuilt filesystem URI keeps the (bracketed) IPv6 authority intact.
     assertEquals(new URI(uri).getAuthority(), ofs.getUri().getAuthority());
+  }
+
+  @Test
+  public void testRootedAuthorityRejectsOutOfRangePort() {
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    // HostAndPort rejects ports outside 0-65535, unlike a bare Integer.parseInt.
+    assertThrows(IllegalArgumentException.class,
+        () -> ofs.initialize(new URI("ofs://host:99999/"), new OzoneConfiguration()));
   }
 
   private void assertDefaultBlockSize(long expected, FileSystem subject) {

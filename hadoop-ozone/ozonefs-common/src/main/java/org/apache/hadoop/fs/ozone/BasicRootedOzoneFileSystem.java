@@ -166,7 +166,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       hostAndPort = HostAndPort.fromString(authority);
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
+      throw new IllegalArgumentException(URI_EXCEPTION_TEXT, e);
     }
     int omPort = hostAndPort.hasPort() ? hostAndPort.getPort() : -1;
     String host = hostAndPort.getHost();
