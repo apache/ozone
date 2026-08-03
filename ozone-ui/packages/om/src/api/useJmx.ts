@@ -16,42 +16,52 @@
  * limitations under the License.
  */
 
-import { useEffect, useState } from 'react';
-import { fetchJmxBean } from './jmx';
+import { useQuery } from '@tanstack/react-query';
+import { queryJmx } from './jmx';
 
 export interface JmxBeanState<T> {
   data?: T;
-  loading: boolean;
-  error?: Error;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  /** The query succeeded but no MBean matched (`{ beans: [] }`). */
+  isEmpty: boolean;
 }
 
+export interface UseJmxBeanOptions {
+  /**
+   * Auto-refresh interval in milliseconds. Omit or pass `false` to disable
+   * polling (the default). This is the hook-level hook for a future
+   * auto-polling toggle.
+   */
+  refetchInterval?: number | false;
+  /** Disable the query until a dependency is ready. Defaults to `true`. */
+  enabled?: boolean;
+}
+
+/** The shared cache key for a JMX query, so callers can invalidate by prefix. */
+export const JMX_QUERY_KEY = 'jmx';
+
 /**
- * Fetch a single JMX MBean for a section. Requests are de-duplicated by query
- * (see {@link fetchJmxBean}), so multiple sections depending on the same MBean
- * share one network call. Pass a changing `refreshToken` (together with
- * `clearJmxCache()`) to force a refetch.
+ * Fetch a single JMX MBean (the first bean) for a section via TanStack Query.
+ * Requests are de-duplicated by query key, so multiple sections depending on the
+ * same MBean share one network call. Refresh by invalidating the `['jmx']` key.
  */
-export function useJmxBean<T>(qry: string, refreshToken = 0): JmxBeanState<T> {
-  const [state, setState] = useState<JmxBeanState<T>>({ loading: true });
+export function useJmxBean<T>(qry: string, options: UseJmxBeanOptions = {}): JmxBeanState<T> {
+  const { refetchInterval = false, enabled = true } = options;
 
-  useEffect(() => {
-    let active = true;
-    setState({ loading: true });
-    fetchJmxBean<T>(qry)
-      .then((data) => {
-        if (active) {
-          setState({ data, loading: false });
-        }
-      })
-      .catch((error: Error) => {
-        if (active) {
-          setState({ loading: false, error });
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [qry, refreshToken]);
+  const query = useQuery({
+    queryKey: [JMX_QUERY_KEY, qry],
+    queryFn: () => queryJmx<T>(qry),
+    refetchInterval,
+    enabled,
+  });
 
-  return state;
+  return {
+    data: query.data?.[0],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: (query.error as Error | null) ?? null,
+    isEmpty: query.isSuccess && (query.data?.length ?? 0) === 0,
+  };
 }

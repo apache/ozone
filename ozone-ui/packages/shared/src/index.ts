@@ -51,5 +51,12 @@ export type { IconButtonProps } from './components/IconButton/IconButton';
 export { default as Icon } from './components/Icon/Icon';
 export type { IconProps, IconName } from './components/Icon/Icon';
 
+// Data fetching (TanStack Query foundation)
+export { fetchJson, HttpError } from './data/fetchJson';
+export type { FetchJsonOptions, QueryParams } from './data/fetchJson';
+export { createQueryClient, defaultQueryClientConfig } from './data/queryClient';
+export { QueryProvider } from './data/QueryProvider';
+export type { QueryProviderProps } from './data/QueryProvider';
+
 // Utils
 export * from './utils/menuUtils';

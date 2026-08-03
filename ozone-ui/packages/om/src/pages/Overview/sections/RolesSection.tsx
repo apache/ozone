@@ -18,7 +18,7 @@
 
 import React from 'react';
 import type { TableColumnsType } from 'antd';
-import { Chip, DataTable, KeyValuePair, Section, TextLink } from '@ozone-ui/shared';
+import { Alert, Chip, DataTable, KeyValuePair, Section } from '@ozone-ui/shared';
 import {
   JMX_QUERY,
   formatElapsed,
@@ -31,7 +31,6 @@ import {
 } from '../../../api/overview';
 import { useJmxBean } from '../../../api/useJmx';
 import SectionBody from '../SectionBody';
-import type { SectionProps } from './InstanceDetailsSection';
 
 /** Grid for the per-host details revealed when a role row is expanded. */
 const detailsGridStyle: React.CSSProperties = {
@@ -47,9 +46,7 @@ const columns: TableColumnsType<RatisRole> = [
     dataIndex: 'hostName',
     key: 'hostName',
     render: (hostName: string, row) => (
-      <TextLink href="#" style={{ fontWeight: row.isCurrent ? 600 : undefined }}>
-        {hostName}
-      </TextLink>
+      <span style={{ fontWeight: row.isCurrent ? 600 : undefined }}>{hostName}</span>
     ),
   },
   { title: 'Node ID', dataIndex: 'nodeId', key: 'nodeId' },
@@ -80,21 +77,28 @@ const columns: TableColumnsType<RatisRole> = [
 ];
 
 /** "Ozone Manager Roles" HA table. Sourced from the OM ServerRuntime bean. */
-export const RolesSection: React.FC<SectionProps> = ({ refreshToken }) => {
+export const RolesSection: React.FC = () => {
   const {
     data: omInfo,
-    loading,
+    isLoading,
     error,
-  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
-  const { data: ratis } = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer, refreshToken);
-  const { data: electionCount } = useJmxBean<LeaderElectionCountBean>(
-    JMX_QUERY.leaderElectionCount,
-    refreshToken
+    isEmpty,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
+  const ratisQuery = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer);
+  const electionCountQuery = useJmxBean<LeaderElectionCountBean>(JMX_QUERY.leaderElectionCount);
+  const electionElapsedQuery = useJmxBean<LeaderElectionElapsedBean>(
+    JMX_QUERY.leaderElectionElapsed
   );
-  const { data: electionElapsed } = useJmxBean<LeaderElectionElapsedBean>(
-    JMX_QUERY.leaderElectionElapsed,
-    refreshToken
-  );
+
+  const ratis = ratisQuery.data;
+  const electionCount = electionCountQuery.data;
+  const electionElapsed = electionElapsedQuery.data;
+
+  // The primary bean (omInfo) drives the section's load/error/empty state; the
+  // secondary beans only enrich the expanded row, so surface their failures as a
+  // non-blocking partial-data warning rather than failing the whole section.
+  const partialError =
+    ratisQuery.isError || electionCountQuery.isError || electionElapsedQuery.isError;
 
   const roles = omInfo ? parseRatisRoles(omInfo.RatisRoles, ratis?.Id) : [];
 
@@ -120,17 +124,32 @@ export const RolesSection: React.FC<SectionProps> = ({ refreshToken }) => {
 
   return (
     <Section title="Ozone Manager Roles" description="High Availability">
-      <SectionBody loading={loading} error={error} skeletonRows={3}>
-        <DataTable<RatisRole>
-          columns={columns}
-          dataSource={roles}
-          rowKey="key"
-          size="middle"
-          expandable={{
-            expandedRowRender: renderHostDetails,
-            rowExpandable: (record) => record.isCurrent,
-          }}
-        />
+      <SectionBody
+        loading={isLoading}
+        error={error ?? undefined}
+        isEmpty={isEmpty}
+        skeletonRows={3}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {partialError && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Some role details are unavailable"
+              description="The current node's RPC/group and leader-election metrics could not be loaded. Roles are shown from the OM info bean."
+            />
+          )}
+          <DataTable<RatisRole>
+            columns={columns}
+            dataSource={roles}
+            rowKey="key"
+            size="middle"
+            expandable={{
+              expandedRowRender: renderHostDetails,
+              rowExpandable: (record) => record.isCurrent,
+            }}
+          />
+        </div>
       </SectionBody>
     </Section>
   );

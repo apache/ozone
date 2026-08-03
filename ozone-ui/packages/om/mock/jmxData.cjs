@@ -27,8 +27,13 @@ const ozoneManagerInfo = {
   name: 'Hadoop:service=OzoneManager,name=OzoneManagerInfo,component=ServerRuntime',
   modelerType: 'org.apache.hadoop.ozone.om.OzoneManager',
   RpcPort: '9862',
-  RatisRoles:
-    ' { HostName: node1.test.site.com | Node-Id: om1546336043 | Ratis-Port : 9872 | Role: FOLLOWER}  { HostName: node2.test.site.com | Node-Id: om1546336047 | Ratis-Port : 9872 | Role: LEADER}  { HostName: node3.test.site.com | Node-Id: om1546336039 | Ratis-Port : 9872 | Role: FOLLOWER} ',
+  // Array of [hostName, nodeId, ratisPort, role, leaderReadiness] tuples, matching
+  // OMMXBean.getRatisRoles() (List<List<String>>) on a real OM.
+  RatisRoles: [
+    ['node1.test.site.com', 'om1546336043', '9872', 'FOLLOWER', 'LEADER_AND_READY'],
+    ['node2.test.site.com', 'om1546336047', '9872', 'LEADER', 'LEADER_AND_READY'],
+    ['node3.test.site.com', 'om1546336039', '9872', 'FOLLOWER', 'LEADER_AND_READY'],
+  ],
   RatisLogDirectory: '/var/lib/hadoop-ozone/om/ratis',
   RocksDbDirectory: '/var/lib/hadoop-ozone/om/data',
   Version: '2.3.0, r0a1b2c3d4e5f60718293a4b5c6d7e8f901234567',

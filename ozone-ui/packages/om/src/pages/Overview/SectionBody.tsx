@@ -17,12 +17,16 @@
  */
 
 import React from 'react';
-import { Skeleton } from 'antd';
+import { Empty, Skeleton } from 'antd';
 import { Alert } from '@ozone-ui/shared';
 
 export interface SectionBodyProps {
   loading: boolean;
   error?: Error;
+  /** Query succeeded but returned no data — renders an explicit empty state. */
+  isEmpty?: boolean;
+  /** Message for the empty state. Defaults to "No JMX data available". */
+  emptyMessage?: string;
   /** Number of skeleton rows to show while loading. Defaults to 2. */
   skeletonRows?: number;
   children: React.ReactNode;
@@ -30,11 +34,14 @@ export interface SectionBodyProps {
 
 /**
  * Renders a section's async state: a skeleton while loading, an error alert on
- * failure, or the resolved content.
+ * failure, an explicit empty state when the query returned no data, or the
+ * resolved content.
  */
 export const SectionBody: React.FC<SectionBodyProps> = ({
   loading,
   error,
+  isEmpty = false,
+  emptyMessage = 'No JMX data available',
   skeletonRows = 2,
   children,
 }) => {
@@ -43,6 +50,9 @@ export const SectionBody: React.FC<SectionBodyProps> = ({
   }
   if (loading) {
     return <Skeleton active paragraph={{ rows: skeletonRows }} />;
+  }
+  if (isEmpty) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyMessage} />;
   }
   return <>{children}</>;
 };

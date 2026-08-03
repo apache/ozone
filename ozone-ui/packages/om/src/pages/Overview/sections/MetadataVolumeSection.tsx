@@ -21,7 +21,6 @@ import { Card, KeyValuePair, Section } from '@ozone-ui/shared';
 import { JMX_QUERY, type OzoneManagerInfoBean } from '../../../api/overview';
 import { useJmxBean } from '../../../api/useJmx';
 import SectionBody from '../SectionBody';
-import type { SectionProps } from './InstanceDetailsSection';
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -30,17 +29,23 @@ const gridStyle: React.CSSProperties = {
 };
 
 /** "Metadata Volume Information" card. Sourced from the OM ServerRuntime bean. */
-export const MetadataVolumeSection: React.FC<SectionProps> = ({ refreshToken }) => {
+export const MetadataVolumeSection: React.FC = () => {
   const {
     data: omInfo,
-    loading,
+    isLoading,
     error,
-  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
+    isEmpty,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
 
   return (
     <Section title="Metadata Volume Information">
       <Card>
-        <SectionBody loading={loading} error={error} skeletonRows={1}>
+        <SectionBody
+          loading={isLoading}
+          error={error ?? undefined}
+          isEmpty={isEmpty}
+          skeletonRows={1}
+        >
           {omInfo && (
             <div style={gridStyle}>
               <KeyValuePair label="RATIS LOG DIRECTORY" value={omInfo.RatisLogDirectory} copyable />

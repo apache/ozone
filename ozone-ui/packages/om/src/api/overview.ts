@@ -43,7 +43,13 @@ export const JMX_QUERY = {
 
 export interface OzoneManagerInfoBean {
   RpcPort: string;
-  RatisRoles: string;
+  /**
+   * OM Ratis peers, one row per node. Each row is a tuple
+   * `[hostName, nodeId, ratisPort, role, leaderReadiness]` (see
+   * `OMMXBean.getRatisRoles` / `OmUtils.format`). On error the bean returns a
+   * single-element row `[message]`.
+   */
+  RatisRoles: string[][];
   RatisLogDirectory: string;
   RocksDbDirectory: string;
   Version: string;
@@ -120,36 +126,28 @@ export interface JvmParameter {
 /* -------------------------------- Parsers --------------------------------- */
 
 /**
- * Parse the OM `RatisRoles` string, e.g.
- * `{ HostName: h1 | Node-Id: om1 | Ratis-Port : 9872 | Role: FOLLOWER } {...}`.
+ * Parse the OM `RatisRoles` bean — an array of
+ * `[hostName, nodeId, ratisPort, role, leaderReadiness]` tuples. Rows that don't
+ * carry at least the first four fields (e.g. the single-element error row the
+ * bean returns when there is no leader) are skipped.
  */
-export function parseRatisRoles(raw: string, currentNodeId?: string): RatisRole[] {
-  const groups = raw?.match(/\{[^}]*\}/g) ?? [];
-  return groups.map((group, index) => {
-    const fields: Record<string, string> = {};
-    group
-      .replace(/[{}]/g, '')
-      .split('|')
-      .forEach((part) => {
-        const sep = part.indexOf(':');
-        if (sep === -1) {
-          return;
-        }
-        fields[part.slice(0, sep).trim()] = part.slice(sep + 1).trim();
-      });
-    const role = (fields.Role ?? '').toUpperCase();
-    const nodeId = fields['Node-Id'] ?? '';
-    return {
-      key: nodeId || String(index),
-      hostName: fields.HostName ?? '',
-      nodeId,
-      ratisPort: fields['Ratis-Port'] ?? '',
-      role,
-      // The leader has no "readiness"; followers are shown as synced with the leader.
-      readiness: role === 'LEADER' ? null : 'Synced',
-      isCurrent: !!currentNodeId && nodeId === currentNodeId,
-    };
-  });
+export function parseRatisRoles(rows: string[][] | undefined, currentNodeId?: string): RatisRole[] {
+  return (rows ?? [])
+    .filter((row) => Array.isArray(row) && row.length >= 4)
+    .map((row, index) => {
+      const [hostName = '', nodeId = '', ratisPort = '', roleRaw = ''] = row;
+      const role = roleRaw.toUpperCase();
+      return {
+        key: nodeId || String(index),
+        hostName,
+        nodeId,
+        ratisPort,
+        role,
+        // The leader has no "readiness"; followers are shown as synced with the leader.
+        readiness: role === 'LEADER' ? null : 'Synced',
+        isCurrent: !!currentNodeId && nodeId === currentNodeId,
+      };
+    });
 }
 
 const MEMORY_GC = /Xm[xsn]|Xss|gc|CMS|Heap|Memory/i;
@@ -219,8 +217,23 @@ function formatHeap(xmx: string | undefined): string {
   }
   const size = Number(match[1]);
   const unit = (match[2] ?? 'B').toUpperCase();
-  const megabytes = unit === 'G' ? size * 1024 : unit === 'K' ? Math.round(size / 1024) : size;
-  return `${megabytes.toLocaleString('en-US')} MB`;
+  // A bare -Xmx value (no suffix) is a byte count, so normalise everything to MB.
+  let megabytes: number;
+  switch (unit) {
+    case 'G':
+      megabytes = size * 1024;
+      break;
+    case 'M':
+      megabytes = size;
+      break;
+    case 'K':
+      megabytes = size / 1024;
+      break;
+    default:
+      megabytes = size / (1024 * 1024);
+      break;
+  }
+  return `${Math.round(megabytes).toLocaleString('en-US')} MB`;
 }
 
 function detectGarbageCollector(args: string[]): string {

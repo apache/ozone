@@ -31,7 +31,6 @@ import {
 } from '../../../api/overview';
 import { useJmxBean } from '../../../api/useJmx';
 import SectionBody from '../SectionBody';
-import type { SectionProps } from './InstanceDetailsSection';
 
 const highlightsGridStyle: React.CSSProperties = {
   display: 'grid',
@@ -101,12 +100,8 @@ const columns: TableColumnsType<JvmParameter> = [
  * filterable and paginated Parameters table. Sourced from the JVM runtime bean,
  * fetched lazily only when this section renders.
  */
-export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
-  const {
-    data: runtime,
-    loading,
-    error,
-  } = useJmxBean<RuntimeBean>(JMX_QUERY.runtime, refreshToken);
+export const JvmSection: React.FC = () => {
+  const { data: runtime, isLoading, error, isEmpty } = useJmxBean<RuntimeBean>(JMX_QUERY.runtime);
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<'All' | JvmParameterCategory>('All');
@@ -170,7 +165,12 @@ export const JvmSection: React.FC<SectionProps> = ({ refreshToken }) => {
 
   return (
     <Section title="Java Virtual Machine">
-      <SectionBody loading={loading} error={error} skeletonRows={4}>
+      <SectionBody
+        loading={isLoading}
+        error={error ?? undefined}
+        isEmpty={isEmpty}
+        skeletonRows={4}
+      >
         {runtime && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <Card title="Highlights">

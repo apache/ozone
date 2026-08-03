@@ -16,26 +16,27 @@
  * limitations under the License.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from 'antd';
+import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader, Icon } from '@ozone-ui/shared';
-import { clearJmxCache } from '../../api/jmx';
+import { JMX_QUERY_KEY } from '../../api/useJmx';
 import InstanceDetailsSection from './sections/InstanceDetailsSection';
 import RolesSection from './sections/RolesSection';
 import MetadataVolumeSection from './sections/MetadataVolumeSection';
 import JvmSection from './sections/JvmSection';
 
 /**
- * OM Overview page. Each section fetches its own JMX MBean lazily; sections that
- * share a query (the OM ServerRuntime bean feeds three of them) are de-duplicated
- * to a single request by the JMX cache. Refresh clears the cache and re-fetches.
+ * OM Overview page. Each section fetches its own JMX MBean lazily via TanStack
+ * Query; sections that share a query (the OM ServerRuntime bean feeds three of
+ * them) are de-duplicated to a single request by query key. Refresh invalidates
+ * the `['jmx']` cache so every visible query refetches.
  */
 export const OverviewPage: React.FC = () => {
-  const [refreshToken, setRefreshToken] = useState(0);
+  const queryClient = useQueryClient();
 
   const refresh = () => {
-    clearJmxCache();
-    setRefreshToken((t) => t + 1);
+    queryClient.invalidateQueries({ queryKey: [JMX_QUERY_KEY] });
   };
 
   return (
@@ -48,10 +49,10 @@ export const OverviewPage: React.FC = () => {
           </Button>
         }
       />
-      <InstanceDetailsSection refreshToken={refreshToken} />
-      <RolesSection refreshToken={refreshToken} />
-      <MetadataVolumeSection refreshToken={refreshToken} />
-      <JvmSection refreshToken={refreshToken} />
+      <InstanceDetailsSection />
+      <RolesSection />
+      <MetadataVolumeSection />
+      <JvmSection />
     </div>
   );
 };

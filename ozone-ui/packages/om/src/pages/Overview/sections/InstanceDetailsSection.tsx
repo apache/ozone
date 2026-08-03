@@ -34,21 +34,18 @@ const kvGridStyle: React.CSSProperties = {
   gap: '16px 24px',
 };
 
-export interface SectionProps {
-  refreshToken?: number;
-}
-
 /**
  * "Instance Details" card. Sourced from the OM ServerRuntime bean (shared with
  * the Roles and Metadata Volume sections) plus this node's Ratis bean.
  */
-export const InstanceDetailsSection: React.FC<SectionProps> = ({ refreshToken }) => {
+export const InstanceDetailsSection: React.FC = () => {
   const {
     data: omInfo,
-    loading,
+    isLoading,
     error,
-  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo, refreshToken);
-  const { data: ratis } = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer, refreshToken);
+    isEmpty,
+  } = useJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
+  const { data: ratis } = useJmxBean<RatisServerBean>(JMX_QUERY.ratisServer);
 
   const currentHost = omInfo
     ? parseRatisRoles(omInfo.RatisRoles, ratis?.Id).find((r) => r.isCurrent)?.hostName
@@ -57,7 +54,12 @@ export const InstanceDetailsSection: React.FC<SectionProps> = ({ refreshToken })
   return (
     <Section title="Instance Details">
       <Card>
-        <SectionBody loading={loading} error={error} skeletonRows={2}>
+        <SectionBody
+          loading={isLoading}
+          error={error ?? undefined}
+          isEmpty={isEmpty}
+          skeletonRows={2}
+        >
           {omInfo && (
             <div style={kvGridStyle}>
               <KeyValuePair label="Host" value={currentHost ?? '—'} />
