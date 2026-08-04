@@ -96,6 +96,7 @@ public final class ContainerCache extends LRUMap {
       }
       // reset the cache
       cache.clear();
+      ContainerCacheMetrics.unregister();
     } finally {
       lock.unlock();
     }
