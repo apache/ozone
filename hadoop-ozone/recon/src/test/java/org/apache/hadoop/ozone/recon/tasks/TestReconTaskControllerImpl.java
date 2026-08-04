@@ -811,7 +811,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should remain false after successful reinitialization");
     
     // Verify cleanup was called on the checkpointed manager
-    verify(mockCheckpointedManager, times(1)).close();
+    verify(mockCheckpointedManager, times(1)).stop();
   }
 
   @Test
