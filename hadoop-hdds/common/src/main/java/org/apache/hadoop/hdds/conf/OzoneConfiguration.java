@@ -73,6 +73,11 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     activate();
   }
 
+  /** Ozone's built-in default resources; a value coming only from these may be overridden. */
+  private static final Set<String> DEFAULT_RESOURCES = getConfigurationResourceFiles().stream()
+      .filter(resource -> resource.endsWith("-default.xml"))
+      .collect(Collectors.toSet());
+
   private Properties delegatingProps;
 
   public static OzoneConfiguration of(ConfigurationSource source) {
@@ -446,11 +451,6 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     super.reloadConfiguration();
     delegatingProps = null;
   }
-
-  /** Ozone's built-in default resources; a value coming only from these may be overridden. */
-  private static final Set<String> DEFAULT_RESOURCES = getConfigurationResourceFiles().stream()
-      .filter(resource -> resource.endsWith("-default.xml"))
-      .collect(Collectors.toSet());
 
   /**
    * Sets {@code value} unless the property was already set explicitly
