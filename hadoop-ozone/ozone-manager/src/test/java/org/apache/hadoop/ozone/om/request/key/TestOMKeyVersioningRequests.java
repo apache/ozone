@@ -1149,4 +1149,145 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNotNull(noncurrentVersion(300L));
     assertNotNull(noncurrentVersion(100L));
   }
+
+  /**
+   * A delete while versioning is suspended writes a marker into the key's null
+   * version slot rather than creating a version.
+   */
+  @Test
+  public void testSuspendedDeleteWritesANullMarker() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+
+    deleteAt(500L, PROPOSED);
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertTrue(current.isDeleteMarker());
+    assertTrue(current.isNullVersion());
+    // the version it superseded is retained, as under an enabled bucket
+    assertNotNull(noncurrentVersion(300L));
+  }
+
+  /** The null marker replaces the null version that held the slot. */
+  @Test
+  public void testSuspendedDeleteReplacesTheCurrentNullVersion()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(100L, false, true, true);
+
+    OMKeyDeleteMarkerResponse response =
+        (OMKeyDeleteMarkerResponse) deleteAt(500L, PROPOSED);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isDeleteMarker());
+    assertTrue(current.isNullVersion());
+    // the replaced record is not kept as a noncurrent version
+    assertNull(noncurrentVersion(100L));
+    assertNotNull(response.getKeysToDelete());
+  }
+
+  /**
+   * Versions created while versioning was enabled stay readable and deletable
+   * by versionId after a suspended delete.
+   */
+  @Test
+  public void testSuspendedDeleteKeepsEnabledEraVersions() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, true);
+    seedNoncurrentVersion(100L, false);
+
+    deleteAt(500L, PROPOSED);
+
+    assertTrue(currentVersion().isDeleteMarker());
+    // the superseded version and the older one are retained
+    assertNotNull(noncurrentVersion(300L));
+    assertNotNull(noncurrentVersion(100L));
+    // only the null version the marker replaced is gone
+    assertNull(noncurrentVersion(200L));
+
+    // and a retained version can still be deleted by versionId
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        deleteVersionAt(100L, false, 600L).getOMResponse().getStatus());
+    assertNull(noncurrentVersion(100L));
+  }
+
+  /**
+   * A batch delete on a suspended bucket takes the same path as a single one.
+   * Hard-deleting there would destroy the current version and strand the
+   * versions written while versioning was enabled, which is the failure a
+   * suspended bucket is explicitly not allowed to have: suspending stops new
+   * versions from being created, it does not stop the old ones from being
+   * protected.
+   */
+  @Test
+  public void testSuspendedBatchDeleteWritesANullMarker() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isDeleteMarker());
+    assertTrue(current.isNullVersion());
+    assertNotNull(noncurrentVersion(300L));
+  }
+
+  /**
+   * The null slot the batch marker replaces is dropped from the DB and its
+   * blocks queued, like the single-key path. Leaving the record behind would
+   * keep a version nothing can address; skipping the queue would leak its
+   * blocks after the quota for them was already returned.
+   */
+  @Test
+  public void testSuspendedBatchDeleteReplacesTheNullVersion()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNullVersionWithBlocks(200L);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 500L);
+    assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+
+    try (BatchOperation batch =
+             omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+
+    assertTrue(currentVersion().isDeleteMarker());
+    assertTrue(currentVersion().isNullVersion());
+    // the null version is gone from the DB, not only from the cache
+    assertNull(omMetadataManager.getVersionedKeyTable().getSkipCache(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, 200L)));
+    assertFalse(deletedVersions().isEmpty(),
+        "the replaced null version's blocks never reached the deletedTable");
+    // the version written while versioning was enabled is untouched
+    assertNotNull(omMetadataManager.getVersionedKeyTable().getSkipCache(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, 300L)));
+  }
+
+  /** A noncurrent null version holding one block. */
+  private void seedNullVersionWithBlocks(long versionId) throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .setNullVersion(true)
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(version, 0L, 100L);
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionId), version);
+  }
 }

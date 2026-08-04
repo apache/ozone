@@ -281,10 +281,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-      // On a versioned bucket a delete removes no data: each key gets a delete
-      // marker as its current version, exactly as a single-key delete does.
+      // On a bucket that has ever been versioned a delete removes no data:
+      // each key gets a delete marker as its current version, exactly as a
+      // single-key delete does. While versioning is suspended the marker is
+      // the key's null version, which destroys only what held that slot.
       List<DeleteMarkerInsertion> markerInsertions = null;
-      if (omBucketInfo.isS3VersioningEnabled()) {
+      if (omBucketInfo.hasEverBeenVersioned()) {
         insertingDeleteMarkers = true;
         markerInsertions = insertDeleteMarkers(ozoneManager, omMetadataManager,
             omBucketInfo, omKeyInfoList, markerOnlyKeys,

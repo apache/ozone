@@ -174,7 +174,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         // naming a version that does not exist with a plain success, which the
         // gateway reaches by swallowing KEY_NOT_FOUND. NOT_SUPPORTED_OPERATION
         // would surface an error AWS never returns here.
-        if (!omBucketInfo.isS3VersioningEnabled()) {
+        if (!omBucketInfo.hasEverBeenVersioned()) {
           throw new OMException("Bucket " + bucketName
               + " does not have S3 versioning enabled, so it holds no version "
               + "the request could name", KEY_NOT_FOUND);
@@ -190,11 +190,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         visibleKeyRemoved = omKeyInfo != null && !omKeyInfo.isDeleteMarker()
             && omMetadataManager.getKeyTable(getBucketLayout())
                 .get(objectKey) == null;
-      } else if (omBucketInfo.isS3VersioningEnabled()) {
+      } else if (omBucketInfo.hasEverBeenVersioned()) {
         // A delete without a versionId removes no data: a delete marker
         // becomes the current version and the version it supersedes moves to
         // the versionedKeyTable. Like S3, the marker is inserted even when the
-        // key does not exist.
+        // key does not exist. While versioning is suspended the marker takes
+        // the key's null version slot instead of creating a version.
         insertingDeleteMarker = true;
         omClientResponse = insertDeleteMarker(ozoneManager, omMetadataManager,
             omBucketInfo, omKeyInfo, objectKey, keyArgs, trxnLogIndex,
@@ -433,7 +434,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
         inserted.getDeleteMarker(), inserted.getObjectKey(),
         inserted.getDemotedVersionKey(), inserted.getDemotedVersion(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject())
+        .withReplacedNullVersion(inserted.getReplacedNullVersionKey(),
+            inserted.getKeysToDelete());
   }
 
   /**
