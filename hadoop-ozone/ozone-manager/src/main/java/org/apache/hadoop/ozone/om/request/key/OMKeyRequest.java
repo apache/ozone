@@ -1067,7 +1067,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // the in-record block version list is not used to accumulate object
       // versions and always holds a single version.
       boolean keepInRecordVersions = omBucketInfo.getIsVersionEnabled()
-          && !omBucketInfo.isS3VersioningEnabled();
+          && !omBucketInfo.hasEverBeenVersioned();
       dbKeyInfo.addNewVersion(locations, false, keepInRecordVersions);
       long newSize = size;
       if (keepInRecordVersions) {
