@@ -917,7 +917,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, String keyName) throws IOException {
     return findNoncurrentVersion(omMetadataManager, volumeName, bucketName,
-        keyName, OmKeyInfo::isNullVersion);
+        keyName, OmKeyInfo::isNullVersionRecord);
   }
 
   /**

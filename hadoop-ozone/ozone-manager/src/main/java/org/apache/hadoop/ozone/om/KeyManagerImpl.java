@@ -689,7 +689,7 @@ public class KeyManagerImpl implements KeyManager {
   private OmKeyInfo getAddressedVersion(OmKeyArgs args, String volumeName,
       String bucketName, String keyName, OmKeyInfo current) throws IOException {
     if (args.isNullVersion()) {
-      if (current != null && current.isNullVersion()) {
+      if (current != null && current.isNullVersionRecord()) {
         return current;
       }
       // The null version carries a normally generated versionId, so it can only
@@ -702,7 +702,7 @@ public class KeyManagerImpl implements KeyManager {
                metadataManager.getVersionedKeyTable().iterator(prefix)) {
         while (versions.hasNext()) {
           OmKeyInfo version = versions.next().getValue();
-          if (version.isNullVersion()) {
+          if (version.isNullVersionRecord()) {
             return version;
           }
         }
