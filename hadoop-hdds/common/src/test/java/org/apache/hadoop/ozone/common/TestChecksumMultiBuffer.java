@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -43,7 +43,7 @@ class TestChecksumMultiBuffer {
   void splitBufferProducesSameChecksumAsSingleBuffer(ChecksumType type)
       throws Exception {
     byte[] data = new byte[CHUNK_SIZE];
-    new Random(0xCAFEBABEL).nextBytes(data);
+    ThreadLocalRandom.current().nextBytes(data);
 
     Checksum checksum = new Checksum(type, BYTES_PER_CHECKSUM);
 
@@ -76,7 +76,7 @@ class TestChecksumMultiBuffer {
     // path in computeChecksumDirect.
     int total = BYTES_PER_CHECKSUM * 3 + 12345;
     byte[] data = new byte[total];
-    new Random(0xDEADBEEFL).nextBytes(data);
+    ThreadLocalRandom.current().nextBytes(data);
 
     Checksum checksum = new Checksum(type, BYTES_PER_CHECKSUM);
 
