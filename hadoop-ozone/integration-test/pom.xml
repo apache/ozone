@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-integration-test</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Integration Tests</name>
   <description>Apache Ozone Integration Tests</description>
@@ -403,11 +403,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-csi</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem</artifactId>
       <scope>test</scope>
     </dependency>
@@ -569,6 +564,17 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
           <proc>none</proc>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>${maven-surefire-plugin.argLine} ${maven-surefire-plugin.argLineAccessArgs} @{argLine} -Djava.library.path=${project.basedir}/../../target/native-lib</argLine>
+          <environmentVariables>
+            <LD_LIBRARY_PATH>${project.basedir}/../../target/native-lib</LD_LIBRARY_PATH>
+            <DYLD_LIBRARY_PATH>${project.basedir}/../../target/native-lib</DYLD_LIBRARY_PATH>
+          </environmentVariables>
         </configuration>
       </plugin>
     </plugins>

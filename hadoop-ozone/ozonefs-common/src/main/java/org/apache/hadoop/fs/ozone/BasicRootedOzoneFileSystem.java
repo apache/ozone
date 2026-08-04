@@ -1070,6 +1070,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   public FileStatusAdapter getFileStatusAdapter(Path f) throws IOException {
+    return getFileStatusAdapter(f, false);
+  }
+
+  /**
+   * @param headOp when true, requests a metadata-only (type) check so the OM
+   *               skips the pipeline refresh (SCM round-trip) and datanode
+   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
+   *               which only need the entry type.
+   */
+  public FileStatusAdapter getFileStatusAdapter(Path f, boolean headOp)
+      throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
@@ -1081,8 +1092,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     FileStatusAdapter fileStatus = null;
     try {
-      fileStatus = 
-        adapter.getFileStatus(key, uri, qualifiedPath, getUsername());
+      fileStatus =
+        adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp);
     } catch (IOException e) {
       if (e instanceof OMException) {
         OMException ex = (OMException) e;
@@ -1163,14 +1174,28 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @SuppressWarnings("deprecation")
   public boolean isDirectory(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_DIRECTORY);
-    return super.isDirectory(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      // Read the type straight off the adapter to avoid the extra work of
+      // building a Hadoop FileStatus.
+      return getFileStatusAdapter(f, true).isDir();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
   @SuppressWarnings("deprecation")
   public boolean isFile(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE);
-    return super.isFile(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      // Read the type straight off the adapter to avoid the extra work of
+      // building a Hadoop FileStatus.
+      return getFileStatusAdapter(f, true).isFile();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
@@ -1575,18 +1600,25 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       long length = status.getLength();
       long spaceConsumed = status.getDiskConsumed();
 
-      return new ContentSummary.Builder().length(length).
-          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+      ContentSummary.Builder builder = new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+      applyEcPolicy(builder, status.getErasureCodingPolicy());
+      return builder.build();
     }
     // f is a directory
     long[] summary = {0, 0, 0, 1};
-    int i = 0;
     for (FileStatusAdapter s : listStatusAdapter(f, true)) {
       long length = s.getLength();
       long spaceConsumed = s.getDiskConsumed();
-      ContentSummary c = s.isDir() ? getContentSummary(s.getPath()) :
-          new ContentSummary.Builder().length(length).
-          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+      ContentSummary c;
+      if (s.isDir()) {
+        c = getContentSummary(s.getPath());
+      } else {
+        ContentSummary.Builder childBuilder = new ContentSummary.Builder().length(length).
+            fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+        applyEcPolicy(childBuilder, s.getErasureCodingPolicy());
+        c = childBuilder.build();
+      }
 
       summary[0] += c.getLength();
       summary[1] += c.getSpaceConsumed();
@@ -1594,9 +1626,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       summary[3] += c.getDirectoryCount();
     }
 
-    return new ContentSummary.Builder().length(summary[0]).
+    ContentSummary.Builder builder = new ContentSummary.Builder().length(summary[0]).
         fileCount(summary[2]).directoryCount(summary[3]).
-        spaceConsumed(summary[1]).build();
+        spaceConsumed(summary[1]);
+    applyEcPolicy(builder, status.getErasureCodingPolicy());
+    return builder.build();
+  }
+
+  /**
+   * Apply the erasure coding policy on the {@link ContentSummary.Builder}.
+   * Default implementation is a no-op so that this class can compile and run
+   * against Hadoop 2, where {@code ContentSummary.Builder.erasureCodingPolicy}
+   * does not exist. The Hadoop 3 subclass overrides this to set the policy.
+   */
+  protected void applyEcPolicy(ContentSummary.Builder builder, String ecPolicy) {
   }
 
   @Override

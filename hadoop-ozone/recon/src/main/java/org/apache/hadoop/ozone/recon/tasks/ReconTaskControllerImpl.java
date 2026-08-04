@@ -28,6 +28,7 @@ import com.google.inject.Inject;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -88,6 +89,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
+  private volatile boolean running = false;
   private final AtomicBoolean tasksFailed = new AtomicBoolean(false);
   private volatile ReconOMMetadataManager currentOMMetadataManager;
   private final OzoneConfiguration configuration;
@@ -101,6 +103,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private AtomicLong lastRetryTimestamp = new AtomicLong(0);
   private static final int MAX_EVENT_PROCESS_RETRIES = 6;
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
+  // Clock for the retry-delay gate; overridable in tests via the
+  // @VisibleForTesting constructor to drive the gate with a MockClock.
+  private Clock clock = Clock.systemUTC();
 
   @Inject
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -133,6 +138,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
+  }
+
+  @VisibleForTesting
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  ReconTaskControllerImpl(OzoneConfiguration configuration,
+                          Set<ReconOmTask> tasks,
+                          ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
+                          ReconDBProvider reconDBProvider,
+                          ReconContainerMetadataManager reconContainerMetadataManager,
+                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                          ReconGlobalStatsManager reconGlobalStatsManager,
+                          ReconFileMetadataManager reconFileMetadataManager,
+                          Clock clock) {
+    this(configuration, tasks, taskStatusUpdaterManager, reconDBProvider,
+        reconContainerMetadataManager, reconNamespaceSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
+    this.clock = clock;
   }
 
   @Override
@@ -359,6 +381,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             .build());
     
     // Start async event processing thread
+    running = true;
     eventProcessingExecutor = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder().setNameFormat("ReconEventProcessor-%d")
             .build());
@@ -369,6 +392,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
+    // Signal the event processing loop to exit on its next poll cycle so the
+    // graceful shutdown below can complete without waiting out the timeout.
+    running = false;
     shutdownExecutorGracefully(this.executorService, "main task executor");
     shutdownExecutorGracefully(this.eventProcessingExecutor, "event processing executor");
   }
@@ -481,7 +507,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private void processBufferedEventsAsync() {
     LOG.info("Started async buffered event processing thread");
     
-    while (!Thread.currentThread().isInterrupted()) {
+    while (running && !Thread.currentThread().isInterrupted()) {
       try {
         ReconEvent event = eventBuffer.poll(1000); // 1 second timeout
         if (event != null) {
@@ -591,6 +617,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Track reprocess submission
     controllerMetrics.incrTotalReprocessSubmittedToQueue();
 
+    if (reason == ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD) {
+      lastRetryTimestamp.set(0);
+    }
+
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
     if (null != reInitializationResult) {
       return reInitializationResult;
@@ -631,7 +661,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private ReconTaskController.ReInitializationResult validateRetryCountAndDelay() {
     // Check if we should retry based on timing for iteration-based retries
-    long currentTime = System.currentTimeMillis();
+    long currentTime = clock.millis();
     if (eventProcessRetryCount.get() > 0) {
       // Check if 2 seconds have passed since last iteration
       long timeSinceLastRetry = currentTime - lastRetryTimestamp.get();
@@ -650,7 +680,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Handle iteration failure by updating retry counters.
    */
   private void handleEventFailure() {
-    long currentTime = System.currentTimeMillis();
+    long currentTime = clock.millis();
     lastRetryTimestamp.set(currentTime);
     eventProcessRetryCount.getAndIncrement();
     tasksFailed.compareAndSet(false, true);
@@ -720,9 +750,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Create temporary directory for checkpoint
     String parentPath = cleanTempCheckPointPath(omMetaManager);
     
-    // Create checkpoint
+    // Create checkpoint. getCheckpoint returns null when RocksDB fails to snapshot
+    // (e.g. a manually placed OM DB that is incomplete or corrupt).
     DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint(parentPath, true);
-    
+    if (checkpoint == null) {
+      throw new IOException("Failed to create OM DB checkpoint at " + parentPath
+          + "; the on-disk OM DB may be incomplete or corrupt.");
+    }
+
     return omMetaManager.createCheckpointReconMetadataManager(configuration, checkpoint);
   }
 
@@ -814,7 +849,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Reset retry counters - for testing purposes.
    */
   @VisibleForTesting
-  void resetRetryCounters() {
+  public void resetRetryCounters() {
     eventProcessRetryCount.set(0);
     lastRetryTimestamp.set(0);
   }
@@ -842,8 +877,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   private void cleanupPreExistingCheckpoints() {
     try {
-      if (currentOMMetadataManager == null) {
-        LOG.debug("No current OM metadata manager, skipping pre-existing checkpoint cleanup");
+      if (currentOMMetadataManager == null || currentOMMetadataManager.getStore() == null) {
+        LOG.debug("No current OM metadata manager or store, skipping pre-existing checkpoint cleanup");
         return;
       }
       

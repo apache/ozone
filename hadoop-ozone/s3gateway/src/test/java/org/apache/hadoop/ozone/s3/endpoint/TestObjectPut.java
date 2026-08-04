@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -379,6 +380,87 @@ class TestObjectPut {
         BUCKET_NAME + "/" + urlEncode(NONEXISTENT_BUCKET));
     assertErrorResponse(NO_SUCH_BUCKET,
         () -> put(objectEndpoint, "nonexistent", KEY_NAME, CONTENT));
+  }
+
+  @Test
+  void testContentTypeStoredAndCopied() throws Exception {
+    // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("audio/mpeg");
+
+    assertSucceeds(() -> putObject(CONTENT));
+    OzoneKeyDetails source = bucket.getKey(KEY_NAME);
+    assertEquals("audio/mpeg",
+        source.getMetadata().get(HttpHeaders.CONTENT_TYPE));
+
+    // COPY directive: destination keeps the source Content-Type, ignoring the
+    // Content-Type on the copy request.
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("COPY");
+    when(headers.getHeaderString(COPY_SOURCE_HEADER))
+        .thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("text/plain");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals("audio/mpeg",
+        destBucket.getKey(DEST_KEY).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+
+    // REPLACE directive: destination takes the Content-Type from the request.
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("REPLACE");
+    when(headers.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("application/json");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals("application/json",
+        destBucket.getKey(DEST_KEY).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+  }
+
+  @Test
+  void testStandardObjectHeadersCopiedAndReplaced() throws Exception {
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+    when(headers.getHeaderString(HttpHeaders.EXPIRES)).thenReturn("Wed, 21 Oct 2015 07:29:00 GMT");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_ENCODING)).thenReturn("gzip");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LANGUAGE)).thenReturn("en-CA");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_DISPOSITION)).thenReturn("inline");
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("audio/mpeg");
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("COPY");
+    when(headers.getHeaderString(COPY_SOURCE_HEADER))
+        .thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("max-age=0");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_ENCODING)).thenReturn("compress");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    OzoneKeyDetails copied = destBucket.getKey(DEST_KEY);
+    assertEquals("no-cache", copied.getMetadata().get(HttpHeaders.CACHE_CONTROL));
+    assertEquals("gzip", copied.getMetadata().get(HttpHeaders.CONTENT_ENCODING));
+    assertEquals("en-CA", copied.getMetadata().get(HttpHeaders.CONTENT_LANGUAGE));
+
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER))
+        .thenReturn("REPLACE");
+    when(headers.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("private");
+    when(headers.getHeaderString(HttpHeaders.EXPIRES)).thenReturn("Wed, 21 Oct 2015 07:28:00 GMT");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_ENCODING)).thenReturn("deflate");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LANGUAGE)).thenReturn("de-DE");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_DISPOSITION)).thenReturn("attachment");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    OzoneKeyDetails replaced = destBucket.getKey(DEST_KEY);
+    assertEquals("private", replaced.getMetadata().get(HttpHeaders.CACHE_CONTROL));
+    assertEquals("Wed, 21 Oct 2015 07:28:00 GMT",
+        replaced.getMetadata().get(HttpHeaders.EXPIRES));
+    assertEquals("deflate", replaced.getMetadata().get(HttpHeaders.CONTENT_ENCODING));
+    assertEquals("de-DE", replaced.getMetadata().get(HttpHeaders.CONTENT_LANGUAGE));
+    assertEquals("attachment",
+        replaced.getMetadata().get(HttpHeaders.CONTENT_DISPOSITION));
   }
 
   @Test

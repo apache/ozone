@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -36,6 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -44,7 +46,6 @@ import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -62,7 +63,7 @@ public class SCMConnectionManager
       LoggerFactory.getLogger(SCMConnectionManager.class);
 
   private final ReadWriteLock mapLock;
-  private final Map<InetSocketAddress, EndpointStateMachine> scmMachines;
+  private final Map<HostAndPort, EndpointStateMachine> scmMachines;
 
   private final int rpcTimeout;
   private final ConfigurationSource conf;
@@ -131,7 +132,7 @@ public class SCMConnectionManager
    * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void addSCMServer(InetSocketAddress address,
+  public void addSCMServer(HostAndPort address,
       String threadNamePrefix) throws IOException {
     writeLock();
     try {
@@ -140,38 +141,80 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-
-      Configuration hadoopConfig =
-          LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
-      RPC.setProtocolEngine(
-          hadoopConfig,
-          StorageContainerDatanodeProtocolPB.class,
-          ProtobufRpcEngine.class);
-      long version =
-          RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
-
-      RetryPolicy retryPolicy =
-          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-              getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf),
-              TimeUnit.MILLISECONDS);
-
-      StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
-          StorageContainerDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
-          NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
-          retryPolicy).getProxy();
-
-      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
-          new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-              rpcProxy);
-
-      EndpointStateMachine endPoint = new EndpointStateMachine(address,
-          rpcClient, this.conf, threadNamePrefix);
+      EndpointStateMachine endPoint = buildScmEndpoint(address, address.getAddress(), threadNamePrefix);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();
     }
+  }
+
+  @VisibleForTesting
+  EndpointStateMachine buildScmEndpoint(HostAndPort address, InetSocketAddress dialAddress,
+      String threadNamePrefix) throws IOException {
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
+    RPC.setProtocolEngine(hadoopConfig, StorageContainerDatanodeProtocolPB.class,
+        ProtobufRpcEngine.class);
+    long version = RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
+    RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+        getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf), TimeUnit.MILLISECONDS);
+    StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+        StorageContainerDatanodeProtocolPB.class, version,
+        dialAddress, UserGroupInformation.getCurrentUser(), hadoopConfig,
+        NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
+        retryPolicy).getProxy();
+    StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
+        new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
+    return new EndpointStateMachine(address, rpcClient, this.conf, threadNamePrefix);
+  }
+
+  /**
+   * Re-resolves the active SCM endpoint at {@code address}; on an IP change, rebuilds it under the
+   * same key and closes the stale proxy. Returns true if rebuilt.
+   */
+  public boolean refreshSCMServer(HostAndPort address, String threadNamePrefix)
+      throws IOException {
+    final EndpointStateMachine current;
+    readLock();
+    try {
+      current = scmMachines.get(address);
+      if (current == null || current.isPassive()) {
+        return false;
+      }
+    } finally {
+      readUnlock();
+    }
+    // Resolve outside the lock, but commit the new address only after the replacement is built,
+    // so a build failure or a lost race never leaves the cached address ahead of the live proxy.
+    final InetSocketAddress latest = address.resolveLatest();
+    if (latest == null) {
+      return false;
+    }
+    final EndpointStateMachine stale;
+    final InetSocketAddress previous;
+    writeLock();
+    try {
+      if (scmMachines.get(address) != current) {
+        return false;
+      }
+      EndpointStateMachine rebuilt = buildScmEndpoint(address, latest, threadNamePrefix);
+      rebuilt.setPassive(false);
+      previous = address.getAddress();
+      address.setAddress(latest);
+      scmMachines.put(address, rebuilt);
+      stale = current;
+    } finally {
+      writeUnlock();
+    }
+    // The swap is committed; failing to close the stale proxy is cleanup-only, not a refresh failure.
+    try {
+      stale.close();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to close stale endpoint for {}", address, e);
+    }
+    LOG.info("SCM endpoint {} re-resolved: {} -> {}", address.getHostAndPortString(), previous, latest);
+    return true;
   }
 
   /**
@@ -180,7 +223,7 @@ public class SCMConnectionManager
    * @param address Recon address.
    * @throws IOException
    */
-  public void addReconServer(InetSocketAddress address,
+  public void addReconServer(HostAndPort address,
       String threadNamePrefix) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
     writeLock();
@@ -203,7 +246,7 @@ public class SCMConnectionManager
               TimeUnit.MILLISECONDS);
       ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           ReconDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
+          address.getAddress(), UserGroupInformation.getCurrentUser(), hadoopConfig,
           NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
           retryPolicy).getProxy();
 
@@ -225,7 +268,7 @@ public class SCMConnectionManager
    * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void removeSCMServer(InetSocketAddress address) throws IOException {
+  public void removeSCMServer(HostAndPort address) throws IOException {
     writeLock();
     try {
       EndpointStateMachine endPoint = scmMachines.remove(address);
@@ -234,7 +277,9 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-      endPoint.setState(EndPointStates.SHUTDOWN);
+      // This is a normal reconfiguration removal. Do not set the endpoint to
+      // SHUTDOWN, as an in-flight task may report that state as a DN fatal
+      // shutdown.
       endPoint.close();
     } finally {
       writeUnlock();

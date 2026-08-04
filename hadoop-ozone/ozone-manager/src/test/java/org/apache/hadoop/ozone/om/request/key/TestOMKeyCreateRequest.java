@@ -97,7 +97,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * This class tests the OM Key Create Request.
  */
-public class TestOMKeyCreateRequest extends TestOMKeyRequest {
+public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
   public static Collection<Object[]> data() {
     return Arrays.asList(

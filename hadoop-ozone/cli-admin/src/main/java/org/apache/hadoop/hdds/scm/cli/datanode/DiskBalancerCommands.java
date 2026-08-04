@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine.Command;
 
@@ -33,12 +35,19 @@ import picocli.CommandLine.Command;
  *      [--in-service-datanodes]   Send requests to all available DataNodes in HEALTHY
  *                                  and IN_SERVICE operational state. When this option
  *                                  is used, specific datanode addresses are not required.
- *                                  Note: Commands will only be sent to IN_SERVICE datanodes,
- *                                  excluding DECOMMISSIONING, DECOMMISSIONED, and nodes
- *                                  in maintenance states.
+ *                                  Note: Commands will only be sent to HEALTHY datanodes
+ *                                  in IN_SERVICE operational state, excluding non-HEALTHY,
+ *                                  DECOMMISSIONING, DECOMMISSIONED, and nodes in maintenance states.
+ *
+ * Datanode identifiers:
+ *      Positional arguments accept hostname, host:port, or IP address.
+ *      Use --node-id to target a datanode by UUID (requires SCM).
+ *      --in-service-datanodes queries SCM for all HEALTHY IN_SERVICE datanodes.
  *
  * To start:
- *      ozone admin datanode diskbalancer start {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer start {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
@@ -52,6 +61,9 @@ import picocli.CommandLine.Command;
  *
  *      ozone admin datanode diskbalancer start 192.168.1.10:19864
  *        Start balancer with explicit port specification
+ *
+ *      ozone admin datanode diskbalancer start --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
+ *        Start balancer using a datanode UUID (resolved via SCM)
  *
  *      ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
  *        Start balancer on multiple datanodes (using default port)
@@ -75,10 +87,12 @@ import picocli.CommandLine.Command;
  *        Start balancer on all IN_SERVICE and HEALTHY datanodes
  *
  *      ozone admin datanode diskbalancer start --in-service-datanodes --json
- *        Start balancer on all IN_SERVICE datanodes and output results in JSON format
+ *        Start balancer on all IN_SERVICE and HEALTHY datanodes and output results in JSON format
  *
  * To stop:
- *      ozone admin datanode diskbalancer stop {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer stop {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
@@ -96,7 +110,9 @@ import picocli.CommandLine.Command;
  *        Stop diskbalancer on DN-1 and output result in JSON format
  *
  * To update:
- *      ozone admin datanode diskbalancer update {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer update {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
@@ -109,13 +125,15 @@ import picocli.CommandLine.Command;
  *        Update diskbalancer threshold to 10% on DN-1
  *
  *      ozone admin datanode diskbalancer update --in-service-datanodes -t 10
- *        Update diskbalancer threshold to 10% on all IN_SERVICE datanodes
+ *        Update diskbalancer threshold to 10% on all IN_SERVICE and HEALTHY datanodes
  *
  *      ozone admin datanode diskbalancer update DN-1 -t 10 --json
  *        Update diskbalancer threshold to 10% on DN-1 and output result in JSON format
  *
  * To get report:
- *      ozone admin datanode diskbalancer report {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer report {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
@@ -133,13 +151,18 @@ import picocli.CommandLine.Command;
  *        Retrieve volume density report from DN-1 in JSON format
  *
  * To get status:
- *      ozone admin datanode diskbalancer status {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer status {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
  *      Examples:
  *      ozone admin datanode diskbalancer status DN-1
  *        Return the diskbalancer status on DN-1
+ *
+ *      ozone admin datanode diskbalancer status --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
+ *        Return the diskbalancer status using a datanode UUID
  *
  *      ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
  *        Return the diskbalancer status on multiple datanodes
@@ -155,11 +178,10 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "diskbalancer",
-    description = "DiskBalancer specific operations. It is disabled by default." +
-        " To enable it, set 'hdds.datanode.disk.balancer.enabled' as true",
+    description = "DiskBalancer specific operations to ensure even disk utilization." +
+        " It is enabled by default. Set " + HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " to false to disable.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
-    hidden = true,
     subcommands = {
         DiskBalancerStartSubcommand.class,
         DiskBalancerStopSubcommand.class,

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -73,8 +74,8 @@ public class ContainerSet implements Iterable<Container<?>> {
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
-  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
-      new ConcurrentSkipListMap<>();
+
+  private final ConcurrentHashMap<Long, Long> recoveringContainerMap = new ConcurrentHashMap<>();
   private final Clock clock;
   private long recoveringTimeout;
   @Nullable
@@ -208,8 +209,7 @@ public class ContainerSet implements Iterable<Container<?>> {
       updateContainerIdTable(containerId, container.getContainerData());
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
-        recoveringContainerMap.put(
-            clock.millis() + recoveringTimeout, containerId);
+        recoveringContainerMap.put(containerId, getCurrentTime() + recoveringTimeout);
       }
       HddsVolume volume = container.getContainerData().getVolume();
       if (volume != null) {
@@ -420,22 +420,20 @@ public class ContainerSet implements Iterable<Container<?>> {
   public boolean removeRecoveringContainer(long containerId) {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
-    //it might take a little long time to iterate all the entries
-    // in recoveringContainerMap, but it seems ok here since:
-    // 1 In the vast majority of cases，there will not be too
-    // many recovering containers.
-    // 2 closing container is not a sort of urgent action
-    //
-    // we can revisit here if any performance problem happens
-    Iterator<Map.Entry<Long, Long>> it = getRecoveringContainerIterator();
-    while (it.hasNext()) {
-      Map.Entry<Long, Long> entry = it.next();
-      if (entry.getValue() == containerId) {
-        it.remove();
-        return true;
-      }
-    }
-    return false;
+    return recoveringContainerMap.remove(containerId) != null;
+  }
+
+  /**
+   * Reset the stale recovering scrub deadline for an active RECOVERING container.
+   */
+  public void updateRecoveringContainerTimeout(long containerId) {
+    Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
+    recoveringContainerMap.put(containerId, getCurrentTime() + recoveringTimeout);
+  }
+
+  @VisibleForTesting
+  public Map<Long, Long> getRecoveringContainerMap() {
+    return recoveringContainerMap;
   }
 
   /**
@@ -485,15 +483,6 @@ public class ContainerSet implements Iterable<Container<?>> {
   @Override
   public Iterator<Container<?>> iterator() {
     return containerMap.values().iterator();
-  }
-
-  /**
-   * Return an container Iterator over
-   * {@link ContainerSet#recoveringContainerMap}.
-   * @return {@literal Iterator<Container<?>>}
-   */
-  public Iterator<Map.Entry<Long, Long>> getRecoveringContainerIterator() {
-    return recoveringContainerMap.entrySet().iterator();
   }
 
   /**

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
  */
 @Path("/volumes")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class VolumeEndpoint {
 
   @Inject

@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -153,7 +156,7 @@ public class TestSequenceIDGenerator {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable()) {
       @Override
       public StateManager createStateManager(
-          SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
+          SCMHAManager scmhaManager, Table<SequenceIdType, Long> sequenceIdTable) {
         Objects.requireNonNull(scmhaManager, "scmhaManager == null");
         return stateManager;
       }
@@ -178,6 +181,93 @@ public class TestSequenceIDGenerator {
       } catch (Exception e) {
         // ignore
       }
+    }
+  }
+
+  @Test
+  public void testAllocateBatchFromDBWhenMissingInMap() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
+
+    // Create the StateManager directly using its Builder
+    SequenceIdGenerator.StateManager stateManager =
+        new SequenceIdGenerator.StateManagerImpl.Builder()
+            .setRatisServer(scmHAManager.getRatisServer())
+            .setDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+            .setSequenceIdTable(scmMetadataStore.getSequenceIdTable())
+            .build();
+
+    SequenceIdType idType = SequenceIdType.localId;
+    // Verify initial state from empty DB
+    Assertions.assertNull(stateManager.getLastId(idType));
+
+    // Allocate a new batch, which puts 100L into the sequenceIdToLastIdMap map
+    assertTrue(stateManager.allocateBatch(idType.name(), 0L, 100L));
+    // Verify the map was updated
+    assertEquals(100L, stateManager.getLastId(idType));
+
+    // Allocate a new batch, which puts 100L into the sequenceIdToLastIdMap map
+    assertTrue(stateManager.allocateBatch(idType.name(), 100L, 200L));
+    // Verify the map was updated
+    assertEquals(200L, stateManager.getLastId(idType));
+
+    // This call should fail because expectedLastId in db should be (200L)
+    // But we are passing 0L
+    assertFalse(stateManager.allocateBatch(idType.name(), 0L, 100L));
+  }
+
+  @Test
+  public void testReinitializePopulatesSequenceIdMapFromDB() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
+
+    SequenceIdType idType = SequenceIdType.containerId;
+    // Simulate an SCM restart by writing a raw String directly to the database.
+    scmMetadataStore.getSequenceIdTable().put(idType, 100L);
+
+    // Create the StateManager directly using its Builder
+    SequenceIdGenerator.StateManager stateManager =
+        new SequenceIdGenerator.StateManagerImpl.Builder()
+            .setRatisServer(scmHAManager.getRatisServer())
+            .setDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+            .setSequenceIdTable(scmMetadataStore.getSequenceIdTable())
+            .build();
+
+    // Check if reinitialize() correctly converts DB key into SequenceIdType Enums
+    // for the sequenceIdToLastIdMap used.
+    stateManager.reinitialize(scmMetadataStore.getSequenceIdTable());
+
+    assertEquals(100L, stateManager.getLastId(idType));
+    assertTrue(stateManager.allocateBatch(idType.name(), 100L, 1100L));
+    assertEquals(1100L, stateManager.getLastId(idType));
+  }
+
+  @Test
+  public void testAllocateBatchFailsOnUnknownSequenceId() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
+
+    // Create the StateManager directly using its Builder
+    SequenceIdGenerator.StateManager stateManager =
+        new SequenceIdGenerator.StateManagerImpl.Builder()
+            .setRatisServer(scmHAManager.getRatisServer())
+            .setDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+            .setSequenceIdTable(scmMetadataStore.getSequenceIdTable())
+            .build();
+
+    try {
+      // sequenceIdName string must match one of the predefined Enums.
+      // Passing an invalid string should immediately throw an exception before hitting the db.
+      stateManager.allocateBatch("unknownSequenceId", 0L, 1L);
+      fail("Expected allocateBatch to reject an unknown sequence id");
+    } catch (Exception e) {
+      // ignore
     }
   }
 }

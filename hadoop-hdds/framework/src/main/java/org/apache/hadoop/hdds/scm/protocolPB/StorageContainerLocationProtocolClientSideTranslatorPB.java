@@ -1005,9 +1005,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
-      Preconditions.checkState(mdti >= 0,
+      Preconditions.checkState(mdti > 0,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
-              "greater than equal to zero.");
+              "greater than zero.");
       Preconditions.checkState(mdti <= 100,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than equal to hundred.");
@@ -1248,10 +1248,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     GetContainerCountRequestProto request =
-        GetContainerCountRequestProto.newBuilder().build();
+        GetContainerCountRequestProto.newBuilder()
+            .setState(state)
+            .build();
 
     GetContainerCountResponseProto response =
-        submitRequest(Type.GetClosedContainerCount,
+        submitRequest(Type.GetContainerCount,
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();
