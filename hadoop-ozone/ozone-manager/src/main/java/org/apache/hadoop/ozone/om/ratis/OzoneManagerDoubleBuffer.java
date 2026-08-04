@@ -113,6 +113,13 @@ public final class OzoneManagerDoubleBuffer {
    */
   private final Object transactionInfoLock = new Object();
 
+  /**
+   * Runs inside {@link #persistIfNewer} between reading the stored transaction info and writing
+   * the candidate. Lets a test attempt a batch commit in exactly that window, which is the one
+   * {@link #transactionInfoLock} has to close. No-op in production.
+   */
+  private volatile Runnable afterTransactionInfoRead = () -> { };
+
   /** Entry for {@link #currentBuffer} and {@link #readyBuffer}. */
   private static class Entry {
     private final TermIndex termIndex;
@@ -376,12 +383,18 @@ public final class OzoneManagerDoubleBuffer {
     synchronized (transactionInfoLock) {
       final Table<String, TransactionInfo> table = omMetadataManager.getTransactionInfoTable();
       final TransactionInfo stored = table.get(TRANSACTION_INFO_KEY);
+      afterTransactionInfoRead.run();
       if (stored != null && stored.compareTo(candidate) >= 0) {
         return stored;
       }
       table.put(TRANSACTION_INFO_KEY, candidate);
       return candidate;
     }
+  }
+
+  @VisibleForTesting
+  void setAfterTransactionInfoRead(Runnable hook) {
+    this.afterTransactionInfoRead = hook;
   }
 
   private void flushBatch(Queue<Entry> buffer) throws IOException {
