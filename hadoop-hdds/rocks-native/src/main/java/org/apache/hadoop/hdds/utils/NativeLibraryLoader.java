@@ -161,7 +161,7 @@ public class NativeLibraryLoader {
     try {
       is = getResourceStream(libraryFileName);
       if (is == null) {
-        return new LoadedFiles(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty());
       }
 
       final String nativeLibDir =
@@ -173,7 +173,7 @@ public class NativeLibraryLoader {
       final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
-        return new LoadedFiles(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty());
       }
 
       Path libPath = tempPath.resolve(libraryFileName);
@@ -200,7 +200,7 @@ public class NativeLibraryLoader {
       ShutdownHookManager.get().addShutdownHook(
           () -> FileUtils.deleteQuietly(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
-      return new LoadedFiles(Optional.of(libFile), dependentFiles);
+      return new LoadedFiles(Optional.of(libFile));
     } finally {
       if (is != null) {
         is.close();
@@ -213,11 +213,9 @@ public class NativeLibraryLoader {
    */
   private static final class LoadedFiles {
     private final Optional<File> libraryFile;
-    private final List<File> dependentFiles;
 
-    private LoadedFiles(Optional<File> libraryFile, List<File> dependentFiles) {
+    private LoadedFiles(Optional<File> libraryFile) {
       this.libraryFile = libraryFile;
-      this.dependentFiles = dependentFiles;
     }
   }
 }

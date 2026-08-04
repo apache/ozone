@@ -482,7 +482,7 @@ public class TestSCMSafeModeManager {
     for (Map.Entry<String, SafeModeRuleStatus> entry : ruleStatuses) {
       if (entry.getKey().equals(safeModeRule)) {
         SafeModeRuleStatus value = entry.getValue();
-        assertEquals(false, value.isValidated());
+        assertFalse(value.isValidated());
         assertThat(value.getStatusText()).containsIgnoringCase(stringToMatch);
       }
     }

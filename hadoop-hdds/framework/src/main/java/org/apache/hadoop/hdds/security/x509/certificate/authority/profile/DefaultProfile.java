@@ -66,6 +66,42 @@ public class DefaultProfile implements PKIProfile {
   private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_EXTENDED_KEY_USAGE = DefaultProfile::validateExtendedKeyUsage;
 
+  // If we decide to add more General Names, we should add those here and
+  // also update the logic in validateGeneralName function.
+  private static final int[] GENERAL_NAMES = {
+      GeneralName.dNSName,
+      GeneralName.iPAddress,
+      GeneralName.otherName,
+  };
+  // Map that handles all the Extensions lookup and validations.
+  protected static final Map<ASN1ObjectIdentifier, BiPredicate<Extension,
+      PKIProfile>> EXTENSIONS_MAP = Stream.of(
+          new ExtensionValidator(Extension.keyUsage, VALIDATE_KEY_USAGE),
+          new ExtensionValidator(Extension.subjectAlternativeName, VALIDATE_SAN),
+          new ExtensionValidator(Extension.authorityKeyIdentifier,
+              VALIDATE_AUTHORITY_KEY_IDENTIFIER),
+          new ExtensionValidator(Extension.extendedKeyUsage,
+              VALIDATE_EXTENDED_KEY_USAGE),
+          // Ozone certs are issued only for the use of Ozone.
+          // However, some users will discover that this is a full scale CA
+          // and decide to mis-use these certs for other purposes.
+          // To discourage usage of these certs for other purposes, we can leave
+          // the Ozone Logo inside these certs. So if a browser is used to
+          // connect these logos will show up.
+          // https://www.ietf.org/rfc/rfc3709.txt
+          new ExtensionValidator(Extension.logoType, VALIDATE_LOGO_TYPE))
+          .collect(Collectors.toMap(ExtensionValidator::getExtension,
+              ExtensionValidator::getValidator));
+  // If we decide to add more General Names, we should add those here and
+  // also update the logic in validateGeneralName function.
+  private static final KeyPurposeId[] EXTENDED_KEY_USAGE = {
+      id_kp_serverAuth, // TLS Web server authentication
+      id_kp_clientAuth, // TLS Web client authentication
+
+  };
+  private final Set<KeyPurposeId> extendKeyPurposeSet;
+  private final Set<Integer> generalNameSet;
+
   /**
    * A certificate extension and the validator used for it.
    */
@@ -114,42 +150,6 @@ public class DefaultProfile implements PKIProfile {
           + '}';
     }
   }
-
-  // If we decide to add more General Names, we should add those here and
-  // also update the logic in validateGeneralName function.
-  private static final int[] GENERAL_NAMES = {
-      GeneralName.dNSName,
-      GeneralName.iPAddress,
-      GeneralName.otherName,
-  };
-  // Map that handles all the Extensions lookup and validations.
-  protected static final Map<ASN1ObjectIdentifier, BiPredicate<Extension,
-      PKIProfile>> EXTENSIONS_MAP = Stream.of(
-          new ExtensionValidator(Extension.keyUsage, VALIDATE_KEY_USAGE),
-          new ExtensionValidator(Extension.subjectAlternativeName, VALIDATE_SAN),
-          new ExtensionValidator(Extension.authorityKeyIdentifier,
-              VALIDATE_AUTHORITY_KEY_IDENTIFIER),
-          new ExtensionValidator(Extension.extendedKeyUsage,
-              VALIDATE_EXTENDED_KEY_USAGE),
-          // Ozone certs are issued only for the use of Ozone.
-          // However, some users will discover that this is a full scale CA
-          // and decide to mis-use these certs for other purposes.
-          // To discourage usage of these certs for other purposes, we can leave
-          // the Ozone Logo inside these certs. So if a browser is used to
-          // connect these logos will show up.
-          // https://www.ietf.org/rfc/rfc3709.txt
-          new ExtensionValidator(Extension.logoType, VALIDATE_LOGO_TYPE))
-          .collect(Collectors.toMap(ExtensionValidator::getExtension,
-              ExtensionValidator::getValidator));
-  // If we decide to add more General Names, we should add those here and
-  // also update the logic in validateGeneralName function.
-  private static final KeyPurposeId[] EXTENDED_KEY_USAGE = {
-      id_kp_serverAuth, // TLS Web server authentication
-      id_kp_clientAuth, // TLS Web client authentication
-
-  };
-  private final Set<KeyPurposeId> extendKeyPurposeSet;
-  private final Set<Integer> generalNameSet;
 
   /**
    * Construct DefaultProfile.
