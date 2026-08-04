@@ -390,12 +390,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();
+      // RocksDB object leaks are often the root cause; check them first.
+      ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
       // Assert before tearing down the metrics system: Hadoop does not clear
       // allSources on shutdown, but checking before shutdown makes the
       // assertion independent of that behavior.
       MetricsLeakAssertion.assertNoLeaks();
       DefaultMetricsSystem.shutdown();
-      ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
