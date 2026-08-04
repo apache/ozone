@@ -29,26 +29,27 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
- * Node-level storage totals for a DataNode, aggregated across all HDDS data
- * volumes. Registered as {@code Hadoop:service=HddsDatanode,name=DatanodeStorageMetrics}.
- * Reads {@link MutableVolumeSet#getStorageReport()} so values stay consistent
- * with what the DataNode reports to SCM.
+ * Node-level storage totals for a DataNode, aggregated over its HDDS data volumes only
+ * ({@code VolumeType.DATA_VOLUME}) via {@link MutableVolumeSet#getStorageReport()}.
+ * This is the same scope as the {@code storageReport} entries produced by
+ * {@code OzoneContainer.getNodeReport()}; meta and DB volumes are excluded.
+ * Registered as {@code Hadoop:service=HddsDatanode,name=DatanodeStorageMetrics}.
  */
 @Metrics(about = "Ozone DataNode node-level storage totals",
     context = OzoneConsts.OZONE)
 public final class DatanodeStorageMetrics implements MetricsSource {
 
-  static final String SOURCE_NAME = "DatanodeStorageMetrics";
+  public static final String SOURCE_NAME = DatanodeStorageMetrics.class.getSimpleName();
 
-  private static final MetricsInfo CAPACITY = Interns.info("Capacity",
+  private static final MetricsInfo CAPACITY = Interns.info("OzoneCapacity",
       "Total Ozone usable capacity across the DataNode's data volumes (bytes,"
           + " post reserved-space adjustment)");
-  private static final MetricsInfo USED = Interns.info("Used",
+  private static final MetricsInfo USED = Interns.info("OzoneUsed",
       "Total Ozone used space across the DataNode's data volumes (bytes)");
   private static final MetricsInfo USED_PERCENTAGE =
-      Interns.info("UsedPercentage",
-          "100 * Used / Capacity across the DataNode's data volumes;"
-              + " 0 when Capacity is 0");
+      Interns.info("OzoneUsedPercentage",
+          "100 * OzoneUsed / OzoneCapacity across the DataNode's data volumes;"
+              + " 0 when OzoneCapacity is 0");
 
   private final MetricsRegistry registry;
   private final MutableVolumeSet volumeSet;

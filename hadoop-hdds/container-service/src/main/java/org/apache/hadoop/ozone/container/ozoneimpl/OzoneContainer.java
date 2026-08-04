@@ -157,7 +157,7 @@ public class OzoneContainer {
 
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
-  private DatanodeStorageMetrics datanodeStorageMetrics;
+  private final DatanodeStorageMetrics datanodeStorageMetrics;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -637,6 +637,7 @@ public class OzoneContainer {
     this.handlers.values().forEach(Handler::stop);
     hddsDispatcher.shutdown();
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
+    datanodeStorageMetrics.unregister();
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
     if (dbVolumeSet != null) {
@@ -650,9 +651,6 @@ public class OzoneContainer {
       diskBalancerService.shutdown();
     }
     recoveringContainerScrubbingService.shutdown();
-    if (datanodeStorageMetrics != null) {
-      datanodeStorageMetrics.unregister();
-    }
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
     checksumTreeManager.stop();

@@ -33,9 +33,8 @@ import org.junit.jupiter.api.Test;
  * <p>Tests verify:
  * <ul>
  *   <li>Correct aggregation of Capacity and Used across multiple volumes.</li>
- *   <li>Attribute names match exactly (guards the CSD context regex contract).</li>
- *   <li>UsedPercentage arithmetic (100 * Used / Capacity).</li>
- *   <li>Zero-capacity guard: UsedPercentage returns 0 instead of NaN/divide-by-zero.</li>
+ *   <li>OzoneUsedPercentage arithmetic (100 * OzoneUsed / OzoneCapacity).</li>
+ *   <li>Zero-capacity guard: OzoneUsedPercentage returns 0 instead of NaN/divide-by-zero.</li>
  * </ul>
  */
 class TestDatanodeStorageMetrics {
@@ -43,7 +42,7 @@ class TestDatanodeStorageMetrics {
   @Test
   void testAggregationAcrossTwoVolumes() {
     // vol1: capacity=100, scmUsed=40  vol2: capacity=300, scmUsed=60
-    // expected: Capacity=400, Used=100, UsedPercentage=25.0
+    // expected: OzoneCapacity=400, OzoneUsed=100, OzoneUsedPercentage=25.0
     StorageLocationReport vol1 = StorageLocationReport.newBuilder()
         .setId("vol1").setCapacity(100L).setScmUsed(40L).setRemaining(60L)
         .build();
@@ -67,9 +66,9 @@ class TestDatanodeStorageMetrics {
       assertThat(rec.name()).isEqualTo(DatanodeStorageMetrics.SOURCE_NAME);
 
       Iterable<AbstractMetric> all = rec.metrics();
-      assertThat(findLong(all, "Capacity")).isEqualTo(400L);
-      assertThat(findLong(all, "Used")).isEqualTo(100L);
-      assertThat(findDouble(all, "UsedPercentage")).isEqualTo(25.0);
+      assertThat(findLong(all, "OzoneCapacity")).isEqualTo(400L);
+      assertThat(findLong(all, "OzoneUsed")).isEqualTo(100L);
+      assertThat(findDouble(all, "OzoneUsedPercentage")).isEqualTo(25.0);
     } finally {
       metrics.unregister();
     }
@@ -77,7 +76,7 @@ class TestDatanodeStorageMetrics {
 
   @Test
   void testZeroCapacityReturnsZeroPercentage() {
-    // No volumes → capacity=0, used=0; UsedPercentage must be 0.0, not NaN.
+    // No volumes → capacity=0, used=0; OzoneUsedPercentage must be 0.0, not NaN.
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getStorageReport()).thenReturn(new StorageLocationReport[0]);
 
@@ -87,9 +86,9 @@ class TestDatanodeStorageMetrics {
       metrics.getMetrics(collector, true);
 
       Iterable<AbstractMetric> all = collector.getRecords().get(0).metrics();
-      assertThat(findLong(all, "Capacity")).isEqualTo(0L);
-      assertThat(findLong(all, "Used")).isEqualTo(0L);
-      assertThat(findDouble(all, "UsedPercentage")).isEqualTo(0.0);
+      assertThat(findLong(all, "OzoneCapacity")).isEqualTo(0L);
+      assertThat(findLong(all, "OzoneUsed")).isEqualTo(0L);
+      assertThat(findDouble(all, "OzoneUsedPercentage")).isEqualTo(0.0);
     } finally {
       metrics.unregister();
     }
