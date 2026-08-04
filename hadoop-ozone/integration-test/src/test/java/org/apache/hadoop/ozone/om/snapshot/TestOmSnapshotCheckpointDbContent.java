@@ -149,11 +149,10 @@ public class TestOmSnapshotCheckpointDbContent {
 
     store.deleteSnapshot(setup.volumeName, setup.bucketName, s2.getName());
     waitForSnapshotPurged(s2);
-    waitForSnapshotNeedsDefrag(s3);
+    // Reload S3 so pathPreviousSnapshotId reflects the purged chain, not deleted S2.
+    s3 = loadSnapshotInfo(setup.volumeName, setup.bucketName, s3.getName());
 
-    triggerDefragUntilDone(Arrays.asList(s3));
-    assertTrue(readSnapshotVersion(s3) > s3VersionAfterFirstDefrag,
-        "Expected a second defrag pass on S3 after middle snapshot purge");
+    triggerDefragUntilVersionIncreases(s3, s3VersionAfterFirstDefrag);
 
     assertCheckpointMatchesBaseline(
         Collections.singletonMap(s3.getSnapshotId(),
@@ -226,22 +225,26 @@ public class TestOmSnapshotCheckpointDbContent {
   }
 
   /**
-   * After a previous snapshot is purged, the remaining snapshot should be marked as needing
-   * defrag once local YAML metadata is refreshed.
+   * Wait for a follow-up defrag pass after snapshot-chain rewiring (e.g. middle snapshot purge).
+   * Unlike {@link #triggerDefragUntilDone}, this requires the snapshot version to increase so we
+   * do not treat an already-defragged checkpoint from an earlier pass as complete.
    */
-  private void waitForSnapshotNeedsDefrag(SnapshotInfo snapshotInfo)
-      throws TimeoutException, InterruptedException {
-    OmSnapshotLocalDataManager localDataManager =
-        cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+  private void triggerDefragUntilVersionIncreases(SnapshotInfo snapshotInfo,
+      int baselineVersion) throws TimeoutException, InterruptedException {
+    OzoneManager om = cluster.getOzoneManager();
     GenericTestUtils.waitFor(() -> {
-      try (OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider provider =
-               localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
-        provider.commit();
-        return provider.needsDefrag();
+      try {
+        if (readSnapshotVersion(snapshotInfo) > baselineVersion
+            && isSnapshotDefragComplete(snapshotInfo)) {
+          return true;
+        }
+        om.triggerSnapshotDefrag(false);
+        return readSnapshotVersion(snapshotInfo) > baselineVersion
+            && isSnapshotDefragComplete(snapshotInfo);
       } catch (IOException e) {
         return false;
       }
-    }, 1000, CHECKPOINT_WAIT_MS);
+    }, 2000, DEFRAG_WAIT_MS);
   }
 
   private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
