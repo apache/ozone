@@ -215,12 +215,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
               excludeList, clientMachine, storagePolicy, true);
-    } catch (SCMException ex) {
+    } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
-        throw new OMException(ex.getMessage(),
-            OMException.ResultCodes.SCM_IN_SAFE_MODE);
+      if (ex instanceof SCMException) {
+        if (((SCMException)ex).getResult()
+            .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+          throw new OMException(ex.getMessage(),
+              OMException.ResultCodes.SCM_IN_SAFE_MODE);
+        }
       }
       throw ex;
     }

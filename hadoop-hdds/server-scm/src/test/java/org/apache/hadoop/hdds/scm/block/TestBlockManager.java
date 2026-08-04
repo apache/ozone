@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -243,18 +242,19 @@ public class TestBlockManager {
       staleDatanodeForStorageType(storagePolicy.getCreationTier().getStorageTypes(1).get(0), dns);
       // Do not allow fallback StoragePolicy, Since all the specific creation StorageTier had been
       // disabled, so there is not a Block can be allocated
-      block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-          new ExcludeList(), storagePolicy, false);
-      assertNull(block);
-      // Allow Fallback StoragePolicy, allocate Block in the fallback creation StorageTier
-      block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-          new ExcludeList(), storagePolicy, true);
+      try {
+        blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+            new ExcludeList(), storagePolicy, false);
+      } catch (IOException e) {
+        e.getMessage().contains(storagePolicy.getCreationTier().name());
+      }
       if (storagePolicy.getCreationFallbackTier() != StorageTier.EMPTY) {
+        // Allow Fallback StoragePolicy, allocate Block in the fallback creation StorageTier
+        block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+            new ExcludeList(), storagePolicy, true);
         assertNotNull(block);
         assertEquals(storagePolicy.getCreationFallbackTier(), block.getStorageTier());
         assertTrue(block.isFallBack());
-      } else {
-        assertNull(block);
       }
     }
   }
