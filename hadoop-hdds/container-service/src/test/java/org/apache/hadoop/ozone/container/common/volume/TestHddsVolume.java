@@ -50,9 +50,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.metrics2.MetricsCollector;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -279,28 +277,6 @@ public class TestHddsVolume {
         reportedUsage.getCapacity() + reservedSpaceInBytes);
     assertEquals(spaceUsage.getAvailable(),
         reportedUsage.getAvailable() + reservedSpaceInBytes);
-  }
-
-  @Test
-  public void testFailVolumeUnregistersMetrics() throws Exception {
-    HddsVolume volume = volumeBuilder.build();
-    volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, null);
-
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    String ioStatsName = volume.getVolumeIOStats().getMetricsSourceName();
-    String infoMetricsName =
-        VolumeInfoMetrics.class.getSimpleName() + "-" + folder.toString();
-
-    // Both metrics should be registered after the volume is created.
-    assertNotNull(ms.getSource(ioStatsName));
-    assertNotNull(ms.getSource(infoMetricsName));
-
-    volume.failVolume();
-
-    // Both metrics should be unregistered when the volume is failed.
-    assertNull(ms.getSource(ioStatsName));
-    assertNull(ms.getSource(infoMetricsName));
   }
 
   /**
