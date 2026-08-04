@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -38,6 +40,25 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 public final class MetricsLeakAssertion {
 
   private static final String ALL_SOURCES_FIELD = "allSources";
+
+  /**
+   * Names of metrics sources that are registered once per JVM (or once per
+   * service) and intentionally never unregistered, so they are expected to
+   * still be present after a mini cluster shuts down.  These are matched by
+   * prefix to also cover the numeric suffixes the metrics system appends for
+   * repeated registrations (e.g. {@code JvmMetrics-1}).
+   *
+   * <p>Do not add per-instance service metrics here; those should be
+   * unregistered on service shutdown and a leftover registration is a real
+   * leak.  Keep this list limited to JVM-level singletons.
+   */
+  private static final List<String> EXPECTED_LEFTOVER_SOURCES = Arrays.asList(
+      "JvmMetrics", // registered per service by HddsServerUtil.initializeMetrics
+      "JvmMetricsCpu", // registered alongside JvmMetrics
+      "UgiMetrics", // Hadoop security UGI metrics, JVM-level singleton
+      "ManagedRocksObjectMetrics", // static singleton
+      "ContainerCacheMetrics" // static singleton
+  );
 
   private MetricsLeakAssertion() {
   }
@@ -72,11 +93,21 @@ public final class MetricsLeakAssertion {
       throw new AssertionError("Cannot check for metrics leaks: unable to access '" +
           ALL_SOURCES_FIELD + "' on " + ms.getClass().getName() + ".", e);
     }
-    if (!allSources.isEmpty()) {
-      Set<String> leaked = new TreeSet<>(allSources.keySet());
+    Set<String> leaked = new TreeSet<>(allSources.keySet());
+    leaked.removeIf(MetricsLeakAssertion::isExpectedLeftover);
+    if (!leaked.isEmpty()) {
       throw new AssertionError("Found " + leaked.size() +
           " metrics source(s) still registered after cluster shutdown: " + leaked);
     }
+  }
+
+  private static boolean isExpectedLeftover(String name) {
+    for (String prefix : EXPECTED_LEFTOVER_SOURCES) {
+      if (name.equals(prefix) || name.startsWith(prefix + "-")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static Field findAllSourcesField(Class<?> clazz) {
