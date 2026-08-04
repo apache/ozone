@@ -126,7 +126,8 @@ public class TestReconAsPassiveScm {
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test",
+                StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -166,7 +167,8 @@ public class TestReconAsPassiveScm {
     // Create container in SCM.
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test",
+                StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =

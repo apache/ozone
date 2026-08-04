@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -88,7 +89,8 @@ public class TestReconScmSnapshot {
 
     for (int i = 0; i < 10; i++) {
       containerManager.allocateContainer(RatisReplicationConfig.getInstance(
-          HddsProtos.ReplicationFactor.ONE), "testOwner");
+          HddsProtos.ReplicationFactor.ONE), "testOwner",
+          StorageTier.getDefaultTier());
     }
 
     recon.start(conf);

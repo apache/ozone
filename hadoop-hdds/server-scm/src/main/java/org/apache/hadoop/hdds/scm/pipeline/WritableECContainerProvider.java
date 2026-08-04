@@ -104,7 +104,7 @@ public class WritableECContainerProvider
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < maximumPipelines) {
         try {
-          return allocateContainer(repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList, storageTier);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container with {} existing ones; "
               + "requested size={}, replication={}, owner={}, {}",
@@ -173,7 +173,7 @@ public class WritableECContainerProvider
       }
       if (openPipelineCount < maximumPipelines) {
         synchronized (this) {
-          return allocateContainer(repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList, storageTier);
         }
       }
       throw new IOException("Pipeline limit (" + maximumPipelines
@@ -197,7 +197,8 @@ public class WritableECContainerProvider
   }
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
-      long size, String owner, ExcludeList excludeList)
+      long size, String owner, ExcludeList excludeList,
+      @Nonnull StorageTier storageTier)
       throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
@@ -205,13 +206,12 @@ public class WritableECContainerProvider
       excludedNodes = new ArrayList<>(excludeList.getDatanodes());
     }
 
-    // TODO StoragePolicy Support EC
     Pipeline newPipeline = pipelineManager.createPipeline(repConfig,
-        excludedNodes, Collections.emptyList(), StorageTier.getDefaultTier());
+        excludedNodes, Collections.emptyList(), storageTier);
     // the returned ContainerInfo should not be null (due to not enough space in the Datanodes specifically) because
     // this is a new pipeline and pipeline creation checks for sufficient space in the Datanodes
     ContainerInfo container =
-        containerManager.getMatchingContainer(size, owner, newPipeline);
+        containerManager.getMatchingContainer(size, owner, newPipeline, Collections.emptySet(), storageTier);
     if (container == null) {
       // defensive null handling
       throw new IOException("Could not allocate a new container");

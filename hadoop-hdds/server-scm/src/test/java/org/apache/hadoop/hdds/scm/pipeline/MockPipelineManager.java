@@ -81,7 +81,10 @@ public class MockPipelineManager implements PipelineManager {
     if (replicationConfig.getReplicationType()
         == HddsProtos.ReplicationType.EC) {
       pipeline = buildECPipeline(
-          replicationConfig, excludedNodes, favoredNodes);
+          replicationConfig, excludedNodes, favoredNodes)
+          .toBuilder()
+          .setSupportedStorageTier(storageTier)
+          .build();
     } else {
       pipeline = createPipeline(replicationConfig,
           ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),

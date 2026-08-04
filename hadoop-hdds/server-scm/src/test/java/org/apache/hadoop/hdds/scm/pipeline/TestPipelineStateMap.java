@@ -25,6 +25,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,5 +93,35 @@ public class TestPipelineStateMap {
         Pipeline.PipelineState.CLOSED));
     assertEquals(1, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.CLOSED));
+  }
+
+  @Test
+  public void testGetPipelinesRequiresExactStorageTier() throws IOException {
+    Pipeline legacyPipeline = MockPipeline.createPipeline(1);
+    Pipeline diskPipeline = withStorageTier(
+        MockPipeline.createPipeline(1), StorageTier.DISK);
+    map.addPipeline(legacyPipeline);
+    map.addPipeline(diskPipeline);
+
+    assertEquals(1, map.getPipelines(
+        StandaloneReplicationConfig.getInstance(ONE),
+        Pipeline.PipelineState.OPEN, StorageTier.DISK).size());
+    assertEquals(diskPipeline, map.getPipelines(
+        StandaloneReplicationConfig.getInstance(ONE),
+        Pipeline.PipelineState.OPEN, StorageTier.DISK).get(0));
+    assertEquals(0, map.getPipelines(
+        StandaloneReplicationConfig.getInstance(ONE),
+        Pipeline.PipelineState.OPEN, StorageTier.ARCHIVE).size());
+  }
+
+  private static Pipeline withStorageTier(
+      Pipeline pipeline, StorageTier storageTier) {
+    return Pipeline.newBuilder()
+        .setState(pipeline.getPipelineState())
+        .setId(pipeline.getId())
+        .setReplicationConfig(pipeline.getReplicationConfig())
+        .setNodes(pipeline.getNodes())
+        .setSupportedStorageTier(storageTier)
+        .build();
   }
 }

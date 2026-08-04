@@ -259,20 +259,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public ContainerWithPipeline allocateContainer(
       HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner) throws IOException {
+      String owner, HddsProtos.StorageTierProto storageTier) throws IOException {
     ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(type, factor);
-    return allocateContainer(replicationConfig, owner);
+    return allocateContainer(replicationConfig, owner, storageTier);
   }
 
   @Override
   public ContainerWithPipeline allocateContainer(
-      ReplicationConfig replicationConfig, String owner) throws IOException {
+      ReplicationConfig replicationConfig, String owner,
+      HddsProtos.StorageTierProto storageTier) throws IOException {
 
     ContainerRequestProto.Builder request = ContainerRequestProto.newBuilder()
           .setTraceID(TracingUtil.exportCurrentSpan())
           .setReplicationType(replicationConfig.getReplicationType())
-          .setOwner(owner);
+          .setOwner(owner)
+          .setStorageTier(storageTier);
 
     if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
       HddsProtos.ECReplicationConfig ecProto =

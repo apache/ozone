@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -170,9 +171,9 @@ public class TestReconTasks {
     ContainerManager reconCm = reconScm.getContainerManager();
 
     final ContainerInfo container1 = scmContainerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin");
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin", StorageTier.getDefaultTier());
     final ContainerInfo container2 = scmContainerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin");
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin", StorageTier.getDefaultTier());
     scmContainerManager.updateContainerState(container1.containerID(),
         HddsProtos.LifeCycleEvent.FINALIZE);
     scmContainerManager.updateContainerState(container2.containerID(),
@@ -222,7 +223,7 @@ public class TestReconTasks {
 
     ContainerInfo containerInfo = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        "test");
+        "test", StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -361,7 +362,7 @@ public class TestReconTasks {
     ReconContainerManager reconCm = (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -464,7 +465,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -569,7 +570,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -692,7 +693,7 @@ public class TestReconTasks {
 
     ContainerInfo containerInfo = scm.getContainerManager().allocateContainer(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        "test");
+        "test", StorageTier.getDefaultTier());
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 

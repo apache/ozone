@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -81,7 +82,7 @@ public class TestNodeDecommissionManager {
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
-    when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString()))
+    when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString(), any(StorageTier.class)))
         .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
             (String) invocation.getArguments()[1]));
   }
@@ -423,7 +424,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 5; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
 
@@ -477,7 +480,9 @@ public class TestNodeDecommissionManager {
 
     Set<ContainerID> idsEC = new HashSet<>();
     for (int i = 0; i < 5; i++) {
-      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+      ContainerInfo container = containerManager.allocateContainer(
+          new ECReplicationConfig(3, 2), "admin",
+          StorageTier.getDefaultTier());
       idsEC.add(container.containerID());
     }
 
@@ -513,10 +518,12 @@ public class TestNodeDecommissionManager {
 
     Set<ContainerID> idsRatis = new HashSet<>();
     ContainerInfo containerRatis = containerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     idsRatis.add(containerRatis.containerID());
     Set<ContainerID> idsEC = new HashSet<>();
-    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    ContainerInfo containerEC = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     idsEC.add(containerEC.containerID());
 
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -570,7 +577,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 5; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
 
@@ -606,7 +615,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 3; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
 
@@ -667,7 +678,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 5; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
@@ -767,7 +780,9 @@ public class TestNodeDecommissionManager {
     }
     Set<ContainerID> idsEC = new HashSet<>();
     for (int i = 0; i < 5; i++) {
-      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+      ContainerInfo container = containerManager.allocateContainer(
+          new ECReplicationConfig(3, 2), "admin",
+          StorageTier.getDefaultTier());
       idsEC.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
@@ -837,10 +852,12 @@ public class TestNodeDecommissionManager {
     }
     Set<ContainerID> idsRatis = new HashSet<>();
     ContainerInfo containerRatis = containerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     idsRatis.add(containerRatis.containerID());
     Set<ContainerID> idsEC = new HashSet<>();
-    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    ContainerInfo containerEC = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     idsEC.add(containerEC.containerID());
 
     when(containerManager.getContainer(any(ContainerID.class)))
@@ -924,7 +941,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 5; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
@@ -964,7 +983,9 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 3; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE),
+          "admin", StorageTier.getDefaultTier());
       idsRatis.add(container.containerID());
     }
 

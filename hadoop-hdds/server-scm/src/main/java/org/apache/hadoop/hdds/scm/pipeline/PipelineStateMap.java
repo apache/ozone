@@ -250,15 +250,12 @@ class PipelineStateMap {
   }
 
   /**
-   * A pipeline with no supportedStorageTier (e.g. one created by an older
-   * SCM before this field was introduced, or restored from a legacy DB
-   * snapshot) is treated as matching any tier. This preserves backward
-   * compatibility during rolling upgrade: legacy pipelines remain usable
-   * until they are scrubbed and replaced by tier-tagged ones.
+   * A pipeline matches only when it explicitly supports the requested tier.
+   * An untyped legacy pipeline cannot safely satisfy an explicit tier request.
    */
   static boolean matchesStorageTier(Pipeline pipeline, StorageTier storageTier) {
     final StorageTier pipelineTier = pipeline.getSupportedStorageTier();
-    return pipelineTier == null || Objects.equals(pipelineTier, storageTier);
+    return Objects.equals(pipelineTier, storageTier);
   }
 
   /**

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -141,8 +142,9 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
-      public ContainerInfo getMatchingContainer(long arg0, String arg1, PipelineID arg2, NavigableSet arg3) {
-        return invoker.getImpl().getMatchingContainer(arg0, arg1, arg2, arg3);
+      public ContainerInfo getMatchingContainerAndStorageTier(long arg0, String arg1, PipelineID arg2, NavigableSet
+          arg3, StorageTier arg4) {
+        return invoker.getImpl().getMatchingContainerAndStorageTier(arg0, arg1, arg2, arg3, arg4);
       }
 
       @Override
@@ -267,56 +269,57 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       returnValue = getImpl().getContainerReplicas(arg14);
       break;
 
-    case "getMatchingContainer":
+    case "getMatchingContainerAndStorageTier":
       final long arg15 = p.length > 0 ? (long) p[0] : 0L;
       final String arg16 = p.length > 1 ? (String) p[1] : null;
       final PipelineID arg17 = p.length > 2 ? (PipelineID) p[2] : null;
       final NavigableSet arg18 = p.length > 3 ? (NavigableSet) p[3] : null;
+      final StorageTier arg19 = p.length > 4 ? (StorageTier) p[4] : null;
       returnType = ContainerInfo.class;
-      returnValue = getImpl().getMatchingContainer(arg15, arg16, arg17, arg18);
+      returnValue = getImpl().getMatchingContainerAndStorageTier(arg15, arg16, arg17, arg18, arg19);
       break;
 
     case "reinitialize":
-      final Table arg19 = p.length > 0 ? (Table) p[0] : null;
-      getImpl().reinitialize(arg19);
+      final Table arg20 = p.length > 0 ? (Table) p[0] : null;
+      getImpl().reinitialize(arg20);
       return Message.EMPTY;
 
     case "removeContainer":
-      final HddsProtos.ContainerID arg20 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      getImpl().removeContainer(arg20);
+      final HddsProtos.ContainerID arg21 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      getImpl().removeContainer(arg21);
       return Message.EMPTY;
 
     case "removeContainerReplica":
-      final ContainerReplica arg21 = p.length > 0 ? (ContainerReplica) p[0] : null;
-      getImpl().removeContainerReplica(arg21);
+      final ContainerReplica arg22 = p.length > 0 ? (ContainerReplica) p[0] : null;
+      getImpl().removeContainerReplica(arg22);
       return Message.EMPTY;
 
     case "transitionDeletingOrDeletedToTargetState":
-      final HddsProtos.ContainerID arg22 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      final LifeCycleState arg23 = p.length > 1 ? (LifeCycleState) p[1] : null;
-      getImpl().transitionDeletingOrDeletedToTargetState(arg22, arg23);
+      final HddsProtos.ContainerID arg23 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleState arg24 = p.length > 1 ? (LifeCycleState) p[1] : null;
+      getImpl().transitionDeletingOrDeletedToTargetState(arg23, arg24);
       return Message.EMPTY;
 
     case "updateContainerInfo":
-      final ContainerInfoProto arg24 = p.length > 0 ? (ContainerInfoProto) p[0] : null;
-      getImpl().updateContainerInfo(arg24);
+      final ContainerInfoProto arg25 = p.length > 0 ? (ContainerInfoProto) p[0] : null;
+      getImpl().updateContainerInfo(arg25);
       return Message.EMPTY;
 
     case "updateContainerReplica":
-      final ContainerReplica arg25 = p.length > 0 ? (ContainerReplica) p[0] : null;
-      getImpl().updateContainerReplica(arg25);
+      final ContainerReplica arg26 = p.length > 0 ? (ContainerReplica) p[0] : null;
+      getImpl().updateContainerReplica(arg26);
       return Message.EMPTY;
 
     case "updateContainerStateWithSequenceId":
-      final HddsProtos.ContainerID arg26 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      final LifeCycleEvent arg27 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
-      final Long arg28 = p.length > 2 ? (Long) p[2] : null;
-      getImpl().updateContainerStateWithSequenceId(arg26, arg27, arg28);
+      final HddsProtos.ContainerID arg27 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleEvent arg28 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
+      final Long arg29 = p.length > 2 ? (Long) p[2] : null;
+      getImpl().updateContainerStateWithSequenceId(arg27, arg28, arg29);
       return Message.EMPTY;
 
     case "updateDeleteTransactionId":
-      final Map arg29 = p.length > 0 ? (Map) p[0] : null;
-      getImpl().updateDeleteTransactionId(arg29);
+      final Map arg30 = p.length > 0 ? (Map) p[0] : null;
+      getImpl().updateDeleteTransactionId(arg30);
       return Message.EMPTY;
 
     default:
