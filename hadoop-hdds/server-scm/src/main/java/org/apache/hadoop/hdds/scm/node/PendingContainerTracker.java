@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -78,11 +80,11 @@ public class PendingContainerTracker {
 
   /**
    * Two-window bucket for a single DataNode.
-   * Contains current and previous window sets, plus last roll timestamp.
+   * Contains current and previous window maps, plus last roll timestamp.
    */
   public static class TwoWindowBucket {
-    private Set<ContainerID> currentWindow = new HashSet<>();
-    private Set<ContainerID> previousWindow = new HashSet<>();
+    private Map<ContainerID, StorageType> currentWindow = new HashMap<>();
+    private Map<ContainerID, StorageType> previousWindow = new HashMap<>();
     private long lastRollTime = Time.monotonicNow();
     private final long rollIntervalMs;
     private final DatanodeID datanodeID;
@@ -107,7 +109,7 @@ public class PendingContainerTracker {
         LOG.debug("Double roll interval elapsed ({}ms): dropped {} pending containers", elapsed, dropped);
       } else if (elapsed >= rollIntervalMs) {
         previousWindow.clear();
-        final Set<ContainerID> tmp = previousWindow;
+        final Map<ContainerID, StorageType> tmp = previousWindow;
         previousWindow = currentWindow;
         currentWindow = tmp;
         lastRollTime = now;
@@ -117,16 +119,26 @@ public class PendingContainerTracker {
     }
 
     synchronized boolean contains(ContainerID containerID) {
-      return currentWindow.contains(containerID) || previousWindow.contains(containerID);
+      return currentWindow.containsKey(containerID) || previousWindow.containsKey(containerID);
     }
 
     /**
      * Add container to current window.
      */
     synchronized boolean add(ContainerID containerID) {
-      boolean added = currentWindow.add(containerID);
-      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-          containerID, datanodeID, added, getCount());
+      return add(containerID, null);
+    }
+
+    /**
+     * Add container with its storage type to current window.
+     */
+    synchronized boolean add(ContainerID containerID, StorageType storageType) {
+      boolean added = !currentWindow.containsKey(containerID);
+      if (added) {
+        currentWindow.put(containerID, storageType);
+      }
+      LOG.debug("Recorded pending container {} on DataNode {} with storageType {}. Added={}, Total pending={}",
+          containerID, datanodeID, storageType, added, getCount());
       return added;
     }
 
@@ -134,8 +146,10 @@ public class PendingContainerTracker {
      * Remove container from both windows.
      */
     synchronized boolean remove(ContainerID containerID) {
-      boolean removedFromCurrent = currentWindow.remove(containerID);
-      boolean removedFromPrevious = previousWindow.remove(containerID);
+      boolean removedFromCurrent = currentWindow.containsKey(containerID);
+      currentWindow.remove(containerID);
+      boolean removedFromPrevious = previousWindow.containsKey(containerID);
+      previousWindow.remove(containerID);
       boolean removed = removedFromCurrent || removedFromPrevious;
       LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
           containerID, datanodeID, removed, getCount());
@@ -147,6 +161,27 @@ public class PendingContainerTracker {
      */
     synchronized int getCount() {
       return currentWindow.size() + previousWindow.size();
+    }
+
+    /**
+     * Count pending containers of the given storage type.
+     * Unknown storage type entries are counted for typed checks because they
+     * may occupy the requested storage type.
+     */
+    synchronized int getCount(StorageType storageType) {
+      if (checksAllStorageTypes(storageType)) {
+        return getCount();
+      }
+      return countByStorageType(currentWindow, storageType)
+          + countByStorageType(previousWindow, storageType);
+    }
+
+    private static int countByStorageType(
+        Map<ContainerID, StorageType> window, StorageType storageType) {
+      return (int) window.values().stream()
+          .filter(recordedStorageType ->
+              recordedStorageType == null || storageType.equals(recordedStorageType))
+          .count();
     }
   }
 
@@ -166,9 +201,23 @@ public class PendingContainerTracker {
    * @param datanodeInfo storage reports for the datanode
    */
   public boolean hasEffectiveAllocatableSpaceForNewContainer(DatanodeInfo datanodeInfo) {
+    return hasEffectiveAllocatableSpaceForNewContainer(datanodeInfo, null);
+  }
+
+  /**
+   * Whether the datanode can fit another container of {@link #maxContainerSize}
+   * in the requested storage type after accounting for SCM pending allocations.
+   * A null storage type preserves the legacy behavior of checking all reports.
+   *
+   * @param datanodeInfo storage reports for the datanode
+   * @param storageType storage type for this allocation, or null for all reports
+   */
+  public boolean hasEffectiveAllocatableSpaceForNewContainer(
+      DatanodeInfo datanodeInfo, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
 
-    long pendingAllocationSize = datanodeInfo.getPendingContainerAllocations().getCount() * maxContainerSize;
+    long pendingAllocationSize =
+        datanodeInfo.getPendingContainerAllocations().getCount(storageType) * maxContainerSize;
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     Objects.requireNonNull(storageReports, "storageReports == null");
     if (storageReports.isEmpty()) {
@@ -176,6 +225,9 @@ public class PendingContainerTracker {
     }
     long effectiveAllocatableSpace = 0L;
     for (StorageReportProto report : storageReports) {
+      if (!matchesStorageType(report, storageType)) {
+        continue;
+      }
       long usableSpace = VolumeUsage.getUsableSpace(report);
       long containersOnThisDisk = usableSpace / maxContainerSize;
       effectiveAllocatableSpace += containersOnThisDisk * maxContainerSize;
@@ -193,14 +245,29 @@ public class PendingContainerTracker {
    * Record a pending container allocation for a single DataNode.
    * Container is added to the current window.
    *
+   * @param datanodeInfo The DataNode receiving the allocation
    * @param containerID The container being allocated/replicated
    */
   public void recordPendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    recordPendingAllocationForDatanode(datanodeInfo, containerID, null);
+  }
+
+  /**
+   * Record a pending container allocation for a single DataNode.
+   * Container is added to the current window.
+   *
+   * @param datanodeInfo The DataNode receiving the allocation
+   * @param containerID The container being allocated/replicated
+   * @param storageType The storage type selected for the allocation
+   */
+  public void recordPendingAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     Objects.requireNonNull(containerID, "containerID == null");
     if (datanodeInfo == null) {
       return;
     }
-    final boolean added = datanodeInfo.getPendingContainerAllocations().add(containerID);
+    final boolean added =
+        datanodeInfo.getPendingContainerAllocations().add(containerID, storageType);
     if (added && metrics != null) {
       metrics.incNumPendingContainersAdded();
     }
@@ -221,5 +288,15 @@ public class PendingContainerTracker {
     if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
+  }
+
+  private static boolean matchesStorageType(
+      StorageReportProto report, StorageType storageType) {
+    return checksAllStorageTypes(storageType)
+        || StorageTypeUtils.getFromProtobuf(report.getStorageType()).equals(storageType);
+  }
+
+  private static boolean checksAllStorageTypes(StorageType storageType) {
+    return storageType == null;
   }
 }

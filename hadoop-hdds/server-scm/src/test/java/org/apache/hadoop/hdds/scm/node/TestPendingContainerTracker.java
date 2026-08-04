@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -375,7 +377,74 @@ public class TestPendingContainerTracker {
     assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
   }
 
+  @Test
+  public void testStorageTypeSpecificSpaceCheckIgnoresOtherTypes() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize, StorageTypeProto.SSD));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        0, StorageTypeProto.DISK));
+    dnInfo.updateStorageReports(reports);
+
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.SSD));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.DISK));
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
+  }
+
+  @Test
+  public void testPendingAllocationsAreCountedPerStorageType() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize, StorageTypeProto.SSD));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize, StorageTypeProto.DISK));
+    dnInfo.updateStorageReports(reports);
+
+    tracker.recordPendingAllocationForDatanode(
+        dnInfo, containers.get(0), StorageType.DISK);
+
+    assertEquals(1,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.DISK));
+    assertEquals(0,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.SSD));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.DISK));
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.SSD));
+  }
+
+  @Test
+  public void testUnknownStorageTypePendingCountsAgainstTypedChecks() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize, StorageTypeProto.DISK));
+    dnInfo.updateStorageReports(reports);
+
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(0));
+
+    assertEquals(1,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.DISK));
+    assertEquals(1,
+        dnInfo.getPendingContainerAllocations().getCount(StorageType.SSD));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(
+        dnInfo, StorageType.DISK));
+  }
+
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
+  }
+
+  private StorageReportProto createStorageReport(
+      DatanodeInfo dn, long capacity, long remaining, StorageTypeProto type) {
+    return HddsTestUtils.createStorageReport(
+        dn.getID(), "test-" + type, capacity, 0, remaining, type);
   }
 }

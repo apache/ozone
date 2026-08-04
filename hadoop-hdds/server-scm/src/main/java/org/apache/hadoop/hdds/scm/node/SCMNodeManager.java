@@ -1078,22 +1078,36 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
+    return hasSpaceForNewContainerAllocation(datanodeID, null);
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(
+      DatanodeID datanodeID, StorageType storageType) {
     DatanodeInfo datanodeInfo = getNode(datanodeID);
     if (datanodeInfo == null) {
       LOG.warn("DatanodeInfo not found for node {}", datanodeID);
       return false;
     }
-    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(datanodeInfo);
+    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(
+        datanodeInfo, storageType);
   }
 
   @Override
   public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+    recordPendingAllocationForDatanode(datanodeID, containerID, null);
+  }
+
+  @Override
+  public void recordPendingAllocationForDatanode(
+      DatanodeID datanodeID, ContainerID containerID, StorageType storageType) {
     DatanodeInfo datanodeInfo = getNode(datanodeID);
     if (datanodeInfo == null) {
       LOG.warn("DatanodeInfo not found for node {}", datanodeID);
       return;
     }
-    pendingContainerTracker.recordPendingAllocationForDatanode(datanodeInfo, containerID);
+    pendingContainerTracker.recordPendingAllocationForDatanode(
+        datanodeInfo, containerID, storageType);
   }
 
   /**
@@ -1758,6 +1772,7 @@ public class SCMNodeManager implements NodeManager {
       final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.addContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
   }
 
   @Override
@@ -1765,6 +1780,14 @@ public class SCMNodeManager implements NodeManager {
                            final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.removeContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
+  }
+
+  private void removePendingAllocation(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerId);
   }
 
   /**
