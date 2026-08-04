@@ -123,6 +123,14 @@ SnapshotDeletingService (SDS)
 5. Decrement counters on **successful purge** (same durability boundary as `purgeSnapshotUsedBytes`).
 6. Ship in **small phased PRs** behind feature flags.
 
+### Non-Goals
+
+1. Replacing `bucket.snapshotUsedBytes` as the **quota authority** (it remains the bucket total).
+2. Synchronous subtree walks on the delete or snapshot-create Ratis path.
+3. Removing `exclusiveSize` / `exclusiveSizeDeltaFromDirDeepCleaning` in the first release (may
+   deprecate later).
+4. Replacing `QuotaRepairTask` internals in v1 (only minimal trapped-counter repair additions are expected).
+
 ---
 
 ## 4. Terminology
@@ -131,7 +139,6 @@ SnapshotDeletingService (SDS)
 |------|---------|
 | **AOS** | Active object store — live OM metadata, not a snapshot checkpoint |
 | **Store snapshot** | The snapshot whose DB holds a `deletedTable` / `deletedDirTable` row |
-| **Pinning snapshot** | In this design, counter ownership follows the **store snapshot** (snapshot DB currently holding the deleted row) |
 | **Trapped deleted bytes** | Logical data size of deleted objects not yet purged due to snapshot retention |
 | **Deep clean** | Background pass that finishes scanning a snapshot's deleted tables (existing flags) |
 | **Expand and account** | Read-only subtree walk that attributes file bytes without promoting to purge |
@@ -179,7 +186,7 @@ totalTrappedDeletedBytes(S) = S.trappedKeyBytes
 
 New OM table: `snapshotTrappedLedgerTable` (name TBD).
 
-**Key:** `deleteDbKey` (row key in `deletedTable` / `deletedDirTable`)
+**Key:** `/{volumeId}/{bucketId}/{deleteDbKey}` (normalized row key based on `deletedTable` / `deletedDirTable`)
 
 **Value:** three fields only — no bytes, namespace, or updateId stored in the ledger.
 
@@ -215,9 +222,10 @@ in what phase of lifecycle?*
 * Increment snapshot counters **only** when `putIfAbsent` on ledger succeeds.
 * Decrement **only** when CAS `ACCOUNTED_* → PURGED` (or `DIR_EXPAND_ACCOUNTED → PURGED` for dir
   root after purge) succeeds.
-* One ledger row per `deleteDbKey`; prevents double counting across create, expand, DDS promote, and purge.
+* One ledger row per `/{volumeId}/{bucketId}/{deleteDbKey}`; prevents double counting across create, expand, DDS promote, and purge.
 * Purge decrement uses **purge payload sizes** (`BucketPurgeKeysSize` / dir purge), not ledger-stored
   bytes.
+* `PURGED` rows are physically deleted from the ledger table by a background cleanup task or immediately upon purge.
 
 ### 6.3 Counter lifecycle
 
@@ -300,10 +308,10 @@ iteration).
 
 1. Re-validate snapshot chain (`expectedPreviousSnapshotId`).
 2. Re-check `ReclaimableDirFilter`; if now reclaimable → exit (DDS owns expansion).
-3. Read-only walk `fileTable` under dir root (and subdirs still in `directoryTable`).
+3. Read-only walk `fileTable` under dir root (and subdirs still in `directoryTable`) using the existing DDS traversal logic.
 4. For each file: use `storeSnapshotId` from the job context.
 5. `ledger.putIfAbsent(deleteDbKey, storeSnapshotId, ACCOUNTED_KEY)` → on success, increment store
-   snapshot `trappedKey*`.
+   snapshot `trappedKey*` in the same OM DB batch.
 6. If no unaccounted files remain under root → CAS dir root ledger
    `ACCOUNTED_DIR_ROOT → DIR_EXPAND_ACCOUNTED` (skip re-walk on subsequent runs) and credit
    `trappedDirNamespace` once for expanded subdirs under that root (batched).
@@ -314,8 +322,8 @@ iteration).
 * Call SCM or purge blocks.
 * Update `trappedDirNamespace` before subtree walk completion.
 
-**Ratis pressure mitigation:** accumulate counter deltas in memory; one batched `SetSnapshotProperty` or
-inline `SnapshotInfo` update per task — **not** one transaction per file.
+**Ratis pressure mitigation:** accumulate counter deltas in memory; one batched `OMDirectoriesPurgeRequestWithFSO` or
+inline `SnapshotInfo` update per task — **not** one transaction per file. The `putIfAbsent` and counter delta must use the same OM Ratis request and active DB batch to prevent failure windows.
 
 ### 6.5 Integration with existing services
 
@@ -379,7 +387,7 @@ inline `SnapshotInfo` update per task — **not** one transaction per file.
 2. Create S2 → root moves to S2.deletedDirTable
                  S2.trappedDirNamespace = 1 (no file bytes yet)
 3. DDS on S2: /foo in S1 → not reclaimable → enqueue ExpandAndAccount
-4. ExpandAndAccount: files under /foo → S2.trappedKeyBytes += ... and credit subdirs on completion
+4. ExpandAndAccount: files under /foo → S2.trappedKeyBytes += ... and credit subdirs on completion (same DB batch)
 5. User deletes S1 → SDS moves tables; DDS expands (reclaimable); KDS purges
 6. trappedKey* and trappedDirNamespace → 0 after full purge
 ```
@@ -415,7 +423,7 @@ OMKeyPurgeRequest committed   →  trappedKey*--, ledger PURGED  ← durable bou
 | Race | Risk | Mitigation |
 |------|------|------------|
 | Expand vs KDS purge same file | Double decrement or ghost increment | Ledger CAS on inc/dec; existence check before increment |
-| Expand vs DDS promote | Double count | `putIfAbsent` on promote: increment only when ledger absent; promote-only when expand/create already ledgered |
+| Expand vs DDS promote | Double count | `putIfAbsent` on promote: increment only when ledger absent; promote-only when expand/create already ledgered. Coordination with DDS is required if running concurrently. |
 | SDS move during expand job | Wrong store walk | `expectedPreviousSnapshotId` on job; abort/requeue |
 | Dir becomes reclaimable before expand runs | Duplicate work | Re-check filter at job start; exit if reclaimable |
 | Snapshot deleted mid-expand | Stale per-snapshot counter | Transfer row + ledger owner + trapped* in same SDS batch txn |
@@ -475,7 +483,7 @@ optional uint64 trappedDirNamespace = 26;
 |-------|--------------|
 | `referencedSize` | Live data at create — orthogonal |
 | `exclusiveSize` | Legacy deep-clean side effect — keep for reconciliation; do not sum with `trappedKeyBytes` |
-| `snapshotUsedBytes` (bucket) | Superset across snapshots + AOS; authoritative for quota |
+| `snapshotUsedBytes` (bucket) | Superset across snapshots + AOS; authoritative for quota. Note: `trappedKeyBytes` can exceed `snapshotUsedBytes` temporarily because it includes files under pinned directories that are still in `fileTable` (not yet moved to `deletedTable` by DDS). |
 
 ---
 
