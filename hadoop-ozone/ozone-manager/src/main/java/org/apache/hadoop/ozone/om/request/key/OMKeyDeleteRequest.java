@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -169,7 +170,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (keyArgs.hasVersionId() || keyArgs.getNullVersion()) {
         // DELETE ?versionId= permanently removes one version. It is the only
         // delete that destroys data on a versioned bucket.
-        if (!omBucketInfo.isS3VersioningEnabled()) {
+        if (!omBucketInfo.hasEverBeenVersioned()) {
           throw new OMException("Bucket " + bucketName
               + " does not have S3 versioning enabled",
               NOT_SUPPORTED_OPERATION);
@@ -180,11 +181,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
             omResponse);
         // Noncurrent versions are invisible to plain reads, so removing one
         // does not change the visible key count.
-      } else if (omBucketInfo.isS3VersioningEnabled()) {
+      } else if (omBucketInfo.hasEverBeenVersioned()) {
         // A delete without a versionId removes no data: a delete marker
         // becomes the current version and the version it supersedes moves to
         // the versionedKeyTable. Like S3, the marker is inserted even when the
-        // key does not exist.
+        // key does not exist. While versioning is suspended the marker takes
+        // the key's null version slot instead of creating a version.
         insertingDeleteMarker = true;
         omClientResponse = insertDeleteMarker(ozoneManager, omMetadataManager,
             omBucketInfo, omKeyInfo, objectKey, keyArgs, trxnLogIndex,
@@ -412,6 +414,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     String volumeName = omBucketInfo.getVolumeName();
     String bucketName = omBucketInfo.getBucketName();
     String keyName = keyArgs.getKeyName();
+    // While versioning is suspended the marker is the key's null version, so
+    // it replaces whatever held that slot instead of superseding it.
+    final boolean suspended = omBucketInfo.isS3VersioningSuspended();
+    final boolean replacesCurrent = suspended && currentVersion != null
+        && currentVersion.isNullVersionRecord();
 
     // Everything that can fail runs before the first cache entry is added: a
     // request that throws here is answered with an OMKeyDeleteResponse, whose
@@ -450,12 +457,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         .setUpdateID(trxnLogIndex)
         .setVersionId(markerVersionId)
         .setDeleteMarker(true)
-        .setNullVersion(false)
+        .setNullVersion(suspended)
         .build();
 
     String movedVersionedKeyName = null;
     OmKeyInfo movedVersionedKeyInfo = null;
-    if (currentVersion != null) {
+    if (currentVersion != null && !replacesCurrent) {
       movedVersionedKeyInfo = currentVersion.getVersionId() != null
           ? currentVersion
           : currentVersion.toBuilder()
@@ -469,6 +476,31 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
     }
 
+    // The null version the marker replaces is removed: the current one when
+    // the last write was also suspended, and a noncurrent one when versioning
+    // was enabled in between.
+    OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion : null;
+    String replacedNullVersionKey = null;
+    if (suspended && !replacesCurrent) {
+      Pair<String, OmKeyInfo> nullVersion = getNoncurrentNullVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      if (nullVersion != null) {
+        replacedNullVersionKey = nullVersion.getKey();
+        replacedNullVersion = nullVersion.getValue();
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(replacedNullVersionKey),
+            CacheValue.get(trxnLogIndex));
+      }
+    }
+    Map<String, RepeatedOmKeyInfo> keysToDelete = null;
+    if (replacedNullVersion != null) {
+      keysToDelete = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex,
+          objectKey, omBucketInfo.getObjectID(),
+          replacedNullVersion.withCommittedKeyDeletedFlag(true), null);
+      omBucketInfo.decrUsedBytes(sumBlockLengths(replacedNullVersion), true);
+      omBucketInfo.decrUsedNamespace(1L, true);
+    }
+
     omBucketInfo.incrUsedNamespace(1L);
 
     omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
@@ -477,7 +509,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     return new OMKeyDeleteMarkerResponse(
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
         deleteMarker, objectKey, movedVersionedKeyName, movedVersionedKeyInfo,
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject())
+        .withReplacedNullVersion(replacedNullVersionKey, keysToDelete);
   }
 
   /**

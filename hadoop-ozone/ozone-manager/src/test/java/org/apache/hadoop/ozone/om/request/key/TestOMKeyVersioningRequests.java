@@ -750,4 +750,67 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNotNull(noncurrentVersion(300L));
     assertNotNull(noncurrentVersion(100L));
   }
+
+  /**
+   * A delete while versioning is suspended writes a marker into the key's null
+   * version slot rather than creating a version.
+   */
+  @Test
+  public void testSuspendedDeleteWritesANullMarker() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+
+    deleteAt(500L);
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertTrue(current.isDeleteMarker());
+    assertTrue(current.isNullVersion());
+    // the version it superseded is retained, as under an enabled bucket
+    assertNotNull(noncurrentVersion(300L));
+  }
+
+  /** The null marker replaces the null version that held the slot. */
+  @Test
+  public void testSuspendedDeleteReplacesTheCurrentNullVersion()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(100L, false, true, true);
+
+    OMKeyDeleteMarkerResponse response =
+        (OMKeyDeleteMarkerResponse) deleteAt(500L);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isDeleteMarker());
+    assertTrue(current.isNullVersion());
+    // the replaced record is not kept as a noncurrent version
+    assertNull(noncurrentVersion(100L));
+    assertNotNull(response.getKeysToDelete());
+  }
+
+  /**
+   * Versions created while versioning was enabled stay readable and deletable
+   * by versionId after a suspended delete.
+   */
+  @Test
+  public void testSuspendedDeleteKeepsEnabledEraVersions() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, true);
+    seedNoncurrentVersion(100L, false);
+
+    deleteAt(500L);
+
+    assertTrue(currentVersion().isDeleteMarker());
+    // the superseded version and the older one are retained
+    assertNotNull(noncurrentVersion(300L));
+    assertNotNull(noncurrentVersion(100L));
+    // only the null version the marker replaced is gone
+    assertNull(noncurrentVersion(200L));
+
+    // and a retained version can still be deleted by versionId
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        deleteVersionAt(100L, false, 600L).getOMResponse().getStatus());
+    assertNull(noncurrentVersion(100L));
+  }
 }
