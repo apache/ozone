@@ -396,7 +396,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
-      isFile(keyPath, keyDetails);
+      validateFileKey(keyPath, keyDetails);
 
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
@@ -647,7 +647,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
           getClientProtocol().headS3Object(bucketName, keyPath);
 
-      isFile(keyPath, key);
+      validateFileKey(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {

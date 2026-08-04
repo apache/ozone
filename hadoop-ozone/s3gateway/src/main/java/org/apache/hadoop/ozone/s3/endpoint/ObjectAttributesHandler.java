@@ -74,6 +74,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
     context.setAction(S3GAction.GET_OBJECT_ATTRIBUTES);
 
+    final long startNanos = context.getStartNanos();
     try {
       Set<String> requestedAttributes = parseAttributesHeader(keyPath);
       String bucketName = context.getBucketName();
@@ -81,7 +82,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       OzoneKey key;
       try {
         key = getClientProtocol().headS3Object(bucketName, keyPath);
-        isFile(keyPath, key);
+        validateFileKey(keyPath, key);
       } catch (OMException ex) {
         if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
           throw newError(NO_SUCH_KEY, keyPath, ex);
@@ -95,11 +96,11 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
       Response.ResponseBuilder rb = Response.ok(response, MediaType.APPLICATION_XML_TYPE);
       ObjectEndpoint.addLastModifiedDate(rb, key);
-      getMetrics().updateGetObjectAttributesSuccessStats(context.getStartNanos());
+      getMetrics().updateGetObjectAttributesSuccessStats(startNanos);
       return rb.build();
 
-    } catch (IOException | RuntimeException ex) {
-      getMetrics().updateGetObjectAttributesFailureStats(context.getStartNanos());
+    } catch (OS3Exception | IOException ex) {
+      getMetrics().updateGetObjectAttributesFailureStats(startNanos);
       throw ex;
     }
   }

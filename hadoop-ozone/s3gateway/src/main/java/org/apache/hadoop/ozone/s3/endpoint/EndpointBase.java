@@ -813,12 +813,12 @@ public abstract class EndpointBase {
   }
 
   /**
-   * Reject directory keys accessed without a trailing slash when FSO directory creation is enabled.
+   * Rejects FSO directory keys when the request path omits the trailing slash.
    *
    * <p>Necessary for directories in buckets with FSO layout. Intended for apps which use Hadoop S3A
    * (e.g. Trino through the Hive connector).
    */
-  protected void isFile(String keyPath, OzoneKey key) throws OMException {
+  protected void validateFileKey(String keyPath, OzoneKey key) throws OMException {
     boolean isFsoDirCreationEnabled = getOzoneConfiguration()
         .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
             OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
