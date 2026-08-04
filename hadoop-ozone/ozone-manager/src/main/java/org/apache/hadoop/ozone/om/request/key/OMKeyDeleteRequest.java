@@ -168,7 +168,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (keyArgs.hasVersionId() || keyArgs.getNullVersion()) {
         // DELETE ?versionId= permanently removes one version. It is the only
         // delete that destroys data on a versioned bucket.
-        if (!omBucketInfo.isS3VersioningEnabled()) {
+        if (!omBucketInfo.hasEverBeenVersioned()) {
           throw new OMException("Bucket " + bucketName
               + " does not have S3 versioning enabled",
               NOT_SUPPORTED_OPERATION);
@@ -179,11 +179,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
             omResponse);
         // Noncurrent versions are invisible to plain reads, so removing one
         // does not change the visible key count.
-      } else if (omBucketInfo.isS3VersioningEnabled()) {
+      } else if (omBucketInfo.hasEverBeenVersioned()) {
         // A delete without a versionId removes no data: a delete marker
         // becomes the current version and the version it supersedes moves to
         // the versionedKeyTable. Like S3, the marker is inserted even when the
-        // key does not exist.
+        // key does not exist. While versioning is suspended the marker takes
+        // the key's null version slot instead of creating a version.
         insertingDeleteMarker = true;
         omClientResponse = insertDeleteMarker(ozoneManager, omMetadataManager,
             omBucketInfo, omKeyInfo, objectKey, keyArgs, trxnLogIndex,
@@ -418,7 +419,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
         inserted.getDeleteMarker(), inserted.getObjectKey(),
         inserted.getDemotedVersionKey(), inserted.getDemotedVersion(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject())
+        .withReplacedNullVersion(inserted.getReplacedNullVersionKey(),
+            inserted.getKeysToDelete());
   }
 
   /**
