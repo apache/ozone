@@ -30,8 +30,11 @@ import java.util.List;
 import java.util.concurrent.CompletionException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for {@link BlockDataStreamOutput} exercised through the {@link ByteBufferStreamOutput} interface with a
@@ -59,14 +62,31 @@ class TestBlockDataStreamOutput {
   }
 
   private BlockDataStreamOutput createStream(MockDatanodePipeline pipeline) throws IOException {
+    return createStream(pipeline, createConfig());
+  }
+
+  private BlockDataStreamOutput createStream(
+      MockDatanodePipeline pipeline, OzoneClientConfig config) throws IOException {
     List<StreamBuffer> bufferList = new ArrayList<>();
     return new BlockDataStreamOutput(
         pipeline.getBlockID(),
         pipeline.getClientFactory(),
         pipeline.getPipeline(),
-        createConfig(),
+        config,
         null,  // no token
         bufferList);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void streamInitTypeFollowsClientConfig(boolean putBlockOnCloseEnabled) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      Type expected = putBlockOnCloseEnabled ? Type.StreamInitWithPutBlock : Type.StreamInit;
+      assertEquals(expected, pipeline.getStreamInitType());
+    }
   }
 
   @Test
