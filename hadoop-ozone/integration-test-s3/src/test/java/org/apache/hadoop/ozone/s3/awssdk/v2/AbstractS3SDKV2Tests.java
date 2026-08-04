@@ -639,6 +639,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetObjectTorrentNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectTorrent(b -> b.bucket(bucketName).key(keyName)));
+
+    assertEquals(501, exception.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+
+    // object must be untouched
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(content.length(), headObjectResponse.contentLength());
+  }
+
+  @Test
   public void testHeadObjectIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
