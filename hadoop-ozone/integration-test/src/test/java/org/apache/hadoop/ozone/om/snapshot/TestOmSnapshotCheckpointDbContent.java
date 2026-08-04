@@ -17,27 +17,34 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -55,181 +62,266 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 /**
- * HDDS-13217: when an OM snapshot is created, the on-disk RocksDB checkpoint for that snapshot
- * should contain the same bucket-scoped metadata as the live OM for the tables exercised here.
+ * HDDS-13217: verify snapshot checkpoint DB content is preserved across defrag iterations.
  *
- * <p>Flow: write some keys, call createSnapshot, wait until the checkpoint is materialized, open
- * it read-only, then for each relevant table scan the key prefix for this volume/bucket on both
- * the live metadata manager and the checkpoint and assert the maps match.
+ * <p>After defrag compacts a snapshot checkpoint (S' = compact(S)), the on-disk metadata for that
+ * bucket prefix in the defragged checkpoint must still match the original checkpoint taken at
+ * snapshot creation time (version 0).
  *
- * <p>Tables compared: volume and bucket rows; key table for OBJECT_STORE and LEGACY layouts;
- * file and directory tables for FILE_SYSTEM_OPTIMIZED; openKeyTable and multipartInfoTable (these
- * stay empty in these tests but we still compare to catch stray open writes).
- *
- * <p>Omitted on purpose: snapshotInfoTable, because the new snapshot row is part of the same DB
- * batch as the checkpoint step, so it appears on the live OM after the batch commits but not
- * inside the checkpoint taken mid-batch. deletedTable, deletedDirTable, snapshotRenamedTable:
- * the leader deletes those prefix ranges on the active DB immediately after the checkpoint, so
- * live and checkpoint intentionally differ. We also do not scan cluster-wide tables (tokens,
- * secrets, compaction log, other tenants/volumes).
- *
- * <p>Later tests worth adding: a second snapshot on the same bucket; writes after the snapshot to
- * prove the checkpoint slice does not change; multipart uploads with real state; linked buckets
- * resolving to a source bucket.
- *
- * <p>Executed as a nested class under {@link org.apache.ozone.test.TestOzoneIntegrationNonHA} so
- * one {@link MiniOzoneCluster} is shared with other safe tests (HDDS-12183). Tests only add
- * volumes, buckets, keys, and snapshots; they do not stop or restart the cluster.
+ * <p>Tables compared per bucket: volume, bucket, key (object store layout), openKey, multipart.
+ * Snapshot-info and deleted/renamed tables are omitted because they differ by design between live
+ * OM and checkpoint or after purge.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOmSnapshotCheckpointDbContent implements NonHATests.TestCase {
+public class TestOmSnapshotCheckpointDbContent {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
+  private static final int DEFRAG_WAIT_MS = 120_000;
 
-  private OzoneConfiguration conf;
-  private OzoneClient client;
-  private ObjectStore store;
+  private static MiniOzoneCluster cluster;
+  private static OzoneConfiguration conf;
+  private static OzoneClient client;
+  private static ObjectStore store;
 
   @BeforeAll
-  void init() throws IOException {
-    conf = cluster().getConf();
-    client = cluster().newClient();
+  void initCluster() throws Exception {
+    assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary(),
+        "Snapshot defrag requires rocks-tools native library");
+
+    conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 7200);
+    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
+    cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     store = client.getObjectStore();
   }
 
   @AfterAll
-  void cleanup() {
+  void shutdownCluster() {
     IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(cluster);
   }
 
   /**
-   * Object store layout: mixed key shapes (flat and path-like), then snapshot and compare tables
-   * for this bucket.
+   * Test#1 from HDDS-13217: create S1, S2, S3 on one bucket, run defrag, and verify each
+   * defragged checkpoint still matches its version-0 baseline.
    */
   @Test
-  public void testSnapshotCheckpointMatchesLiveObsBucket()
-      throws IOException, InterruptedException, TimeoutException {
-    runLayoutScenario(BucketLayout.OBJECT_STORE,
-        Arrays.asList("k1", "prefix/k2", "prefix/k3"));
+  public void testDefragPreservesSnapshotCheckpointContent()
+      throws Exception {
+    ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
+    triggerDefragUntilDone(setup.snapshots);
+    assertCheckpointMatchesBaseline(setup.snapshots);
   }
 
   /**
-   * File-system-optimized layout: data lives in file/dir tables; includes keys under a short path and
-   * one at the bucket root.
+   * Test#2 from HDDS-13217: after an initial defrag pass, delete the middle snapshot, run defrag
+   * again, and verify the remaining youngest snapshot checkpoint still matches its baseline.
    */
   @Test
-  public void testSnapshotCheckpointMatchesLiveFsoBucket()
-      throws IOException, InterruptedException, TimeoutException {
-    runLayoutScenario(BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        Arrays.asList("d/k1", "d/k2", "k-root"));
+  public void testDefragAfterSnapshotDeletePreservesRemainingSnapshot()
+      throws Exception {
+    ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
+    triggerDefragUntilDone(setup.snapshots);
+
+    SnapshotInfo s2 = setup.snapshots.get(1);
+    SnapshotInfo s3 = setup.snapshots.get(2);
+    store.deleteSnapshot(setup.volumeName, setup.bucketName, s2.getName());
+    waitForSnapshotPurged(s2);
+
+    triggerDefragUntilDone(Arrays.asList(s3));
+    assertCheckpointMatchesBaseline(Arrays.asList(s3));
   }
 
-  /**
-   * Legacy layout: still uses the key table only; flat key names to match default path behavior on
-   * this cluster.
-   */
-  @Test
-  public void testSnapshotCheckpointMatchesLiveLegacyBucket()
-      throws IOException, InterruptedException, TimeoutException {
-    runLayoutScenario(BucketLayout.LEGACY,
-        Arrays.asList("key-a", "key-b", "key-c"));
-  }
-
-  /** Create bucket, write keys, snapshot, wait for checkpoint files, open checkpoint DB, compare. */
-  private void runLayoutScenario(BucketLayout layout, List<String> keyNames)
+  private ThreeSnapshotSetup createThreeSnapshotsOnNewBucket()
       throws IOException, InterruptedException, TimeoutException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, layout);
+        TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
 
-    for (String keyName : keyNames) {
-      TestDataUtil.createKey(bucket, keyName, TEST_KEY_CONTENT);
+    TestDataUtil.createKey(bucket, "key-s1", TEST_KEY_CONTENT);
+    store.createSnapshot(volumeName, bucketName, "snap-s1");
+
+    TestDataUtil.createKey(bucket, "key-s2", TEST_KEY_CONTENT);
+    store.createSnapshot(volumeName, bucketName, "snap-s2");
+
+    TestDataUtil.createKey(bucket, "key-s3", TEST_KEY_CONTENT);
+    store.createSnapshot(volumeName, bucketName, "snap-s3");
+
+    List<SnapshotInfo> snapshots = Arrays.asList(
+        loadSnapshotInfo(volumeName, bucketName, "snap-s1"),
+        loadSnapshotInfo(volumeName, bucketName, "snap-s2"),
+        loadSnapshotInfo(volumeName, bucketName, "snap-s3"));
+
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      waitForCheckpointReady(snapshotInfo);
     }
+    return new ThreeSnapshotSetup(volumeName, bucketName, snapshots);
+  }
 
-    String snapshotName = "snap-a";
-    store.createSnapshot(volumeName, bucketName, snapshotName);
-
-    OzoneManager om = cluster().getOzoneManager();
-    OMMetadataManager liveMm = om.getMetadataManager();
-    SnapshotInfo snapshotInfo = liveMm.getSnapshotInfoTable().get(
+  private SnapshotInfo loadSnapshotInfo(String volumeName, String bucketName,
+      String snapshotName) throws IOException {
+    OzoneManager om = cluster.getOzoneManager();
+    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable().get(
         SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
-    assertNotNull(snapshotInfo, "Snapshot row should exist after createSnapshot");
+    assertNotNull(snapshotInfo, "Snapshot row should exist for " + snapshotName);
     assertEquals(snapshotName, snapshotInfo.getName());
+    return snapshotInfo;
+  }
 
-    String currentPath =
-        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0)
-            + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(currentPath).exists(), 1000, 120_000);
+  private void waitForCheckpointReady(SnapshotInfo snapshotInfo)
+      throws TimeoutException, InterruptedException {
+    String currentPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0)
+        + OM_KEY_PREFIX + "CURRENT";
+    GenericTestUtils.waitFor(() -> new File(currentPath).exists(), 1000, DEFRAG_WAIT_MS);
+  }
 
-    RocksDBCheckpoint checkpoint = new RocksDBCheckpoint(
-        Paths.get(OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0)));
-    try (OmMetadataManagerImpl checkpointMm =
-             OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint)) {
-      TablePrefixInfo prefixes = liveMm.getTableBucketPrefix(volumeName, bucketName);
-      assertBucketPrefixTablesMatch(liveMm, checkpointMm, prefixes, layout);
+  private void waitForSnapshotPurged(SnapshotInfo snapshotInfo)
+      throws TimeoutException, InterruptedException {
+    OzoneManager om = cluster.getOzoneManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return om.getMetadataManager().getSnapshotInfoTable()
+            .get(snapshotInfo.getTableKey()) == null;
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, DEFRAG_WAIT_MS);
+  }
+
+  private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
+      throws TimeoutException, InterruptedException {
+    OzoneManager om = cluster.getOzoneManager();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        if (!om.triggerSnapshotDefrag(false)) {
+          return false;
+        }
+      } catch (IOException e) {
+        return false;
+      }
+      return snapshots.stream().allMatch(this::isSnapshotDefragComplete);
+    }, 1000, DEFRAG_WAIT_MS);
+  }
+
+  private boolean isSnapshotDefragComplete(SnapshotInfo snapshotInfo) {
+    try {
+      OmSnapshotLocalDataManager localDataManager =
+          cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
+               localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+        return provider.getVersion() > 0 && !provider.needsDefrag();
+      }
+    } catch (IOException e) {
+      return false;
     }
   }
 
-  /** Load every row under the bucket prefix from live vs checkpoint for the tables this test cares about. */
+  /**
+   * For each snapshot, compare bucket-scoped tables in the current checkpoint against version 0.
+   */
+  private void assertCheckpointMatchesBaseline(List<SnapshotInfo> snapshots)
+      throws IOException {
+    OzoneManager om = cluster.getOzoneManager();
+    OMMetadataManager liveMm = om.getMetadataManager();
+
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      int currentVersion = readSnapshotVersion(snapshotInfo);
+      TablePrefixInfo prefixes = liveMm.getTableBucketPrefix(
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+
+      try (OmMetadataManagerImpl baselineMm = openCheckpoint(snapshotInfo, 0);
+           OmMetadataManagerImpl currentMm = openCheckpoint(snapshotInfo, currentVersion)) {
+        assertBucketPrefixTablesMatch(baselineMm, currentMm, prefixes,
+            BucketLayout.OBJECT_STORE);
+      }
+    }
+  }
+
+  private int readSnapshotVersion(SnapshotInfo snapshotInfo) throws IOException {
+    OmSnapshotLocalDataManager localDataManager =
+        cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
+             localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+      return (int) provider.getVersion();
+    }
+  }
+
+  private OmMetadataManagerImpl openCheckpoint(SnapshotInfo snapshotInfo, int version)
+      throws IOException {
+    RocksDBCheckpoint checkpoint = new RocksDBCheckpoint(
+        Paths.get(OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, version)));
+    return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
+  }
+
   private void assertBucketPrefixTablesMatch(
-      OMMetadataManager live,
-      OMMetadataManager checkpoint,
+      OMMetadataManager baseline,
+      OMMetadataManager defragged,
       TablePrefixInfo prefixes,
       BucketLayout layout) throws IOException {
 
-    assertPrefixEquals(VOLUME_TABLE, live.getVolumeTable(),
-        checkpoint.getVolumeTable(), prefixes);
-    assertPrefixEquals(BUCKET_TABLE, live.getBucketTable(),
-        checkpoint.getBucketTable(), prefixes);
-
-    if (layout.isFileSystemOptimized()) {
-      assertPrefixEquals(FILE_TABLE, live.getFileTable(),
-          checkpoint.getFileTable(), prefixes);
-      assertPrefixEquals(DIRECTORY_TABLE, live.getDirectoryTable(),
-          checkpoint.getDirectoryTable(), prefixes);
-    } else {
-      assertPrefixEquals(KEY_TABLE,
-          live.getKeyTable(layout),
-          checkpoint.getKeyTable(layout), prefixes);
-    }
-
+    assertPrefixEquals(VOLUME_TABLE, baseline.getVolumeTable(),
+        defragged.getVolumeTable(), prefixes);
+    assertPrefixEquals(BUCKET_TABLE, baseline.getBucketTable(),
+        defragged.getBucketTable(), prefixes);
+    assertPrefixEquals(KEY_TABLE,
+        baseline.getKeyTable(layout),
+        defragged.getKeyTable(layout), prefixes);
     assertPrefixEquals(OPEN_KEY_TABLE,
-        live.getOpenKeyTable(layout),
-        checkpoint.getOpenKeyTable(layout), prefixes);
-    assertPrefixEquals(MULTIPART_INFO_TABLE, live.getMultipartInfoTable(),
-        checkpoint.getMultipartInfoTable(), prefixes);
+        baseline.getOpenKeyTable(layout),
+        defragged.getOpenKeyTable(layout), prefixes);
+    assertPrefixEquals(MULTIPART_INFO_TABLE, baseline.getMultipartInfoTable(),
+        defragged.getMultipartInfoTable(), prefixes);
   }
 
   private static <V> void assertPrefixEquals(
       String tableName,
-      Table<String, V> live,
-      Table<String, V> checkpoint,
+      Table<String, V> baseline,
+      Table<String, V> defragged,
       TablePrefixInfo prefixes) throws IOException {
     String prefix = prefixes.getTablePrefix(tableName);
-    assertEquals(readPrefix(live, prefix), readPrefix(checkpoint, prefix),
+    assertTrue(prefix != null && !prefix.isEmpty(),
+        "Expected non-empty prefix for " + tableName);
+    assertEquals(readPrefix(baseline, prefix), readPrefix(defragged, prefix),
         tableName);
   }
 
   private static <V> SortedMap<String, V> readPrefix(
       Table<String, V> table, String prefix) throws IOException {
     SortedMap<String, V> map = new TreeMap<>();
-    if (prefix == null || prefix.isEmpty()) {
-      return map;
-    }
     try (KeyValueIterator<String, V> it = table.iterator(prefix)) {
       while (it.hasNext()) {
         KeyValue<String, V> kv = it.next();
+        if (!kv.getKey().startsWith(prefix)) {
+          break;
+        }
         map.put(kv.getKey(), kv.getValue());
       }
     }
     return map;
+  }
+
+  private static final class ThreeSnapshotSetup {
+    private final String volumeName;
+    private final String bucketName;
+    private final List<SnapshotInfo> snapshots;
+
+    private ThreeSnapshotSetup(String volumeName, String bucketName,
+        List<SnapshotInfo> snapshots) {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.snapshots = new ArrayList<>(snapshots);
+    }
   }
 }
