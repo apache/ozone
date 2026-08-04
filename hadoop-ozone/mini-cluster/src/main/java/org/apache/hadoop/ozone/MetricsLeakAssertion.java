@@ -42,33 +42,31 @@ public final class MetricsLeakAssertion {
   private static final String ALL_SOURCES_FIELD = "allSources";
 
   /**
-   * Metrics sources that are known to still be registered after a mini
-   * cluster shuts down.  This is a transitional list: the JVM-level
-   * singletons (first group) are never unregistered by design, while the rest
-   * are genuine per-service leaks that are being burned down in follow-up
-   * issues.  Do not add new entries; fix the leak instead and remove the
-   * entry here.
+   * Metrics sources that are registered once per JVM (or once per service)
+   * and intentionally never unregistered, so they are expected to still be
+   * present after a mini cluster shuts down.  These are JVM-level singletons
+   * with no per-service owner; do not add per-service metrics here.
    *
-   * <p>Matching rules:
-   * <ul>
-   *   <li>An entry ending in {@code *} is a prefix match, used for sources
-   *   whose registered name embeds a random id, an absolute path, or a port
-   *   (e.g. {@code RpcActivityForPort15000}).</li>
-   *   <li>An entry starting with {@code *} is a suffix match, used for sources
-   *   whose registered name embeds a table-specific prefix (e.g.
-   *   {@code keyTableCache-1}).</li>
-   *   <li>Any other entry matches the source name exactly, or the name with a
-   *   numeric suffix the metrics system appends for repeated registrations
-   *   (e.g. {@code JvmMetrics-1}).</li>
-   * </ul>
+   * <p>For the matching rules see {@link #isExpectedLeftover(String)}.
    */
   private static final List<String> EXPECTED_LEFTOVER_SOURCES = Arrays.asList(
-      // JVM-level singletons, never unregistered by design.
       "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
       "JvmMetricsCpu",
       "UgiMetrics", // Hadoop security UGI metrics
       "ManagedRocksObjectMetrics",
+      "ContainerCacheMetrics" // ContainerCache singleton, created once per JVM
+  );
 
+  /**
+   * Metrics sources that leak: they should be unregistered when the mini
+   * cluster shuts down but currently are not.  This is a transitional list to
+   * keep the integration suite green while the leaks are being fixed.  Each
+   * entry should be removed once the corresponding source unregisters
+   * properly; do not add new entries, fix the leak instead.
+   *
+   * <p>For the matching rules see {@link #isExpectedLeftover(String)}.
+   */
+  private static final List<String> TODO_LEFTOVER_SOURCES = Arrays.asList(
       // RPC / HTTP server metrics (name embeds the listening port).
       "RpcActivityForPort*",
       "RpcDetailedActivityForPort*",
@@ -176,8 +174,27 @@ public final class MetricsLeakAssertion {
     }
   }
 
+  /**
+   * Matching rules for {@link #EXPECTED_LEFTOVER_SOURCES} and
+   * {@link #TODO_LEFTOVER_SOURCES}:
+   * <ul>
+   *   <li>An entry ending in {@code *} is a prefix match, used for sources
+   *   whose registered name embeds a random id, an absolute path, or a port
+   *   (e.g. {@code RpcActivityForPort15000}).</li>
+   *   <li>An entry starting with {@code *} is a suffix match, used for sources
+   *   whose registered name embeds a table-specific prefix (e.g.
+   *   {@code keyTableCache-1}).</li>
+   *   <li>Any other entry matches the source name exactly, or the name with a
+   *   numeric suffix the metrics system appends for repeated registrations
+   *   (e.g. {@code JvmMetrics-1}).</li>
+   * </ul>
+   */
   private static boolean isExpectedLeftover(String name) {
-    for (String entry : EXPECTED_LEFTOVER_SOURCES) {
+    return matches(EXPECTED_LEFTOVER_SOURCES, name) || matches(TODO_LEFTOVER_SOURCES, name);
+  }
+
+  private static boolean matches(List<String> entries, String name) {
+    for (String entry : entries) {
       if (entry.startsWith("*")) {
         // Suffix match, also tolerating a trailing numeric suffix (-N).
         String suffix = entry.substring(1);
