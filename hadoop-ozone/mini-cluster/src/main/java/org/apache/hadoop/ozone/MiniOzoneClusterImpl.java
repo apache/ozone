@@ -392,6 +392,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ContainerCache.getInstance(conf).shutdownCache();
       DefaultMetricsSystem.shutdown();
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
+      MetricsLeakAssertion.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
@@ -617,6 +618,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
+      // Enable metrics percentile collection so that the quantile code paths
+      // are exercised by every integration test.
+      conf.setIfUnset(OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
 
       configureHostAndRackTopology();
     }
