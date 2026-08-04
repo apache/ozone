@@ -431,12 +431,38 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
             "is less than used namespaceQuota");
   }
 
+  /**
+   * S3 object versioning is only defined for OBJECT_STORE buckets: combining
+   * it with the directory and rename semantics of the other layouts is out of
+   * scope, so the status cannot be set on them at all.
+   */
+  @Test
+  public void testVersioningStatusRejectedOnNonObjectStoreBucket()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED)).validateAndUpdateCache(
+                ozoneManager, 1);
+
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        response.getOMResponse().getStatus());
+    assertFalse(omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .hasVersioningStatus());
+  }
+
   @Test
   public void testVersioningStatusTransitions() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, BucketLayout.OBJECT_STORE);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     assertEquals(BucketVersioningStatus.UNVERSIONED,
@@ -486,7 +512,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, BucketLayout.OBJECT_STORE);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     // legacy false on a never-enabled bucket stays UNVERSIONED

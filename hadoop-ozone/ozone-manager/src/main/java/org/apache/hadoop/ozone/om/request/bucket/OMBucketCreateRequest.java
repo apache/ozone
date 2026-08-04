@@ -101,6 +101,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
+    if (bucketInfo.hasVersioningStatus()
+        && bucketLayout != BucketLayout.OBJECT_STORE) {
+      throw new OMException("S3 object versioning is only supported on "
+          + BucketLayout.OBJECT_STORE + " buckets, but bucket "
+          + bucketInfo.getBucketName() + " is created with layout "
+          + bucketLayout + ".",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
       try {
