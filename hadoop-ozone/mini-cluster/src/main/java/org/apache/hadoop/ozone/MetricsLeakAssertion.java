@@ -81,7 +81,9 @@ public final class MetricsLeakAssertion {
       "BackgroundVolumeScannerMetrics",
       "VolumeHealthMetrics-*",
       "VolumeIOStats-*", // name embeds the volume path
-      "VolumeInfoMetrics-*", // name embeds the volume path
+      // Name embeds the volume path.  Also intentionally kept registered for
+      // failed volumes (HDDS-7086), so only the healthy-volume case is a leak.
+      "VolumeInfoMetrics-*",
       "CommandHandlerMetrics",
       "HddsDispatcher",
       "ECReconstructionMetrics",
