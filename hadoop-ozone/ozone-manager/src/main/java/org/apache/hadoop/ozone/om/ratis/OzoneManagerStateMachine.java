@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
@@ -599,14 +598,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
     long startTime = Time.monotonicNow();
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
+    // The double buffer may have committed transactions past the index computed above, since it
+    // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+    // keeps the stored index from moving backwards over that data, and yields whichever value is
+    // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+    final TransactionInfo transactionInfo =
+        ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
     ozoneManager.setTransactionInfo(transactionInfo);
-    ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
     LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
         "notified = {}, current snapshot index = {}, took {} ms",
-            getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
-    return snapshot.getIndex();
+            getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+            Time.monotonicNow() - startTime);
+    return transactionInfo.getTermIndex().getIndex();
   }
 
   /**
