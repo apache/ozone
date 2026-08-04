@@ -412,6 +412,19 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectToSelfWithoutMetadataReplaceRejected() throws Exception {
+    // Seed the source object.
+    assertSucceeds(() -> putObject(CONTENT));
+
+    // Self-copy without x-amz-metadata-directive: REPLACE (and no storage-class
+    // change) is not a real update, so it stays InvalidRequest.
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    assertErrorResponse(INVALID_REQUEST, () -> putObject(CONTENT));
+  }
+
+  @Test
   void testContentTypeStoredAndCopied() throws Exception {
     // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
     when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
