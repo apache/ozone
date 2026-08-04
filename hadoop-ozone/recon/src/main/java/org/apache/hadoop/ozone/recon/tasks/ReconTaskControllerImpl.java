@@ -633,30 +633,43 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     // Try checkpoint creation (single attempt per iteration)
     ReconOMMetadataManager checkpointedOMMetadataManager = null;
-    
+    // Whether the checkpoint has been handed off to the event buffer. If not,
+    // this method owns its cleanup (the finally block below).
+    boolean handedOff = false;
+
     try {
       LOG.info("Attempting checkpoint creation (retry attempt: {})", eventProcessRetryCount.get() + 1);
-      checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
-      LOG.info("Checkpoint creation succeeded");
-    } catch (IOException e) {
-      LOG.error("Checkpoint creation failed: {}", e.getMessage());
+      try {
+        checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
+        LOG.info("Checkpoint creation succeeded");
+      } catch (IOException e) {
+        LOG.error("Checkpoint creation failed: {}", e.getMessage());
+        handleEventFailure();
+        return ReInitializationResult.RETRY_LATER;
+      }
+
+      // Create and queue the reinitialization event with checkpointed metadata manager
+      ReconTaskReInitializationEvent reinitEvent =
+          new ReconTaskReInitializationEvent(reason, checkpointedOMMetadataManager);
+      // If reinitialization event queued successfully, reset event buffer overflow flag and task failure flag,
+      // so that we can resume queuing the delta events.
+      if (eventBuffer.offer(reinitEvent)) {
+        // The downstream consumer now owns the checkpoint and its cleanup.
+        handedOff = true;
+        resetEventFlags();
+        LOG.info("Successfully queued reinitialization event after {} retries", eventProcessRetryCount.get() + 1);
+        return ReconTaskController.ReInitializationResult.SUCCESS;
+      }
+
+      // Buffer full - drop the event and clean up the fresh checkpoint (in finally) to avoid leaking it.
+      LOG.warn("Failed to queue reinitialization event (buffer full); discarding fresh checkpoint");
       handleEventFailure();
       return ReInitializationResult.RETRY_LATER;
+    } finally {
+      if (!handedOff && checkpointedOMMetadataManager != null) {
+        cleanupCheckpoint(checkpointedOMMetadataManager);
+      }
     }
-
-    // Create and queue the reinitialization event with checkpointed metadata manager
-    ReconTaskReInitializationEvent reinitEvent =
-        new ReconTaskReInitializationEvent(reason, checkpointedOMMetadataManager);
-    boolean queued = eventBuffer.offer(reinitEvent);
-    // If reinitialization event queued successfully, reset event buffer overflow flag and task failure flag,
-    // so that we can resume queuing the delta events.
-    if (queued) {
-      resetEventFlags();
-      // Success - reset retry counters and flags
-      LOG.info("Successfully queued reinitialization event after {} retries", eventProcessRetryCount.get() + 1);
-      return ReconTaskController.ReInitializationResult.SUCCESS;
-    }
-    return null;
   }
 
   private ReconTaskController.ReInitializationResult validateRetryCountAndDelay() {
@@ -936,35 +949,35 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     if (checkpointedManager == null) {
       return;
     }
+    // Get the checkpoint location before closing.
+    File checkpointLocation = null;
     try {
-      // Get the checkpoint location before closing
-      File checkpointLocation = null;
-      try {
-        if (checkpointedManager.getStore() != null &&
-            checkpointedManager.getStore().getDbLocation() != null) {
-          // The checkpoint location is typically the parent directory of the DB location
-          checkpointLocation = checkpointedManager.getStore().getDbLocation().getParentFile();
-        }
-      } catch (Exception e) {
-        LOG.warn("Failed to get checkpoint location for cleanup", e);
+      if (checkpointedManager.getStore() != null &&
+          checkpointedManager.getStore().getDbLocation() != null) {
+        // The checkpoint location is typically the parent directory of the DB location
+        checkpointLocation = checkpointedManager.getStore().getDbLocation().getParentFile();
       }
+    } catch (Exception e) {
+      LOG.warn("Failed to get checkpoint location for cleanup", e);
+    }
 
-      // Close the database connections first
+    // Close the database connections first, but always attempt to delete the
+    // checkpoint files afterwards - even if stop() throws - so the directory
+    // (a full copy of the OM DB) is never leaked.
+    try {
       checkpointedManager.stop();
       LOG.debug("Closed checkpointed OM metadata manager database connections");
-
-      // Clean up the checkpoint files if we have the location
+    } catch (Exception e) {
+      LOG.warn("Failed to stop checkpointed OM metadata manager", e);
+    } finally {
       if (checkpointLocation != null && checkpointLocation.exists()) {
         try {
           FileUtils.deleteDirectory(checkpointLocation);
-          LOG.debug("Cleaned up checkpoint directory: {}", checkpointLocation);
+          LOG.info("Cleaned up checkpoint directory: {}", checkpointLocation);
         } catch (IOException e) {
           LOG.warn("Failed to cleanup checkpoint directory: {}", checkpointLocation, e);
         }
       }
-
-    } catch (Exception e) {
-      LOG.warn("Failed to cleanup checkpointed OM metadata manager", e);
     }
   }
 
