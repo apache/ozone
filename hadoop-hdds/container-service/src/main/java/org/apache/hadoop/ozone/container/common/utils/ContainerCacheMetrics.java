@@ -28,6 +28,8 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
  */
 public final class ContainerCacheMetrics {
 
+  private static final String SOURCE_NAME = "ContainerCacheMetrics";
+
   @Metric("Rate to measure the db open latency")
   private MutableRate dbOpenLatency;
 
@@ -54,16 +56,12 @@ public final class ContainerCacheMetrics {
 
   public static ContainerCacheMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerCacheMetrics";
-
-    return ms.register(name, "null", new ContainerCacheMetrics());
+    return ms.register(SOURCE_NAME, "null", new ContainerCacheMetrics());
   }
 
   public static void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerCacheMetrics";
-
-    ms.unregisterSource(name);
+    ms.unregisterSource(SOURCE_NAME);
   }
 
   public void incNumDbGetOps() {
