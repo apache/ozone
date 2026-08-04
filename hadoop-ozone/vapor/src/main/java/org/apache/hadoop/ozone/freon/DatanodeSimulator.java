@@ -461,8 +461,8 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
     DatanodeDetails details = DatanodeDetails.newBuilder()
         .setID(DatanodeID.randomID())
         .build();
-    details.setInitialVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
-    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
+    details.setInitialVersion(HDDSVersion.SOFTWARE_VERSION);
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
     details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
     details.setStandalonePort(0);
@@ -471,7 +471,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
-    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
     return details;
   }
 

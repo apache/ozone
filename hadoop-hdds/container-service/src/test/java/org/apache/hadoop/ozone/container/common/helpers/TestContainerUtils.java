@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -152,7 +153,7 @@ public class TestContainerUtils {
       }
       assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile, conf));
 
-      id1.setInitialVersion(1);
+      id1.setInitialVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
       assertWriteRead(tempDir, id1);
     }
   }

@@ -836,14 +836,16 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   /**
    * Returns the initial version of the datanode.
    */
-  private int getInitialVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize());
+  private HDDSVersion getInitialVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 
   /**
    * Returns the current version of the datanode.
    */
-  private int getCurrentVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, HDDSVersion.SOFTWARE_VERSION.serialize());
+  private HDDSVersion getCurrentVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_CURRENT, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

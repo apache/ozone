@@ -342,7 +342,7 @@ public class TestBlockDataStreamOutput {
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
         assertEquals(DN_OLD_VERSION,
-            HDDSVersion.deserialize(details.getCurrentVersion()));
+            details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -354,7 +354,7 @@ public class TestBlockDataStreamOutput {
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
         assertEquals(DN_OLD_VERSION,
-            HDDSVersion.deserialize(details.getCurrentVersion()));
+            details.getCurrentVersion());
       }
     }
   }
