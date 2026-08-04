@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anySet;
@@ -600,6 +601,53 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setNullVersion(nullVersion)
         .setDeleteMarker(deleteMarker)
         .build();
+  }
+
+  /**
+   * Enabling versioning does not rewrite the objects a bucket already holds:
+   * they keep no versionId at all, and S3 reports their version as "null".
+   */
+  @Test
+  public void testLookupPreVersioningKeyAsNullVersion() throws Exception {
+    String volume = "vol-legacy";
+    String bucket = "buck-legacy";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // written before versioning was enabled: no versionId, no null flag
+    OmKeyInfo legacy = new OmKeyInfo.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .setOmKeyLocationInfos(Collections.emptyList())
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
+        .build();
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key), legacy);
+
+    OmKeyArgs.Builder base = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true);
+
+    // a plain read still returns it
+    OmKeyArgs args = base.build();
+    assertNull(keyManager.lookupKey(args, resolveBucket(args), null)
+        .getVersionId());
+
+    // and version "null" addresses it, without the record having been rewritten
+    args = base.setNullVersion(true).build();
+    OmKeyInfo nullVersion =
+        keyManager.lookupKey(args, resolveBucket(args), null);
+    assertNull(nullVersion.getVersionId());
+    assertTrue(nullVersion.isNullVersionRecord());
+    assertEquals(legacy, metadataManager
+        .getKeyTable(BucketLayout.OBJECT_STORE)
+        .get(metadataManager.getOzoneKey(volume, bucket, key)));
   }
 
   @Test

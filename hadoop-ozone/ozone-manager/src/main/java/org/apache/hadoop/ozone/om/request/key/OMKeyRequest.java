@@ -1625,7 +1625,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throws IOException {
 
     boolean deletingCurrent = currentVersion != null && (nullVersion
-        ? currentVersion.isNullVersion()
+        ? currentVersion.isNullVersionRecord()
         : Long.valueOf(versionId).equals(currentVersion.getVersionId()));
 
     String objectKey =
