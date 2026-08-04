@@ -1109,55 +1109,103 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
-          String multipartOpenKey;
-          try {
-            multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
-                volumeName, bucketName, keyName, upload.getUploadId(),
-                omMetadataManager, bucketInfo.getBucketLayout());
-          } catch (OMException e) {
-            LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
-                volumeName, bucketName, keyName, e);
-            continue;
-          }
-
-          OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
-              .get(multipartOpenKey);
-          if (openKeyInfo == null) {
-            LOG.warn("Open key not found for multipart upload {}/{}/{}, skipping",
-                volumeName, bucketName, keyName);
-            continue;
-          }
-
+          OmLCRule matchedRuleWithoutTags = null;
+          boolean needsTagMatch = false;
           for (OmLCRule rule : ruleList) {
-            if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
-              if (expiredUploads.isFull()) {
-                LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
-                    "({} uploads, {} parts) for bucket {}/{}",
-                    mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
-                    volumeName, bucketName);
-                abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
-              }
-
-              // Split-schema MPUs keep parts in multipartPartsTable (the embedded map
-              // is empty); legacy MPUs use the embedded map. An MPU with no uploaded
-              // parts is valid (S3 allows aborting it with an empty parts list).
-              int uploadedParts;
-              try {
-                uploadedParts = mpuKeyInfo.getSchemaVersion()
-                    == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
-                    ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
-                    : mpuKeyInfo.getPartKeyInfoMap().size();
-              } catch (IOException e) {
-                LOG.warn("Failed to count parts for MPU {}/{}/{} uploadId {}, skipping",
-                    volumeName, bucketName, keyName, upload.getUploadId(), e);
-                break;
-              }
-              expiredUploads.add(upload, uploadedParts);
-              LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
-                  volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
+            if (!passesAgeAndPrefix(upload, keyName, rule)) {
+              continue;
+            }
+            if (!rule.isTagEnable()) {
+              matchedRuleWithoutTags = rule;
               break;
             }
+            needsTagMatch = true;
           }
+
+          if (matchedRuleWithoutTags == null && !needsTagMatch) {
+            continue;
+          }
+
+          OmLCRule matchingRule = matchedRuleWithoutTags;
+
+          if (matchingRule == null) {
+            String multipartOpenKey;
+            try {
+              multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                  volumeName, bucketName, keyName, upload.getUploadId(),
+                  omMetadataManager, bucketInfo.getBucketLayout());
+            } catch (OMException e) {
+              LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                  volumeName, bucketName, keyName, e);
+              continue;
+            }
+
+            OmKeyInfo openKeyInfo;
+            try {
+              openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
+                  .get(multipartOpenKey);
+            } catch (IOException e) {
+              LOG.warn("Failed to read open key table for {}/{}/{}, skipping",
+                  volumeName, bucketName, keyName, e);
+              continue;
+            }
+
+            if (openKeyInfo == null) {
+              for (OmLCRule rule : ruleList) {
+                if (!rule.isTagEnable() && passesAgeAndPrefix(upload, keyName, rule)) {
+                  matchingRule = rule;
+                  break;
+                }
+              }
+              if (matchingRule == null) {
+                LOG.debug("Orphan multipart upload {}/{}/{} has no open key and no tag-free rule matches, skipping",
+                    volumeName, bucketName, keyName);
+                continue;
+              }
+              LOG.debug("Orphan multipart upload {}/{}/{} matched rule '{}' without open key, scheduling abort",
+                  volumeName, bucketName, keyName, matchingRule.getId());
+            } else {
+              for (OmLCRule rule : ruleList) {
+                if (passesAgeAndPrefix(upload, keyName, rule) && rule.isTagEnable()) {
+                  OmLCFilter filter = rule.getFilter();
+                  if (filter == null || filter.match(openKeyInfo, keyName)) {
+                    matchingRule = rule;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (matchingRule == null) {
+            continue;
+          }
+
+          if (expiredUploads.isFull()) {
+            LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
+                "({} uploads, {} parts) for bucket {}/{}",
+                mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
+                volumeName, bucketName);
+            abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+          }
+
+          // Split-schema MPUs keep parts in multipartPartsTable (the embedded map
+          // is empty); legacy MPUs use the embedded map. An MPU with no uploaded
+          // parts is valid (S3 allows aborting it with an empty parts list).
+          int uploadedParts;
+          try {
+            uploadedParts = mpuKeyInfo.getSchemaVersion()
+                == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+                ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
+                : mpuKeyInfo.getPartKeyInfoMap().size();
+          } catch (IOException e) {
+            LOG.warn("Failed to count parts for MPU {}/{}/{} uploadId {}, skipping",
+                volumeName, bucketName, keyName, upload.getUploadId(), e);
+            continue;
+          }
+          expiredUploads.add(upload, uploadedParts);
+          LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
+              volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
         }
       } catch (IOException e) {
         LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
@@ -1172,33 +1220,16 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     /**
-     * Check if a multipart upload should be aborted based on the lifecycle rule.
-     *
-     * @param openKeyInfo the open key information with tags
-     * @param upload the multipart upload information
-     * @param keyName the key name of the upload
-     * @param rule the lifecycle rule to evaluate against
-     * @return true if the upload should be aborted, false otherwise
+     * Returns true if the upload passes the age and prefix checks for the given rule,
+     * without consulting the open key table (no tag evaluation).
      */
-    private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
-                                      String keyName, OmLCRule rule) {
-
+    private boolean passesAgeAndPrefix(OmMultipartUpload upload, String keyName, OmLCRule rule) {
       if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
           upload.getCreationTime().toEpochMilli())) {
         return false;
       }
-
       String effectivePrefix = rule.getEffectivePrefix();
-      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
-        return false;
-      }
-
-      OmLCFilter filter = rule.getFilter();
-      if (filter != null && !filter.match(openKeyInfo, keyName)) {
-        return false;
-      }
-
-      return true;
+      return effectivePrefix == null || keyName.startsWith(effectivePrefix);
     }
 
     /**
