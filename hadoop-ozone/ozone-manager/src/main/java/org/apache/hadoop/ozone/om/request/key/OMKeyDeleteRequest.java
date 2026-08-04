@@ -332,7 +332,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     boolean nullVersion = keyArgs.getNullVersion();
     boolean deletingCurrent = currentVersion != null && (nullVersion
-        ? currentVersion.isNullVersion()
+        ? currentVersion.isNullVersionRecord()
         : Long.valueOf(keyArgs.getVersionId()).equals(
             currentVersion.getVersionId()));
 
