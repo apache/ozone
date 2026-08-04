@@ -1153,4 +1153,45 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
         omMetadataManager.getVersionedOzoneKey(
             volumeName, bucketName, keyName, versionId), version);
   }
+
+  /**
+   * A key written before versioning was enabled carries no versionId and no
+   * null flag. It is the key's null version all the same, so version "null"
+   * addresses it - without the record ever having been rewritten.
+   */
+  @Test
+  public void testPreVersioningCurrentIsAddressableAsNullVersion()
+      throws Exception {
+    setupVersionedBucket();
+    String ozoneKey = seedCurrentVersion(null);
+    OmKeyInfo legacy = currentVersion();
+    assertNull(legacy.getVersionId());
+    assertFalse(legacy.isNullVersion());
+    assertTrue(legacy.isNullVersionRecord());
+
+    // deleting version "null" hits it even though it carries no flag
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        deleteVersionAt(null, true, 500L).getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+  }
+
+  /**
+   * A suspended write replaces a pre-versioning record, since that record is
+   * the key's null version.
+   */
+  @Test
+  public void testSuspendedWriteReplacesAPreVersioningRecord()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(null, false, false, true);
+
+    OMKeyCommitResponse response = (OMKeyCommitResponse) commitAt(500L, PROPOSED);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isNullVersion());
+    assertEquals(PROPOSED, current.getVersionId());
+    // it was replaced, not kept as a noncurrent version
+    assertNull(noncurrentVersion(VersionIdGenerator.UNSET_VERSION_ID));
+    assertNotNull(response.getKeysToDelete());
+  }
 }
