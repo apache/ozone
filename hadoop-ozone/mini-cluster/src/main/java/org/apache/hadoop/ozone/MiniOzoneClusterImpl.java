@@ -113,6 +113,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   private OzoneConfiguration conf;
   private final SCMConfigurator scmConfigurator;
+  // Whether to assert no metrics sources leak on shutdown.  Tests running
+  // multiple clusters concurrently disable this via the builder.
+  private boolean metricsLeakAssertEnabled = true;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -163,6 +166,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   protected void setConf(OzoneConfiguration newConf) {
     this.conf = newConf;
+  }
+
+  void setMetricsLeakAssertEnabled(boolean enabled) {
+    this.metricsLeakAssertEnabled = enabled;
   }
 
   public void waitForSCMToBeReady() throws TimeoutException,
@@ -394,8 +401,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
       // Assert before tearing down the metrics system: Hadoop does not clear
       // allSources on shutdown, but checking before shutdown makes the
-      // assertion independent of that behavior.
-      MetricsLeakAssertion.assertNoLeaks();
+      // assertion independent of that behavior.  Tests running multiple
+      // clusters concurrently disable this because the registry is JVM-wide.
+      if (metricsLeakAssertEnabled) {
+        MetricsLeakAssertion.assertNoLeaks();
+      }
       DefaultMetricsSystem.shutdown();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
@@ -531,6 +541,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
             hddsDatanodes, getServices());
+        cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
         cluster.startServices();
 
         cluster.setCAClient(certClient);
