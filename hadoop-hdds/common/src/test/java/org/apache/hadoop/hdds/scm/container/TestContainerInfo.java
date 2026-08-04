@@ -30,8 +30,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ozone.test.TestClock;
@@ -129,6 +131,17 @@ public class TestContainerInfo {
     assertEquals(initialStateEnterTime, subject.getStateEnterTime());
 
     assertThrows(IllegalStateException.class, subject::revertState);
+  }
+
+  @Test
+  void storageTierIsIncludedInJson() {
+    ContainerInfo container = newBuilderForTest()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setStorageTier(StorageTier.ARCHIVE)
+        .build();
+
+    assertEquals("ARCHIVE", JsonTestUtils.valueToJsonNode(container)
+        .get("storageTier").asText());
   }
 
   public static ContainerInfo.Builder newBuilderForTest() {

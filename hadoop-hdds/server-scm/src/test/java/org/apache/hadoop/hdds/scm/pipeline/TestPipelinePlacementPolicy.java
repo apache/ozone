@@ -730,6 +730,29 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
+  public void testCurrentRatisThreePipelineCountIgnoresLegacyPipeline()
+      throws IOException {
+    List<DatanodeDetails> healthyNodes = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> pipelineNodes = healthyNodes.subList(0, 3);
+    Pipeline legacyPipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE))
+        .setNodes(pipelineNodes)
+        .build();
+
+    nodeManager.addPipeline(legacyPipeline);
+    stateManager.addPipeline(legacyPipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION));
+
+    assertEquals(0, PipelinePlacementPolicy.currentRatisThreePipelineCount(
+        nodeManager, stateManager, pipelineNodes.get(0),
+        StorageType.DEFAULT));
+  }
+
+  @Test
   public void testPipelinePlacementPolicyDefaultLimitFiltersNodeAtLimit()
       throws IOException, TimeoutException {
 

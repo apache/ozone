@@ -235,18 +235,22 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
-      String owner) throws IOException {
+      String owner, HddsProtos.StorageTierProto storageTier) throws IOException {
     ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
-    return allocateContainer(replicationConfig, owner);
+    return allocateContainer(replicationConfig, owner, storageTier);
   }
 
   @Override
-  public ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner) throws IOException {
+  public ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner,
+      HddsProtos.StorageTierProto storageTier) throws IOException {
+    StorageTier tier = storageTier != null
+        ? StorageTier.fromProto(storageTier) : StorageTier.getDefaultTier();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("replicationType", String.valueOf(replicationConfig.getReplicationType()));
     auditMap.put("replication", String.valueOf(replicationConfig.getReplication()));
     auditMap.put("owner", String.valueOf(owner));
+    auditMap.put("storageTier", String.valueOf(tier));
 
     try {
       if (scm.getScmContext().isInSafeMode()) {
@@ -255,7 +259,7 @@ public class SCMClientProtocolServer implements
       }
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(replicationConfig, owner);
+          .allocateContainer(replicationConfig, owner, tier);
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);

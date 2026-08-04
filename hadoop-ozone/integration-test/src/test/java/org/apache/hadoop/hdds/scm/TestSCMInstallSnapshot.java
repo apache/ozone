@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -93,12 +94,12 @@ public class TestSCMInstallSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RatisReplicationConfig.getInstance(THREE), "Owner1")
+            RatisReplicationConfig.getInstance(THREE), "Owner1", StorageTier.getDefaultTier())
             .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RatisReplicationConfig.getInstance(ONE), "Owner2")
+            RatisReplicationConfig.getInstance(ONE), "Owner2", StorageTier.getDefaultTier())
             .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()

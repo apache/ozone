@@ -115,20 +115,21 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   private static boolean isNonClosedRatisThreePipeline(Pipeline p, StorageType storageType) {
-    boolean matchedTier = false;
-    if (storageType != null) {
-      try {
-        // TODO: Do we need to return true if getSupportedStorageTier() is empty
-        //  otherwise this might cause more pipelines to be created than necessary
-        matchedTier = p.getSupportedStorageTier().getUniformStorageType().equals(storageType);
-      } catch (IllegalArgumentException e) {
-        LOG.debug("Cannot convert pipeline storage tier {} to storage type.", p.getSupportedStorageTier(), e);
-        return false;
-      }
+    if (p == null || storageType == null ||
+        p.getSupportedStorageTier() == null ||
+        !p.getReplicationConfig().equals(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE)) ||
+        p.isClosed()) {
+      return false;
     }
-    return p != null && p.getReplicationConfig()
-        .equals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        && !p.isClosed() && matchedTier;
+    try {
+      return p.getSupportedStorageTier().getUniformStorageType()
+          .equals(storageType);
+    } catch (IllegalArgumentException e) {
+      LOG.debug("Cannot convert pipeline storage tier {} to storage type.",
+          p.getSupportedStorageTier(), e);
+      return false;
+    }
   }
 
   @Override

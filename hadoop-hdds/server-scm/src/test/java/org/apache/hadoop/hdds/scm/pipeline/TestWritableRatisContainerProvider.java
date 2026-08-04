@@ -141,7 +141,8 @@ class TestWritableRatisContainerProvider {
         .setPipelineID(pipeline.getId())
         .build();
 
-    when(containerManager.getMatchingContainer(CONTAINER_SIZE, OWNER, pipeline, emptySet()))
+    when(containerManager.getMatchingContainer(
+        CONTAINER_SIZE, OWNER, pipeline, emptySet(), StorageTier.getDefaultTier()))
         .thenReturn(container);
 
     return container;

@@ -68,6 +68,13 @@ public enum StorageTier {
     return defaultTier;
   }
 
+  public static void setDefault(StorageTier tier) {
+    if (tier == null) {
+      throw new IllegalArgumentException("Default StorageTier cannot be null.");
+    }
+    defaultTier = tier;
+  }
+
   public StorageTierProto toProto() {
     switch (this) {
     case SSD:

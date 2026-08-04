@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -261,6 +263,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
     private final List<Service> services = new ArrayList<>();
+    protected int numDataVolumes = 1;
+    protected List<List<StorageType>> datanodeStorageType = Collections.emptyList();
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -364,6 +368,37 @@ public interface MiniOzoneCluster extends AutoCloseable {
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
       return this;
+    }
+
+    /**
+     * Sets the number of data volumes per datanode. Rebuilds the default
+     * {@link UniformDatanodesFactory} to honor the new count. If a custom
+     * {@link DatanodeFactory} was set via {@link #setDatanodeFactory(DatanodeFactory)},
+     * this method has no effect on it.
+     */
+    public Builder setNumDataVolumes(int val) {
+      this.numDataVolumes = val;
+      rebuildDefaultDatanodeFactory();
+      return this;
+    }
+
+    /**
+     * Per-datanode storage type list. Outer list size must equal number of datanodes;
+     * each inner list, when non-empty, must equal {@link #numDataVolumes}. When set,
+     * each data dir is advertised with the requested {@link StorageType}.
+     */
+    public Builder setDatanodeStorageType(List<List<StorageType>> datanodeStorageType) {
+      this.datanodeStorageType = datanodeStorageType == null
+          ? Collections.emptyList() : datanodeStorageType;
+      rebuildDefaultDatanodeFactory();
+      return this;
+    }
+
+    private void rebuildDefaultDatanodeFactory() {
+      this.dnFactory = UniformDatanodesFactory.newBuilder()
+          .setNumDataVolumes(numDataVolumes)
+          .setDatanodeStorageType(datanodeStorageType)
+          .build();
     }
 
     public Builder addService(Service service) {

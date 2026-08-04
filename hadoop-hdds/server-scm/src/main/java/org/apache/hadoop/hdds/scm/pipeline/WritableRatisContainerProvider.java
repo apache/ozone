@@ -190,9 +190,8 @@ public class WritableRatisContainerProvider
           availablePipelines, req);
 
       // look for OPEN containers that match the criteria.
-      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final ContainerInfo containerInfo = containerManager.getMatchingContainer(
-          req.getSize(), owner, pipeline, excludeList.getContainerIds());
+          req.getSize(), owner, pipeline, excludeList.getContainerIds(), storageTier);
 
       if (containerInfo != null) {
         return containerInfo;

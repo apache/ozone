@@ -145,7 +145,7 @@ public class TestWritableECContainerProvider {
       containers.put(container.containerID(), container);
       return container;
     }).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), any(Pipeline.class));
+        anyString(), any(Pipeline.class), any(), any(StorageTier.class));
 
     doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))

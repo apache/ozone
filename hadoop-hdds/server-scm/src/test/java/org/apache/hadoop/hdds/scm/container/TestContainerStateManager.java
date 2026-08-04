@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
@@ -36,7 +37,9 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -211,6 +214,29 @@ public class TestContainerStateManager {
 
     assertEquals(2, replicas.size());
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+  }
+
+  @Test
+  public void testMatchingContainerRequiresExactStorageTier()
+      throws IOException {
+    ContainerInfo legacyContainer = createContainer(1, null);
+    containerStateManager.addContainer(legacyContainer.getProtobuf());
+    NavigableSet<ContainerID> containerIDs = new TreeSet<>();
+    containerIDs.add(legacyContainer.containerID());
+
+    assertNull(containerStateManager.getMatchingContainerAndStorageTier(
+        0, "root", pipeline.getId(), containerIDs, StorageTier.DISK));
+
+    ContainerInfo diskContainer = createContainer(2, StorageTier.DISK);
+    containerStateManager.addContainer(diskContainer.getProtobuf());
+    containerIDs.add(diskContainer.containerID());
+
+    assertEquals(diskContainer.containerID(),
+        containerStateManager.getMatchingContainerAndStorageTier(
+            0, "root", pipeline.getId(), containerIDs, StorageTier.DISK)
+            .containerID());
+    assertNull(containerStateManager.getMatchingContainerAndStorageTier(
+        0, "root", pipeline.getId(), containerIDs, StorageTier.ARCHIVE));
   }
 
   @ParameterizedTest
@@ -455,19 +481,27 @@ public class TestContainerStateManager {
   private ContainerInfo allocateContainer()
       throws IOException, TimeoutException {
 
-    final ContainerInfo containerInfo = new ContainerInfo.Builder()
+    final ContainerInfo containerInfo = createContainer(1, null);
+
+    containerStateManager.addContainer(containerInfo.getProtobuf());
+    return containerInfo;
+  }
+
+  private ContainerInfo createContainer(
+      long containerID, StorageTier storageTier) {
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setPipelineID(pipeline.getId())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
-        .setContainerID(1)
+        .setContainerID(containerID)
         .setDeleteTransactionId(0)
-        .setReplicationConfig(pipeline.getReplicationConfig())
-        .build();
-
-    containerStateManager.addContainer(containerInfo.getProtobuf());
-    return containerInfo;
+        .setReplicationConfig(pipeline.getReplicationConfig());
+    if (storageTier != null) {
+      builder.setStorageTier(storageTier);
+    }
+    return builder.build();
   }
 
   private static StorageContainerDatanodeProtocolProtos.ContainerReportsProto getContainerReportsProto(

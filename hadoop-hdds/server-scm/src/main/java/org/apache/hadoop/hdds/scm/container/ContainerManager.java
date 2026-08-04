@@ -19,11 +19,11 @@ package org.apache.hadoop.hdds.scm.container;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -137,7 +137,7 @@ public interface ContainerManager {
    * @throws IOException
    */
   ContainerInfo allocateContainer(ReplicationConfig replicationConfig,
-                                  String owner)
+                                  String owner, StorageTier storageTier)
       throws IOException;
 
   /**
@@ -197,24 +197,21 @@ public interface ContainerManager {
   void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
       throws IOException;
 
-  default ContainerInfo getMatchingContainer(long size, String owner,
-                                     Pipeline pipeline) {
-    return getMatchingContainer(size, owner, pipeline, Collections.emptySet());
-  }
-
   /**
    * Returns ContainerInfo which matches the requirements.
    * @param size - the amount of space required in the container
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
+   * @param storageTier - Required storageTier for Container.
    * @return ContainerInfo for the matching container, or null if a container could not be found and could not be
    * allocated
    */
   @Nullable
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
-                                     Set<ContainerID> excludedContainerIDS);
+                                     Set<ContainerID> excludedContainerIDS,
+                                     StorageTier storageTier);
 
   /**
    * Once after report processor handler completes, call this to notify
