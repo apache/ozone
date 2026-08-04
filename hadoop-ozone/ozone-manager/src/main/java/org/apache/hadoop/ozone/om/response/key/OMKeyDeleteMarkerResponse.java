@@ -18,16 +18,20 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -37,7 +41,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * the keyTable, and the version it supersedes (if the key existed) moves to
  * the versionedKeyTable.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE, BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE, BUCKET_TABLE,
+    DELETED_TABLE})
 public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
 
   private OmKeyInfo deleteMarker;
@@ -45,6 +50,8 @@ public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
   private String movedVersionedKeyName;
   private OmKeyInfo movedVersionedKeyInfo;
   private OmBucketInfo omBucketInfo;
+  private String replacedNullVersionKey;
+  private Map<String, RepeatedOmKeyInfo> keysToDelete;
 
   public OMKeyDeleteMarkerResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo deleteMarker, @Nonnull String ozoneKeyName,
@@ -68,6 +75,23 @@ public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
     checkStatusNotOK();
   }
 
+  /**
+   * The null version the marker replaced, when versioning is suspended: the
+   * versionedKeyTable entry to remove, if it had one, and its blocks to queue
+   * for reclamation.
+   */
+  public OMKeyDeleteMarkerResponse withReplacedNullVersion(
+      String dbVersionedKey, Map<String, RepeatedOmKeyInfo> deleteMap) {
+    this.replacedNullVersionKey = dbVersionedKey;
+    this.keysToDelete = deleteMap;
+    return this;
+  }
+
+  @VisibleForTesting
+  public Map<String, RepeatedOmKeyInfo> getKeysToDelete() {
+    return keysToDelete;
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
@@ -77,6 +101,19 @@ public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
     if (movedVersionedKeyInfo != null) {
       omMetadataManager.getVersionedKeyTable().putWithBatch(batchOperation,
           movedVersionedKeyName, movedVersionedKeyInfo);
+    }
+
+    if (replacedNullVersionKey != null) {
+      omMetadataManager.getVersionedKeyTable()
+          .deleteWithBatch(batchOperation, replacedNullVersionKey);
+    }
+
+    if (keysToDelete != null) {
+      for (Map.Entry<String, RepeatedOmKeyInfo> entry
+          : keysToDelete.entrySet()) {
+        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+            entry.getKey(), entry.getValue());
+      }
     }
 
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

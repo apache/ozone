@@ -1505,6 +1505,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     String volumeName = omBucketInfo.getVolumeName();
     String bucketName = omBucketInfo.getBucketName();
+    // While versioning is suspended the marker is the key's null version, so
+    // it replaces whatever held that slot instead of superseding it.
+    final boolean suspended = omBucketInfo.isS3VersioningSuspended();
+    final boolean replacesCurrent = suspended && currentVersion != null
+        && currentVersion.isNullVersionRecord();
 
     long markerVersionId = ozoneManager.getVersionIdAllocator().allocate(
         proposedVersionId, currentVersion);
@@ -1544,12 +1549,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .setUpdateID(trxnLogIndex)
         .setVersionId(markerVersionId)
         .setDeleteMarker(true)
-        .setNullVersion(false)
+        .setNullVersion(suspended)
         .build();
 
     String movedVersionedKeyName = null;
     OmKeyInfo movedVersionedKeyInfo = null;
-    if (currentVersion != null) {
+    if (currentVersion != null && !replacesCurrent) {
       movedVersionedKeyInfo = currentVersion.getVersionId() != null
           ? currentVersion
           : currentVersion.toBuilder()
@@ -1563,13 +1568,41 @@ public abstract class OMKeyRequest extends OMClientRequest {
           movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
     }
 
+    // The null version the marker replaces is removed: the current one when
+    // the last write was also suspended, and a noncurrent one when versioning
+    // was enabled in between.
+    OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion : null;
+    String replacedNullVersionKey = null;
+    if (suspended && !replacesCurrent) {
+      Pair<String, OmKeyInfo> nullVersion = getNoncurrentNullVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      if (nullVersion != null) {
+        replacedNullVersionKey = nullVersion.getKey();
+        replacedNullVersion = nullVersion.getValue();
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(replacedNullVersionKey),
+            CacheValue.get(trxnLogIndex));
+      }
+    }
+    Map<String, RepeatedOmKeyInfo> keysToDelete = null;
+    if (replacedNullVersion != null) {
+      keysToDelete = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex,
+          objectKey, omBucketInfo.getObjectID(),
+          replacedNullVersion.withCommittedKeyDeletedFlag(true), null);
+      omBucketInfo.decrUsedBytes(sumBlockLengths(replacedNullVersion), true);
+    }
+    // Replacing the null version swaps one record for another, so the marker
+    // then takes no namespace of its own; the caller applies what it does take.
+    final long addedNamespace = replacedNullVersion == null ? 1L : 0L;
+
     omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
         objectKey, deleteMarker, trxnLogIndex);
 
     // The namespace is left to the caller: the bucket is the cached instance,
     // and a batch that fails on a later key must not have counted this one.
     return new DeleteMarkerInsertion(deleteMarker, objectKey,
-        movedVersionedKeyName, movedVersionedKeyInfo, 1L);
+        movedVersionedKeyName, movedVersionedKeyInfo, replacedNullVersionKey,
+        keysToDelete, addedNamespace);
   }
 
   /**
