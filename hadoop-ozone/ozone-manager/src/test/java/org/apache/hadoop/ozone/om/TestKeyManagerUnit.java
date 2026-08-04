@@ -758,6 +758,49 @@ class TestKeyManagerUnit extends OzoneTestBase {
     assertEquals(OMException.ResultCodes.KEY_IS_DELETE_MARKER, ex.getResult());
   }
 
+  /**
+   * A delete while versioning is suspended leaves the marker in the null slot.
+   * It hides the key from plain reads exactly as a versioned marker does, and
+   * the versions behind it stay readable by id.
+   */
+  @Test
+  public void testLookupBehindANullDeleteMarker() throws Exception {
+    String volume = "vol-nullmarker";
+    String bucket = "buck-nullmarker";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // the marker took the null slot, over a version from the enabled era
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 50L, true, true));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 20L),
+        versionedKeyInfo(volume, bucket, key, 20L, false, false));
+
+    OmKeyArgs.Builder base = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true);
+
+    // a plain read steps over the marker and reports the key absent
+    OmKeyArgs plain = base.build();
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(plain, resolveBucket(plain), null));
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+
+    // addressing the null slot names the marker itself
+    OmKeyArgs nullSlot = base.setNullVersion(true).build();
+    ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(nullSlot, resolveBucket(nullSlot), null));
+    assertEquals(OMException.ResultCodes.KEY_IS_DELETE_MARKER, ex.getResult());
+
+    // and the enabled-era version behind it is still readable
+    OmKeyArgs behind = base.setVersionId(20L).build();
+    assertEquals(20L, keyManager.lookupKey(behind, resolveBucket(behind), null)
+        .getVersionId());
+  }
+
   @Test
   public void testCurrentVersionIsResolvedWithoutReadingVersionedKeyTable()
       throws Exception {

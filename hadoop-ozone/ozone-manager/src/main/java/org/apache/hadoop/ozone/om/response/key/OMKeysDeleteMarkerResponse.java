@@ -41,12 +41,14 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for a batch DeleteKeys request on a bucket with S3-compatible
- * versioning enabled: no data is removed. Each key gets a delete marker as its
- * current version, and the version each marker supersedes moves to the
- * versionedKeyTable. Entries naming a version are the exception: each
- * permanently deletes that version, as {@link OMKeyVersionDeleteResponse} does
- * for a single delete.
+ * Response for a batch DeleteKeys request on a bucket that has ever been
+ * versioned: no version the key still needs is removed. Each key gets a delete
+ * marker as its current version, and the version each marker supersedes moves
+ * to the versionedKeyTable. While versioning is suspended the marker is the
+ * key's null version, so it replaces whatever held that slot: that record is
+ * dropped and its blocks are queued for reclamation. Entries naming a version
+ * are the exception: each permanently deletes that version, as
+ * {@link OMKeyVersionDeleteResponse} does for a single delete.
  *
  * <p>The single-key counterpart is {@link OMKeyDeleteMarkerResponse}; both
  * write out what {@code OMKeyRequest.insertDeleteMarker} produced.
@@ -94,6 +96,10 @@ public class OMKeysDeleteMarkerResponse extends OmKeyResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    // Everything the batch sends to the deletedTable, put once per key: the
+    // null version a suspended marker replaced and the versions deleted by id
+    // of the same key are named by the same transaction.
+    Map<String, RepeatedOmKeyInfo> deletedBlocks = new HashMap<>();
     for (DeleteMarkerInsertion inserted : insertions) {
       // The version the marker supersedes and the marker itself go in one
       // batch, so a reader never sees the key without either.
@@ -103,11 +109,19 @@ public class OMKeysDeleteMarkerResponse extends OmKeyResponse {
       }
       omMetadataManager.getKeyTable(getBucketLayout()).putWithBatch(
           batchOperation, inserted.getObjectKey(), inserted.getDeleteMarker());
+
+      // The null version a suspended marker replaced, if the key had one.
+      if (inserted.getReplacedNullVersionKey() != null) {
+        omMetadataManager.getVersionedKeyTable().deleteWithBatch(
+            batchOperation, inserted.getReplacedNullVersionKey());
+      }
+      if (inserted.getKeysToDelete() != null) {
+        deletedBlocks.putAll(inserted.getKeysToDelete());
+      }
     }
 
     // After the markers and in request order, as the request applied them to
     // the table cache.
-    Map<String, RepeatedOmKeyInfo> deletedBlocks = new HashMap<>();
     for (OMKeyVersionDeleteResponse deleted : versionDeletes) {
       deleted.addToDBBatch(omMetadataManager, batchOperation, deletedBlocks);
     }
