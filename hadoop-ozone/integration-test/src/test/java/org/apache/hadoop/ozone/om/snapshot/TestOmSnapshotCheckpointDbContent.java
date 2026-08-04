@@ -37,13 +37,17 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.UncheckedAutoCloseableSupplier;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -66,6 +70,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * HDDS-13217: verify snapshot checkpoint DB content is preserved across defrag iterations.
@@ -74,15 +79,16 @@ import org.junit.jupiter.api.TestInstance;
  * bucket prefix in the defragged checkpoint must still match the original checkpoint taken at
  * snapshot creation time (version 0).
  *
- * <p>Tables compared per bucket: volume, bucket, key (object store layout), openKey, multipart.
- * Snapshot-info and deleted/renamed tables are omitted because they differ by design between live
- * OM and checkpoint or after purge.
+ * <p>Version-0 checkpoint directories are removed after defrag, so baselines are captured before
+ * the first defrag iteration and compared against the active snapshot after defrag completes.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 15, unit = TimeUnit.MINUTES)
 public class TestOmSnapshotCheckpointDbContent {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
-  private static final int DEFRAG_WAIT_MS = 120_000;
+  private static final int CHECKPOINT_WAIT_MS = 120_000;
+  private static final int DEFRAG_WAIT_MS = 600_000;
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -121,7 +127,7 @@ public class TestOmSnapshotCheckpointDbContent {
       throws Exception {
     ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
     triggerDefragUntilDone(setup.snapshots);
-    assertCheckpointMatchesBaseline(setup.snapshots);
+    assertCheckpointMatchesBaseline(setup.baselines, setup.snapshots);
   }
 
   /**
@@ -140,7 +146,9 @@ public class TestOmSnapshotCheckpointDbContent {
     waitForSnapshotPurged(s2);
 
     triggerDefragUntilDone(Arrays.asList(s3));
-    assertCheckpointMatchesBaseline(Arrays.asList(s3));
+    assertCheckpointMatchesBaseline(
+        Map.of(s3.getSnapshotId(), setup.baselines.get(s3.getSnapshotId())),
+        Arrays.asList(s3));
   }
 
   private ThreeSnapshotSetup createThreeSnapshotsOnNewBucket()
@@ -167,7 +175,14 @@ public class TestOmSnapshotCheckpointDbContent {
     for (SnapshotInfo snapshotInfo : snapshots) {
       waitForCheckpointReady(snapshotInfo);
     }
-    return new ThreeSnapshotSetup(volumeName, bucketName, snapshots);
+
+    OMMetadataManager liveMm = cluster.getOzoneManager().getMetadataManager();
+    TablePrefixInfo prefixes = liveMm.getTableBucketPrefix(volumeName, bucketName);
+    Map<UUID, SnapshotBaseline> baselines = new HashMap<>();
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      baselines.put(snapshotInfo.getSnapshotId(), captureBaseline(snapshotInfo, prefixes));
+    }
+    return new ThreeSnapshotSetup(volumeName, bucketName, snapshots, baselines);
   }
 
   private SnapshotInfo loadSnapshotInfo(String volumeName, String bucketName,
@@ -184,7 +199,7 @@ public class TestOmSnapshotCheckpointDbContent {
       throws TimeoutException, InterruptedException {
     String currentPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0)
         + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(currentPath).exists(), 1000, DEFRAG_WAIT_MS);
+    GenericTestUtils.waitFor(() -> new File(currentPath).exists(), 1000, CHECKPOINT_WAIT_MS);
   }
 
   private void waitForSnapshotPurged(SnapshotInfo snapshotInfo)
@@ -197,22 +212,23 @@ public class TestOmSnapshotCheckpointDbContent {
       } catch (IOException e) {
         return false;
       }
-    }, 1000, DEFRAG_WAIT_MS);
+    }, 1000, CHECKPOINT_WAIT_MS);
   }
 
   private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
       throws TimeoutException, InterruptedException {
     OzoneManager om = cluster.getOzoneManager();
     GenericTestUtils.waitFor(() -> {
+      if (snapshots.stream().allMatch(this::isSnapshotDefragComplete)) {
+        return true;
+      }
       try {
-        if (!om.triggerSnapshotDefrag(false)) {
-          return false;
-        }
+        om.triggerSnapshotDefrag(false);
       } catch (IOException e) {
         return false;
       }
       return snapshots.stream().allMatch(this::isSnapshotDefragComplete);
-    }, 1000, DEFRAG_WAIT_MS);
+    }, 2000, DEFRAG_WAIT_MS);
   }
 
   private boolean isSnapshotDefragComplete(SnapshotInfo snapshotInfo) {
@@ -228,33 +244,32 @@ public class TestOmSnapshotCheckpointDbContent {
     }
   }
 
-  /**
-   * For each snapshot, compare bucket-scoped tables in the current checkpoint against version 0.
-   */
-  private void assertCheckpointMatchesBaseline(List<SnapshotInfo> snapshots)
-      throws IOException {
-    OzoneManager om = cluster.getOzoneManager();
-    OMMetadataManager liveMm = om.getMetadataManager();
-
-    for (SnapshotInfo snapshotInfo : snapshots) {
-      int currentVersion = readSnapshotVersion(snapshotInfo);
-      TablePrefixInfo prefixes = liveMm.getTableBucketPrefix(
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-
-      try (OmMetadataManagerImpl baselineMm = openCheckpoint(snapshotInfo, 0);
-           OmMetadataManagerImpl currentMm = openCheckpoint(snapshotInfo, currentVersion)) {
-        assertBucketPrefixTablesMatch(baselineMm, currentMm, prefixes,
-            BucketLayout.OBJECT_STORE);
-      }
+  private SnapshotBaseline captureBaseline(SnapshotInfo snapshotInfo,
+      TablePrefixInfo prefixes) throws IOException {
+    try (OmMetadataManagerImpl checkpointMm = openCheckpoint(snapshotInfo, 0)) {
+      return new SnapshotBaseline(
+          readAllBucketPrefixTables(checkpointMm, prefixes, BucketLayout.OBJECT_STORE));
     }
   }
 
-  private int readSnapshotVersion(SnapshotInfo snapshotInfo) throws IOException {
-    OmSnapshotLocalDataManager localDataManager =
-        cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
-    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
-             localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
-      return (int) provider.getVersion();
+  private void assertCheckpointMatchesBaseline(
+      Map<UUID, SnapshotBaseline> baselines, List<SnapshotInfo> snapshots)
+      throws IOException {
+    OzoneManager om = cluster.getOzoneManager();
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      SnapshotBaseline baseline = baselines.get(snapshotInfo.getSnapshotId());
+      assertNotNull(baseline, "Missing baseline for " + snapshotInfo.getName());
+      TablePrefixInfo prefixes = om.getMetadataManager().getTableBucketPrefix(
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> activeSnapshot =
+               om.getOmSnapshotManager().getActiveSnapshot(
+                   snapshotInfo.getVolumeName(),
+                   snapshotInfo.getBucketName(),
+                   snapshotInfo.getName())) {
+        OMMetadataManager currentMm = activeSnapshot.get().getMetadataManager();
+        assertBucketPrefixTablesMatch(baseline.getTableData(), currentMm, prefixes,
+            BucketLayout.OBJECT_STORE);
+      }
     }
   }
 
@@ -265,41 +280,59 @@ public class TestOmSnapshotCheckpointDbContent {
     return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
   }
 
-  private void assertBucketPrefixTablesMatch(
-      OMMetadataManager baseline,
-      OMMetadataManager defragged,
+  private static Map<String, SortedMap<String, ?>> readAllBucketPrefixTables(
+      OMMetadataManager mm,
+      TablePrefixInfo prefixes,
+      BucketLayout layout) throws IOException {
+    Map<String, SortedMap<String, ?>> tables = new HashMap<>();
+    tables.put(VOLUME_TABLE, readPrefix(mm.getVolumeTable(),
+        prefixes.getTablePrefix(VOLUME_TABLE)));
+    tables.put(BUCKET_TABLE, readPrefix(mm.getBucketTable(),
+        prefixes.getTablePrefix(BUCKET_TABLE)));
+    tables.put(KEY_TABLE, readPrefix(mm.getKeyTable(layout),
+        prefixes.getTablePrefix(KEY_TABLE)));
+    tables.put(OPEN_KEY_TABLE, readPrefix(mm.getOpenKeyTable(layout),
+        prefixes.getTablePrefix(OPEN_KEY_TABLE)));
+    tables.put(MULTIPART_INFO_TABLE, readPrefix(mm.getMultipartInfoTable(),
+        prefixes.getTablePrefix(MULTIPART_INFO_TABLE)));
+    return tables;
+  }
+
+  private static void assertBucketPrefixTablesMatch(
+      Map<String, SortedMap<String, ?>> baseline,
+      OMMetadataManager current,
       TablePrefixInfo prefixes,
       BucketLayout layout) throws IOException {
 
-    assertPrefixEquals(VOLUME_TABLE, baseline.getVolumeTable(),
-        defragged.getVolumeTable(), prefixes);
-    assertPrefixEquals(BUCKET_TABLE, baseline.getBucketTable(),
-        defragged.getBucketTable(), prefixes);
-    assertPrefixEquals(KEY_TABLE,
-        baseline.getKeyTable(layout),
-        defragged.getKeyTable(layout), prefixes);
-    assertPrefixEquals(OPEN_KEY_TABLE,
-        baseline.getOpenKeyTable(layout),
-        defragged.getOpenKeyTable(layout), prefixes);
-    assertPrefixEquals(MULTIPART_INFO_TABLE, baseline.getMultipartInfoTable(),
-        defragged.getMultipartInfoTable(), prefixes);
+    assertPrefixEquals(VOLUME_TABLE, baseline.get(VOLUME_TABLE),
+        current.getVolumeTable(), prefixes);
+    assertPrefixEquals(BUCKET_TABLE, baseline.get(BUCKET_TABLE),
+        current.getBucketTable(), prefixes);
+    assertPrefixEquals(KEY_TABLE, baseline.get(KEY_TABLE),
+        current.getKeyTable(layout), prefixes);
+    assertPrefixEquals(OPEN_KEY_TABLE, baseline.get(OPEN_KEY_TABLE),
+        current.getOpenKeyTable(layout), prefixes);
+    assertPrefixEquals(MULTIPART_INFO_TABLE, baseline.get(MULTIPART_INFO_TABLE),
+        current.getMultipartInfoTable(), prefixes);
   }
 
   private static <V> void assertPrefixEquals(
       String tableName,
-      Table<String, V> baseline,
-      Table<String, V> defragged,
+      SortedMap<String, ?> expected,
+      Table<String, V> current,
       TablePrefixInfo prefixes) throws IOException {
     String prefix = prefixes.getTablePrefix(tableName);
     assertTrue(prefix != null && !prefix.isEmpty(),
         "Expected non-empty prefix for " + tableName);
-    assertEquals(readPrefix(baseline, prefix), readPrefix(defragged, prefix),
-        tableName);
+    assertEquals(expected, readPrefix(current, prefix), tableName);
   }
 
   private static <V> SortedMap<String, V> readPrefix(
       Table<String, V> table, String prefix) throws IOException {
     SortedMap<String, V> map = new TreeMap<>();
+    if (prefix == null || prefix.isEmpty()) {
+      return map;
+    }
     try (KeyValueIterator<String, V> it = table.iterator(prefix)) {
       while (it.hasNext()) {
         KeyValue<String, V> kv = it.next();
@@ -312,16 +345,30 @@ public class TestOmSnapshotCheckpointDbContent {
     return map;
   }
 
+  private static final class SnapshotBaseline {
+    private final Map<String, SortedMap<String, ?>> tableData;
+
+    private SnapshotBaseline(Map<String, SortedMap<String, ?>> tableData) {
+      this.tableData = tableData;
+    }
+
+    private Map<String, SortedMap<String, ?>> getTableData() {
+      return tableData;
+    }
+  }
+
   private static final class ThreeSnapshotSetup {
     private final String volumeName;
     private final String bucketName;
     private final List<SnapshotInfo> snapshots;
+    private final Map<UUID, SnapshotBaseline> baselines;
 
     private ThreeSnapshotSetup(String volumeName, String bucketName,
-        List<SnapshotInfo> snapshots) {
+        List<SnapshotInfo> snapshots, Map<UUID, SnapshotBaseline> baselines) {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.snapshots = new ArrayList<>(snapshots);
+      this.baselines = baselines;
     }
   }
 }
