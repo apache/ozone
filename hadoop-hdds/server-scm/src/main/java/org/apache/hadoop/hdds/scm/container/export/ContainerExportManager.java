@@ -19,20 +19,13 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_PAGE_SIZE;
 import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_SHARD_SIZE;
-import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.EXPORT_SUBDIR;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
@@ -45,18 +38,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
-import java.util.zip.GZIPOutputStream;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.utils.Archiver;
-import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +54,9 @@ import org.slf4j.LoggerFactory;
  * if RM has not yet evaluated a container.
  *
  * <p>Job status is kept in memory only. On SCM restart or leader failover, in-flight jobs are lost
- * and the operator must re-submit on the new leader. {@link ExportFileManager} removes incomplete
- * work on startup and retains completed {@code .tar.gz} files for eviction rebuild.
+ * and the operator must re-submit on the new leader. {@link ExportFileManager} owns on-disk layout,
+ * locking, shard files, and completed archives; this class tracks {@link ExportJob} state,
+ * schedules work, and applies {@code maxTerminalJobs} eviction.
  */
 public class ContainerExportManager {
 
@@ -81,10 +68,8 @@ public class ContainerExportManager {
 
   private static final DateTimeFormatter METADATA_TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
-  private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
 
-  private final Map<ExportJob.Id, ExportJob> jobTracker = new ConcurrentHashMap<>();
+  private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
   private final Deque<String> completedArchivePaths = new ArrayDeque<>();
   private final AtomicReference<ExportJob.Id> runningJobId = new AtomicReference<>();
   private final ExecutorService workerPool;
@@ -103,7 +88,7 @@ public class ContainerExportManager {
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(
-        Objects.requireNonNull(resolveExportDirectory(conf), "exportDirectory == null"));
+        Objects.requireNonNull(ExportFileManager.resolveExportDirectory(conf), "exportDirectory == null"));
     this.scmId = Objects.requireNonNull(scmId, "scmId == null");
     this.defaultShardSize = DEFAULT_SHARD_SIZE;
     this.defaultPageSize = DEFAULT_PAGE_SIZE;
@@ -144,14 +129,6 @@ public class ContainerExportManager {
         fileManager.getExportDirectory(), defaultShardSize, defaultPageSize, maxTerminalJobs);
   }
 
-  // TODO: make ozone.scm.container.export.dir configurable
-  // Set path separate from scm.db.dirs to avoid large export archive I/O
-  // contending with SCM metadata DB access as the disk fills.
-  private static String resolveExportDirectory(OzoneConfiguration conf) {
-    File scmDbDir = ServerUtils.getScmDbDir(conf);
-    return new File(scmDbDir, EXPORT_SUBDIR).getAbsolutePath();
-  }
-
   /**
    * Submit a container ID export job on the SCM leader.
    * Batch sizing is described by {@link ExportSizing}.
@@ -178,13 +155,12 @@ public class ContainerExportManager {
     ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     Instant now = Instant.now();
     String metadataTimestamp = METADATA_TIMESTAMP_FORMAT.format(now);
-    String archiveTimestamp = ARCHIVE_TIMESTAMP_FORMAT.format(now);
-    String tarPath = fileManager.resolveArchiveFile(scope, archiveTimestamp, jobId).getAbsolutePath();
+    String tarPath = fileManager.resolveArchivePath(scope, now, jobId);
 
     ExportJob job = new ExportJob(jobId, scope, metadataTimestamp, tarPath, start, sizing);
 
     evictOldTerminalJobs();
-    jobTracker.put(jobId, job);
+    jobMap.put(jobId, job);
 
     if (metrics != null) {
       metrics.incrExportJobsSubmitted();
@@ -198,12 +174,13 @@ public class ContainerExportManager {
 
   private static void validateRequest(ContainerID start) {
     if (start != null && start.getProtobuf().getId() < 0) {
-      throw new IllegalArgumentException("start container ID must be non-negative: " + start.getProtobuf().getId());
+      throw new IllegalArgumentException(
+          "start container ID must be non-negative, got: " + start.getProtobuf().getId());
     }
   }
 
   public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
-    ExportJob job = jobTracker.get(jobId);
+    ExportJob job = jobMap.get(jobId);
     return job != null ? job.toStatus() : null;
   }
 
@@ -228,12 +205,12 @@ public class ContainerExportManager {
     }
   }
 
-  Map<ExportJob.Id, ExportJob> getJobTracker() {
-    return jobTracker;
+  Map<ExportJob.Id, ExportJob> getJobMap() {
+    return jobMap;
   }
 
   private void evictOldTerminalJobs() {
-    List<Map.Entry<ExportJob.Id, ExportJob>> terminalJobs = jobTracker.entrySet().stream()
+    List<Map.Entry<ExportJob.Id, ExportJob>> terminalJobs = jobMap.entrySet().stream()
         .filter(e -> e.getValue().getExecutionState() != ExportJob.ExecutionState.RUNNING)
         .sorted(Comparator.comparingLong(e -> e.getValue().getEndTimeNs()))
         .collect(Collectors.toList());
@@ -241,7 +218,7 @@ public class ContainerExportManager {
     for (int i = 0; i < excess; i++) {
       ExportJob evicted = terminalJobs.get(i).getValue();
       removeCompletedArchive(evicted.getTarPath());
-      jobTracker.remove(evicted.getId());
+      jobMap.remove(evicted.getId());
     }
     trimCompletedArchives();
   }
@@ -264,18 +241,17 @@ public class ContainerExportManager {
     }
     fileManager.deleteExportTar(tarPath);
     completedArchivePaths.remove(tarPath);
-    jobTracker.entrySet().removeIf(e -> tarPath.equals(e.getValue().getTarPath()));
+    jobMap.entrySet().removeIf(e -> tarPath.equals(e.getValue().getTarPath()));
   }
 
   private void executeExport(ExportJob job) {
     String jobIdValue = job.getId().getValue();
-    Path jobDir = Paths.get(fileManager.getExportDirectory(), ExportFileManager.exportJobDirName(job.getId()));
-    File archiveFile = fileManager.resolveArchiveFile(job.getScope(), job.getTimestamp(), job.getId());
+    String archivePath = job.getTarPath();
     job.setStartTimeNs(System.nanoTime());
     boolean succeeded = false;
 
     try {
-      Files.createDirectories(jobDir);
+      fileManager.createJobDirectory(job.getId());
       job.setExecutionState(ExportJob.ExecutionState.RUNNING);
 
       ContainerID cursor = job.getStartContainerId();
@@ -283,7 +259,6 @@ public class ContainerExportManager {
       long totalRows = 0;
       long recordsInCurrentFile = 0;
       BufferedWriter writer = null;
-      Path currentShardPath = null;
       // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per page.
       StringBuilder buf = new StringBuilder(job.getPageSize() * 12);
 
@@ -314,8 +289,7 @@ public class ContainerExportManager {
           for (ContainerID containerId : page) {
             if (recordsInCurrentFile == 0) {
               writer = closeWriter(writer);
-              currentShardPath = jobDir.resolve(job.shardFileName(fileIndex));
-              writer = Files.newBufferedWriter(currentShardPath, StandardCharsets.UTF_8);
+              writer = fileManager.newShardWriter(job.getId(), job.shardFileName(fileIndex));
               job.writeMetadataHeader(writer, fileIndex, containerId);
               LOG.info("Export job {} created shard part{}", jobIdValue, fileIndex);
             }
@@ -329,7 +303,6 @@ public class ContainerExportManager {
               writer.write(buf.toString());
               buf.setLength(0);
               writer = closeWriter(writer);
-              currentShardPath = null;
               recordsInCurrentFile = 0;
               fileIndex++;
             }
@@ -355,36 +328,33 @@ public class ContainerExportManager {
         job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
         LOG.info("Export job {} completed with zero matching containers", jobIdValue);
       } else {
-        writeArchive(job, jobDir, archiveFile);
-        job.setTarPath(archiveFile.getAbsolutePath());
+        fileManager.writeArchive(job.getId(), archivePath);
+        job.setTarPath(archivePath);
         job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
-        completedArchivePaths.addLast(archiveFile.getAbsolutePath());
+        completedArchivePaths.addLast(archivePath);
         LOG.info("Export job {} completed ({} rows, archive={}).",
-            jobIdValue, totalRows, archiveFile.getAbsolutePath());
+            jobIdValue, totalRows, archivePath);
       }
-      if (Files.exists(jobDir)) {
-        FileUtils.deleteDirectory(jobDir.toFile());
-      }
+      fileManager.deleteJobDirectory(job.getId());
       succeeded = true;
     } catch (InterruptedException e) {
       job.setExecutionState(ExportJob.ExecutionState.FAILED);
       job.setErrorMessage(e.getMessage());
-      fileManager.cleanupFailedJob(jobDir, archiveFile);
+      fileManager.cleanupFailedJob(job.getId(), archivePath);
       LOG.info("Export job {} was cancelled", jobIdValue);
       Thread.currentThread().interrupt();
     } catch (IOException | RuntimeException e) {
       succeeded = false;
       job.setExecutionState(ExportJob.ExecutionState.FAILED);
       job.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.toString());
-      fileManager.cleanupFailedJob(jobDir, archiveFile);
+      fileManager.cleanupFailedJob(job.getId(), archivePath);
       LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
       runningJobId.compareAndSet(job.getId(), null);
       if (metrics != null) {
         if (succeeded) {
           metrics.incrExportJobsSucceeded();
-          long bytesWritten = archiveFile.isFile() ? archiveFile.length() : 0L;
-          metrics.recordLastSuccessfulExport(job.getTotalRows(), bytesWritten);
+          metrics.recordLastSuccessfulExport(job.getTotalRows(), fileManager.getArchiveLength(archivePath));
         } else if (job.getExecutionState() == ExportJob.ExecutionState.FAILED) {
           metrics.incrExportJobsFailed();
         }
@@ -392,21 +362,6 @@ public class ContainerExportManager {
       if (job.getExecutionState() == ExportJob.ExecutionState.SUCCEEDED
           || job.getExecutionState() == ExportJob.ExecutionState.FAILED) {
         evictOldTerminalJobs();
-      }
-    }
-  }
-
-  private void writeArchive(ExportJob job, Path jobDir, File archiveFile) throws IOException {
-    File[] shards = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
-    if (shards == null || shards.length == 0) {
-      throw new IOException("No shard files found for export job " + job.getId());
-    }
-    Arrays.sort(shards, Comparator.comparing(File::getName));
-    try (AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(archiveFile);
-         GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
-         ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
-      for (File shard : shards) {
-        Archiver.includeFile(shard, shard.getName(), tarOut);
       }
     }
   }

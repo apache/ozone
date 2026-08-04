@@ -194,7 +194,7 @@ public class TestContainerExportManager {
     assertNotNull(jobId);
     waitForTerminal(jobId);
 
-    ExportJob job = exportManager.getJobTracker().get(jobId);
+    ExportJob job = exportManager.getJobMap().get(jobId);
     assertTrue(job.getTimestamp().matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z"));
   }
 

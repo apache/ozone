@@ -236,7 +236,7 @@ public final class ExportJob {
   }
 
   String shardFileName(int partIndex) {
-    return String.format("container-ids-%s-%s-part%03d.txt",
+    return String.format("container-ids_%s_%s_part%03d.txt",
         scope.getValue(), timestamp, partIndex);
   }
 
