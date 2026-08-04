@@ -334,8 +334,8 @@ public class TestRackAwarePlacement {
             + "2 racks, but were on: " + racks);
   }
 
-  private static void assertRackAssignments(MiniOzoneCluster cluster,
-                                            String[] expectedRacks) {
+  private void assertRackAssignments(MiniOzoneCluster cluster,
+                                     String[] expectedRacks) {
     NodeManager nodeManager =
         cluster.getStorageContainerManager().getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
@@ -370,8 +370,8 @@ public class TestRackAwarePlacement {
     }
   }
 
-  private static void assertHostnameAssignments(MiniOzoneCluster cluster,
-                                                String[] expectedHosts) {
+  private void assertHostnameAssignments(MiniOzoneCluster cluster,
+                                         String[] expectedHosts) {
     NodeManager nodeManager =
         cluster.getStorageContainerManager().getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
