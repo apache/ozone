@@ -54,7 +54,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -83,6 +82,7 @@ import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.ScmNodeAddress;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -764,12 +764,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
         scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
 
-    final Collection<Pair<String, HostAndPort>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
+    final Collection<ScmNodeAddress> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToAdd);
     if (scmToAdd == null) {
       throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
     }
-    final Collection<Pair<String, HostAndPort>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
+    final Collection<ScmNodeAddress> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToRemove);
     if (scmToRemove == null) {
       throw new IllegalArgumentException(
@@ -790,9 +790,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Add the new SCM servers
-    for (Pair<String, HostAndPort> pair : scmToAdd) {
-      String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
+    for (ScmNodeAddress entry : scmToAdd) {
+      String scmNodeId = entry.getScmNodeId();
+      final HostAndPort scmAddress = entry.getHostAndPort();
       if (scmAddress.getAddress().isUnresolved()) {
         LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
             "be resolved, skipping", scmAddress, scmServiceId);
@@ -809,9 +809,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Remove the old SCM server
-    for (Pair<String, HostAndPort> pair : scmToRemove) {
-      String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
+    for (ScmNodeAddress entry : scmToRemove) {
+      String scmNodeId = entry.getScmNodeId();
+      final HostAndPort scmAddress = entry.getHostAndPort();
       try {
         connectionManager.removeSCMServer(scmAddress);
         context.removeEndpoint(scmAddress);

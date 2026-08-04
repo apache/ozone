@@ -33,7 +33,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,9 +127,9 @@ public class NativeLibraryLoader {
 
       }
       if (!loaded) {
-        Pair<Optional<File>, List<File>> files = copyResourceFromJarToTemp(libraryName, dependentFiles);
-        if (files.getKey().isPresent()) {
-          System.load(files.getKey().get().getAbsolutePath());
+        LoadedFiles files = copyResourceFromJarToTemp(libraryName, dependentFiles);
+        if (files.libraryFile.isPresent()) {
+          System.load(files.libraryFile.get().getAbsolutePath());
           loaded = true;
         }
       }
@@ -154,7 +153,7 @@ public class NativeLibraryLoader {
         .getResourceAsStream(libraryFileName);
   }
 
-  private Pair<Optional<File>, List<File>> copyResourceFromJarToTemp(final String libraryName,
+  private LoadedFiles copyResourceFromJarToTemp(final String libraryName,
                                                                      final List<String> dependentFileNames)
       throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
@@ -162,7 +161,7 @@ public class NativeLibraryLoader {
     try {
       is = getResourceStream(libraryFileName);
       if (is == null) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty(), null);
       }
 
       final String nativeLibDir =
@@ -174,7 +173,7 @@ public class NativeLibraryLoader {
       final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty(), null);
       }
 
       Path libPath = tempPath.resolve(libraryFileName);
@@ -201,11 +200,24 @@ public class NativeLibraryLoader {
       ShutdownHookManager.get().addShutdownHook(
           () -> FileUtils.deleteQuietly(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
-      return Pair.of(Optional.of(libFile), dependentFiles);
+      return new LoadedFiles(Optional.of(libFile), dependentFiles);
     } finally {
       if (is != null) {
         is.close();
       }
+    }
+  }
+
+  /**
+   * The extracted library file and any dependent temp files.
+   */
+  private static final class LoadedFiles {
+    private final Optional<File> libraryFile;
+    private final List<File> dependentFiles;
+
+    private LoadedFiles(Optional<File> libraryFile, List<File> dependentFiles) {
+      this.libraryFile = libraryFile;
+      this.dependentFiles = dependentFiles;
     }
   }
 }

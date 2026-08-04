@@ -37,7 +37,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -131,6 +130,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -881,7 +881,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+  public Map<String, SafeModeRuleStatus> getSafeModeRuleStatuses()
       throws IOException {
     GetSafeModeRuleStatusesRequestProto request =
         GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
@@ -896,12 +896,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * Helper method to build a map from GetSafeModeRuleStatusesResponseProto.
    * Extracts rule names and their status information.
    */
-  private Map<String, Pair<Boolean, String>> buildSafeModeRuleStatusesMap(
+  private Map<String, SafeModeRuleStatus> buildSafeModeRuleStatusesMap(
       GetSafeModeRuleStatusesResponseProto response) {
-    Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
+    Map<String, SafeModeRuleStatus> ruleStatuses = new HashMap<>();
     for (SafeModeRuleStatusProto statusProto : response.getSafeModeRuleStatusesProtoList()) {
       ruleStatuses.put(statusProto.getRuleName(),
-          Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
+          new SafeModeRuleStatus(statusProto.getValidate(), statusProto.getStatusText()));
     }
     return ruleStatuses;
   }

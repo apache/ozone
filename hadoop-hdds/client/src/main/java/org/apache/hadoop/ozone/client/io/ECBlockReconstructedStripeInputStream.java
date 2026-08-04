@@ -43,7 +43,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -570,11 +569,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   protected void loadDataBuffersFromStream()
       throws IOException, InterruptedException {
-    Queue<ImmutablePair<Integer, Future<Void>>> pendingReads
+    Queue<PendingRead> pendingReads
         = new ArrayDeque<>();
     for (int i : selectedIndexes) {
       ByteBuffer buf = decoderInputBuffers[i];
-      pendingReads.add(new ImmutablePair<>(i, executor.submit(() -> {
+      pendingReads.add(new PendingRead(i, executor.submit(() -> {
         readIntoBuffer(i, buf);
         return null;
       })));
@@ -583,8 +582,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     while (!pendingReads.isEmpty()) {
       int index = -1;
       try {
-        ImmutablePair<Integer, Future<Void>> pair = pendingReads.poll();
-        index = pair.getKey();
+        PendingRead pendingRead = pendingReads.poll();
+        index = pendingRead.index;
         // Should this future.get() have a timeout? At the end of the call chain
         // we eventually call a grpc or ratis client to read the block data. Its
         // the call to the DNs which could potentially block. There is a timeout
@@ -593,7 +592,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // Which defaults to 30s. So if there is a DN communication problem, it
         // should timeout in the client which should propagate up the stack as
         // an IOException.
-        pair.getValue().get();
+        pendingRead.future.get();
       } catch (ExecutionException ee) {
         boolean added = failedDataIndexes.add(index);
         Throwable t = ee.getCause() != null ? ee.getCause() : ee;
@@ -621,6 +620,19 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     if (exceptionOccurred) {
       throw new IOException("One or more errors occurred reading block "
           + getBlockID());
+    }
+  }
+
+  /**
+   * A pending block read tracked by stripe reconstruction.
+   */
+  private static final class PendingRead {
+    private final int index;
+    private final Future<Void> future;
+
+    private PendingRead(int index, Future<Void> future) {
+      this.index = index;
+      this.future = future;
     }
   }
 

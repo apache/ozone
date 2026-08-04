@@ -30,10 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.ozone.test.TestEntry;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -80,9 +80,12 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testCorrectReplicationWithOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -155,7 +158,7 @@ public class TestQuasiClosedStuckReplicaCount {
   public void testUnderReplicationWithOneOrigin() {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
         ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE));
+        new TestEntry<>(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -200,10 +203,13 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testOverReplicationWithOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, IN_SERVICE));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -249,9 +255,12 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testUnderReplicationDueToDecommissionWithOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, DECOMMISSIONING), Pair.of(origin1, DECOMMISSIONING));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, DECOMMISSIONING),
+            new TestEntry<>(origin1, DECOMMISSIONING));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -298,10 +307,13 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testNoOverReplicationWithOutOfServiceReplicasWithOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, DECOMMISSIONED));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, DECOMMISSIONED));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
@@ -310,17 +322,23 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testUnderReplicationWithMaintenanceWithOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE), Pair.of(origin1, ENTERING_MAINTENANCE));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, ENTERING_MAINTENANCE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
 
-    replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, ENTERING_MAINTENANCE), Pair.of(origin1, ENTERING_MAINTENANCE));
+    replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, ENTERING_MAINTENANCE),
+            new TestEntry<>(origin1, ENTERING_MAINTENANCE));
 
     replicaCount = new QuasiClosedStuckReplicaCount(replicas, 2, 3, 2);
     assertTrue(replicaCount.isUnderReplicated());
@@ -379,10 +397,13 @@ public class TestQuasiClosedStuckReplicaCount {
 
   @Test
   public void testNoOverReplicationWithExcessMaintenanceReplicasOneOrigin() {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(
-        ContainerID.valueOf(1), QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE), Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, IN_MAINTENANCE));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithOriginAndOpState(
+            ContainerID.valueOf(1), QUASI_CLOSED,
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_SERVICE),
+            new TestEntry<>(origin1, IN_MAINTENANCE));
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1, 3, 2);
     assertFalse(replicaCount.isUnderReplicated());

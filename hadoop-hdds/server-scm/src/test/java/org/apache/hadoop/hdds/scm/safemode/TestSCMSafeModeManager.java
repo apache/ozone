@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -465,7 +465,6 @@ public class TestSCMSafeModeManager {
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentPipelinesWithAtleastOneReplicaCount().value());
 
-
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
     GenericTestUtils.waitFor(() ->
@@ -478,13 +477,13 @@ public class TestSCMSafeModeManager {
    * @param stringToMatch string to match in the rule status.
    */
   private void validateRuleStatus(String safeModeRule, String stringToMatch) {
-    Set<Map.Entry<String, Pair<Boolean, String>>> ruleStatuses =
+    Set<Map.Entry<String, SafeModeRuleStatus>> ruleStatuses =
         scmSafeModeManager.getRuleStatus().entrySet();
-    for (Map.Entry<String, Pair<Boolean, String>> entry : ruleStatuses) {
+    for (Map.Entry<String, SafeModeRuleStatus> entry : ruleStatuses) {
       if (entry.getKey().equals(safeModeRule)) {
-        Pair<Boolean, String> value = entry.getValue();
-        assertEquals(false, value.getLeft());
-        assertThat(value.getRight()).containsIgnoringCase(stringToMatch);
+        SafeModeRuleStatus value = entry.getValue();
+        assertEquals(false, value.isValidated());
+        assertThat(value.getStatusText()).containsIgnoringCase(stringToMatch);
       }
     }
   }
@@ -1108,7 +1107,7 @@ public class TestSCMSafeModeManager {
    */
   private void verifyPeriodicLoggingActive(GenericTestUtils.LogCapturer logCapturer)
       throws InterruptedException {
-    Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    Map<String, SafeModeRuleStatus> ruleStatuses = scmSafeModeManager.getRuleStatus();
     for (int i = 0; i < 2; i++) {
       logCapturer.clearOutput();
       // Wait for configured interval (500ms + small buffer) for next log message

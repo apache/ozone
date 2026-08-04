@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.RocksTestUtils;
@@ -44,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -62,13 +62,13 @@ class TestManagedRawSSTFileIterator {
   private Path tempDir;
 
   private File createSSTFileWithKeys(
-      TreeMap<Pair<String, Integer>, String> keys) throws Exception {
+      TreeMap<KeySpec, String> keys) throws Exception {
     File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
       sstFileWriter.open(file.getAbsolutePath());
-      for (Map.Entry<Pair<String, Integer>, String> entry : keys.entrySet()) {
+      for (Map.Entry<KeySpec, String> entry : keys.entrySet()) {
         if (entry.getKey().getValue() == 0) {
           sstFileWriter.delete(entry.getKey().getKey().getBytes(StandardCharsets.UTF_8));
         } else {
@@ -105,16 +105,18 @@ class TestManagedRawSSTFileIterator {
   }
 
   @BeforeAll
-  public static void init() throws NativeLibraryNotLoadedException {
-    ManagedRawSSTFileReader.loadLibrary();
+  public static void init() {
+    Assumptions.assumeTrue(
+        ManagedRawSSTFileReader.tryLoadLibrary(),
+        "Rocks native tools library is not available");
   }
 
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat, IteratorType type)
       throws Exception {
-    TreeMap<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
-        i -> Pair.of(String.format(keyFormat, i), i % 2),
+    TreeMap<KeySpec, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
+        i -> new KeySpec(String.format(keyFormat, i), i % 2),
         i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
         (v1, v2) -> v2, TreeMap::new));
     File file = createSSTFileWithKeys(keys);
@@ -122,10 +124,10 @@ class TestManagedRawSSTFileIterator {
          ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(
              options, file.getAbsolutePath(), 2 * 1024 * 1024)) {
       List<Optional<String>> testBounds = RocksTestUtils.getTestingBounds(keys.keySet().stream()
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
+          .collect(Collectors.toMap(KeySpec::getKey, KeySpec::getValue, (v1, v2) -> v1, TreeMap::new)));
       for (Optional<String> keyStart : testBounds) {
         for (Optional<String> keyEnd : testBounds) {
-          Map<Pair<String, Integer>, String> expectedKeys = keys.entrySet().stream()
+          Map<KeySpec, String> expectedKeys = keys.entrySet().stream()
               .filter(e -> keyStart.map(s -> e.getKey().getKey().compareTo(s) >= 0).orElse(true))
               .filter(e -> keyEnd.map(s -> e.getKey().getKey().compareTo(s) < 0).orElse(true))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, TreeMap::new));
@@ -134,11 +136,11 @@ class TestManagedRawSSTFileIterator {
           Optional<ManagedSlice> upperBound = keyEnd.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           try (ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator =
                    reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null), type)) {
-            Iterator<Map.Entry<Pair<String, Integer>, String>> expectedKeyItr = expectedKeys.entrySet().iterator();
+            Iterator<Map.Entry<KeySpec, String>> expectedKeyItr = expectedKeys.entrySet().iterator();
             while (iterator.hasNext()) {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
               assertTrue(expectedKeyItr.hasNext());
-              Map.Entry<Pair<String, Integer>, String> expectedKey = expectedKeyItr.next();
+              Map.Entry<KeySpec, String> expectedKey = expectedKeyItr.next();
               String key = r.getKey() == null ? null : StringCodec.get().fromCodecBuffer(r.getKey());
               assertEquals(type.readKey() ? expectedKey.getKey().getKey() : null, key);
               assertEquals(type.readValue() ? expectedKey.getValue() : null,
@@ -152,6 +154,52 @@ class TestManagedRawSSTFileIterator {
           }
         }
       }
+    }
+  }
+
+  /**
+   * A key and sequence used to build test SST entries.
+   */
+  private static final class KeySpec {
+    private final String key;
+    private final int value;
+
+    KeySpec(String key, int value) {
+      this.key = key;
+      this.value = value;
+    }
+
+    String getKey() {
+      return key;
+    }
+
+    int getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof KeySpec)) {
+        return false;
+      }
+      KeySpec that = (KeySpec) other;
+      return value == that.value && java.util.Objects.equals(key, that.key);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(key, value);
+    }
+
+    @Override
+    public String toString() {
+      return "KeySpec{"
+          + "key='" + key + '\''
+          + ", value=" + value
+          + '}';
     }
   }
 }

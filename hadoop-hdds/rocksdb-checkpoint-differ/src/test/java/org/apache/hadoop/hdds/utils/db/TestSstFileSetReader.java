@@ -36,7 +36,6 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksTestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
@@ -121,7 +120,7 @@ class TestSstFileSetReader {
    * @return Pair containing the complete sorted key map and list of SST file paths
    * @throws RocksDBException if there's an error during SST file creation
    */
-  private Pair<SortedMap<String, Integer>, List<Path>> createDummyData(int numberOfFiles) throws RocksDBException {
+  private DummyData createDummyData(int numberOfFiles) throws RocksDBException {
     List<Path> files = new ArrayList<>();
     int numberOfKeysPerFile = 1000;
     TreeMap<String, Integer> keys =
@@ -139,7 +138,7 @@ class TestSstFileSetReader {
       Path tmpSSTFile = createRandomSSTFile(fileKeys);
       files.add(tmpSSTFile);
     }
-    return Pair.of(keys, files);
+    return new DummyData(keys, files);
   }
 
   /**
@@ -153,9 +152,9 @@ class TestSstFileSetReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException, CodecException {
-    Pair<SortedMap<String, Integer>, List<Path>> data = createDummyData(numberOfFiles);
-    List<Path> files = data.getRight();
-    SortedMap<String, Integer> keys = data.getLeft();
+    DummyData data = createDummyData(numberOfFiles);
+    List<Path> files = data.getFiles();
+    SortedMap<String, Integer> keys = data.getKeys();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -195,10 +194,10 @@ class TestSstFileSetReader {
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, CodecException {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
-    Pair<SortedMap<String, Integer>, List<Path>> data =
+    DummyData data =
         createDummyData(numberOfFiles);
-    List<Path> files = data.getRight();
-    SortedMap<String, Integer> keys = data.getLeft();
+    List<Path> files = data.getFiles();
+    SortedMap<String, Integer> keys = data.getKeys();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -360,4 +359,50 @@ class TestSstFileSetReader {
         "Should have correct total number of distinct keys");
   }
 
+  /**
+   * The keys and files used to simulate SST reader input.
+   */
+  private static final class DummyData {
+    private final SortedMap<String, Integer> keys;
+    private final List<Path> files;
+
+    private DummyData(SortedMap<String, Integer> keys, List<Path> files) {
+      this.keys = keys;
+      this.files = files;
+    }
+
+    private SortedMap<String, Integer> getKeys() {
+      return keys;
+    }
+
+    private List<Path> getFiles() {
+      return files;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof DummyData)) {
+        return false;
+      }
+      DummyData that = (DummyData) other;
+      return java.util.Objects.equals(keys, that.keys)
+          && java.util.Objects.equals(files, that.files);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(keys, files);
+    }
+
+    @Override
+    public String toString() {
+      return "DummyData{"
+          + "keys=" + keys
+          + ", files=" + files
+          + '}';
+    }
+  }
 }

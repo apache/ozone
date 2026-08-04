@@ -22,7 +22,6 @@ import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashSet;
@@ -66,6 +65,56 @@ public class DefaultProfile implements PKIProfile {
       VALIDATE_SAN = DefaultProfile::validateSubjectAlternativeName;
   private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_EXTENDED_KEY_USAGE = DefaultProfile::validateExtendedKeyUsage;
+
+  /**
+   * A certificate extension and the validator used for it.
+   */
+  private static final class ExtensionValidator {
+
+    private final ASN1ObjectIdentifier extension;
+    private final BiPredicate<Extension, PKIProfile> validator;
+
+    private ExtensionValidator(ASN1ObjectIdentifier extension,
+        BiPredicate<Extension, PKIProfile> validator) {
+      this.extension = extension;
+      this.validator = validator;
+    }
+
+    private ASN1ObjectIdentifier getExtension() {
+      return extension;
+    }
+
+    private BiPredicate<Extension, PKIProfile> getValidator() {
+      return validator;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ExtensionValidator)) {
+        return false;
+      }
+      ExtensionValidator that = (ExtensionValidator) other;
+      return Objects.equals(extension, that.extension)
+          && Objects.equals(validator, that.validator);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(extension, validator);
+    }
+
+    @Override
+    public String toString() {
+      return "ExtensionValidator{"
+          + "extension=" + extension
+          + ", validator=" + validator
+          + '}';
+    }
+  }
+
   // If we decide to add more General Names, we should add those here and
   // also update the logic in validateGeneralName function.
   private static final int[] GENERAL_NAMES = {
@@ -76,11 +125,11 @@ public class DefaultProfile implements PKIProfile {
   // Map that handles all the Extensions lookup and validations.
   protected static final Map<ASN1ObjectIdentifier, BiPredicate<Extension,
       PKIProfile>> EXTENSIONS_MAP = Stream.of(
-          new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
-          new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
-          new SimpleEntry<>(Extension.authorityKeyIdentifier,
+          new ExtensionValidator(Extension.keyUsage, VALIDATE_KEY_USAGE),
+          new ExtensionValidator(Extension.subjectAlternativeName, VALIDATE_SAN),
+          new ExtensionValidator(Extension.authorityKeyIdentifier,
               VALIDATE_AUTHORITY_KEY_IDENTIFIER),
-          new SimpleEntry<>(Extension.extendedKeyUsage,
+          new ExtensionValidator(Extension.extendedKeyUsage,
               VALIDATE_EXTENDED_KEY_USAGE),
           // Ozone certs are issued only for the use of Ozone.
           // However, some users will discover that this is a full scale CA
@@ -89,9 +138,9 @@ public class DefaultProfile implements PKIProfile {
           // the Ozone Logo inside these certs. So if a browser is used to
           // connect these logos will show up.
           // https://www.ietf.org/rfc/rfc3709.txt
-          new SimpleEntry<>(Extension.logoType, VALIDATE_LOGO_TYPE))
-          .collect(Collectors.toMap(SimpleEntry::getKey,
-              SimpleEntry::getValue));
+          new ExtensionValidator(Extension.logoType, VALIDATE_LOGO_TYPE))
+          .collect(Collectors.toMap(ExtensionValidator::getExtension,
+              ExtensionValidator::getValidator));
   // If we decide to add more General Names, we should add those here and
   // also update the logic in validateGeneralName function.
   private static final KeyPurposeId[] EXTENDED_KEY_USAGE = {

@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
+import org.apache.ozone.test.TestEntry;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,9 +73,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   public void testMisReplicationWithAllNodesAvailable(int misreplicationCount)
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                Pair.of(IN_SERVICE, 5));
+        .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+            new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+                new TestEntry<>(IN_SERVICE, 5));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 5));
   }
@@ -83,9 +83,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   @Test
   public void testMisReplicationWithNoNodesReturned() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+                    new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+                    new TestEntry<>(IN_SERVICE, 5));
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             mock(ContainerPlacementStatus.class);
@@ -105,9 +105,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   public void testMisReplicationWithSomeNodesNotInService(
           int misreplicationCount) throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_MAINTENANCE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+                    new TestEntry<>(IN_MAINTENANCE, 3), new TestEntry<>(IN_MAINTENANCE, 4),
+                    new TestEntry<>(IN_SERVICE, 5));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 3));
   }
@@ -115,18 +115,18 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   @Test
   public void testMisReplicationWithUndereplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 2),
+                    new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+                    new TestEntry<>(IN_SERVICE, 5));
     testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 0);
   }
 
   @Test
   public void testMisReplicationWithOvereplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-                    Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-                    Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 1),
+                    new TestEntry<>(IN_SERVICE, 2), new TestEntry<>(IN_SERVICE, 3),
+                    new TestEntry<>(IN_SERVICE, 4), new TestEntry<>(IN_SERVICE, 5));
     testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 0);
   }
 
@@ -134,9 +134,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   public void testMisReplicationWithSatisfiedPlacementPolicy()
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+                    new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+                    new TestEntry<>(IN_SERVICE, 5));
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             mock(ContainerPlacementStatus.class);
@@ -151,9 +151,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   public void testMisReplicationWithPendingOps()
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+                    new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+                    new TestEntry<>(IN_SERVICE, 5));
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             mock(ContainerPlacementStatus.class);
@@ -179,9 +179,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
         .when(replicationManager).sendThrottledReplicationCommand(any(),
             anyList(), any(), anyInt());
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+        .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+            new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+            new TestEntry<>(IN_SERVICE, 5));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
             Collections.emptyList(), 0, 1, 1, 0));
@@ -191,9 +191,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   public void testFirstSourcesOverloaded() {
     setThrowThrottledException(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+        .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+            new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+            new TestEntry<>(IN_SERVICE, 5));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
             Collections.emptyList(), 0, 2, 2, 1));
@@ -202,9 +202,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   @Test
   public void commandsForFewerThanRequiredNodes() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-            Pair.of(IN_SERVICE, 5));
+        .createReplicas(new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+            new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+            new TestEntry<>(IN_SERVICE, 5));
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     List<DatanodeDetails> targetDatanodes = singletonList(
         availableReplicas.iterator().next().getDatanodeDetails());

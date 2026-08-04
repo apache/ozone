@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
@@ -382,10 +381,10 @@ public class ChunkInputStream extends InputStream
     if (verifyChecksum) {
       // Adjust the chunk offset and length to include required checksum
       // boundaries
-      Pair<Long, Long> adjustedOffsetAndLength =
+      ChecksumBoundaries adjustedOffsetAndLength =
           computeChecksumBoundaries(startByteIndex, len);
-      adjustedBuffersOffset = adjustedOffsetAndLength.getLeft();
-      adjustedBuffersLen = adjustedOffsetAndLength.getRight();
+      adjustedBuffersOffset = adjustedOffsetAndLength.offset;
+      adjustedBuffersLen = adjustedOffsetAndLength.length;
     } else {
       // Read from the startByteIndex
       adjustedBuffersOffset = startByteIndex;
@@ -517,7 +516,7 @@ public class ChunkInputStream extends InputStream
    * @return Adjusted (Chunk Offset, Chunk Length) which needs to be read
    * from Container
    */
-  private Pair<Long, Long> computeChecksumBoundaries(long startByteIndex,
+  private ChecksumBoundaries computeChecksumBoundaries(long startByteIndex,
       int dataLen) {
 
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
@@ -529,7 +528,20 @@ public class ChunkInputStream extends InputStream
     final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
         * bytesPerChecksum; // exclusive
     long adjustedChunkLen = Math.min(endIndex, length) - adjustedChunkOffset;
-    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
+    return new ChecksumBoundaries(adjustedChunkOffset, adjustedChunkLen);
+  }
+
+  /**
+   * Checksum-aligned chunk boundaries for a read operation.
+   */
+  private static final class ChecksumBoundaries {
+    private final long offset;
+    private final long length;
+
+    private ChecksumBoundaries(long offset, long length) {
+      this.offset = offset;
+      this.length = length;
+    }
   }
 
   /**
