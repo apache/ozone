@@ -121,7 +121,10 @@ public class Checksum {
 
       @Override
       public ByteString finish() {
-        return UnsafeByteOperations.unsafeWrap(md.digest());
+        // The JCA SPI does not guarantee exclusive ownership of the digest
+        // array, while Protobuf unsafeWrap requires exclusive, immutable
+        // ownership. Copying 16 bytes for MD5 or 32 bytes for SHA-256 is cheap.
+        return ByteString.copyFrom(md.digest());
       }
     };
   }
@@ -298,9 +301,9 @@ public class Checksum {
    */
   private List<ByteString> computeChecksumDirect(ChunkBuffer data,
       StreamingChecksum algo) {
-    final int dataLimit = data.limit();
-    final List<ByteString> result = new ArrayList<>(
-        (dataLimit + bytesPerChecksum - 1) / bytesPerChecksum);
+    final int dataLength = data.remaining();
+    final int checksumCount = dataLength == 0 ? 0 : 1 + (dataLength - 1) / bytesPerChecksum;
+    final List<ByteString> result = new ArrayList<>(checksumCount);
     int windowRemaining = bytesPerChecksum;
     algo.reset();
 

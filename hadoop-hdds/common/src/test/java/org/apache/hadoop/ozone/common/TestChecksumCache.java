@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.ozone.common.Checksum.Algorithm;
@@ -62,10 +63,42 @@ class TestChecksumCache {
             Assertions.assertEquals(lastRes.get(j), res.get(j));
           }
         }
-        lastRes = res;
+        lastRes = new ArrayList<>(res);
       }
     }
 
     checksumCache.clear();
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
+  void testGrowingMultiBufferMatchesDirectChecksum(ChecksumType checksumType)
+      throws Exception {
+    final int bytesPerChecksum = 16;
+    final byte[] data = new byte[66];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+
+    final Checksum cached = new Checksum(checksumType, bytesPerChecksum, true);
+    final Checksum direct = new Checksum(checksumType, bytesPerChecksum);
+    final int[] lengths = {1, 7, 15, 16, 17, 22, 31, 32, 33, 47, 48, 49, 65, 66};
+    for (int length : lengths) {
+      final ChecksumData expected = direct.computeChecksum(
+          split(data, length, 7));
+      final ChecksumData actual = cached.computeChecksum(
+          split(data, length, 7), true);
+      Assertions.assertEquals(expected.getChecksums(), actual.getChecksums(),
+          "cached checksums must match direct checksums at length " + length);
+    }
+  }
+
+  private static ChunkBuffer split(byte[] data, int length, int bufferSize) {
+    final List<ByteBuffer> buffers = new ArrayList<>();
+    for (int offset = 0; offset < length; offset += bufferSize) {
+      final int size = Math.min(bufferSize, length - offset);
+      buffers.add(ByteBuffer.wrap(data, offset, size).slice());
+    }
+    return ChunkBuffer.wrap(buffers);
   }
 }
