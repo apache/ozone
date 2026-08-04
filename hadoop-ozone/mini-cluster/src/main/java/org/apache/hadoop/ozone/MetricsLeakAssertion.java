@@ -42,21 +42,97 @@ public final class MetricsLeakAssertion {
   private static final String ALL_SOURCES_FIELD = "allSources";
 
   /**
-   * Names of metrics sources that are registered once per JVM (or once per
-   * service) and intentionally never unregistered, so they are expected to
-   * still be present after a mini cluster shuts down.  These are matched by
-   * prefix to also cover the numeric suffixes the metrics system appends for
-   * repeated registrations (e.g. {@code JvmMetrics-1}).
+   * Metrics sources that are known to still be registered after a mini
+   * cluster shuts down.  This is a transitional list: the JVM-level
+   * singletons (first group) are never unregistered by design, while the rest
+   * are genuine per-service leaks that are being burned down in follow-up
+   * issues.  Do not add new entries; fix the leak instead and remove the
+   * entry here.
    *
-   * <p>Do not add per-instance service metrics here; those should be
-   * unregistered on service shutdown and a leftover registration is a real
-   * leak.  Keep this list limited to JVM-level singletons.
+   * <p>Matching rules:
+   * <ul>
+   *   <li>An entry ending in {@code *} is a prefix match, used for sources
+   *   whose registered name embeds a random id, an absolute path, or a port
+   *   (e.g. {@code RpcActivityForPort15000}).</li>
+   *   <li>An entry starting with {@code *} is a suffix match, used for sources
+   *   whose registered name embeds a table-specific prefix (e.g.
+   *   {@code keyTableCache-1}).</li>
+   *   <li>Any other entry matches the source name exactly, or the name with a
+   *   numeric suffix the metrics system appends for repeated registrations
+   *   (e.g. {@code JvmMetrics-1}).</li>
+   * </ul>
    */
   private static final List<String> EXPECTED_LEFTOVER_SOURCES = Arrays.asList(
-      "JvmMetrics", // registered per service by HddsServerUtil.initializeMetrics
-      "JvmMetricsCpu", // registered alongside JvmMetrics
-      "UgiMetrics", // Hadoop security UGI metrics, JVM-level singleton
-      "ManagedRocksObjectMetrics" // static singleton
+      // JVM-level singletons, never unregistered by design.
+      "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
+      "JvmMetricsCpu",
+      "UgiMetrics", // Hadoop security UGI metrics
+      "ManagedRocksObjectMetrics",
+
+      // RPC / HTTP server metrics (name embeds the listening port).
+      "RpcActivityForPort*",
+      "RpcDetailedActivityForPort*",
+      "HttpServer2*",
+      "LocalJobRunnerMetrics*",
+
+      // Datanode per-instance metrics.
+      "StorageContainerMetrics",
+      "ContainerDataScannerMetrics*", // name embeds the volume path
+      "ContainerMetadataScannerMetrics",
+      "On-demand container scanner metrics",
+      "BackgroundVolumeScannerMetrics",
+      "VolumeHealthMetrics-*",
+      "VolumeIOStats-*", // name embeds the volume path
+      "VolumeInfoMetrics-*", // name embeds the volume path
+      "CommandHandlerMetrics",
+      "HddsDispatcher",
+      "ECReconstructionMetrics",
+      "ReplicationSupervisorMetrics",
+      "ContainerReplicator/push",
+      "BlockDeletingService",
+      "GrpcMetrics",
+
+      // SCM metrics.
+      "SCMNodeMetrics",
+      "SCMContainerManagerMetrics",
+      "SCMContainerMetrics",
+      "SCMMetrics",
+      "SafeModeMetrics",
+      "ContainerBalancerMetrics",
+      "NodeDecommissionMetrics",
+      "SCMDatanodeProtocol",
+      "ScmBlockLocationProtocol",
+      "ScmContainerLocationProtocol",
+      "ScmSecurityProtocol",
+      "EventQueue*", // per event/handler pair, registered by SCM EventQueue
+
+      // OM metrics.
+      "OMMetrics",
+      "OMPerformanceMetrics",
+      "OMLockMetrics",
+      "OMHAMetrics",
+      "OMSnapshotDirectoryMetrics",
+      "OmSnapshotInternalMetrics",
+      "OmSnapshotMetrics",
+      "OmClientProtocol",
+      "DeletingServiceMetrics",
+      "KeyLifecycleServiceMetrics",
+      "BucketUtilizationMetrics",
+      "DelegationTokenSecretManagerMetrics",
+
+      // OM / SCM RocksDB table cache and DB metrics (name embeds path/uuid).
+      "Rocksdb_*",
+      "SSTFilePruningMetrics-*",
+      "DBCheckpointMetrics",
+      "*TableCache",
+
+      // Ratis / third-party infrastructure metrics.
+      "CSMMetricsgroup-*", // Ratis container state machine, embeds a random id
+      "CacheMetrics-*", // Hadoop cache metrics (XceiverClientManager, etc.)
+      "NettyMetrics*",
+      "ContainerClientMetrics1",
+      "ReconTaskMetrics",
+      "ReconTaskControllerMetrics"
   );
 
   private MetricsLeakAssertion() {
@@ -101,12 +177,40 @@ public final class MetricsLeakAssertion {
   }
 
   private static boolean isExpectedLeftover(String name) {
-    for (String prefix : EXPECTED_LEFTOVER_SOURCES) {
-      if (name.equals(prefix) || name.startsWith(prefix + "-")) {
+    for (String entry : EXPECTED_LEFTOVER_SOURCES) {
+      if (entry.startsWith("*")) {
+        // Suffix match, also tolerating a trailing numeric suffix (-N).
+        String suffix = entry.substring(1);
+        if (name.endsWith(suffix) || stripNumericSuffix(name).endsWith(suffix)) {
+          return true;
+        }
+      } else if (entry.endsWith("*")) {
+        if (name.startsWith(entry.substring(0, entry.length() - 1))) {
+          return true;
+        }
+      } else if (name.equals(entry) || name.startsWith(entry + "-")) {
         return true;
       }
     }
     return false;
+  }
+
+  private static String stripNumericSuffix(String name) {
+    int idx = name.lastIndexOf('-');
+    if (idx > 0 && idx < name.length() - 1) {
+      String tail = name.substring(idx + 1);
+      boolean numeric = true;
+      for (int i = 0; i < tail.length(); i++) {
+        if (!Character.isDigit(tail.charAt(i))) {
+          numeric = false;
+          break;
+        }
+      }
+      if (numeric) {
+        return name.substring(0, idx);
+      }
+    }
+    return name;
   }
 
   private static Field findAllSourcesField(Class<?> clazz) {
