@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot.defrag;
 import static java.nio.file.Files.createDirectories;
 import static org.apache.commons.io.file.PathUtils.deleteDirectory;
 import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
+import static org.apache.hadoop.hdds.utils.db.RDBCheckpointManager.RDB_CHECKPOINT_DIR_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
@@ -573,7 +574,13 @@ public class SnapshotDefragService extends BackgroundService
       Set<String> incrementalColumnFamilies) throws IOException {
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getActiveSnapshot(
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName())) {
-      DBCheckpoint checkpoint = snapshot.get().getMetadataManager().getStore().getCheckpoint(tmpDefragDir, true);
+      DBStore snapshotStore = snapshot.get().getMetadataManager().getStore();
+      DBCheckpoint checkpoint = snapshotStore.getCheckpoint(tmpDefragDir, true);
+      if (checkpoint == null) {
+        deletePartialCheckpointDirs(snapshotStore.getDbLocation().getName());
+        throw new IOException("Failed to create checkpoint under " + tmpDefragDir + " for snapshot: "
+            + snapshotInfo.getTableKey() + " (ID: " + snapshotInfo.getSnapshotId() + ")");
+      }
       Path checkpointLocation = checkpoint.getCheckpointLocation();
       boolean checkpointSuccessful = false;
       try {
@@ -604,6 +611,36 @@ public class SnapshotDefragService extends BackgroundService
           }
         }
       }
+    }
+  }
+
+  /**
+   * Deletes checkpoint directories left behind under {@link #tmpDefragDir} for the given source
+   * RocksDB name after {@link DBStore#getCheckpoint} failed to produce a checkpoint. The checkpoint
+   * directory name is only known to
+   * {@link org.apache.hadoop.hdds.utils.db.RDBCheckpointManager}, so any leftover is located by its
+   * {@code <dbName>_} + {@code RDB_CHECKPOINT_PREFIX} naming convention rather than by an exact path.
+   */
+  private void deletePartialCheckpointDirs(String dbName) {
+    String prefix = dbName + "_" + RDB_CHECKPOINT_DIR_PREFIX;
+    try (Stream<Path> entries = Files.list(Paths.get(tmpDefragDir))) {
+      Iterator<Path> it = entries.iterator();
+      while (it.hasNext()) {
+        Path entry = it.next();
+        Path fileName = entry.getFileName();
+        if (fileName != null && fileName.toString().startsWith(prefix)) {
+          try {
+            deleteDirectory(entry);
+          } catch (IOException e) {
+            LOG.error("Failed to delete partial checkpoint directory {} under {}. " +
+                    "Disk space may not be freed. Manual cleanup may be required.",
+                entry, tmpDefragDir, e);
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to list entries under {} to delete partial checkpoint directories. " +
+          "Disk space may not be freed. Manual cleanup may be required.", tmpDefragDir, e);
     }
   }
 

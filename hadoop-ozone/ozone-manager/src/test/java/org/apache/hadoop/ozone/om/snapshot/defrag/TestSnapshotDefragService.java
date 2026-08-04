@@ -237,7 +237,7 @@ public class TestSnapshotDefragService {
   }
 
   private void putString(Table<String, CodecBuffer> table, String key,
-      String value) throws RocksDatabaseException, CodecException {
+                         String value) throws RocksDatabaseException, CodecException {
     table.put(key, StringCodec.get().toDirectCodecBuffer(value));
   }
 
@@ -251,7 +251,7 @@ public class TestSnapshotDefragService {
   }
 
   private Path createLiveSstDelta(DBStore sourceStore, String tableName,
-      String key, LiveSstType liveSstType) throws Exception {
+                                  String key, LiveSstType liveSstType) throws Exception {
     Table<String, CodecBuffer> sourceTable = sourceStore.getTable(
         tableName, StringCodec.get(), CodecBufferCodec.get(true));
     putString(sourceTable, key, "source-value");
@@ -292,7 +292,7 @@ public class TestSnapshotDefragService {
   }
 
   private void createMockSnapshot(SnapshotInfo snapshotInfo,
-      DBStore snapshotStore) throws IOException {
+                                  DBStore snapshotStore) throws IOException {
     OmSnapshot snapshot = mock(OmSnapshot.class);
     UncheckedAutoCloseableSupplier<OmSnapshot> snapshotSupplier =
         new UncheckedAutoCloseableSupplier<OmSnapshot>() {
@@ -703,7 +703,7 @@ public class TestSnapshotDefragService {
   }
 
   private void createMockSnapshot(SnapshotInfo snapshotInfo, Map<String, CodecBuffer> tableContents,
-      String... tables) throws IOException {
+                                  String... tables) throws IOException {
     OmSnapshot snapshot = mock(OmSnapshot.class);
     UncheckedAutoCloseableSupplier<OmSnapshot> snapshotSupplier = new UncheckedAutoCloseableSupplier<OmSnapshot>() {
 
@@ -744,7 +744,7 @@ public class TestSnapshotDefragService {
         ImmutableMap.of(tableName, "ab"));
 
     try (DBStore sourceStore = createDBStore(
-             "source-" + liveSstType + "-" + UUID.randomUUID(), tableName);
+        "source-" + liveSstType + "-" + UUID.randomUUID(), tableName);
          DBStore previousStore = createDBStore(
              "previous-" + liveSstType + "-" + UUID.randomUUID(), tableName);
          DBStore snapshotStore = createDBStore(
@@ -753,11 +753,11 @@ public class TestSnapshotDefragService {
              "checkpoint-" + liveSstType + "-" + UUID.randomUUID(),
              tableName)) {
       putString(previousStore.getTable(
-          tableName, StringCodec.get(), CodecBufferCodec.get(true)),
+              tableName, StringCodec.get(), CodecBufferCodec.get(true)),
           key, previousValue);
       previousStore.flushDB();
       putString(snapshotStore.getTable(
-          tableName, StringCodec.get(), CodecBufferCodec.get(true)),
+              tableName, StringCodec.get(), CodecBufferCodec.get(true)),
           key, currentValue);
       snapshotStore.flushDB();
       createMockSnapshot(previousSnapshotInfo, previousStore);
