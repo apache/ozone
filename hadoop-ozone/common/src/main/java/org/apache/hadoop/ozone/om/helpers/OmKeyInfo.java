@@ -498,6 +498,19 @@ public final class OmKeyInfo extends WithParentObjectId
     return isNullVersion;
   }
 
+  /**
+   * Whether this record is the key's null version, i.e. what a request naming
+   * version "null" addresses. That is either a record written while versioning
+   * was suspended, which carries the flag, or a record that predates versioning
+   * and so carries no versionId at all: enabling versioning does not rewrite
+   * existing objects, and S3 reports their version as "null".
+   *
+   * @return whether version "null" of the key addresses this record
+   */
+  public boolean isNullVersionRecord() {
+    return isNullVersion || versionId == null;
+  }
+
   @Override
   public String toString() {
     return "OmKeyInfo{" +

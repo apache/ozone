@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteMarkerResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -84,14 +85,25 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     setupVersionedBucket(quotaInBytes, quotaInNamespace, 0L);
   }
 
+  private void setupSuspendedBucket() throws Exception {
+    setupVersionedBucket(OzoneConsts.QUOTA_RESET, OzoneConsts.QUOTA_RESET, 0L,
+        BucketVersioningStatus.SUSPENDED);
+  }
+
   private void setupVersionedBucket(long quotaInBytes, long quotaInNamespace,
       long usedNamespace) throws Exception {
+    setupVersionedBucket(quotaInBytes, quotaInNamespace, usedNamespace,
+        BucketVersioningStatus.ENABLED);
+  }
+
+  private void setupVersionedBucket(long quotaInBytes, long quotaInNamespace,
+      long usedNamespace, BucketVersioningStatus status) throws Exception {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setBucketLayout(BucketLayout.OBJECT_STORE)
-        .setVersioningStatus(BucketVersioningStatus.ENABLED)
+        .setVersioningStatus(status)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
         .setUsedNamespace(usedNamespace)
@@ -127,11 +139,25 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
 
   private String seedCurrentVersion(Long versionId, boolean deleteMarker)
       throws Exception {
+    return seedCurrentVersion(versionId, deleteMarker, false);
+  }
+
+  private String seedCurrentVersion(Long versionId, boolean deleteMarker,
+      boolean nullVersion) throws Exception {
+    return seedCurrentVersion(versionId, deleteMarker, nullVersion, false);
+  }
+
+  private String seedCurrentVersion(Long versionId, boolean deleteMarker,
+      boolean nullVersion, boolean withBlocks) throws Exception {
     OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
             volumeName, bucketName, keyName, replicationConfig)
         .setVersionId(versionId)
         .setDeleteMarker(deleteMarker)
+        .setNullVersion(nullVersion)
         .build();
+    if (withBlocks) {
+      OMRequestTestUtils.addKeyLocationInfo(keyInfo, 0L, 1000L);
+    }
     String ozoneKey = omMetadataManager.getOzoneKey(
         volumeName, bucketName, keyName);
     omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, keyInfo);
@@ -1032,5 +1058,95 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     OmBucketInfo after = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(usedBytes, after.getUsedBytes());
     assertEquals(usedNamespace + 1, after.getUsedNamespace());
+  }
+
+  /**
+   * A write while versioning is suspended takes the key's null version slot
+   * instead of creating a version of its own.
+   */
+  @Test
+  public void testSuspendedWriteTakesTheNullVersionSlot() throws Exception {
+    setupSuspendedBucket();
+
+    commitAt(500L, PROPOSED);
+
+    OmKeyInfo current = currentVersion();
+    assertNotNull(current);
+    assertTrue(current.isNullVersion());
+    assertEquals(PROPOSED, current.getVersionId());
+  }
+
+  /**
+   * Repeated suspended writes replace each other: versions do not accumulate,
+   * and the replaced record's blocks are queued for reclamation.
+   */
+  @Test
+  public void testSuspendedWriteReplacesTheCurrentNullVersion()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(100L, false, true, true);
+
+    OMKeyCommitResponse response =
+        (OMKeyCommitResponse) commitAt(500L, PROPOSED);
+
+    assertTrue(currentVersion().isNullVersion());
+    assertEquals(PROPOSED, currentVersion().getVersionId());
+    // the replaced null version is not kept as a noncurrent version
+    assertNull(noncurrentVersion(100L));
+    // its blocks are queued for reclamation instead
+    assertReclaimed(response, 100L);
+  }
+
+  /** Asserts that the given version was queued for block reclamation. */
+  private void assertReclaimed(OMKeyCommitResponse response, long versionId) {
+    assertNotNull(response.getKeysToDelete());
+    assertTrue(response.getKeysToDelete().values().stream()
+        .flatMap(repeated -> repeated.getOmKeyInfoList().stream())
+        .anyMatch(info -> info.getVersionId() != null
+            && info.getVersionId() == versionId),
+        "version " + versionId + " was not queued for reclamation");
+  }
+
+  /**
+   * Versions created while versioning was enabled are not touched by a
+   * suspended write: the one it supersedes becomes noncurrent as usual.
+   */
+  @Test
+  public void testSuspendedWriteKeepsEnabledEraVersions() throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(100L, false);
+
+    commitAt(500L, PROPOSED);
+
+    assertTrue(currentVersion().isNullVersion());
+    // the version it superseded is retained, as is the older one
+    assertNotNull(noncurrentVersion(300L));
+    assertFalse(noncurrentVersion(300L).isNullVersion());
+    assertNotNull(noncurrentVersion(100L));
+  }
+
+  /**
+   * The null version may be noncurrent, when versioning was enabled again
+   * after the write that created it. A suspended write still replaces it, and
+   * still becomes the current version.
+   */
+  @Test
+  public void testSuspendedWriteReplacesANoncurrentNullVersion()
+      throws Exception {
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, true);
+    seedNoncurrentVersion(100L, false);
+
+    commitAt(500L, PROPOSED);
+
+    OmKeyInfo current = currentVersion();
+    assertTrue(current.isNullVersion());
+    assertEquals(PROPOSED, current.getVersionId());
+    // the old null version is gone, everything else is retained
+    assertNull(noncurrentVersion(200L));
+    assertNotNull(noncurrentVersion(300L));
+    assertNotNull(noncurrentVersion(100L));
   }
 }
