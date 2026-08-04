@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -183,7 +182,6 @@ public class NativeLibraryLoader {
         libFile.deleteOnExit();
       }
 
-      List<File> dependentFiles = new ArrayList<>();
       for (String fileName : dependentFileNames) {
         if (is != null) {
           is.close();
@@ -195,7 +193,6 @@ public class NativeLibraryLoader {
         if (file.exists()) {
           file.deleteOnExit();
         }
-        dependentFiles.add(file);
       }
       ShutdownHookManager.get().addShutdownHook(
           () -> FileUtils.deleteQuietly(tempDir),
@@ -209,7 +206,7 @@ public class NativeLibraryLoader {
   }
 
   /**
-   * The extracted library file and any dependent temp files.
+   * The extracted library file.
    */
   private static final class LoadedFiles {
     private final Optional<File> libraryFile;
