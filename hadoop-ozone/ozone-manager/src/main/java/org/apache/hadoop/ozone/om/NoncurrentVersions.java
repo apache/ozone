@@ -47,7 +47,7 @@ public final class NoncurrentVersions {
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, String keyName) throws IOException {
     return newestMatching(omMetadataManager, volumeName, bucketName, keyName,
-        OmKeyInfo::isNullVersion);
+        OmKeyInfo::isNullVersionRecord);
   }
 
   /**
