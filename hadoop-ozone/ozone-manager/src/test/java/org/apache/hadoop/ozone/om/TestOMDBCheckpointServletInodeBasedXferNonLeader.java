@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -31,11 +35,14 @@ import java.io.IOException;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for {@link OMDBCheckpointServletInodeBasedXfer} behavior when this OM is not leader.
@@ -94,13 +101,11 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
     ServletContext ctx = mock(ServletContext.class);
     when(ctx.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE)).thenReturn(om);
     doReturn(ctx).when(servlet).getServletContext();
-    BootstrapStateHandler.Lock lock = mock(BootstrapStateHandler.Lock.class);
     // Force a failure after leader check so this unit test can stay lightweight
     // (no full servlet/bootstrap setup) while still proving that leader requests
     // are not rejected with 503.
-    doThrow(new InterruptedException("test lock failure"))
-        .when(lock).acquireWriteLock();
-    doReturn(lock).when(servlet).getBootstrapStateLock();
+    doThrow(new IOException("test collect failure"))
+        .when(servlet).collectDbDataToTransfer(any(), anySet(), any());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -109,7 +114,20 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
 
     verify(response, never())
         .sendError(eq(HttpServletResponse.SC_SERVICE_UNAVAILABLE), anyString());
-    // Internal error comes from the forced lock failure above.
+    verify(om).isLeader();
+    verify(om, never()).isLeaderReady();
+    // Internal error comes from the forced collect failure above.
     verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+  }
+
+  @ParameterizedTest
+  @EnumSource(RaftServerStatus.class)
+  void isLeaderReflectsRaftServerStatus(RaftServerStatus raftServerStatus) {
+    OzoneManager om = mock(OzoneManager.class, CALLS_REAL_METHODS);
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    when(ratisServer.getLeaderStatus()).thenReturn(raftServerStatus);
+    HddsWhiteboxTestUtils.setInternalState(om, "omRatisServer", ratisServer);
+
+    assertEquals(raftServerStatus != RaftServerStatus.NOT_LEADER, om.isLeader());
   }
 }
