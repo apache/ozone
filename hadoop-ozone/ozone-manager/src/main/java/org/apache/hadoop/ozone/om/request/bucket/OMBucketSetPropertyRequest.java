@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -195,6 +196,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
       }
       if (newVersioningStatus != null) {
+        if (dbBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+          throw new OMException("S3 object versioning is only supported on "
+              + BucketLayout.OBJECT_STORE + " buckets, but bucket " + bucketName
+              + " has layout " + dbBucketInfo.getBucketLayout() + ".",
+              OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
         if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
           throw new OMException("Bucket versioning cannot be changed from "
               + dbBucketInfo.getVersioningStatus() + " to " + newVersioningStatus

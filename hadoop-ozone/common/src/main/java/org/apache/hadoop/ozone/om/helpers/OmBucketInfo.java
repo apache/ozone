@@ -206,16 +206,36 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
-   * Whether S3-compatible versioning is in effect, i.e. whether a write keeps
-   * the previous current version as a separate record in the versionedKeyTable.
-   * True for status ENABLED on an OBJECT_STORE bucket; buckets of other layouts
-   * carrying the legacy isVersionEnabled flag keep the legacy in-record block
-   * version behaviour.
-   * @return whether writes create versionedKeyTable records
+   * Whether S3 versioning is enabled on this bucket: a write creates a new
+   * version of the key. A bucket carrying only the legacy isVersionEnabled
+   * flag is not versioned in this sense - that flag selects the in-record
+   * block version list, which is a different feature.
+   * @return whether writes create a new object version
    */
   public boolean isS3VersioningEnabled() {
-    return versioningStatus == BucketVersioningStatus.ENABLED
-        && bucketLayout == BucketLayout.OBJECT_STORE;
+    return getVersioningStatus() == BucketVersioningStatus.ENABLED;
+  }
+
+  /**
+   * Whether S3 versioning is suspended on this bucket: a write takes the key's
+   * null version slot instead of creating a version of its own.
+   * @return whether writes take the null version slot
+   */
+  public boolean isS3VersioningSuspended() {
+    return getVersioningStatus() == BucketVersioningStatus.SUSPENDED;
+  }
+
+  /**
+   * Whether versioning has ever been enabled on this bucket. This is what
+   * makes the versions of its keys retained rather than reclaimed, and it is
+   * the state S3's data-protection promise is phrased against: once a bucket
+   * has been versioned, a write or a delete without a versionId never destroys
+   * data. A bucket can never return to UNVERSIONED, so this holds for ENABLED
+   * and SUSPENDED alike.
+   * @return whether this bucket's object versions are retained
+   */
+  public boolean hasEverBeenVersioned() {
+    return isS3VersioningEnabled() || isS3VersioningSuspended();
   }
 
   /**
