@@ -28,17 +28,12 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
 import java.io.File;
-import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
-import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -274,109 +269,5 @@ public class TestSequenceIDGenerator {
     } catch (Exception e) {
       // ignore
     }
-  }
-
-  @Test
-  public void testGetNextCertificateIdWithoutRatisIsMonotonicAndPersisted()
-      throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    scmMetadataStore.start(conf);
-    SCMHAManager scmHAManager = SCMHAManagerStub
-        .getInstance(true, new SCMDBTransactionBufferImpl());
-
-    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
-        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
-
-    long first = sequenceIdGen.getNextCertificateIdWithoutRatis(scmMetadataStore);
-    long second = sequenceIdGen.getNextCertificateIdWithoutRatis(scmMetadataStore);
-
-    assertTrue(second > first);
-    assertEquals(second,
-        scmMetadataStore.getSequenceIdTable().get(SequenceIdType.CertificateId));
-  }
-
-  @Test
-  public void testGetNextCertificateIdWithoutRatisRecoversMissingRow()
-      throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    scmMetadataStore.start(conf);
-    scmMetadataStore.getSequenceIdTable().delete(SequenceIdType.CertificateId);
-
-    KeyPair keys = CertificateTestUtils.aKeyPair(conf);
-    X509Certificate scmCert = CertificateTestUtils.createSelfSignedCert(
-        keys, "scm1", Duration.ofDays(1), BigInteger.valueOf(50));
-    X509Certificate serviceCert = CertificateTestUtils.createSelfSignedCert(
-        keys, "om1", Duration.ofDays(1), BigInteger.valueOf(75));
-    scmMetadataStore.getValidSCMCertsTable().put(scmCert.getSerialNumber(), scmCert);
-    scmMetadataStore.getValidCertsTable().put(serviceCert.getSerialNumber(), serviceCert);
-
-    SCMHAManager scmHAManager = SCMHAManagerStub
-        .getInstance(true, new SCMDBTransactionBufferImpl());
-    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
-        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
-
-    long allocated = sequenceIdGen.getNextCertificateIdWithoutRatis(scmMetadataStore);
-
-    assertEquals(76L, allocated);
-    assertEquals(76L,
-        scmMetadataStore.getSequenceIdTable().get(SequenceIdType.CertificateId));
-  }
-
-  @Test
-  public void testGetNextCertificateIdWithoutRatisPreventsDuplicateAfterLeaderTransition()
-      throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    scmMetadataStore.start(conf);
-    SCMHAManager scmHAManager = SCMHAManagerStub
-        .getInstance(true, new SCMDBTransactionBufferImpl());
-
-    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
-        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
-
-    // Populate the StateManager's cache via ordinary Ratis-backed allocation,
-    // as would happen while this SCM was leader.
-    sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-    sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-
-    // Now allocate one CertificateId without Ratis, e.g. during leaderless
-    // bootstrap certificate signing.
-    long leaderlessId = sequenceIdGen.getNextCertificateIdWithoutRatis(scmMetadataStore);
-
-    // Simulate the leader-transition hook (SCMStateMachine#notifyLeaderChanged)
-    // invalidating the un-exhausted batch.
-    sequenceIdGen.invalidateBatch();
-
-    long nextId = sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-    assertTrue(nextId > leaderlessId,
-        "Expected " + nextId + " to be strictly greater than " + leaderlessId);
-  }
-
-  @Test
-  public void testGetNextCertificateIdWithoutRatisPreventsDuplicateWithoutInvalidateBatch()
-      throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    scmMetadataStore.start(conf);
-    SCMHAManager scmHAManager = SCMHAManagerStub
-        .getInstance(true, new SCMDBTransactionBufferImpl());
-
-    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
-        conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
-
-    // Populate the StateManager's cache via ordinary Ratis-backed allocation,
-    // as would happen while this SCM was leader.
-    sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-    sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-
-    // Now allocate one CertificateId without Ratis, e.g. during leaderless
-    // bootstrap certificate signing. Note: no invalidateBatch() call here.
-    long leaderlessId = sequenceIdGen.getNextCertificateIdWithoutRatis(scmMetadataStore);
-
-    long nextId = sequenceIdGen.getNextId(SequenceIdType.CertificateId);
-    assertTrue(nextId > leaderlessId,
-        "Expected " + nextId + " to be strictly greater than " + leaderlessId);
   }
 }

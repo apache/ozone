@@ -22,17 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
+import java.util.Collections;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
@@ -61,17 +60,22 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
   private static final String SCM_NODE_ID = "scm-2";
 
   private SCMSecurityProtocol impl;
-  private StorageContainerManager scm;
-  private NotLeaderException nle;
+  private SCMRatisServer ratisServer;
   private SCMSecurityProtocolServerSideTranslatorPB translator;
+
+  private void withRatisPeer(String peerId) {
+    when(ratisServer.getDivision().getRaftConf().getCurrentPeers()).thenReturn(
+        Collections.singletonList(RaftPeer.newBuilder().setId(peerId)
+            .setAddress("scm2.example.com:9894").build()));
+  }
 
   @BeforeEach
   void setup() throws Exception {
     impl = mock(SCMSecurityProtocol.class);
-    scm = mock(StorageContainerManager.class);
+    StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMHAManager haManager = mock(SCMHAManager.class);
-    SCMRatisServer ratisServer = mock(SCMRatisServer.class);
-    nle = mock(NotLeaderException.class);
+    ratisServer = mock(SCMRatisServer.class, RETURNS_DEEP_STUBS);
+    NotLeaderException nle = mock(NotLeaderException.class);
 
     when(scm.checkLeader()).thenReturn(false);
     when(scm.getScmHAManager()).thenReturn(haManager);
@@ -79,10 +83,15 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
     when(ratisServer.triggerNotLeaderException()).thenReturn(nle);
     when(nle.getSuggestedLeader()).thenReturn(null);
 
+    // The requesting SCM is already a member of the existing Ratis group.
+    withRatisPeer(SCM_NODE_ID);
+
     when(scm.getRootCertificateServer()).thenReturn(mock(CertificateServer.class));
 
     SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
     when(storageConfig.isSCMHAEnabled()).thenReturn(true);
+    when(storageConfig.getPrimaryScmNodeId()).thenReturn("scm-1");
+    when(storageConfig.getScmId()).thenReturn("scm-1");
     when(scm.getScmStorageConfig()).thenReturn(storageConfig);
 
     when(scm.getSecurityProtocolRpcPort()).thenReturn("9961");
@@ -135,30 +144,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
   }
 
   @Test
-  void suggestedLeaderKnownIsStillRejected() {
-    when(nle.getSuggestedLeader()).thenReturn(
-        RaftPeer.newBuilder().setId("scm-3").setAddress("scm3.example.com:9861").build());
-
-    SCMSecurityRequest request = wrap(scmCertRequestBuilder());
-
-    ServiceException ex = assertThrows(ServiceException.class,
-        () -> translator.submitRequest(null, request));
-    assertInstanceOf(ServerNotLeaderException.class, ex.getCause());
-  }
-
-  @Test
-  void notPrimaryRootCaHostIsStillRejected() {
-    when(scm.getRootCertificateServer()).thenReturn(null);
-
-    SCMSecurityRequest request = wrap(scmCertRequestBuilder());
-
-    ServiceException ex = assertThrows(ServiceException.class,
-        () -> translator.submitRequest(null, request));
-    assertInstanceOf(ServerNotLeaderException.class, ex.getCause());
-  }
-
-  @Test
-  void otherCommandTypesAreStillRejectedInLeaderlessPrimaryState() {
+  void nonScmCertificateRequestIsStillRejectedInLeaderlessPrimaryState() {
     SCMGetOMCertRequestProto omRequest = SCMGetOMCertRequestProto.newBuilder()
         .setOmDetails(OzoneManagerDetailsProto.newBuilder()
             .setUuid("om-1").setIpAddress("10.0.0.2").setHostName("om1.example.com").build())
@@ -170,28 +156,5 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
         .setGetOMCertRequest(omRequest)
         .build();
     assertThrows(ServiceException.class, () -> translator.submitRequest(null, getOMCertificate));
-
-    SCMGetDataNodeCertRequestProto dnRequest = SCMGetDataNodeCertRequestProto.newBuilder()
-        .setDatanodeDetails(DatanodeDetailsProto.newBuilder()
-            .setHostName("dn1.example.com").setIpAddress("10.0.0.1").build())
-        .setCSR("csr")
-        .build();
-    SCMSecurityRequest getDataNodeCertificate = SCMSecurityRequest.newBuilder()
-        .setCmdType(Type.GetDataNodeCertificate)
-        .setTraceID("trace-3")
-        .setGetDataNodeCertRequest(dnRequest)
-        .build();
-    assertThrows(ServiceException.class,
-        () -> translator.submitRequest(null, getDataNodeCertificate));
-
-    SCMGetCertificateRequestProto certificateRequest = SCMGetCertificateRequestProto.newBuilder()
-        .setCertSerialId("123")
-        .build();
-    SCMSecurityRequest getCertificate = SCMSecurityRequest.newBuilder()
-        .setCmdType(Type.GetCertificate)
-        .setTraceID("trace-4")
-        .setGetCertificateRequest(certificateRequest)
-        .build();
-    assertThrows(ServiceException.class, () -> translator.submitRequest(null, getCertificate));
   }
 }

@@ -88,7 +88,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
           && request.getGetSCMCertificateRequest().getRenew();
       boolean isLeaderlessScmCertBypass =
           request.getCmdType() == Type.GetSCMCertificate && !isRenew
-              && SCMSecurityProtocolServer.isLeaderlessPrimaryScmSigner(scm, nle, isRenew);
+              && SCMSecurityProtocolServer.isLeaderlessPrimaryScmSigner(scm, nle, isRenew,
+                  request.getGetSCMCertificateRequest().getScmDetails().getScmNodeId());
       if (isLeaderlessScmCertBypass) {
         LOG.warn("Bypassing leadership check for leaderless primary SCM certificate signing " +
                 "request from SCM node {}",
