@@ -68,10 +68,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
@@ -83,8 +82,10 @@ import org.junit.jupiter.api.Timeout;
  *
  * <p>Version-0 checkpoint directories are removed after defrag, so baselines are captured before
  * the first defrag iteration and compared against the active snapshot after defrag completes.
+ *
+ * <p>Each test method starts a fresh MiniOzone cluster to avoid cross-test interference on the
+ * global snapshot defrag chain.
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(value = 15, unit = TimeUnit.MINUTES)
 public class TestOmSnapshotCheckpointDbContent {
 
@@ -92,12 +93,12 @@ public class TestOmSnapshotCheckpointDbContent {
   private static final int CHECKPOINT_WAIT_MS = 120_000;
   private static final int DEFRAG_WAIT_MS = 600_000;
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static OzoneClient client;
-  private static ObjectStore store;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private OzoneClient client;
+  private ObjectStore store;
 
-  @BeforeAll
+  @BeforeEach
   void initCluster() throws Exception {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary(),
         "Snapshot defrag requires rocks-tools native library");
@@ -114,7 +115,7 @@ public class TestOmSnapshotCheckpointDbContent {
     store = client.getObjectStore();
   }
 
-  @AfterAll
+  @AfterEach
   void shutdownCluster() {
     IOUtils.closeQuietly(client);
     IOUtils.closeQuietly(cluster);
@@ -144,10 +145,16 @@ public class TestOmSnapshotCheckpointDbContent {
 
     SnapshotInfo s2 = setup.snapshots.get(1);
     SnapshotInfo s3 = setup.snapshots.get(2);
+    int s3VersionAfterFirstDefrag = readSnapshotVersion(s3);
+
     store.deleteSnapshot(setup.volumeName, setup.bucketName, s2.getName());
     waitForSnapshotPurged(s2);
+    waitForSnapshotNeedsDefrag(s3);
 
     triggerDefragUntilDone(Arrays.asList(s3));
+    assertTrue(readSnapshotVersion(s3) > s3VersionAfterFirstDefrag,
+        "Expected a second defrag pass on S3 after middle snapshot purge");
+
     assertCheckpointMatchesBaseline(
         Collections.singletonMap(s3.getSnapshotId(),
             setup.baselines.get(s3.getSnapshotId())),
@@ -218,20 +225,41 @@ public class TestOmSnapshotCheckpointDbContent {
     }, 1000, CHECKPOINT_WAIT_MS);
   }
 
-  private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
+  /**
+   * After a previous snapshot is purged, the remaining snapshot should be marked as needing
+   * defrag once local YAML metadata is refreshed.
+   */
+  private void waitForSnapshotNeedsDefrag(SnapshotInfo snapshotInfo)
       throws TimeoutException, InterruptedException {
-    OzoneManager om = cluster.getOzoneManager();
+    OmSnapshotLocalDataManager localDataManager =
+        cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
     GenericTestUtils.waitFor(() -> {
-      if (snapshots.stream().allMatch(this::isSnapshotDefragComplete)) {
-        return true;
-      }
-      try {
-        om.triggerSnapshotDefrag(false);
+      try (OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider provider =
+               localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
+        provider.commit();
+        return provider.needsDefrag();
       } catch (IOException e) {
         return false;
       }
-      return snapshots.stream().allMatch(this::isSnapshotDefragComplete);
-    }, 2000, DEFRAG_WAIT_MS);
+    }, 1000, CHECKPOINT_WAIT_MS);
+  }
+
+  private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
+      throws TimeoutException, InterruptedException {
+    OzoneManager om = cluster.getOzoneManager();
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      GenericTestUtils.waitFor(() -> {
+        if (isSnapshotDefragComplete(snapshotInfo)) {
+          return true;
+        }
+        try {
+          om.triggerSnapshotDefrag(false);
+        } catch (IOException e) {
+          return false;
+        }
+        return isSnapshotDefragComplete(snapshotInfo);
+      }, 2000, DEFRAG_WAIT_MS);
+    }
   }
 
   private boolean isSnapshotDefragComplete(SnapshotInfo snapshotInfo) {
@@ -244,6 +272,15 @@ public class TestOmSnapshotCheckpointDbContent {
       }
     } catch (IOException e) {
       return false;
+    }
+  }
+
+  private int readSnapshotVersion(SnapshotInfo snapshotInfo) throws IOException {
+    OmSnapshotLocalDataManager localDataManager =
+        cluster.getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
+             localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+      return (int) provider.getVersion();
     }
   }
 
