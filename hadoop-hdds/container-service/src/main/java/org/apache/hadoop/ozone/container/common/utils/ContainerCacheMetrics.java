@@ -59,6 +59,13 @@ public final class ContainerCacheMetrics {
     return ms.register(name, "null", new ContainerCacheMetrics());
   }
 
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String name = "ContainerCacheMetrics";
+
+    ms.unregisterSource(name);
+  }
+
   public void incNumDbGetOps() {
     numDbGetOps.incr();
   }

@@ -56,8 +56,7 @@ public final class MetricsLeakAssertion {
       "JvmMetrics", // registered per service by HddsServerUtil.initializeMetrics
       "JvmMetricsCpu", // registered alongside JvmMetrics
       "UgiMetrics", // Hadoop security UGI metrics, JVM-level singleton
-      "ManagedRocksObjectMetrics", // static singleton
-      "ContainerCacheMetrics" // static singleton
+      "ManagedRocksObjectMetrics" // static singleton
   );
 
   private MetricsLeakAssertion() {
