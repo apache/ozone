@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.util;
 
 import java.security.SecureRandom;
 import java.util.Random;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -45,6 +46,14 @@ public final class UUIDUtil {
     bytes[8]  &= 0x3f;
     bytes[8]  |= 0x80;
     return bytes;
+  }
+
+  public static boolean isValidUuidString(String value) {
+    try {
+      return value.equals(UUID.fromString(value).toString());
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   private UUIDUtil() {

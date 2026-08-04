@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om.lock;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 
-import java.util.Collection;
-
 /**
  * Read only "lock" for snapshots
  * Uses no lock.  Always returns true when acquiring
@@ -30,23 +28,42 @@ import java.util.Collection;
 public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
-  public OMLockDetails acquireReadLock(Resource resource, String... resources) {
+  public OMLockDetails acquireReadLock(Resource resource, String key) {
     return EMPTY_DETAILS_LOCK_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails acquireReadLock(Resource resource, String key1, String key2) {
     return EMPTY_DETAILS_LOCK_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireWriteLock(Resource resource,
-      String... resources) {
+  public OMLockDetails acquireReadLock(Resource resource, String... keys) {
+    return EMPTY_DETAILS_LOCK_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails acquireReadLocks(Resource resource, Iterable<String[]> keys) {
+    return EMPTY_DETAILS_LOCK_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String key) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails acquireWriteLock(Resource resource, String key1, String key2) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String... keys) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLocks(Resource resource, Iterable<String[]> keys) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -66,13 +83,22 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
-  public OMLockDetails releaseWriteLock(Resource resource,
-      String... resources) {
+  public OMLockDetails releaseWriteLock(Resource resource, String key) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails releaseWriteLock(Resource resource, String key1, String key2) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails releaseWriteLock(Resource resource, String... keys) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails releaseWriteLocks(Resource resource, Iterable<String[]> keys) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -82,12 +108,22 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key1, String key2) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
   public OMLockDetails releaseReadLock(Resource resource, String... resources) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> resources) {
+  public OMLockDetails releaseReadLocks(Resource resource, Iterable<String[]> keys) {
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 

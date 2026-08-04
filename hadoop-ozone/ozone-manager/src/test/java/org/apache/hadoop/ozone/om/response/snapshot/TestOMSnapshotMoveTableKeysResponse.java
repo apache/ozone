@@ -128,9 +128,9 @@ public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndRespo
         getVolumeName(), getBucketName(), snapshotName1);
          UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
-      List<List<String>> expectedSnapshotIdLocks =
-          Arrays.asList(Collections.singletonList(snapshot1.get().getSnapshotID().toString()),
-          nextSnapshotExists ? Collections.singletonList(snapshot2.get().getSnapshotID().toString()) : null);
+      final List<String> first = Collections.singletonList(snapshot1.get().getSnapshotID().toString());
+      final List<List<String>> expectedSnapshotIdLocks = !nextSnapshotExists ? Collections.singletonList(first)
+          : Arrays.asList(first, Collections.singletonList(snapshot2.get().getSnapshotID().toString()));
       List<List<String>> locks = new ArrayList<>();
       doAnswer(i -> {
         for (String[] id : (Collection<String[]>)i.getArgument(1)) {

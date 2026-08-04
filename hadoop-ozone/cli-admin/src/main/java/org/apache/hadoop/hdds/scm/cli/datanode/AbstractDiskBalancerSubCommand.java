@@ -26,6 +26,7 @@ import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -43,11 +44,34 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
   // Track if we're in batch mode to run commands on all in-service datanodes
   private boolean isBatchMode = false;
 
-  // Pre-fetched datanode address names for batch mode (address -> "hostname (ip:port)"); null in non-batch
+  // Pre-fetched datanode address names (address -> display name); null when not resolved via SCM
   private Map<String, String> datanodeDisplayNames = null;
+
+  // Datanode identifiers that failed UUID-to-address resolution before RPC execution
+  private final List<ResolutionFailure> resolutionFailures = new ArrayList<>();
+
+  // Normalized hostname/address args and --node-id UUIDs for the current invocation
+  private List<String> explicitAddressArgs = new ArrayList<>();
+  private List<String> explicitNodeIds = new ArrayList<>();
+
+  private static final class ResolutionFailure {
+    private final String datanode;
+    private final String errorMsg;
+
+    private ResolutionFailure(String datanode, String errorMsg) {
+      this.datanode = datanode;
+      this.errorMsg = errorMsg;
+    }
+  }
 
   @Override
   public Void call() throws Exception {
+    resolutionFailures.clear();
+    datanodeDisplayNames = null;
+    explicitAddressArgs = new ArrayList<>();
+    explicitNodeIds = new ArrayList<>();
+    resetCommandState();
+
     // Check if DiskBalancer is enabled in configuration
     OzoneConfiguration conf = new OzoneConfiguration();
     if (!conf.getBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
@@ -57,10 +81,27 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
-    // Validate that either datanode addresses or --in-service-datanodes is specified
-    if ((options.getDatanodes() == null || options.getDatanodes().isEmpty()) 
+    explicitNodeIds.addAll(DiskBalancerSubCommandUtil.normalizeNodeIds(options.getNodeIds()));
+    for (String datanodeArg : options.getDatanodes()) {
+      if (DiskBalancerSubCommandUtil.isDatanodeUuid(datanodeArg)) {
+        if (explicitNodeIds.isEmpty()) {
+          System.err.println("Error: Datanode UUID must be specified with --node-id, not as a "
+              + "positional argument. For multiple UUIDs use a comma-separated list, for example "
+              + "--node-id uuid1,uuid2 or --node-id \"uuid1, uuid2\".");
+          return null;
+        }
+        explicitNodeIds.add(datanodeArg);
+      } else {
+        explicitAddressArgs.add(datanodeArg);
+      }
+    }
+
+    // Validate that either datanode addresses, --node-id, or --in-service-datanodes is specified
+    if (explicitAddressArgs.isEmpty()
+        && explicitNodeIds.isEmpty()
         && !options.isInServiceDatanodes()) {
-      System.err.println("Error: Either datanode address(es) or --in-service-datanodes must be specified.");
+      System.err.println("Error: Either datanode address(es), --node-id, or --in-service-datanodes "
+          + "must be specified.");
       return null;
     }
 
@@ -73,7 +114,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
     // Get the list of datanodes to execute on
     List<String> targetDatanodes = getTargetDatanodes();
-    if (targetDatanodes == null || targetDatanodes.isEmpty()) {
+    if (targetDatanodes == null) {
+      targetDatanodes = new ArrayList<>();
+    }
+    if (targetDatanodes.isEmpty() && resolutionFailures.isEmpty()) {
       System.err.println("Error: No datanodes found to execute command on.");
       return null;
     }
@@ -90,6 +134,16 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     List<String> successNodes = new ArrayList<>();
     List<String> failedNodes = new ArrayList<>();
     List<Object> jsonResults = new ArrayList<>();
+
+    for (ResolutionFailure resolutionFailure : resolutionFailures) {
+      failedNodes.add(resolutionFailure.datanode);
+      if (options.isJson()) {
+        jsonResults.add(createErrorResult(resolutionFailure.datanode, resolutionFailure.errorMsg));
+      } else {
+        System.err.printf("Error on node [%s]: %s%n",
+            formatDatanodeDisplayName(resolutionFailure.datanode), resolutionFailure.errorMsg);
+      }
+    }
     
     // Execute commands and collect results
     for (String dn : deduplicatedDatanodes) {
@@ -114,7 +168,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
           jsonResults.add(errorResult);
         } else {
           // Print error messages in non-JSON mode
-          System.err.printf("Error on node [%s]: %s%n", dn, errorMsg);
+          System.err.printf("Error on node [%s]: %s%n", formatDatanodeDisplayName(dn), errorMsg);
         }
       }
     }
@@ -148,15 +202,70 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
   /**
    * Get the list of target datanodes to execute the command on.
-   * Either from positional arguments or by querying SCM for in-service datanodes.
+   * Either from positional arguments, --node-id, or by querying SCM for in-service datanodes.
    */
   private List<String> getTargetDatanodes() {
     if (options.isInServiceDatanodes()) {
       return getAllInServiceDatanodes();
-    } else {
-      datanodeDisplayNames = null;  // Non-batch: use user input as-is, no SCM for formatting
-      return options.getDatanodes();
     }
+    return resolveExplicitDatanodeTargets(explicitAddressArgs, explicitNodeIds);
+  }
+
+  /**
+   * Resolves hostname/host:port arguments and --node-id UUIDs to CLIENT_RPC addresses.
+   * Hostname and host:port arguments are passed through unchanged without contacting SCM.
+   */
+  private List<String> resolveExplicitDatanodeTargets(
+      List<String> addressArgs, List<String> nodeIdArgs) {
+    List<String> resolvedAddresses = new ArrayList<>(addressArgs);
+    if (nodeIdArgs.isEmpty()) {
+      datanodeDisplayNames = null;
+      return resolvedAddresses;
+    }
+
+    Map<String, String> displayNames = new LinkedHashMap<>();
+    ScmClient scmClient;
+    try {
+      scmClient = new ContainerOperationClient(new OzoneConfiguration());
+    } catch (IOException e) {
+      String msg = e.getMessage();
+      System.err.printf("Error resolving datanode address(es).%n%s%n", msg);
+      nodeIdArgs.forEach(nodeId -> addResolutionFailure(nodeId, msg));
+      datanodeDisplayNames = null;
+      return addressArgs;
+    }
+
+    try {
+      for (String nodeId : nodeIdArgs) {
+        try {
+          DiskBalancerSubCommandUtil.DatanodeTarget target =
+              DiskBalancerSubCommandUtil.resolveDatanodeTargetByUuid(scmClient, nodeId);
+          resolvedAddresses.add(target.getClientRpcAddress());
+          displayNames.put(target.getClientRpcAddress(), target.getDisplayName());
+        } catch (IOException e) {
+          addResolutionFailure(nodeId, e.getMessage());
+        }
+      }
+    } finally {
+      try {
+        scmClient.close();
+      } catch (IOException e) {
+        System.err.printf("Error closing SCM client after resolving datanode address(es).%n%s%n",
+            e.getMessage());
+      }
+    }
+
+    datanodeDisplayNames = displayNames.isEmpty() ? null : displayNames;
+    return resolvedAddresses;
+  }
+
+  private void addResolutionFailure(String datanode, String errorMsg) {
+    for (ResolutionFailure existing : resolutionFailures) {
+      if (existing.datanode.equals(datanode)) {
+        return;
+      }
+    }
+    resolutionFailures.add(new ResolutionFailure(datanode, errorMsg));
   }
 
   /**
@@ -170,6 +279,13 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       System.err.printf("Error querying SCM for in-service datanodes. %n%s%n", e.getMessage());
       return null;
     }
+  }
+
+  /**
+   * Reset subcommand-specific state before each invocation.
+   */
+  protected void resetCommandState() {
+    // Default: no subcommand-specific state
   }
 
   /**
@@ -248,18 +364,34 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
   }
 
   /**
-   * Format a datanode address for display.
-   * In batch mode, uses pre-fetched display names from the SCM query.
-   * In non-batch mode, returns the user's input as-is (no SCM call).
+   * Format a datanode address for display using pre-fetched SCM metadata when available.
+   * Batch mode and --node-id populate {@link #datanodeDisplayNames}.
+   * Hostname and host:port arguments without SCM resolution are returned as-is.
    *
-   * @param address the datanode address in "ip:port" format
-   * @return formatted string "hostname (ip:port)" in batch mode, or address as-is in non-batch
+   * @param address the datanode CLIENT_RPC address or unresolved user input
+   * @return UUID when resolved via --node-id, hostname (ip:port) in batch mode, or address as-is
    */
   protected String formatDatanodeDisplayName(String address) {
     if (datanodeDisplayNames != null) {
       return datanodeDisplayNames.getOrDefault(address, address);
     }
     return address;
+  }
+
+  /**
+   * Format a datanode for status/report output.
+   * Uses SCM-enriched display names when available; otherwise shows hostname (ip:port) without UUID.
+   *
+   * @param address the datanode CLIENT_RPC address used for command execution
+   * @param nodeProto datanode details from the DiskBalancer RPC response
+   * @return formatted datanode identifier for output
+   */
+  protected String formatDatanodeDisplayName(
+      String address, HddsProtos.DatanodeDetailsProto nodeProto) {
+    if (datanodeDisplayNames != null && datanodeDisplayNames.containsKey(address)) {
+      return datanodeDisplayNames.get(address);
+    }
+    return DiskBalancerSubCommandUtil.getDatanodeHostAndIp(nodeProto);
   }
 }
 

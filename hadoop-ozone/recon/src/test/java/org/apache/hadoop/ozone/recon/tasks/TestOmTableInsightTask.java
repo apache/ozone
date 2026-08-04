@@ -58,12 +58,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -781,6 +785,131 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
     // each MPU part is replicated using RATIS THREE, total replicated size = 300 bytes * 3 = 900 bytes.
     assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * Validates schema-aware reprocess for a split (schemaVersion 1) MPU: the
+   * multipartInfoTable value carries NO embedded parts, so Recon must read the
+   * part sizes from the separate multipartPartsTable, using the parent MPU's
+   * replication config to compute the replicated size.
+   */
+  @Test
+  public void testReprocessForMultipartInfoTableSplitSchema() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    // Split-schema MPU: no embedded parts in the multipartInfoTable value.
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    reconOMMetadataManager.getMultipartInfoTable().put(multipartKey, splitMpu);
+
+    // 3 parts of 100 bytes each, stored as rows in the split parts table.
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 1, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 2, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 3, 100L);
+
+    ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.isTaskSuccess());
+
+    // Count is the number of MPU uploads (1), not the number of parts.
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    // 3 split-table parts * 100 bytes = 300 bytes unreplicated.
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    // RATIS THREE: 300 bytes * 3 = 900 bytes replicated.
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * Validates schema-aware reprocess when both legacy (schemaVersion 0, embedded
+   * parts) and split (schemaVersion 1, parts in multipartPartsTable) MPUs coexist
+   * in the same DB. Recon must sum both under the multipartInfoTable stats.
+   */
+  @Test
+  public void testReprocessForMultipartInfoTableMixedSchema() throws Exception {
+    // Legacy MPU: 2 embedded parts of 100 bytes.
+    String legacyUploadID = UUID.randomUUID().toString();
+    String legacyVol = UUID.randomUUID().toString();
+    String legacyBucket = UUID.randomUUID().toString();
+    String legacyKey = UUID.randomUUID().toString();
+    OmMultipartKeyInfo legacyMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(legacyUploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        // schemaVersion defaults to LEGACY_SCHEMA_VERSION (0).
+        .build();
+    legacyMpu.addPartKeyInfo(createPartKeyInfo(legacyVol, legacyBucket, legacyKey, legacyUploadID, 1, 100L));
+    legacyMpu.addPartKeyInfo(createPartKeyInfo(legacyVol, legacyBucket, legacyKey, legacyUploadID, 2, 100L));
+    reconOMMetadataManager.getMultipartInfoTable().put(
+        reconOMMetadataManager.getMultipartKey(legacyVol, legacyBucket, legacyKey, legacyUploadID), legacyMpu);
+
+    // Split MPU: 3 parts of 100 bytes in the split parts table.
+    String splitUploadID = UUID.randomUUID().toString();
+    String splitVol = UUID.randomUUID().toString();
+    String splitBucket = UUID.randomUUID().toString();
+    String splitKey = UUID.randomUUID().toString();
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(2L)
+        .setUploadID(splitUploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    reconOMMetadataManager.getMultipartInfoTable().put(
+        reconOMMetadataManager.getMultipartKey(splitVol, splitBucket, splitKey, splitUploadID), splitMpu);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 1, 100L);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 2, 100L);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 3, 100L);
+
+    ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.isTaskSuccess());
+
+    // 2 MPU uploads total (1 legacy + 1 split).
+    assertEquals(2L, getCountForTable(MULTIPART_INFO_TABLE));
+    // Legacy 2*100 (embedded) + split 3*100 (parts table) = 500 bytes unreplicated.
+    assertEquals(500L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    // RATIS THREE: 500 bytes * 3 = 1500 bytes replicated.
+    assertEquals(1500L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * Writes a single split-schema part (an {@link OmMultipartPartInfo}) to the
+   * multipartPartsTable, keyed by {@code uploadId/partNumber}. An ETag is set
+   * because it is mandatory for split-schema parts.
+   */
+  private void putSplitSchemaPart(String uploadID, String volumeName, String bucketName,
+      String keyName, int partNumber, long dataSize) throws IOException {
+    OmKeyInfo partOmKeyInfo = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setDataSize(dataSize)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(UUID.randomUUID().hashCode())
+        .setUpdateID(1L)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true)))
+        // ETag is mandatory for split-schema parts.
+        .addMetadata(OzoneConsts.ETAG, "etag-" + partNumber)
+        .build();
+    String partName = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, partOmKeyInfo);
+    reconOMMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadID, partNumber), partInfo);
   }
 
   public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,

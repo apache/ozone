@@ -482,17 +482,25 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         final ByteBuffer buf = readFromQueue();
-        if (buf != null && buf.hasRemaining()) {
+        if (buf == null) {
+          return null; // Stream ended
+        }
+        if (buf.hasRemaining()) {
           return buf;
         }
+        // buf is empty: the server aligned its response to a checksum boundary
+        // before our current position and all bytes were skipped. Fetch the next
+        // response, which should start at or after our position.
       }
     }
 
     ByteBuffer readFromQueue() throws IOException {
       final ReadBlockResponseProto readBlock = poll();
+      if (readBlock == null) {
+        return null; // Stream ended
+      }
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
-      // If the reader position is behind
       final ByteString data = readBlock.getData();
       final ByteBuffer dataBuffer = data.asReadOnlyByteBuffer();
       final long blockOffset = readBlock.getOffset();
@@ -528,15 +536,18 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
+        // Record the failure first: the log and observer calls below must not mask it.
+        setFailed(e);
         final ByteString data = readBlock.getData();
         final long offset = readBlock.getOffset();
         final StreamingReadResponse r = getResponse();
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
-            offset, data.size(), StringUtils.bytes2Hex(data.substring(0, 10).asReadOnlyByteBuffer()),
+            offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
             readBlock.getChecksumData(), e);
-        setFailed(e);
-        r.getRequestObserver().onError(e);
+        if (r != null) {
+          r.getRequestObserver().onError(e);
+        }
         releaseResources();
       }
     }

@@ -10,7 +10,7 @@
 - Reuse existing Ozone and Ratis utilities when the surrounding code already uses them.
   Prefer extending an existing helper over duplicating logic or adding a new one-off abstraction.
 - If there are multiple reasonable interpretations, state the tradeoff and ask instead of guessing.
-- Do not wrap lines early just to make them look uniform. The project limit is 120 characters; use the space.
+- Do not wrap lines early just to make them look uniform. The checkstyle maximum (see `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`) is 120 characters for Java. Use the full 120 characters before wrapping; never break a line that fits on one line.
 - Use established Ozone vocabulary in code, docs, and PR text:
   SCM, OM, datanode, container, pipeline, volume, bucket, key, snapshot,
   Recon, FSO, OBS, and S3 Gateway.
@@ -194,7 +194,7 @@ Key paths:
 - [`hadoop-ozone/dev-support/checks/README.md`](./hadoop-ozone/dev-support/checks/README.md)
 - [`hadoop-hdds/dev-support/checkstyle/checkstyle.xml`](./hadoop-hdds/dev-support/checkstyle/checkstyle.xml)
 - [`dev-support/rat/rat-exclusions.txt`](./dev-support/rat/rat-exclusions.txt)
-- [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html)
+- [Ozone Enhancement Proposals](https://ozone.apache.org/docs/next/developer-guide/project/enhancement-proposal)
 
 ## Security
 

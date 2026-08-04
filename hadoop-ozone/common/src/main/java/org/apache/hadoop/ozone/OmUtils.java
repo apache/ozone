@@ -263,6 +263,8 @@ public final class OmUtils {
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -326,6 +328,10 @@ public final class OmUtils {
     case DeleteObjectTagging:
     case PutBucketTagging:
     case DeleteBucketTagging:
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
       return false;
     case UnknownCommand:
       return false;
@@ -381,6 +387,8 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case GetBucketTagging:
       return true;
@@ -461,6 +469,10 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
       // Quota repair lifecycle request should be initiated by the leader
     case DBUpdates: // We are currently only interested on the leader DB info
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
     case UnknownCommand:
       return false;
     case EchoRPC:
