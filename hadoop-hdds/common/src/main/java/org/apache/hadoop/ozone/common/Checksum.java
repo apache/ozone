@@ -281,7 +281,7 @@ public class Checksum {
       algo = Algorithm.valueOf(checksumType).newStreamingChecksum();
     } catch (Exception e) {
       throw new OzoneChecksumException(
-          "Failed to get the checksum function for " + checksumType, e);
+          "Failed to create streaming checksum for " + checksumType, e);
     }
 
     final List<ByteString> checksumList = (checksumCache == null || !useCache)

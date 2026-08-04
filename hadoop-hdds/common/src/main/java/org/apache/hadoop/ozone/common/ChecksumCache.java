@@ -79,7 +79,7 @@ public class ChecksumCache {
    * incrementally; the cached prefix is skipped via index arithmetic so
    * those bytes are never re-fed.
    */
-  public List<ByteString> computeChecksum(ChunkBuffer data,
+  List<ByteString> computeChecksum(ChunkBuffer data,
       StreamingChecksum algo, int chksumSize) {
     if (chksumSize != bytesPerChecksum) {
       throw new IllegalArgumentException("bytesPerChecksum mismatch: cache="
