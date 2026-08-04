@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -146,17 +146,17 @@ public class TestOmSnapshotCheckpointDbContent {
   private ThreeSnapshotSetup createThreeSnapshotsOnNewBucket()
       throws IOException, InterruptedException, TimeoutException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+        DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
 
-    TestDataUtil.createKey(bucket, "key-s1", TEST_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, "key-s1", TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s1");
 
-    TestDataUtil.createKey(bucket, "key-s2", TEST_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, "key-s2", TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s2");
 
-    TestDataUtil.createKey(bucket, "key-s3", TEST_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, "key-s3", TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s3");
 
     List<SnapshotInfo> snapshots = Arrays.asList(
