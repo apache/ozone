@@ -313,9 +313,11 @@ public class TestRackAwarePlacement {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return scm.getContainerManager()
-            .getContainerReplicas(containerID)
-            .size() >= 3;
+        Set<ContainerReplica> current = scm.getContainerManager()
+            .getContainerReplicas(containerID);
+        return current.size() >= 3 && current.stream()
+            .noneMatch(replica -> stoppedDn.equals(
+                replica.getDatanodeDetails()));
       } catch (Exception e) {
         return false;
       }
