@@ -38,6 +38,7 @@ infer run --keep-going \
   --skip-analysis-in-path "src/test/" \
   --skip-analysis-in-path "target/generated-test-sources/" \
   --skip-analysis-in-path "target/generated-sources/" \
+  --skip-analysis-in-path "test-utils/" \
   -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 infer_rc=$?
 
