@@ -24,8 +24,6 @@ import java.util.TreeSet;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Asserts that no metrics sources remain registered in the
@@ -39,7 +37,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class MetricsLeakAssertion {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MetricsLeakAssertion.class);
   private static final String ALL_SOURCES_FIELD = "allSources";
 
   private MetricsLeakAssertion() {
@@ -47,37 +44,38 @@ public final class MetricsLeakAssertion {
 
   /**
    * Throws an {@link AssertionError} if any metrics sources are still
-   * registered with the default metrics system.  If the underlying metrics
-   * implementation does not expose the expected {@code allSources} field
-   * (e.g. a Hadoop version change), a WARN is logged and the check is
-   * skipped rather than failing spuriously.
+   * registered with the default metrics system, or if the expected
+   * {@code allSources} field cannot be found or read (e.g. a Hadoop version
+   * change restructured {@code MetricsSystemImpl}), so that a broken or
+   * missing check fails loudly instead of going unnoticed.
    */
   public static void assertNoLeaks() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     Field field = findAllSourcesField(ms.getClass());
     if (field == null) {
-      LOG.warn("Cannot check for metrics leaks: '{}' field not found on {}. " +
-          "Skipping metrics leak assertion.", ALL_SOURCES_FIELD, ms.getClass().getName());
-      return;
+      throw new AssertionError("Cannot check for metrics leaks: '" + ALL_SOURCES_FIELD +
+          "' field not found on " + ms.getClass().getName() +
+          ". The metrics system implementation may have changed.");
     }
+    final Map<String, MetricsSource> allSources;
     try {
       field.setAccessible(true);
       Object value = field.get(ms);
       if (!(value instanceof Map)) {
-        LOG.warn("Cannot check for metrics leaks: '{}' is not a Map on {}. Skipping.",
-            ALL_SOURCES_FIELD, ms.getClass().getName());
-        return;
+        throw new AssertionError("Cannot check for metrics leaks: '" + ALL_SOURCES_FIELD +
+            "' on " + ms.getClass().getName() + " is not a Map.");
       }
       @SuppressWarnings("unchecked")
-      Map<String, MetricsSource> allSources = (Map<String, MetricsSource>) value;
-      if (!allSources.isEmpty()) {
-        Set<String> leaked = new TreeSet<>(allSources.keySet());
-        throw new AssertionError("Found " + leaked.size() +
-            " metrics source(s) still registered after cluster shutdown: " + leaked);
-      }
+      Map<String, MetricsSource> sources = (Map<String, MetricsSource>) value;
+      allSources = sources;
     } catch (IllegalAccessException e) {
-      LOG.warn("Cannot check for metrics leaks: unable to access '{}' on {}. Skipping.",
-          ALL_SOURCES_FIELD, ms.getClass().getName(), e);
+      throw new AssertionError("Cannot check for metrics leaks: unable to access '" +
+          ALL_SOURCES_FIELD + "' on " + ms.getClass().getName() + ".", e);
+    }
+    if (!allSources.isEmpty()) {
+      Set<String> leaked = new TreeSet<>(allSources.keySet());
+      throw new AssertionError("Found " + leaked.size() +
+          " metrics source(s) still registered after cluster shutdown: " + leaked);
     }
   }
 
