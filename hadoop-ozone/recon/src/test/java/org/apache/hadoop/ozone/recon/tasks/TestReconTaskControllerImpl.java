@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -597,6 +599,38 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     verify(mockCheckpointedManager, times(1)).stop();
     assertFalse(checkpointDir.exists(),
         "checkpoint directory must be deleted even when stop() throws");
+  }
+
+  @Test
+  public void testRealCheckpointCreatedThenCleanedUp(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+    // End-to-end with real RocksDB (no mocked manager): create a real reinit
+    // checkpoint, then verify the real cleanup path deletes it from disk.
+
+    // Halt the async processor so our explicit drain owns the enqueued event.
+    reconTaskController.stop();
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+
+    // Real source OM DB + real RocksDB-backed Recon OM metadata manager.
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager =
+        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    controllerImpl.updateOMMetadataManager(reconOMMetadataManager);
+
+    // Real checkpoint creation -> temp-recon-reinit-checkpoint_<UUID>/ on disk.
+    ReconOMMetadataManager checkpointed = controllerImpl.createOMCheckpoint(reconOMMetadataManager);
+    File checkpointDir = checkpointed.getStore().getDbLocation().getParentFile();
+    assertTrue(checkpointDir.exists(), "checkpoint dir should exist after creation");
+    assertTrue(checkpointDir.getName().startsWith("temp-recon-reinit-checkpoint"),
+        "checkpoint dir should be the reinit temp dir");
+
+    // Real cleanup path: closes the real RocksDB and deletes the directory.
+    controllerImpl.getEventBuffer().offer(new ReconTaskReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW, checkpointed));
+    controllerImpl.drainEventBufferAndCleanExistingCheckpoints();
+
+    assertFalse(checkpointDir.exists(),
+        "real checkpoint directory must be deleted by the cleanup path");
   }
   
   @Test
