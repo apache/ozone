@@ -23,12 +23,14 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -44,7 +46,9 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationSetResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
@@ -92,10 +96,12 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
     if (resolvedBucket.bucketLayout().toProto() != request.getLifecycleConfiguration().getBucketLayout()) {
       throw new OMException("Bucket layout mismatch: requested lifecycle configuration " +
-          "has bucket layout " + request.getLifecycleConfiguration().getBucketLayout() + 
+          "has bucket layout " + request.getLifecycleConfiguration().getBucketLayout() +
           " but the actual bucket has layout " + resolvedBucket.bucketLayout().toProto(),
           OMException.ResultCodes.INVALID_REQUEST);
     }
+
+    validateAbortMpuDaysAgainstCleanupThreshold(ozoneManager, lifecycleConfiguration);
 
     SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
@@ -200,6 +206,46 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
       LOG.error("Lifecycle configuration creation failed for bucket:{} " +
           "in volume:{}", bucketName, volumeName, exception);
       return omClientResponse;
+    }
+  }
+
+  /**
+   * Rejects lifecycle configurations where an AbortIncompleteMultipartUpload rule's
+   * daysAfterInitiation is greater than or equal to the cluster-wide MPU expire threshold
+   * (ozone.om.open.mpu.expire.threshold). When that happens, MultipartUploadCleanupService
+   * will reap the upload before the lifecycle rule ever fires, silently making the rule
+   * ineffective. Failing fast here surfaces the misconfiguration to the operator.
+   */
+  private static void validateAbortMpuDaysAgainstCleanupThreshold(
+      OzoneManager ozoneManager, LifecycleConfiguration config) throws OMException {
+    long expireThresholdMillis = ozoneManager.getConfiguration().getTimeDuration(
+        OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    long expireThresholdDays = TimeUnit.MILLISECONDS.toDays(expireThresholdMillis);
+
+    for (LifecycleRule rule : config.getRulesList()) {
+      for (LifecycleAction action : rule.getActionList()) {
+        if (action.hasAbortIncompleteMultipartUpload()) {
+          int daysAfterInitiation = action.getAbortIncompleteMultipartUpload().getDaysAfterInitiation();
+          if (daysAfterInitiation >= expireThresholdDays) {
+            throw new OMException(
+                "Invalid lifecycle configuration: rule '" + rule.getId() + "' has an " +
+                "AbortIncompleteMultipartUpload action with daysAfterInitiation=" + daysAfterInitiation +
+                " day(s), which is greater than or equal to the cluster MPU expire threshold " +
+                expireThresholdDays + " day(s) (" +
+                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" +
+                ozoneManager.getConfiguration().get(
+                    OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
+                    OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT) +
+                "). The MultipartUploadCleanupService will abort the upload before the " +
+                "lifecycle rule fires, making the rule ineffective. " +
+                "Set daysAfterInitiation to a value less than " + expireThresholdDays +
+                " day(s), or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
+                OMException.ResultCodes.INVALID_REQUEST);
+          }
+        }
+      }
     }
   }
 
