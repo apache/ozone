@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.function.BiFunction;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -331,7 +333,23 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         boolean isNamespaceUpdate = false;
-        if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // Completing a multipart upload creates a version like any other
+        // write: the version it supersedes is kept instead of reclaimed,
+        // except for the null version, which a suspended write replaces.
+        final boolean supersededVersionRetained = keyToDelete != null
+            && omBucketInfo.hasEverBeenVersioned()
+            && (omBucketInfo.isS3VersioningEnabled()
+                || !keyToDelete.isNullVersionRecord());
+        if (omBucketInfo.hasEverBeenVersioned()) {
+          omKeyInfo = omKeyInfo.toBuilder()
+              .setVersionId(ozoneManager.getVersionIdAllocator().allocate(
+                  omMetadataManager, volumeName, bucketName, keyName,
+                  trxnLogIndex, keyToDelete))
+              .setNullVersion(omBucketInfo.isS3VersioningSuspended())
+              .build();
+        }
+        if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()
+            && !supersededVersionRetained) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
               keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
@@ -340,6 +358,41 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           checkBucketQuotaInNamespace(omBucketInfo, 1L);
           omBucketInfo.incrUsedNamespace(1L);
           isNamespaceUpdate = true;
+        }
+
+        // The superseded version becomes a noncurrent version. Without this the
+        // record would be dropped from the keyTable, kept out of the
+        // deletedTable by the check above, and leak.
+        String dbVersionedKey = null;
+        OmKeyInfo versionedKeyInfo = null;
+        if (supersededVersionRetained) {
+          versionedKeyInfo = keyToDelete.getVersionId() != null ? keyToDelete
+              : keyToDelete.toBuilder()
+                  .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+                  .setNullVersion(true)
+                  .build();
+          dbVersionedKey = omMetadataManager.getVersionedOzoneKey(
+              volumeName, bucketName, keyName, versionedKeyInfo.getVersionId());
+          omMetadataManager.getVersionedKeyTable().addCacheEntry(
+              dbVersionedKey, versionedKeyInfo, trxnLogIndex);
+        }
+
+        // A suspended write replaces the key's null version wherever it is.
+        String replacedNullVersionKey = null;
+        if (omBucketInfo.isS3VersioningSuspended()
+            && supersededVersionRetained) {
+          Pair<String, OmKeyInfo> nullVersion = getNoncurrentNullVersion(
+              omMetadataManager, volumeName, bucketName, keyName);
+          if (nullVersion != null) {
+            replacedNullVersionKey = nullVersion.getKey();
+            allKeyInfoToRemove.add(nullVersion.getValue()
+                .withCommittedKeyDeletedFlag(true));
+            usedBytesDiff -= nullVersion.getValue().getReplicatedSize();
+            omBucketInfo.decrUsedNamespace(1L, true);
+            omMetadataManager.getVersionedKeyTable().addCacheEntry(
+                new CacheKey<>(replacedNullVersionKey),
+                CacheValue.get(trxnLogIndex));
+          }
         }
 
         String dbBucketKey = omMetadataManager.getBucketKey(
@@ -366,10 +419,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         long volumeId = omMetadataManager.getVolumeId(volumeName);
         long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
         omClientResponse =
-            getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
+            ((S3MultipartUploadCompleteResponse) getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
                 omKeyInfo, allKeyInfoToRemove, omBucketInfo,
                 volumeId, bucketId, missingParentInfos, multipartKeyInfo,
-                multipartPartKeysToDelete);
+                multipartPartKeysToDelete))
+                .withVersionedKey(dbVersionedKey, versionedKeyInfo,
+                    replacedNullVersionKey);
 
         result = Result.SUCCESS;
       } else {

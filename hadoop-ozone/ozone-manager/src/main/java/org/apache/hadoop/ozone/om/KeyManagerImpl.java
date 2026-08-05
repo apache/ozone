@@ -601,14 +601,30 @@ public class KeyManagerImpl implements KeyManager {
               bucketLayout);
 
       if (bucketLayout.isFileSystemOptimized()) {
+        if (args.addressesVersion()) {
+          throw new OMException("Object versioning is only supported on "
+              + BucketLayout.OBJECT_STORE + " buckets",
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName, bucketLayout);
+        if (args.addressesVersion()) {
+          value = getAddressedVersion(args, volumeName, bucketName, keyName,
+              value);
+        }
         if (value != null) {
           // For Legacy & OBS buckets, any key is a file by default. This is to
           // keep getKeyInfo compatible with OFS clients.
           value.setFile(true);
         }
+      }
+      if (value != null && value.isDeleteMarker()) {
+        // Addressing a delete marker by version is answered with 405 by S3,
+        // while a request that lands on a current marker is a plain 404.
+        throw new OMException("Key: " + keyName + " is a delete marker",
+            args.addressesVersion()
+                ? ResultCodes.KEY_IS_DELETE_MARKER : ResultCodes.KEY_NOT_FOUND);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -659,6 +675,48 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager
         .getKeyTable(bucketLayout)
         .get(keyBytes);
+  }
+
+  /**
+   * Resolves the version addressed by {@code args} for a key whose current
+   * version is {@code current}. The current version is checked first, so a
+   * request naming the current version costs no extra read; otherwise the
+   * version is looked up in the versionedKeyTable.
+   *
+   * @param current the key's current version, or null when the key has none
+   * @return the addressed version, or null when it does not exist
+   */
+  private OmKeyInfo getAddressedVersion(OmKeyArgs args, String volumeName,
+      String bucketName, String keyName, OmKeyInfo current) throws IOException {
+    if (args.isNullVersion()) {
+      if (current != null && current.isNullVersionRecord()) {
+        return current;
+      }
+      // The null version carries a normally generated versionId, so it can only
+      // be found by scanning the key's versions. The scan is bounded by the
+      // number of versions the key has and stops at the first match, since a key
+      // has at most one null version.
+      String prefix = metadataManager
+          .getVersionedOzoneKeyPrefix(volumeName, bucketName, keyName);
+      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+               metadataManager.getVersionedKeyTable().iterator(prefix)) {
+        while (versions.hasNext()) {
+          OmKeyInfo version = versions.next().getValue();
+          if (version.isNullVersionRecord()) {
+            return version;
+          }
+        }
+      }
+      return null;
+    }
+
+    long versionId = args.getVersionId();
+    if (current != null && current.getVersionId() != null
+        && current.getVersionId() == versionId) {
+      return current;
+    }
+    return metadataManager.getVersionedKeyTable().get(metadataManager
+        .getVersionedOzoneKey(volumeName, bucketName, keyName, versionId));
   }
 
   /**
