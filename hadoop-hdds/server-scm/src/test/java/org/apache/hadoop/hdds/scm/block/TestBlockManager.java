@@ -246,7 +246,7 @@ public class TestBlockManager {
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList(), storagePolicy, false);
       } catch (IOException e) {
-        e.getMessage().contains(storagePolicy.getCreationTier().name());
+        assertTrue(e.getMessage().contains(storagePolicy.getCreationTier().name()));
       }
       if (storagePolicy.getCreationFallbackTier() != StorageTier.EMPTY) {
         // Allow Fallback StoragePolicy, allocate Block in the fallback creation StorageTier
