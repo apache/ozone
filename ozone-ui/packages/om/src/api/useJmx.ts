@@ -17,6 +17,7 @@
  */
 
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { useRefetchInterval } from '@ozone-ui/shared';
 import { queryJmx } from './jmx';
 
 export interface JmxBeanState<T> {
@@ -88,8 +89,12 @@ export function useJmxBean<T>(qry: string, options: UseJmxBeanOptions = {}): Jmx
  * Suspense variant: suspends while loading and throws to the nearest error
  * boundary on failure, so the caller renders assuming data is settled. Returns
  * the first matching MBean (or `undefined` when the endpoint returned no beans).
+ *
+ * Automatically picks up the auto-refresh interval from the nearest
+ * `SyncConfigProvider` — no manual `setInterval` needed.
  */
 export function useSuspenseJmxBean<T>(qry: string): SuspenseJmxBeanState<T> {
-  const { data } = useSuspenseQuery(jmxQueryOptions<T>(qry));
+  const refetchInterval = useRefetchInterval();
+  const { data } = useSuspenseQuery({ ...jmxQueryOptions<T>(qry), refetchInterval });
   return { data: data[0], isEmpty: data.length === 0 };
 }

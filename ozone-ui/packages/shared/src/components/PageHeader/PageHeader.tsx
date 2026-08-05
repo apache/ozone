@@ -27,8 +27,6 @@ export interface PageHeaderProps {
   subtitle?: React.ReactNode;
   /** Optional content rendered above the title (e.g. breadcrumbs). */
   breadcrumb?: React.ReactNode;
-  /** Right-aligned actions (buttons, filters, ...). */
-  actions?: React.ReactNode;
   style?: React.CSSProperties;
 }
 
@@ -37,13 +35,7 @@ export interface PageHeaderProps {
  * right-aligned actions, matching the "Page Header" component used at the top of
  * the Ozone content area.
  */
-export const PageHeader: React.FC<PageHeaderProps> = ({
-  title,
-  subtitle,
-  breadcrumb,
-  actions,
-  style,
-}) => {
+export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, breadcrumb, style }) => {
   return (
     <div
       style={{
@@ -55,41 +47,29 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       }}
     >
       {breadcrumb}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: spacing.lg,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xxs }}>
-          <Typography.Title
-            level={1}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xxs }}>
+        <Typography.Title
+          level={1}
+          style={{
+            margin: 0,
+            fontSize: textStyles.h1.fontSize,
+            lineHeight: `${textStyles.h1.lineHeight}px`,
+            fontWeight: textStyles.h1.fontWeight,
+            color: semanticColors.textPrimary,
+          }}
+        >
+          {title}
+        </Typography.Title>
+        {subtitle && (
+          <Typography.Text
             style={{
-              margin: 0,
-              fontSize: textStyles.h1.fontSize,
-              lineHeight: `${textStyles.h1.lineHeight}px`,
-              fontWeight: textStyles.h1.fontWeight,
-              color: semanticColors.textPrimary,
+              color: semanticColors.textSecondary,
+              fontSize: textStyles.bodyStandard.fontSize,
+              lineHeight: `${textStyles.bodyStandard.lineHeight}px`,
             }}
           >
-            {title}
-          </Typography.Title>
-          {subtitle && (
-            <Typography.Text
-              style={{
-                color: semanticColors.textSecondary,
-                fontSize: textStyles.bodyStandard.fontSize,
-                lineHeight: `${textStyles.bodyStandard.lineHeight}px`,
-              }}
-            >
-              {subtitle}
-            </Typography.Text>
-          )}
-        </div>
-        {actions && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>{actions}</div>
+            {subtitle}
+          </Typography.Text>
         )}
       </div>
     </div>

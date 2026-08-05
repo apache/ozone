@@ -37,7 +37,9 @@ export const defaultQueryClientConfig: QueryClientConfig = {
 };
 
 /** Create a `QueryClient` pre-configured with the Ozone UI defaults. */
-export function createQueryClient(config: QueryClientConfig = defaultQueryClientConfig): QueryClient {
+export function createQueryClient(
+  config: QueryClientConfig = defaultQueryClientConfig
+): QueryClient {
   return new QueryClient(config);
 }
 

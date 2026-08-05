@@ -16,7 +16,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint ."
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.62.0",

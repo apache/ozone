@@ -16,10 +16,19 @@
  * limitations under the License.
  */
 
+import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { AppstoreOutlined } from '@ant-design/icons';
-import { AppLayout, Chip, IconButton, NotFoundState, Sidebar, UtilityBar } from '@ozone-ui/shared';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  AppLayout,
+  Chip,
+  NotFoundState,
+  Sidebar,
+  SyncConfigProvider,
+  UtilityBar,
+} from '@ozone-ui/shared';
 import { navItems, SIDEBAR_WIDTH } from './navigation';
+import { JMX_QUERY_KEY } from './api/useJmx';
 import OverviewPage from './pages/Overview/OverviewPage';
 import Placeholder from './pages/Placeholder';
 
@@ -44,22 +53,38 @@ const BrandTitle = () => {
   );
 };
 
-const utilityBar = (
-  <UtilityBar
-    leading={
-      <IconButton
-        icon={<AppstoreOutlined style={{ fontSize: 18 }} />}
-        label="App switcher"
-        tooltip={null}
-      />
-    }
-    branding={<BrandTitle />}
-  />
-);
+/**
+ * Inner app shell. Must be rendered inside `SyncConfigProvider` and
+ * `QueryProvider` so `useSyncConfig` / `useQueryClient` are available.
+ * Tracks the last-refreshed timestamp by subscribing to the query cache, so the
+ * SyncChip always shows the correct time without any manual `setInterval`.
+ */
+function AppShell() {
+  const queryClient = useQueryClient();
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(() => new Date());
 
-function App() {
+  // Update the timestamp whenever any JMX query settles successfully — TanStack
+  // fires this on both auto-refetch and manual invalidation.
+  useEffect(() => {
+    const cache = queryClient.getQueryCache();
+    const unsubscribe = cache.subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        event.action.type === 'success' &&
+        Array.isArray(event.query.queryKey) &&
+        event.query.queryKey[0] === JMX_QUERY_KEY
+      ) {
+        setLastRefreshedAt(new Date());
+      }
+    });
+    return unsubscribe;
+  }, [queryClient]);
+
   return (
-    <AppLayout utilityBar={utilityBar} sider={<Sidebar items={navItems} width={SIDEBAR_WIDTH} />}>
+    <AppLayout
+      utilityBar={<UtilityBar branding={<BrandTitle />} lastRefreshedAt={lastRefreshedAt} />}
+      sider={<Sidebar items={navItems} width={SIDEBAR_WIDTH} />}
+    >
       <Routes>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/configuration" element={<Placeholder title="Configuration" />} />
@@ -72,6 +97,19 @@ function App() {
         <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </AppLayout>
+  );
+}
+
+/**
+ * Application root. Wraps the shell in `SyncConfigProvider` so the auto-refresh
+ * toggle is available app-wide. `QueryProvider` and `ThemeProvider` are mounted
+ * above this in `main.tsx`.
+ */
+function App() {
+  return (
+    <SyncConfigProvider>
+      <AppShell />
+    </SyncConfigProvider>
   );
 }
 

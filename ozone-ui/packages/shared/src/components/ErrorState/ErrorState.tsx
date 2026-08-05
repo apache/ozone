@@ -19,11 +19,11 @@
 import React from 'react';
 import { Button, Typography } from 'antd';
 import { semanticColors, spacing, textStyles } from '../../theme/tokens';
-import { NetworkErrorArt, NotFoundArt, ServerErrorArt } from './illustrations';
+import { NetworkErrorIcon, NotFoundIcon, ServerErrorIcon } from './icons';
 
 export interface ErrorStateProps {
-  /** Illustration rendered above the title (e.g. one of the bundled error arts). */
-  illustration?: React.ReactNode;
+  /** icon rendered above the title (e.g. one of the bundled error arts). */
+  icon?: React.ReactNode;
   /** Bold headline, e.g. "Network Error". */
   title: React.ReactNode;
   /** Supporting explanation shown under the title. */
@@ -36,13 +36,12 @@ export interface ErrorStateProps {
 }
 
 /**
- * Full-page error / empty state: a centred illustration, headline, description and
+ * Full-page error / empty state: a centred icon, headline, description and
  * a primary action button. Used for the network / 404 / 500 screens and any other
- * "nothing to show" state. Presets ({@link NetworkErrorState}, {@link NotFoundState},
- * {@link ServerErrorState}) fill in the art and copy from the design.
+ * "nothing to show" state.
  */
 export const ErrorState: React.FC<ErrorStateProps> = ({
-  illustration,
+  icon,
   title,
   description,
   actionLabel = 'Refresh',
@@ -67,13 +66,22 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         justifyContent: 'center',
         textAlign: 'center',
         gap: spacing.lg,
-        minHeight: 320,
-        padding: spacing.xxl,
+        paddingTop: '25%',
+        paddingInline: spacing.xxl,
+        paddingBottom: spacing.xxl,
         ...style,
       }}
     >
-      {illustration}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, alignItems: 'center' }}>
+      {icon}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: spacing.sm,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <Typography.Title
           level={2}
           style={{
@@ -109,11 +117,9 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
 };
 
 /** "Network Error" state — no response received from the server. */
-export const NetworkErrorState: React.FC<Omit<ErrorStateProps, 'title' | 'illustration'>> = (
-  props
-) => (
+export const NetworkErrorState: React.FC<Omit<ErrorStateProps, 'title' | 'icon'>> = (props) => (
   <ErrorState
-    illustration={<NetworkErrorArt />}
+    icon={<NetworkErrorIcon />}
     title="Network Error"
     description="No response received from server while fetching data"
     {...props}
@@ -121,9 +127,9 @@ export const NetworkErrorState: React.FC<Omit<ErrorStateProps, 'title' | 'illust
 );
 
 /** "Error 404" state — the requested page/route does not exist. */
-export const NotFoundState: React.FC<Omit<ErrorStateProps, 'title' | 'illustration'>> = (props) => (
+export const NotFoundState: React.FC<Omit<ErrorStateProps, 'title' | 'icon'>> = (props) => (
   <ErrorState
-    illustration={<NotFoundArt />}
+    icon={<NotFoundIcon />}
     title="Error 404"
     description="The page is not available at the moment"
     {...props}
@@ -131,11 +137,9 @@ export const NotFoundState: React.FC<Omit<ErrorStateProps, 'title' | 'illustrati
 );
 
 /** "Error 500" state — the server hit an internal error. */
-export const ServerErrorState: React.FC<Omit<ErrorStateProps, 'title' | 'illustration'>> = (
-  props
-) => (
+export const ServerErrorState: React.FC<Omit<ErrorStateProps, 'title' | 'icon'>> = (props) => (
   <ErrorState
-    illustration={<ServerErrorArt />}
+    icon={<ServerErrorIcon />}
     title="Error 500"
     description="It’s not you, it’s us. We’re having an internal server error"
     {...props}

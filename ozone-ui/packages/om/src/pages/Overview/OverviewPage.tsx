@@ -17,10 +17,7 @@
  */
 
 import React from 'react';
-import { Button } from 'antd';
-import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader, Icon, QueryErrorBoundary } from '@ozone-ui/shared';
-import { JMX_QUERY_KEY } from '../../api/useJmx';
+import { PageHeader, QueryErrorBoundary } from '@ozone-ui/shared';
 import InstanceDetailsSection from './sections/InstanceDetailsSection';
 import RolesSection from './sections/RolesSection';
 import MetadataVolumeSection from './sections/MetadataVolumeSection';
@@ -28,40 +25,24 @@ import JvmSection from './sections/JvmSection';
 
 /**
  * OM Overview page. Each section fetches its own JMX MBean lazily via TanStack
- * Query (with `useSuspenseQuery`); sections that share a query (the OM
- * ServerRuntime bean feeds three of them) are de-duplicated to a single request
- * by query key. Because every section reads from the one `/jmx` endpoint, a
- * transport/server failure fails them all, so a single `QueryErrorBoundary`
- * renders one page-level error state. Refresh invalidates the `['jmx']` cache so
- * every visible query refetches.
+ * Query (with `useSuspenseQuery`); sections that share a query are de-duplicated
+ * to a single request by query key. A single `QueryErrorBoundary` wraps all
+ * sections so a `/jmx` transport or server failure shows one page-level error
+ * state rather than per-section alerts. Refresh is driven from the utility bar
+ * via the SyncChip.
  */
-export const OverviewPage: React.FC = () => {
-  const queryClient = useQueryClient();
-
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: [JMX_QUERY_KEY] });
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-      <PageHeader
-        title="Overview"
-        actions={
-          <Button icon={<Icon name="reports" size={16} />} onClick={refresh}>
-            Refresh
-          </Button>
-        }
-      />
-      <QueryErrorBoundary>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <InstanceDetailsSection />
-          <RolesSection />
-          <MetadataVolumeSection />
-          <JvmSection />
-        </div>
-      </QueryErrorBoundary>
-    </div>
-  );
-};
+export const OverviewPage: React.FC = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <PageHeader title="Overview" />
+    <QueryErrorBoundary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <InstanceDetailsSection />
+        <RolesSection />
+        <MetadataVolumeSection />
+        <JvmSection />
+      </div>
+    </QueryErrorBoundary>
+  </div>
+);
 
 export default OverviewPage;

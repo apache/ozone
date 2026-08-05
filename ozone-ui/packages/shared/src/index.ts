@@ -64,6 +64,8 @@ export { default as IconButton } from './components/IconButton/IconButton';
 export type { IconButtonProps } from './components/IconButton/IconButton';
 export { default as Icon } from './components/Icon/Icon';
 export type { IconProps, IconName } from './components/Icon/Icon';
+export { default as SyncChip } from './components/SyncChip/SyncChip';
+export type { SyncChipProps, DbSyncConfig } from './components/SyncChip/SyncChip';
 
 // Data fetching (TanStack Query foundation)
 export { fetchJson, HttpError } from './data/fetchJson';
@@ -71,6 +73,13 @@ export type { FetchJsonOptions, QueryParams } from './data/fetchJson';
 export { createQueryClient, defaultQueryClientConfig } from './data/queryClient';
 export { QueryProvider } from './data/QueryProvider';
 export type { QueryProviderProps } from './data/QueryProvider';
+export {
+  SyncConfigProvider,
+  useSyncConfig,
+  DEFAULT_REFRESH_INTERVAL_MS,
+} from './data/SyncConfigContext';
+export type { SyncConfig, SyncConfigProviderProps } from './data/SyncConfigContext';
+export { useRefetchInterval } from './data/useRefetchInterval';
 
 // Utils
 export * from './utils/menuUtils';

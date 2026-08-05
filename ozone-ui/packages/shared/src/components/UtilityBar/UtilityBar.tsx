@@ -17,119 +17,96 @@
  */
 
 import React from 'react';
-import { BellOutlined, QuestionCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import { fontFamilies, semanticColors, spacing, textStyles } from '../../theme/tokens';
 import IconButton from '../IconButton/IconButton';
+import SyncChip, { type DbSyncConfig } from '../SyncChip/SyncChip';
 
 export interface UtilityBarProps {
   /** Left slot, e.g. an app switcher or menu button. */
   leading?: React.ReactNode;
   /** Product branding shown next to the leading slot (name/logo + host chip). */
   branding?: React.ReactNode;
-  /** @deprecated Use `branding`. Kept for back-compat; rendered when `branding` is unset. */
-  title?: React.ReactNode;
   /** Optional centre slot (e.g. global search). */
   center?: React.ReactNode;
-  /**
-   * Right slot. When omitted, the bar renders the standard Help / Notifications
-   * / Profile actions (wire them up via the `on*` handlers below).
-   */
-  actions?: React.ReactNode;
-  /** Handler for the standard Help action (used when `actions` is not provided). */
+  /** Handler for the Help icon button. */
   onHelp?: () => void;
-  /** Handler for the standard Notifications action. */
-  onNotifications?: () => void;
-  /** Handler for the standard Profile action. */
-  onProfile?: () => void;
+  /** Timestamp of the last data refresh; forwarded to the embedded `SyncChip`. */
+  lastRefreshedAt?: Date;
+  /**
+   * Recon-only: configuration for the "Database Sync" row in the `SyncChip`
+   * dropdown. Omit for OM, SCM and DN — the row is hidden when absent.
+   */
+  dbSyncConfig?: DbSyncConfig;
   /** Height in px. Defaults to 48. */
   height?: number;
   style?: React.CSSProperties;
 }
 
 /**
- * Global top utility bar (the app chrome at the very top of every screen).
- * Provides a leading slot, product `branding`, an optional centre slot and
- * right-aligned actions — defaulting to the standard Help / Notifications /
- * Profile buttons when `actions` is not supplied.
+ * Global top utility bar. Renders a leading slot, product branding, an optional
+ * centre slot, a Help button and the `SyncChip` auto-refresh control. Requires a
+ * `SyncConfigProvider` ancestor so the chip can read and toggle the refresh state.
  */
 export const UtilityBar: React.FC<UtilityBarProps> = ({
   leading,
   branding,
-  title,
   center,
-  actions,
   onHelp,
-  onNotifications,
-  onProfile,
+  lastRefreshedAt,
+  dbSyncConfig,
   height = 48,
   style,
-}) => {
-  const brand = branding ?? title;
-  const rightContent = actions ?? (
-    <>
+}) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: spacing.md,
+      height,
+      paddingInline: spacing.md,
+      background: semanticColors.bgTopbar,
+      color: semanticColors.textPrimary,
+      borderBottom: `1px solid ${semanticColors.border}`,
+      ...style,
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+      {leading}
+      {branding && (
+        <span
+          style={{
+            fontFamily: fontFamilies.appTitle,
+            fontSize: textStyles.appTitle.fontSize,
+            fontWeight: textStyles.appTitle.fontWeight,
+            lineHeight: `${textStyles.appTitle.lineHeight}px`,
+            color: semanticColors.textPrimary,
+          }}
+        >
+          {branding}
+        </span>
+      )}
+    </div>
+
+    {center && <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>{center}</div>}
+
+    <div
+      style={{
+        marginLeft: center ? 0 : 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        gap: spacing.sm,
+        color: semanticColors.textSecondary,
+      }}
+    >
       <IconButton
         icon={<QuestionCircleOutlined style={{ fontSize: 18 }} />}
         label="Help"
         onClick={onHelp}
       />
-      <IconButton
-        icon={<BellOutlined style={{ fontSize: 18 }} />}
-        label="Notifications"
-        onClick={onNotifications}
-      />
-      <IconButton
-        icon={<UserOutlined style={{ fontSize: 18 }} />}
-        label="Profile"
-        onClick={onProfile}
-      />
-    </>
-  );
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: spacing.md,
-        height,
-        paddingInline: spacing.md,
-        background: semanticColors.bgTopbar,
-        color: semanticColors.textPrimary,
-        ...style,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-        {leading}
-        {brand && (
-          <span
-            style={{
-              fontFamily: fontFamilies.appTitle,
-              fontSize: textStyles.appTitle.fontSize,
-              fontWeight: textStyles.appTitle.fontWeight,
-              lineHeight: `${textStyles.appTitle.lineHeight}px`,
-              color: semanticColors.textPrimary,
-            }}
-          >
-            {brand}
-          </span>
-        )}
-      </div>
-
-      {center && <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>{center}</div>}
-
-      <div
-        style={{
-          marginLeft: center ? 0 : 'auto',
-          display: 'flex',
-          alignItems: 'center',
-          gap: spacing.xs,
-          color: semanticColors.textSecondary,
-        }}
-      >
-        {rightContent}
-      </div>
+      <SyncChip lastRefreshedAt={lastRefreshedAt} dbSync={dbSyncConfig} />
     </div>
-  );
-};
+  </div>
+);
 
 export default UtilityBar;

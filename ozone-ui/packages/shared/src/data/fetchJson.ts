@@ -62,7 +62,10 @@ export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}):
   const { params, body, headers, ...rest } = options;
 
   const isJsonBody =
-    body != null && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob);
+    body != null &&
+    typeof body === 'object' &&
+    !(body instanceof FormData) &&
+    !(body instanceof Blob);
 
   const response = await fetch(withParams(url, params), {
     ...rest,
