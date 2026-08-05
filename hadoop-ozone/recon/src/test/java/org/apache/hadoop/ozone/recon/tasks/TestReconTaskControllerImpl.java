@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -63,6 +65,7 @@ import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class used to test ReconTaskControllerImpl.
@@ -72,6 +75,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
+  @TempDir
+  private Path tempDir;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -506,27 +511,92 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   
   @Test
   public void testCheckpointManagerCleanupOnQueueFailure() throws Exception {
-    // Set up properly mocked ReconOMMetadataManager with required dependencies
-    ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
+    // Verify the buffer-full branch of queueReInitializationEvent: when the freshly
+    // created checkpoint cannot be handed off to the event buffer, it must be cleaned
+    // up (not leaked) and the call must return RETRY_LATER.
+
+    // Stop the async processor from setUp so it can't consume buffered events.
+    reconTaskController.stop();
+
+    // Build a controller with a capacity-1 event buffer so a single pre-filled event
+    // makes the internal eventBuffer.offer(...) return false (buffer full).
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setInt("ozone.recon.om.event.buffer.capacity", 1);
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString()))
+        .thenAnswer(i -> {
+          String taskName = i.getArgument(0);
+          return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
+        });
+    ReconDBProvider reconDbProvider = mock(ReconDBProvider.class);
+    when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
+    when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
+    ReconTaskControllerImpl controller = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
+        reconTaskStatusUpdaterManagerMock, reconDbProvider, mock(ReconContainerMetadataManager.class),
+        mock(ReconNamespaceSummaryManager.class), mock(ReconGlobalStatsManager.class),
+        mock(ReconFileMetadataManager.class));
+    // Do not start async processing.
+
+    // Checkpointed manager whose cleanup (stop()) we verify.
+    ReconOMMetadataManager mockCheckpointedManager = mock(ReconOMMetadataManager.class);
     DBStore mockDBStore = mock(DBStore.class);
     File mockDbLocation = mock(File.class);
-    DBCheckpoint mockCheckpoint = mock(DBCheckpoint.class);
-    Path mockCheckpointPath = Paths.get("/tmp/test/checkpoint");
-    
-    when(mockOMMetadataManager.getStore()).thenReturn(mockDBStore);
+    when(mockCheckpointedManager.getStore()).thenReturn(mockDBStore);
     when(mockDBStore.getDbLocation()).thenReturn(mockDbLocation);
-    when(mockDbLocation.getParent()).thenReturn("/tmp/test");
-    when(mockDBStore.getCheckpoint(any(String.class), any(Boolean.class))).thenReturn(mockCheckpoint);
-    when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
-    
-    reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
-    reconTaskController.stop();
-    
-    // This test verifies the successful path - in practice, queue failure after clear is very rare
-    // since we clear the buffer before queueing the reinitialization event
-    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+    when(mockDbLocation.getParentFile()).thenReturn(mockDbLocation);
+
+    ReconTaskControllerImpl controllerSpy = spy(controller);
+    // Keep the buffer full through the drain step, and return our checkpoint without
+    // touching RocksDB.
+    doNothing().when(controllerSpy).drainEventBufferAndCleanExistingCheckpoints();
+    doReturn(mockCheckpointedManager).when(controllerSpy).createOMCheckpoint(any());
+    controllerSpy.updateOMMetadataManager(mock(ReconOMMetadataManager.class));
+
+    // Fill the capacity-1 buffer so the real offer(...) inside the method fails.
+    OMUpdateEventBatch fillerBatch = mock(OMUpdateEventBatch.class);
+    when(fillerBatch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(fillerBatch.getEventCount()).thenReturn(1);
+    assertTrue(controllerSpy.getEventBuffer().offer(fillerBatch), "precondition: filler event queued");
+
+    ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result, "Should succeed under normal conditions");
+
+    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result,
+        "Buffer-full offer should result in RETRY_LATER");
+    // The fresh checkpoint was never handed off, so it must be cleaned up.
+    verify(mockCheckpointedManager, times(1)).stop();
+  }
+
+  @Test
+  public void testCleanupCheckpointDeletesDirEvenWhenStopThrows() throws Exception {
+    // Verify the cleanupCheckpoint try/finally: even if stop() throws, the checkpoint
+    // directory (a full copy of the OM DB) is still deleted and not leaked.
+
+    // Halt the async processor so the buffered event isn't consumed before we drain.
+    reconTaskController.stop();
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+
+    // Real on-disk checkpoint directory (with content) that cleanup must delete.
+    File checkpointDir = new File(tempDir.toFile(), "temp-recon-reinit-checkpoint_test");
+    assertTrue(checkpointDir.mkdirs(), "precondition: checkpoint dir created");
+    assertTrue(new File(checkpointDir, "CURRENT").createNewFile(), "precondition: dir has content");
+
+    ReconOMMetadataManager mockCheckpointedManager = mock(ReconOMMetadataManager.class);
+    DBStore mockDBStore = mock(DBStore.class);
+    when(mockCheckpointedManager.getStore()).thenReturn(mockDBStore);
+    // getDbLocation().getParentFile() resolves to the real checkpointDir.
+    when(mockDBStore.getDbLocation()).thenReturn(new File(checkpointDir, "om.db"));
+    // stop() throws - cleanup must still delete the directory.
+    doThrow(new IOException("stop failed")).when(mockCheckpointedManager).stop();
+
+    controllerImpl.getEventBuffer().offer(new ReconTaskReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW, mockCheckpointedManager));
+
+    controllerImpl.drainEventBufferAndCleanExistingCheckpoints();
+
+    verify(mockCheckpointedManager, times(1)).stop();
+    assertFalse(checkpointDir.exists(),
+        "checkpoint directory must be deleted even when stop() throws");
   }
   
   @Test

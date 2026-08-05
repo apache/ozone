@@ -665,7 +665,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       }
 
       // Buffer full - drop the event and clean up the fresh checkpoint (in finally) to avoid leaking it.
-      LOG.warn("Failed to queue reinitialization event (buffer full); discarding fresh checkpoint");
+      LOG.warn("Failed to queue reinitialization event (buffer full); discarding fresh checkpoint at {}",
+          checkpointedOMMetadataManager.getStore() != null
+              ? checkpointedOMMetadataManager.getStore().getDbLocation() : "<unknown>");
       handleEventFailure();
       return ReInitializationResult.RETRY_LATER;
     } finally {
