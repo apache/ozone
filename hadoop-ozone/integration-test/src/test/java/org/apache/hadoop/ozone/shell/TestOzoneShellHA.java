@@ -149,9 +149,9 @@ public class TestOzoneShellHA {
   private static File kmsDir;
   private static File testFile;
   private static String testFilePathString;
-  private static MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster;
   private static MiniKMS miniKMS;
-  private static OzoneClient client;
+  private OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
 
@@ -248,7 +248,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private static void execute(GenericCli shell, String[] args) {
+  private void execute(GenericCli shell, String[] args) {
     execute(cluster.getConf(), shell, args);
   }
 
