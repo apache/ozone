@@ -288,6 +288,10 @@ public class TestOMRatisSnapshots {
     });
     List<String> newKeys = writeFuture.get();
 
+    // A write is acked once queued in the double buffer, but the applied index
+    // advances only after the buffer commits. Flush so it covers all newKeys.
+    leaderOM.awaitDoubleBufferFlush();
+
     // All newKeys writes have completed (writeFuture.get() above), so the
     // leader must already contain them.
     OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
@@ -372,6 +376,11 @@ public class TestOMRatisSnapshots {
 
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
+
+    // A write is acked once queued in the double buffer, but the applied index
+    // advances only after the buffer commits. Flush so the transaction info
+    // read below covers all keys.
+    leaderOM.awaitDoubleBufferFlush();
 
     // Get transaction Index
     TransactionInfo transactionInfo =
