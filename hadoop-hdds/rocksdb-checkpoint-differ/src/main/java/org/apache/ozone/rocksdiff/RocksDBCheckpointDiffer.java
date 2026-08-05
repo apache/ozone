@@ -693,6 +693,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
       loadCompactionDagFromDB();
+      cleanupOrphanedSstBackupFiles();
     }
   }
 
@@ -1158,6 +1159,46 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (RocksDBException exception) {
       // TODO Handle exception properly before merging the PR.
       throw new RuntimeException(exception);
+    }
+  }
+
+  /**
+   * Removes SST files from the backup directory that were hard-linked during
+   * {@code onCompactionBegin} but never recorded in the compaction log because
+   * the compaction did not complete (for example, due to an OM crash/restart).
+   */
+  @VisibleForTesting
+  void cleanupOrphanedSstBackupFiles() {
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    if (!Files.isDirectory(sstBackupDirPath)) {
+      return;
+    }
+
+    Set<String> referencedFiles = compactionDag.getCompactionMap().keySet();
+    Set<String> orphanedFiles = new HashSet<>();
+    try (Stream<Path> pathStream = Files.list(sstBackupDirPath)) {
+      pathStream.filter(path -> path.getFileName().toString().toLowerCase()
+              .endsWith(SST_FILE_EXTENSION))
+          .forEach(path -> {
+            String fileName = FilenameUtils.getBaseName(path.getFileName().toString());
+            if (!referencedFiles.contains(fileName)) {
+              orphanedFiles.add(fileName);
+            }
+          });
+    } catch (IOException e) {
+      LOG.warn("Failed to list SST backup directory " + sstBackupDir, e);
+    }
+
+    if (orphanedFiles.isEmpty()) {
+      return;
+    }
+
+    LOG.info("Removing orphaned SST backup files left by incomplete compactions: {}",
+        orphanedFiles);
+    try (UncheckedAutoCloseable ignored = getBootstrapStateLock().acquireReadLock()) {
+      removeSstFiles(orphanedFiles);
+    } catch (InterruptedException e) {
+      LOG.warn("Failed to remove orphaned SST backup files", e);
     }
   }
 

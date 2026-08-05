@@ -1368,8 +1368,7 @@ public class TestRocksDBCheckpointDiffer {
     List<String> initialFiles1 = Arrays.asList("000015", "000013", "000011",
         "000009");
     List<String> initialFiles2 = Arrays.asList("000015", "000013", "000011",
-        "000009", "000018", "000016", "000017", "000026", "000024", "000022",
-        "000020");
+        "000009", "000018", "000016", "000017");
     List<String> initialFiles3 = Arrays.asList("000015", "000013", "000011",
         "000009", "000018", "000016", "000017", "000026", "000024", "000022",
         "000020", "000027", "000030", "000028", "000031", "000029", "000039",
@@ -1377,21 +1376,19 @@ public class TestRocksDBCheckpointDiffer {
         "000046", "000041", "000045", "000054", "000052", "000050", "000048",
         "000059", "000055", "000056", "000060", "000057", "000058");
 
-    List<String> expectedFiles1 = Arrays.asList("000015", "000013", "000011",
-        "000009");
     List<String> expectedFiles2 = Arrays.asList("000015", "000013", "000011",
-        "000009", "000026", "000024", "000022", "000020");
+        "000009");
     List<String> expectedFiles3 = Arrays.asList("000013", "000024", "000035",
         "000011", "000022", "000033", "000039", "000015", "000026", "000037",
         "000048", "000009", "000050", "000054", "000020", "000052");
 
     return Stream.of(
         Arguments.of("Case 1 with compaction log file: " +
-                "No compaction.",
+                "No compaction; orphan backup SST files removed on load.",
             "",
             null,
             initialFiles1,
-            expectedFiles1
+            Collections.emptyList()
         ),
         Arguments.of("Case 2 with compaction log file: " +
                 "One level compaction.",
@@ -1415,11 +1412,11 @@ public class TestRocksDBCheckpointDiffer {
             expectedFiles3
         ),
         Arguments.of("Case 4 with compaction log table: " +
-                "No compaction.",
+                "No compaction; orphan backup SST files removed on load.",
             null,
             Collections.emptyList(),
             initialFiles1,
-            expectedFiles1
+            Collections.emptyList()
         ),
         Arguments.of("Case 5 with compaction log table: " +
                 "One level compaction.",
@@ -1490,7 +1487,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
-   * End-to-end test for SST file pruning.
+   * End-to-end test for SST file pruning after compaction log load and orphan cleanup.
    */
   @ParameterizedTest(name = "{0}")
   @MethodSource("sstFilePruningScenarios")
@@ -1554,6 +1551,40 @@ public class TestRocksDBCheckpointDiffer {
       throws IOException {
     try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
+    }
+  }
+
+  @Test
+  public void testCleanupOrphanedSstBackupFiles() throws IOException {
+    CompactionLogEntry compactionLogEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
+        Collections.singletonList(
+            new CompactionFileInfo("000078", "/volume/bucket1/key-1", "/volume/bucket2/key-5", "keyTable")),
+        Collections.singletonList(
+            new CompactionFileInfo("000081", "/volume/bucket1/key-1", "/volume/bucket2/key-10", "keyTable")),
+        null
+    );
+    rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
+
+    createFileWithContext(sstBackUpDir + "/000078" + SST_FILE_EXTENSION, "tracked");
+    createFileWithContext(sstBackUpDir + "/000099" + SST_FILE_EXTENSION, "orphan");
+
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    assertTrue(Files.exists(sstBackUpDir.toPath().resolve("000078" + SST_FILE_EXTENSION)));
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve("000099" + SST_FILE_EXTENSION)));
+  }
+
+  @Test
+  public void testPruneSstFilesRetainsBackupFilesWhenCompactionDagIsEmpty() throws IOException {
+    List<String> backupFiles = Arrays.asList("000015", "000013", "000011", "000009");
+    for (String fileName : backupFiles) {
+      createFileWithContext(sstBackUpDir + "/" + fileName + SST_FILE_EXTENSION, fileName);
+    }
+
+    rocksDBCheckpointDiffer.pruneSstFiles();
+
+    for (String fileName : backupFiles) {
+      assertTrue(Files.exists(sstBackUpDir.toPath().resolve(fileName + SST_FILE_EXTENSION)));
     }
   }
 
