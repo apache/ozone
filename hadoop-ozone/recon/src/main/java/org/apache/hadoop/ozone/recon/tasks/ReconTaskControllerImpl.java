@@ -885,15 +885,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   private void cleanupPreExistingCheckpoints() {
     try {
-      if (currentOMMetadataManager == null || currentOMMetadataManager.getStore() == null) {
-        LOG.debug("No current OM metadata manager or store, skipping pre-existing checkpoint cleanup");
-        return;
-      }
-      
       // The DB store is only initialized after Recon downloads its first DB
       // snapshot from the OM. On a fresh startup it may still be null.
-      if (currentOMMetadataManager.getStore() == null) {
-        LOG.debug("OM metadata manager DB store not yet initialized, "
+      if (currentOMMetadataManager == null || currentOMMetadataManager.getStore() == null) {
+        LOG.debug("No current OM metadata manager or DB store not yet initialized, "
             + "skipping pre-existing checkpoint cleanup");
         return;
       }
