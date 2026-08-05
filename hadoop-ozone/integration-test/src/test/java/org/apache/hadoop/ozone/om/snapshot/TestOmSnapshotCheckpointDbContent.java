@@ -323,20 +323,24 @@ public class TestOmSnapshotCheckpointDbContent {
     return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint);
   }
 
+  /**
+   * Collects the snapshot OM metadata for the bucket-relevant tables and returns
+   * a map from table name to sorted key-value entries scoped to the bucket prefix.
+   */
   private static Map<String, SortedMap<String, ?>> readAllBucketPrefixTables(
       OMMetadataManager mm,
       TablePrefixInfo prefixes,
       BucketLayout layout) throws IOException {
     Map<String, SortedMap<String, ?>> tables = new HashMap<>();
-    tables.put(VOLUME_TABLE, readPrefix(mm.getVolumeTable(),
+    tables.put(VOLUME_TABLE, filterTableEntriesByKeyPrefix(mm.getVolumeTable(),
         prefixes.getTablePrefix(VOLUME_TABLE)));
-    tables.put(BUCKET_TABLE, readPrefix(mm.getBucketTable(),
+    tables.put(BUCKET_TABLE, filterTableEntriesByKeyPrefix(mm.getBucketTable(),
         prefixes.getTablePrefix(BUCKET_TABLE)));
-    tables.put(KEY_TABLE, readPrefix(mm.getKeyTable(layout),
+    tables.put(KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getKeyTable(layout),
         prefixes.getTablePrefix(KEY_TABLE)));
-    tables.put(OPEN_KEY_TABLE, readPrefix(mm.getOpenKeyTable(layout),
+    tables.put(OPEN_KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getOpenKeyTable(layout),
         prefixes.getTablePrefix(OPEN_KEY_TABLE)));
-    tables.put(MULTIPART_INFO_TABLE, readPrefix(mm.getMultipartInfoTable(),
+    tables.put(MULTIPART_INFO_TABLE, filterTableEntriesByKeyPrefix(mm.getMultipartInfoTable(),
         prefixes.getTablePrefix(MULTIPART_INFO_TABLE)));
     return tables;
   }
@@ -367,10 +371,13 @@ public class TestOmSnapshotCheckpointDbContent {
     String prefix = prefixes.getTablePrefix(tableName);
     assertTrue(prefix != null && !prefix.isEmpty(),
         "Expected non-empty prefix for " + tableName);
-    assertEquals(expected, readPrefix(current, prefix), tableName);
+    assertEquals(expected, filterTableEntriesByKeyPrefix(current, prefix), tableName);
   }
 
-  private static <V> SortedMap<String, V> readPrefix(
+  /**
+   * Filters table entries whose keys start with {@code prefix} and returns them in a sorted map.
+   */
+  private static <V> SortedMap<String, V> filterTableEntriesByKeyPrefix(
       Table<String, V> table, String prefix) throws IOException {
     SortedMap<String, V> map = new TreeMap<>();
     if (prefix == null || prefix.isEmpty()) {
