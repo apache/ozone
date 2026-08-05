@@ -96,8 +96,22 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void processMetadataSnapshotRequestDoesNotReturn503WhenLeader(boolean isLeaderReady) throws Exception {
+    BootstrapStateHandler.Lock lock = mock(BootstrapStateHandler.Lock.class);
+    when(lock.acquireWriteLock())
+        .thenReturn(mock(UncheckedAutoCloseable.class));
+    File tempDataDir = new File(System.getProperty("java.io.tmpdir"));
     OMDBCheckpointServletInodeBasedXfer servlet =
-        spy(new OMDBCheckpointServletInodeBasedXfer());
+        spy(new OMDBCheckpointServletInodeBasedXfer() {
+          @Override
+          public BootstrapStateHandler.Lock getBootstrapStateLock() {
+            return lock;
+          }
+
+          @Override
+          public File getBootstrapTempData() {
+            return tempDataDir;
+          }
+        });
     OzoneManager om = mock(OzoneManager.class);
     when(om.isLeader()).thenReturn(true);
     when(om.isLeaderReady()).thenReturn(isLeaderReady);
@@ -107,12 +121,6 @@ class TestOMDBCheckpointServletInodeBasedXferNonLeader {
     ServletContext ctx = mock(ServletContext.class);
     when(ctx.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE)).thenReturn(om);
     doReturn(ctx).when(servlet).getServletContext();
-    BootstrapStateHandler.Lock lock = mock(BootstrapStateHandler.Lock.class);
-    when(lock.acquireWriteLock())
-        .thenReturn(mock(UncheckedAutoCloseable.class));
-    doReturn(lock).when(servlet).getBootstrapStateLock();
-    doReturn(new File(System.getProperty("java.io.tmpdir")))
-        .when(servlet).getBootstrapTempData();
     // Force a failure after leader check so this unit test can stay lightweight
     // (no full servlet/bootstrap setup) while still proving that leader requests
     // are not rejected with 503.
