@@ -55,6 +55,9 @@ public class ContainerBalancerSelectionCriteria {
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
+
+  // excludeContainersDueToFailure: Containers excluded for current iteration only.
+  // excludeContainersNotFound: Container exclusions persist across iterations.
   private final Set<ContainerID> excludeContainersDueToFailure;
   private final Set<ContainerID> excludeContainersNotFound;
   private FindSourceStrategy findSourceStrategy;
@@ -405,12 +408,9 @@ public class ContainerBalancerSelectionCriteria {
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }
-      if (excludeContainersDueToFailure != null) {
-        idSet.removeAll(excludeContainersDueToFailure);
-      }
-      if (excludeContainersNotFound != null) {
-        idSet.removeAll(excludeContainersNotFound);
-      }
+      idSet.removeAll(excludeContainersDueToFailure);
+      idSet.removeAll(excludeContainersNotFound);
+
       idSet.removeAll(containerToSourceMap.keySet());
       newSet.addAll(idSet);
       return newSet;
