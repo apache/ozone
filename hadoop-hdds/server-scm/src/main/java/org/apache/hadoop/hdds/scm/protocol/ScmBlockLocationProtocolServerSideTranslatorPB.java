@@ -20,8 +20,11 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,9 +50,12 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -212,7 +218,21 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           " blocks. Requested " + request.getNumBlocks() + " blocks",
           SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
+
+    // Allows skipping version computation for pipelines we have already encountered in this request.
+    Map<PipelineID, HddsProtos.Pipeline> pipelineProtoCache = new HashMap<>();
     for (AllocatedBlock block : allocatedBlocks) {
+      Pipeline pipeline = block.getPipeline();
+      if (pipeline.getNodes().isEmpty()) {
+        throw new SCMException("Cannot process allocate block request for empty pipeline",
+            SCMException.ResultCodes.FAILED_TO_FIND_ACTIVE_PIPELINE);
+      }
+      HddsProtos.Pipeline pipelineProto = pipelineProtoCache.get(pipeline.getId());
+      if (pipelineProto == null) {
+        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(pipeline.getNodes());
+        pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS, pipelineVersion);
+        pipelineProtoCache.put(pipeline.getId(), pipelineProto);
+      }
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
           .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));

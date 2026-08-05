@@ -142,7 +142,7 @@ public class TestReplicationManager {
   private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
-  public void setup() throws IOException {
+  public void setup() throws IOException, NodeNotFoundException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
     rmConf = configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
@@ -1799,8 +1799,6 @@ public class TestReplicationManager {
     ComponentVersion higher = HDDSVersion.ZDU;
     mockDatanodeWithApparentVersion(source, sourceNewer ? higher : lower);
     mockDatanodeWithApparentVersion(target, sourceNewer ? lower : higher);
-    when(nodeManager.getLowestApparentVersion(source, target))
-        .thenCallRealMethod();
 
     if (throttled) {
       mockReplicationCommandCounts(dn -> 0, dn -> 0);
@@ -1826,8 +1824,6 @@ public class TestReplicationManager {
     mockDatanodeWithApparentVersion(source, HDDSVersion.SOFTWARE_VERSION);
     // SCM has no information for the target.
     when(nodeManager.getNode(target.getID())).thenReturn(null);
-    when(nodeManager.getLowestApparentVersion(source, target))
-        .thenCallRealMethod();
 
     // We must not proceed with a replication command for a node we don't know.
     assertThrows(IllegalArgumentException.class, () ->

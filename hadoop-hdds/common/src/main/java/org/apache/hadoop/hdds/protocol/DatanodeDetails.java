@@ -588,7 +588,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     }
 
     builder.setCurrentVersion(currentVersion.serialize());
-
     return builder;
   }
 

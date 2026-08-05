@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertSupportedBy
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -133,20 +132,10 @@ public abstract class AbstractComponentVersionTest {
   }
 
   @Test
-  public void testMinRequiresAtLeastOneVersion() {
-    assertThrows(IllegalArgumentException.class, ComponentVersion::min);
-  }
-
-  @Test
-  public void testMinOfSingleVersionIsItself() {
-    ComponentVersion version = getValues()[0];
-    assertEquals(version, ComponentVersion.min(version));
-  }
-
-  @Test
-  public void testMinReturnsLowestKnownVersion() {
+  public void testMinReturnsLowestKnownVersionInAnyOrder() {
     // getValues()[0] is the lowest known version
-    assertEquals(getValues()[0], ComponentVersion.min(getValues()));
+    assertEquals(getValues()[0], ComponentVersion.min(getValues()[0], getValues()[1]));
+    assertEquals(getValues()[0], ComponentVersion.min(getValues()[1], getValues()[0]));
   }
 
   @Test
@@ -157,6 +146,6 @@ public abstract class AbstractComponentVersionTest {
     assertEquals(known, ComponentVersion.min(known, unknown));
     assertEquals(known, ComponentVersion.min(unknown, known));
     // With only the unknown version, it is returned unchanged.
-    assertEquals(unknown, ComponentVersion.min(unknown));
+    assertEquals(unknown, ComponentVersion.min(unknown, unknown));
   }
 }
