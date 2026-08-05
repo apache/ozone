@@ -106,6 +106,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   // Clock for the retry-delay gate; overridable in tests via the
   // @VisibleForTesting constructor to drive the gate with a MockClock.
   private Clock clock = Clock.systemUTC();
+  // Log the 1st cleanup and every Nth after that at INFO; the rest at DEBUG.
+  private static final int CHECKPOINT_CLEANUP_LOG_SAMPLE_RATE = 20;
+  private final AtomicLong checkpointCleanupCount = new AtomicLong(0);
 
   @Inject
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -968,7 +971,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       if (checkpointLocation != null && checkpointLocation.exists()) {
         try {
           FileUtils.deleteDirectory(checkpointLocation);
-          LOG.info("Cleaned up checkpoint directory: {}", checkpointLocation);
+          long cleaned = checkpointCleanupCount.incrementAndGet();
+          if (cleaned % CHECKPOINT_CLEANUP_LOG_SAMPLE_RATE == 1) {
+            LOG.info("Cleaned up checkpoint directory: {} (total cleaned so far: {})",
+                checkpointLocation, cleaned);
+          } else {
+            LOG.debug("Cleaned up checkpoint directory: {}", checkpointLocation);
+          }
         } catch (IOException e) {
           LOG.warn("Failed to cleanup checkpoint directory: {}", checkpointLocation, e);
         }
