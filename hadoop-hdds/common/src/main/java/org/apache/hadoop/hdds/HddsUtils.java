@@ -268,6 +268,8 @@ public final class HddsUtils {
       Preconditions.checkArgument(bracket > 0,
           "Malformed role string (unmatched bracket): %s", roleString);
       hostIp = roleString.substring(bracket + 1, idx - 1);
+      Preconditions.checkArgument(roleString.charAt(bracket - 1) == ':',
+          "Malformed role string (expected ':' before '['): %s", roleString);
       idx = bracket - 1;
     } else {
       int sep = roleString.lastIndexOf(':');

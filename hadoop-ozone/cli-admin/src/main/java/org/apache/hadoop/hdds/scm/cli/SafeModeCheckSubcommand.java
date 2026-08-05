@@ -106,7 +106,12 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     try {
       List<String> roles = scmClient.getScmRoles();
       for (String role : roles) {
-        String[] parts = HddsUtils.parseRatisRoleString(role);
+        String[] parts;
+        try {
+          parts = HddsUtils.parseRatisRoleString(role);
+        } catch (IllegalArgumentException e) {
+          continue;
+        }
         if (!"LEADER".equalsIgnoreCase(parts[2])) {
           continue;
         }
