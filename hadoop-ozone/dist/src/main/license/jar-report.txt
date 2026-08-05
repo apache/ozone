@@ -45,7 +45,6 @@ share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
 share/ozone/lib/error_prone_annotations.jar
 share/ozone/lib/failureaccess.jar
-share/ozone/lib/gethostname4j.jar
 share/ozone/lib/grpc-api.jar
 share/ozone/lib/grpc-context.jar
 share/ozone/lib/grpc-core.jar
@@ -153,8 +152,6 @@ share/ozone/lib/jgraphx.jar
 share/ozone/lib/jheaps.jar
 share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
-share/ozone/lib/jna-platform.jar
-share/ozone/lib/jna.jar
 share/ozone/lib/jnr-a64asm.jar
 share/ozone/lib/jnr-constants.jar
 share/ozone/lib/jnr-ffi.jar
@@ -272,6 +269,7 @@ share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/ranger-audit-core.jar
 share/ozone/lib/ranger-authz-api.jar
+share/ozone/lib/ranger-common-utils.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
 share/ozone/lib/ranger-plugins-common.jar
