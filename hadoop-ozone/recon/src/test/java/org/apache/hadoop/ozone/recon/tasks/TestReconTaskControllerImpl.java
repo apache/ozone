@@ -77,8 +77,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
-  @TempDir
-  private Path tempDir;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -570,7 +568,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testCleanupCheckpointDeletesDirEvenWhenStopThrows() throws Exception {
+  public void testCleanupCheckpointDeletesDirEvenWhenStopThrows(@TempDir File tempDir) throws Exception {
     // Verify the cleanupCheckpoint try/finally: even if stop() throws, the checkpoint
     // directory (a full copy of the OM DB) is still deleted and not leaked.
 
@@ -579,7 +577,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
 
     // Real on-disk checkpoint directory (with content) that cleanup must delete.
-    File checkpointDir = new File(tempDir.toFile(), "temp-recon-reinit-checkpoint_test");
+    File checkpointDir = new File(tempDir, "temp-recon-reinit-checkpoint_test");
     assertTrue(checkpointDir.mkdirs(), "precondition: checkpoint dir created");
     assertTrue(new File(checkpointDir, "CURRENT").createNewFile(), "precondition: dir has content");
 
