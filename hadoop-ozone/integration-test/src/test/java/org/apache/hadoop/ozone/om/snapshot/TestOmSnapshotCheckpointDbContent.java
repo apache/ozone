@@ -23,8 +23,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +88,7 @@ import org.junit.jupiter.api.Test;
 public class TestOmSnapshotCheckpointDbContent {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
+  private static final byte[] OVERWRITE_KEY_CONTENT = new byte[] {0x64, 0x65, 0x66};
   private static final int CHECKPOINT_WAIT_MS = 120_000;
   private static final int DEFRAG_WAIT_MS = 600_000;
 
@@ -116,10 +120,10 @@ public class TestOmSnapshotCheckpointDbContent {
   }
 
   /**
-   * HDDS-13217 scenarios:
+   * HDDS-13217 scenarios for OBS and FSO buckets:
    * <ol>
-   *   <li>Create S1, S2, S3 on one bucket, run defrag, and verify each defragged checkpoint still
-   *       matches its version-0 baseline.</li>
+   *   <li>Create S1, S2, S3 with insert, overwrite, and delete deltas between snapshots, run defrag,
+   *       and verify each defragged checkpoint still matches its version-0 baseline.</li>
    *   <li>Delete the middle snapshot, run defrag again, and verify the remaining youngest snapshot
    *       checkpoint still matches its baseline.</li>
    * </ol>
@@ -127,9 +131,15 @@ public class TestOmSnapshotCheckpointDbContent {
   @Test
   public void testSnapshotCheckpointContentPreservedAcrossDefragIterations()
       throws Exception {
-    ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
+    runDefragIntegrityScenario(BucketLayout.OBJECT_STORE);
+    runDefragIntegrityScenario(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void runDefragIntegrityScenario(BucketLayout layout)
+      throws Exception {
+    ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket(layout);
     triggerDefragUntilDone(setup.snapshots);
-    assertCheckpointMatchesBaseline(setup.baselines, setup.snapshots);
+    assertCheckpointMatchesBaseline(setup.baselines, setup.snapshots, layout);
 
     SnapshotInfo s2 = setup.snapshots.get(1);
     SnapshotInfo s3 = setup.snapshots.get(2);
@@ -145,23 +155,31 @@ public class TestOmSnapshotCheckpointDbContent {
     assertCheckpointMatchesBaseline(
         Collections.singletonMap(s3.getSnapshotId(),
             setup.baselines.get(s3.getSnapshotId())),
-        Arrays.asList(s3));
+        Arrays.asList(s3),
+        layout);
   }
 
-  private ThreeSnapshotSetup createThreeSnapshotsOnNewBucket()
+  private ThreeSnapshotSetup createThreeSnapshotsOnNewBucket(BucketLayout layout)
       throws IOException, InterruptedException, TimeoutException {
-    OzoneBucket bucket =
-        DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
 
-    DataTestUtil.createKey(bucket, "key-s1", TEST_KEY_CONTENT);
+    String keyA = objectKey(layout, "key-a");
+    String keyB = objectKey(layout, "key-b");
+    String keyS2 = objectKey(layout, "key-s2");
+    String keyS3 = objectKey(layout, "key-s3");
+
+    DataTestUtil.createKey(bucket, keyA, TEST_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, keyB, TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s1");
 
-    DataTestUtil.createKey(bucket, "key-s2", TEST_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, keyA, OVERWRITE_KEY_CONTENT);
+    DataTestUtil.createKey(bucket, keyS2, TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s2");
 
-    DataTestUtil.createKey(bucket, "key-s3", TEST_KEY_CONTENT);
+    bucket.deleteKey(keyB);
+    DataTestUtil.createKey(bucket, keyS3, TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s3");
 
     List<SnapshotInfo> snapshots = Arrays.asList(
@@ -177,9 +195,13 @@ public class TestOmSnapshotCheckpointDbContent {
     TablePrefixInfo prefixes = liveMm.getTableBucketPrefix(volumeName, bucketName);
     Map<UUID, SnapshotBaseline> baselines = new HashMap<>();
     for (SnapshotInfo snapshotInfo : snapshots) {
-      baselines.put(snapshotInfo.getSnapshotId(), captureBaseline(snapshotInfo, prefixes));
+      baselines.put(snapshotInfo.getSnapshotId(), captureBaseline(snapshotInfo, prefixes, layout));
     }
     return new ThreeSnapshotSetup(volumeName, bucketName, snapshots, baselines);
+  }
+
+  private static String objectKey(BucketLayout layout, String name) {
+    return layout.isFileSystemOptimized() ? "dir/" + name : name;
   }
 
   private SnapshotInfo loadSnapshotInfo(String volumeName, String bucketName,
@@ -276,16 +298,16 @@ public class TestOmSnapshotCheckpointDbContent {
   }
 
   private SnapshotBaseline captureBaseline(SnapshotInfo snapshotInfo,
-      TablePrefixInfo prefixes) throws IOException {
+      TablePrefixInfo prefixes, BucketLayout layout) throws IOException {
     try (OmMetadataManagerImpl checkpointMm = openCheckpoint(snapshotInfo, 0)) {
       return new SnapshotBaseline(
-          readAllBucketPrefixTables(checkpointMm, prefixes, BucketLayout.OBJECT_STORE));
+          readAllBucketPrefixTables(checkpointMm, prefixes, layout));
     }
   }
 
   private void assertCheckpointMatchesBaseline(
-      Map<UUID, SnapshotBaseline> baselines, List<SnapshotInfo> snapshots)
-      throws IOException {
+      Map<UUID, SnapshotBaseline> baselines, List<SnapshotInfo> snapshots,
+      BucketLayout layout) throws IOException {
     OzoneManager om = cluster.getOzoneManager();
     for (SnapshotInfo snapshotInfo : snapshots) {
       SnapshotBaseline baseline = baselines.get(snapshotInfo.getSnapshotId());
@@ -298,8 +320,7 @@ public class TestOmSnapshotCheckpointDbContent {
                    snapshotInfo.getBucketName(),
                    snapshotInfo.getName())) {
         OMMetadataManager currentMm = activeSnapshot.get().getMetadataManager();
-        assertBucketPrefixTablesMatch(baseline.getTableData(), currentMm, prefixes,
-            BucketLayout.OBJECT_STORE);
+        assertBucketPrefixTablesMatch(baseline.getTableData(), currentMm, prefixes, layout);
       }
     }
   }
@@ -324,10 +345,19 @@ public class TestOmSnapshotCheckpointDbContent {
         prefixes.getTablePrefix(VOLUME_TABLE)));
     tables.put(BUCKET_TABLE, filterTableEntriesByKeyPrefix(mm.getBucketTable(),
         prefixes.getTablePrefix(BUCKET_TABLE)));
-    tables.put(KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getKeyTable(layout),
-        prefixes.getTablePrefix(KEY_TABLE)));
-    tables.put(OPEN_KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getOpenKeyTable(layout),
-        prefixes.getTablePrefix(OPEN_KEY_TABLE)));
+    if (layout.isFileSystemOptimized()) {
+      tables.put(FILE_TABLE, filterTableEntriesByKeyPrefix(mm.getFileTable(),
+          prefixes.getTablePrefix(FILE_TABLE)));
+      tables.put(DIRECTORY_TABLE, filterTableEntriesByKeyPrefix(mm.getDirectoryTable(),
+          prefixes.getTablePrefix(DIRECTORY_TABLE)));
+      tables.put(OPEN_FILE_TABLE, filterTableEntriesByKeyPrefix(mm.getOpenKeyTable(layout),
+          prefixes.getTablePrefix(OPEN_FILE_TABLE)));
+    } else {
+      tables.put(KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getKeyTable(layout),
+          prefixes.getTablePrefix(KEY_TABLE)));
+      tables.put(OPEN_KEY_TABLE, filterTableEntriesByKeyPrefix(mm.getOpenKeyTable(layout),
+          prefixes.getTablePrefix(OPEN_KEY_TABLE)));
+    }
     tables.put(MULTIPART_INFO_TABLE, filterTableEntriesByKeyPrefix(mm.getMultipartInfoTable(),
         prefixes.getTablePrefix(MULTIPART_INFO_TABLE)));
     return tables;
@@ -343,10 +373,19 @@ public class TestOmSnapshotCheckpointDbContent {
         current.getVolumeTable(), prefixes);
     assertPrefixEquals(BUCKET_TABLE, baseline.get(BUCKET_TABLE),
         current.getBucketTable(), prefixes);
-    assertPrefixEquals(KEY_TABLE, baseline.get(KEY_TABLE),
-        current.getKeyTable(layout), prefixes);
-    assertPrefixEquals(OPEN_KEY_TABLE, baseline.get(OPEN_KEY_TABLE),
-        current.getOpenKeyTable(layout), prefixes);
+    if (layout.isFileSystemOptimized()) {
+      assertPrefixEquals(FILE_TABLE, baseline.get(FILE_TABLE),
+          current.getFileTable(), prefixes);
+      assertPrefixEquals(DIRECTORY_TABLE, baseline.get(DIRECTORY_TABLE),
+          current.getDirectoryTable(), prefixes);
+      assertPrefixEquals(OPEN_FILE_TABLE, baseline.get(OPEN_FILE_TABLE),
+          current.getOpenKeyTable(layout), prefixes);
+    } else {
+      assertPrefixEquals(KEY_TABLE, baseline.get(KEY_TABLE),
+          current.getKeyTable(layout), prefixes);
+      assertPrefixEquals(OPEN_KEY_TABLE, baseline.get(OPEN_KEY_TABLE),
+          current.getOpenKeyTable(layout), prefixes);
+    }
     assertPrefixEquals(MULTIPART_INFO_TABLE, baseline.get(MULTIPART_INFO_TABLE),
         current.getMultipartInfoTable(), prefixes);
   }
