@@ -90,7 +90,9 @@ public class TestOmSnapshotCheckpointDbContent {
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
   private static final byte[] OVERWRITE_KEY_CONTENT = new byte[] {0x64, 0x65, 0x66};
   private static final int CHECKPOINT_WAIT_MS = 120_000;
+  private static final int PURGE_WAIT_MS = 180_000;
   private static final int DEFRAG_WAIT_MS = 600_000;
+  private static final int KEY_DELETE_WAIT_MS = 60_000;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -99,6 +101,10 @@ public class TestOmSnapshotCheckpointDbContent {
 
   @BeforeEach
   void initCluster() throws Exception {
+    startCluster();
+  }
+
+  private void startCluster() throws Exception {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary(),
         "Snapshot defrag requires rocks-tools native library");
 
@@ -112,6 +118,19 @@ public class TestOmSnapshotCheckpointDbContent {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
+    resumeBackgroundServices();
+  }
+
+  private void restartCluster() throws Exception {
+    IOUtils.closeQuietly(client, cluster);
+    startCluster();
+  }
+
+  private void resumeBackgroundServices() {
+    OzoneManager om = cluster.getOzoneManager();
+    om.getKeyManager().getDeletingService().resume();
+    om.getKeyManager().getDirDeletingService().resume();
+    om.getKeyManager().getSnapshotDeletingService().resume();
   }
 
   @AfterEach
@@ -132,6 +151,8 @@ public class TestOmSnapshotCheckpointDbContent {
   public void testSnapshotCheckpointContentPreservedAcrossDefragIterations()
       throws Exception {
     runDefragIntegrityScenario(BucketLayout.OBJECT_STORE);
+    // Use a fresh cluster for FSO to avoid interference on the global snapshot defrag chain.
+    restartCluster();
     runDefragIntegrityScenario(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
@@ -179,6 +200,7 @@ public class TestOmSnapshotCheckpointDbContent {
     store.createSnapshot(volumeName, bucketName, "snap-s2");
 
     bucket.deleteKey(keyB);
+    waitForKeyDeleted(bucket, keyB);
     DataTestUtil.createKey(bucket, keyS3, TEST_KEY_CONTENT);
     store.createSnapshot(volumeName, bucketName, "snap-s3");
 
@@ -224,6 +246,7 @@ public class TestOmSnapshotCheckpointDbContent {
   private void waitForSnapshotPurged(SnapshotInfo snapshotInfo)
       throws TimeoutException, InterruptedException {
     OzoneManager om = cluster.getOzoneManager();
+    resumeBackgroundServices();
     GenericTestUtils.waitFor(() -> {
       try {
         return om.getMetadataManager().getSnapshotInfoTable()
@@ -231,7 +254,19 @@ public class TestOmSnapshotCheckpointDbContent {
       } catch (IOException e) {
         return false;
       }
-    }, 1000, CHECKPOINT_WAIT_MS);
+    }, 1000, PURGE_WAIT_MS);
+  }
+
+  private void waitForKeyDeleted(OzoneBucket bucket, String keyName)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        bucket.getKey(keyName);
+        return false;
+      } catch (IOException e) {
+        return true;
+      }
+    }, 1000, KEY_DELETE_WAIT_MS);
   }
 
   /**
@@ -242,15 +277,20 @@ public class TestOmSnapshotCheckpointDbContent {
   private void triggerDefragUntilVersionIncreases(SnapshotInfo snapshotInfo,
       int baselineVersion) throws TimeoutException, InterruptedException {
     OzoneManager om = cluster.getOzoneManager();
+    String volumeName = snapshotInfo.getVolumeName();
+    String bucketName = snapshotInfo.getBucketName();
+    String snapshotName = snapshotInfo.getName();
     GenericTestUtils.waitFor(() -> {
       try {
-        if (readSnapshotVersion(snapshotInfo) > baselineVersion
-            && isSnapshotDefragComplete(snapshotInfo)) {
+        SnapshotInfo currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
+        if (readSnapshotVersion(currentSnapshot) > baselineVersion
+            && isSnapshotDefragComplete(currentSnapshot)) {
           return true;
         }
         om.triggerSnapshotDefrag(false);
-        return readSnapshotVersion(snapshotInfo) > baselineVersion
-            && isSnapshotDefragComplete(snapshotInfo);
+        currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
+        return readSnapshotVersion(currentSnapshot) > baselineVersion
+            && isSnapshotDefragComplete(currentSnapshot);
       } catch (IOException e) {
         return false;
       }
