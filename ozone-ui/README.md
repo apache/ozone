@@ -51,6 +51,12 @@ ozone-ui/                         # pnpm workspace root
     ├── recon/                    # @ozone-ui/ozone-recon (Vite app)
     ├── scm/                      # @ozone-ui/ozone-scm   (Vite app)
     └── om/                       # @ozone-ui/ozone-om    (Vite app)
+        ├── mock/                 # json-server JMX mock (server.cjs, jmxData.cjs)
+        └── src/
+            ├── api/              # JMX client + section-driven data hooks/parsers
+            ├── pages/            # Overview page + section components
+            ├── navigation.tsx    # sidebar nav items
+            └── App.tsx           # utility bar + sidebar + routes
 ```
 
 ## Prerequisites
@@ -77,8 +83,38 @@ pnpm build:shared      # compile @ozone-ui/shared -> packages/shared/dist
 
 pnpm dev:recon         # start the Recon app dev server
 pnpm dev:scm           # start the SCM app dev server
-pnpm dev:om            # start the OM app dev server
+pnpm dev:om            # start the OM app dev server (http://localhost:3000)
 ```
+
+> Tip: run `pnpm build:shared --watch` (or rebuild it after edits) whenever you
+> change `@ozone-ui/shared`, since apps import the compiled `dist/` output.
+
+## Mock backends (local development)
+
+The apps talk to their Ozone service over HTTP. To develop without a live
+cluster, each app can be paired with a **json-server** mock of its backend.
+Mock commands are namespaced per service (`mock:om`, and later `mock:scm`,
+`mock:recon`, …) so every sub-service can host its own mock independently.
+
+### OM (Ozone Manager)
+
+The OM app reads runtime state from the OM JMX servlet (`GET /jmx?qry=<mbean>`).
+The mock in `packages/om/mock/` replays captured JMX responses on port `9878`;
+the OM dev server proxies `/jmx` to it (see `packages/om/vite.config.ts`).
+
+```bash
+cd ozone-ui
+pnpm build:shared      # once, and after any shared change
+
+pnpm dev:om:mock       # OM mock (:9878) + OM dev server (:3000) together
+# — or run them separately —
+pnpm mock:om           # just the OM JMX mock on :9878
+pnpm dev:om            # just the OM dev server on :3000
+```
+
+Then open http://localhost:3000. To point the app at a real OM instead of the
+mock, change the `/jmx` proxy target in `packages/om/vite.config.ts` (or serve
+the built app from the OM itself, where `/jmx` is same-origin).
 
 ## Build
 
@@ -167,14 +203,22 @@ export default function App() {
 - **`components/`** (derived from the components recurring across the mockups)
   - `UtilityBar` — global top bar (leading/title, centre, actions).
   - `Sidebar` — collapsible, router-aware navigation rail driven by `items`
-    (with `path`s) and `logo` props; integrates with `react-router-dom`.
-  - `AppLayout` — page shell (sider + header + content).
+    (with `path`s, plus `group`/`divider` entries) and `logo` props; integrates
+    with `react-router-dom`.
+  - `AppLayout` — page shell with an optional full-width `utilityBar` slot above
+    the sider + content row.
   - `PageHeader` — page title with breadcrumb, subtitle and actions.
+  - `Section` — labelled content block: title, optional supporting text and
+    actions, followed by its content.
   - `Card` — surface with `outlined`/`elevated`/`filled` emphasis and an
     optional `collapsible` header.
-  - `KeyValuePair` — label/value pair (vertical or horizontal, optional link/copy).
+  - `KeyValuePair` — label/value pair (vertical or horizontal, optional
+    link/copy and an info `tooltip`).
+  - `DataTable` — themed Ant Design table with an optional title + filter/actions
+    toolbar and a `TablePagination` footer (client-side paging via `paginated`).
   - `Chip` — pill: `full`/`dot` variant, `standard`/`small` size, colour and
     `selected`/`closable` states.
+  - `SearchInput` — text field with a leading search glyph (table toolbars).
   - `Alert` — inline status banner (info/success/warning/error).
   - `TextLink` — themed inline link with optional external affordance.
   - `IconButton` — square icon-only button with accessible label + tooltip.

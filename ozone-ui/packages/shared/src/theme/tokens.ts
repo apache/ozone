@@ -108,6 +108,18 @@ export const colors = {
     800: 'rgb(70, 53, 0)',
     900: 'rgb(41, 30, 0)',
   },
+  pear: {
+    50: 'rgb(236, 253, 195)',
+    100: 'rgb(218, 251, 110)',
+    200: 'rgb(196, 233, 36)',
+    300: 'rgb(180, 214, 32)', // base (brand primary)
+    400: 'rgb(151, 180, 25)',
+    500: 'rgb(125, 149, 19)',
+    600: 'rgb(97, 117, 12)',
+    700: 'rgb(73, 88, 7)',
+    800: 'rgb(48, 59, 3)',
+    900: 'rgb(27, 34, 1)',
+  },
 } as const;
 
 /**
@@ -115,9 +127,9 @@ export const colors = {
  * intent is explicit and re-theming stays centralised.
  */
 export const semanticColors = {
-  brand: colors.orange[400],
-  brandHover: colors.orange[300],
-  brandActive: colors.orange[500],
+  brand: colors.green[500],
+  brandHover: colors.green[400],
+  brandActive: colors.green[600],
   info: colors.blueNova[600],
   success: colors.green[700],
   warning: colors.amber[300],
@@ -133,6 +145,19 @@ export const semanticColors = {
   bgElevated: 'rgb(255, 255, 255)',
   fill: colors.pewter[50],
   skeleton: colors.pewter[50],
+  // App chrome. The top utility bar and navigation rail share the light layout
+  // surface so the whole shell reads as one continuous background.
+  bgTopbar: colors.pewter[25],
+  bgSidebar: colors.pewter[25],
+  // Navigation rail item colours (light theme).
+  navItemColor: colors.pewter[600],
+  navItemColorSelected: colors.pewter[950],
+  navItemColorHover: colors.pewter[900],
+  navItemBgHover: colors.pewter[50],
+  navIconColor: colors.pewter[400],
+  navGroupTitleColor: colors.pewter[600],
+  /** The 3px accent bar marking the selected navigation item (brand primary). */
+  navIndicator: colors.green[500],
 } as const;
 
 /** Font families. Roboto is the primary UI face; app titles use Plus Jakarta Sans. */

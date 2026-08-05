@@ -17,7 +17,7 @@
  */
 
 import type { ThemeConfig } from 'antd';
-import { colors, fontFamilies, radius, semanticColors, textStyles } from './tokens';
+import { colors, fontFamilies, radius, semanticColors, spacing, textStyles } from './tokens';
 
 /**
  * Ant Design v5 theme derived from the Ozone UI design tokens.
@@ -72,25 +72,38 @@ export const ozoneTheme: ThemeConfig = {
   },
   components: {
     Layout: {
-      headerBg: semanticColors.bgContainer,
+      headerBg: semanticColors.bgTopbar,
       headerColor: semanticColors.textPrimary,
       headerHeight: 56,
       headerPadding: '0 24px',
       bodyBg: semanticColors.bgLayout,
-      // The navigation rail is a deep pewter surface.
-      siderBg: colors.pewter[900],
-      triggerBg: colors.pewter[800],
+      // The navigation rail shares the light layout surface.
+      siderBg: semanticColors.bgSidebar,
+      // Collapse control shares the rail surface so it doesn't read as a
+      // separate section (the Sidebar renders its own left-aligned trigger).
+      triggerBg: semanticColors.bgSidebar,
+      triggerColor: semanticColors.navItemColor,
     },
     Menu: {
-      darkItemBg: colors.pewter[900],
-      darkSubMenuItemBg: colors.pewter[950],
-      darkItemSelectedBg: colors.orange[400],
-      darkItemSelectedColor: 'rgb(255, 255, 255)',
-      darkItemColor: colors.pewter[200],
-      darkItemHoverBg: colors.pewter[800],
-      itemBorderRadius: radius.md,
-      itemSelectedBg: colors.orange[50],
-      itemSelectedColor: colors.orange[500],
+      // Light rail: no full-row selection fill — a left accent bar (applied per
+      // item in the Sidebar) marks the active item instead.
+      itemBg: 'transparent',
+      subMenuItemBg: 'transparent',
+      itemColor: semanticColors.navItemColor,
+      itemSelectedBg: 'transparent',
+      itemSelectedColor: semanticColors.navItemColorSelected,
+      itemHoverBg: semanticColors.navItemBgHover,
+      itemHoverColor: semanticColors.navItemColorHover,
+      itemActiveBg: semanticColors.navItemBgHover,
+      groupTitleColor: semanticColors.navGroupTitleColor,
+      // Radius/margins are applied per item in the Sidebar so the hover/selection
+      // pill rounds on the right only (the left edge carries the accent bar).
+      itemBorderRadius: 0,
+      itemMarginInline: 0,
+      itemMarginBlock: spacing.xs,
+      // Suppress Ant Design's built-in inline selection border.
+      activeBarWidth: 0,
+      activeBarBorderWidth: 0,
     },
     Card: {
       borderRadiusLG: radius.lg,

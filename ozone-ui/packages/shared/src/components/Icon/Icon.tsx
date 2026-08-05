@@ -40,7 +40,15 @@ export type IconName =
   | 'chevron-down'
   | 'chevron-up'
   | 'external-link'
-  | 'copy';
+  | 'copy'
+  | 'grid'
+  | 'help'
+  | 'info'
+  | 'rpc'
+  | 'server'
+  | 'gauge'
+  | 'stack'
+  | 'logs';
 
 /** SVG path data for each icon, drawn on a 24x24 viewBox with `currentColor`. */
 const paths: Record<IconName, React.ReactNode> = {
@@ -199,6 +207,77 @@ const paths: Record<IconName, React.ReactNode> = {
       strokeLinejoin="round"
     />
   ),
+  grid: <path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" />,
+  help: (
+    <path
+      d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-1.8-11.2a1.8 1.8 0 1 1 2.8 1.5c-.7.5-1 .9-1 1.7M12 17h.01"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  info: (
+    <path
+      d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13h.01M11 12h1v5h1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  rpc: (
+    <path
+      d="M4 8h13m0 0-4-4m4 4-4 4M20 16H7m0 0 4-4m-4 4 4 4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  server: (
+    <path
+      d="M4 5h16v6H4V5Zm0 8h16v6H4v-6Zm3-5h.01M7 16h.01"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  gauge: (
+    <path
+      d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18Zm0-9 4-3m-9 3a5 5 0 0 1 10 0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  stack: (
+    <path
+      d="M12 3 2 8l10 5 10-5-10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  logs: (
+    <path
+      d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
 };
 
 export interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, 'name'> {
@@ -220,7 +299,16 @@ export const Icon: React.FC<IconProps> = ({ name, size = 16, style, ...rest }) =
     fill="currentColor"
     aria-hidden={rest['aria-label'] ? undefined : true}
     role={rest['aria-label'] ? 'img' : undefined}
-    style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
+    style={{
+      display: 'inline-block',
+      verticalAlign: 'middle',
+      flexShrink: 0,
+      // Decorative glyph: let the interactive parent (button, menu item, link) be
+      // the sole hit target so the cursor doesn't flicker as the pointer crosses
+      // painted vs. empty regions of the SVG. Consumers can re-enable via `style`.
+      pointerEvents: 'none',
+      ...style,
+    }}
     {...rest}
   >
     {paths[name]}

@@ -17,31 +17,44 @@
  */
 
 import React from 'react';
-import { colors, fontFamilies, semanticColors, spacing, textStyles } from '../../theme/tokens';
+import { QuestionCircleOutlined } from '@ant-design/icons';
+import { fontFamilies, semanticColors, spacing, textStyles } from '../../theme/tokens';
+import IconButton from '../IconButton/IconButton';
+import SyncChip, { type DbSyncConfig } from '../SyncChip/SyncChip';
 
 export interface UtilityBarProps {
   /** Left slot, e.g. an app switcher or menu button. */
   leading?: React.ReactNode;
-  /** Product / app title shown next to the leading slot. */
-  title?: React.ReactNode;
+  /** Product branding shown next to the leading slot (name/logo + host chip). */
+  branding?: React.ReactNode;
   /** Optional centre slot (e.g. global search). */
   center?: React.ReactNode;
-  /** Right slot, e.g. notification/user icon buttons. */
-  actions?: React.ReactNode;
+  /** Handler for the Help icon button. */
+  onHelp?: () => void;
+  /** Timestamp of the last data refresh; forwarded to the embedded `SyncChip`. */
+  lastRefreshedAt?: Date;
+  /**
+   * Recon-only: configuration for the "Database Sync" row in the `SyncChip`
+   * dropdown. Omit for OM, SCM and DN — the row is hidden when absent.
+   */
+  dbSyncConfig?: DbSyncConfig;
   /** Height in px. Defaults to 48. */
   height?: number;
   style?: React.CSSProperties;
 }
 
 /**
- * Global top utility bar (the dark chrome at the very top of every screen).
- * Provides leading/title, an optional centre slot and right-aligned actions.
+ * Global top utility bar. Renders a leading slot, product branding, an optional
+ * centre slot, a Help button and the `SyncChip` auto-refresh control. Requires a
+ * `SyncConfigProvider` ancestor so the chip can read and toggle the refresh state.
  */
 export const UtilityBar: React.FC<UtilityBarProps> = ({
   leading,
-  title,
+  branding,
   center,
-  actions,
+  onHelp,
+  lastRefreshedAt,
+  dbSyncConfig,
   height = 48,
   style,
 }) => (
@@ -52,24 +65,25 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
       gap: spacing.md,
       height,
       paddingInline: spacing.md,
-      background: colors.pewter[950],
-      color: 'rgb(255, 255, 255)',
+      background: semanticColors.bgTopbar,
+      color: semanticColors.textPrimary,
+      borderBottom: `1px solid ${semanticColors.border}`,
       ...style,
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
       {leading}
-      {title && (
+      {branding && (
         <span
           style={{
             fontFamily: fontFamilies.appTitle,
             fontSize: textStyles.appTitle.fontSize,
             fontWeight: textStyles.appTitle.fontWeight,
             lineHeight: `${textStyles.appTitle.lineHeight}px`,
-            color: 'rgb(255, 255, 255)',
+            color: semanticColors.textPrimary,
           }}
         >
-          {title}
+          {branding}
         </span>
       )}
     </div>
@@ -81,11 +95,16 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
         marginLeft: center ? 0 : 'auto',
         display: 'flex',
         alignItems: 'center',
-        gap: spacing.xs,
-        color: semanticColors.textDisabled,
+        gap: spacing.sm,
+        color: semanticColors.textSecondary,
       }}
     >
-      {actions}
+      <IconButton
+        icon={<QuestionCircleOutlined style={{ fontSize: 18 }} />}
+        label="Help"
+        onClick={onHelp}
+      />
+      <SyncChip lastRefreshedAt={lastRefreshedAt} dbSync={dbSyncConfig} />
     </div>
   </div>
 );
