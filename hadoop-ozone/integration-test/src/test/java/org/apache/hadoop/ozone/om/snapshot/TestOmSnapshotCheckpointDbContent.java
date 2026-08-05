@@ -54,8 +54,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.DataTestUtil;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -71,7 +71,6 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * HDDS-13217: verify snapshot checkpoint DB content is preserved across defrag iterations.
@@ -82,11 +81,7 @@ import org.junit.jupiter.api.Timeout;
  *
  * <p>Version-0 checkpoint directories are removed after defrag, so baselines are captured before
  * the first defrag iteration and compared against the active snapshot after defrag completes.
- *
- * <p>Each test method starts a fresh MiniOzone cluster to avoid cross-test interference on the
- * global snapshot defrag chain.
  */
-@Timeout(value = 15, unit = TimeUnit.MINUTES)
 public class TestOmSnapshotCheckpointDbContent {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
@@ -117,31 +112,24 @@ public class TestOmSnapshotCheckpointDbContent {
 
   @AfterEach
   void shutdownCluster() {
-    IOUtils.closeQuietly(client);
-    IOUtils.closeQuietly(cluster);
+    IOUtils.closeQuietly(client, cluster);
   }
 
   /**
-   * Test#1 from HDDS-13217: create S1, S2, S3 on one bucket, run defrag, and verify each
-   * defragged checkpoint still matches its version-0 baseline.
+   * HDDS-13217 scenarios:
+   * <ol>
+   *   <li>Create S1, S2, S3 on one bucket, run defrag, and verify each defragged checkpoint still
+   *       matches its version-0 baseline.</li>
+   *   <li>Delete the middle snapshot, run defrag again, and verify the remaining youngest snapshot
+   *       checkpoint still matches its baseline.</li>
+   * </ol>
    */
   @Test
-  public void testDefragPreservesSnapshotCheckpointContent()
+  public void testSnapshotCheckpointContentPreservedAcrossDefragIterations()
       throws Exception {
     ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
     triggerDefragUntilDone(setup.snapshots);
     assertCheckpointMatchesBaseline(setup.baselines, setup.snapshots);
-  }
-
-  /**
-   * Test#2 from HDDS-13217: after an initial defrag pass, delete the middle snapshot, run defrag
-   * again, and verify the remaining youngest snapshot checkpoint still matches its baseline.
-   */
-  @Test
-  public void testDefragAfterSnapshotDeletePreservesRemainingSnapshot()
-      throws Exception {
-    ThreeSnapshotSetup setup = createThreeSnapshotsOnNewBucket();
-    triggerDefragUntilDone(setup.snapshots);
 
     SnapshotInfo s2 = setup.snapshots.get(1);
     SnapshotInfo s3 = setup.snapshots.get(2);
