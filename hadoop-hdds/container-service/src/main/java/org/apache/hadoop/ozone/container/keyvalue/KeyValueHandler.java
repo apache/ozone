@@ -1791,8 +1791,10 @@ public class KeyValueHandler extends Handler {
           numDivergedDeletedBlocksUpdated++;
         }
 
-        // Advance the container-wide BCSID only when this round left no block partially repaired.
-        advanceContainerBcsIdForFullyCoveredRound(kvContainer, allRepairedBlocksCovered, maxAdoptedBcsId);
+        // Advance the container-wide BCSID only when this round left no block partially repaired and the
+        // diff dropped nothing as unhealthy.
+        advanceContainerBcsIdForFullyCoveredRound(kvContainer, diffReport, allRepairedBlocksCovered,
+            maxAdoptedBcsId);
 
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
@@ -2065,17 +2067,24 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
-   * Advances the container-wide BCSID after reconciling with one peer, and only when every block repaired in that
-   * round ended fully covered. The container BCSID quantifies over all blocks: a fully covered block at a higher
-   * BCSID must not advance the container past another block that remains incomplete at a lower BCSID, because the
-   * missing data of that block would then be attested as present. When a round leaves any block partial, the
-   * container BCSID stays put and converges on a later round once every repair completes. Container-level adoption
-   * on merkle tree equality without repair is tracked separately in HDDS-16011.
+   * Advances the container-wide BCSID after reconciling with one peer, and only when the round proved container
+   * scope coverage. The container BCSID quantifies over all blocks: a fully covered block at a higher BCSID must
+   * not advance the container past another block that remains incomplete at a lower BCSID, because the missing
+   * data of that block would then be attested as present. Two conditions guard the advancement:
+   * (1) every block repaired in the round ended fully covered, and (2) the diff dropped nothing as unhealthy --
+   * a block whose only differences were dropped by reportChunkIfHealthy never enters the repair lists, so it can
+   * not dirty the round through a partial repair, and only the report's filtered counter reveals it. When either
+   * condition fails, the container BCSID stays put and converges on a later round once every repair completes.
+   *
+   * <p>Accepted boundary: data absent from both replicas' trees is invisible to any diff, so advancing based on a
+   * clean round inherits the peer's own container-level claim at exactly the trust level of replicating the
+   * container wholesale. Container-level adoption on merkle tree equality without repair is tracked in HDDS-16011.
    */
   @VisibleForTesting
-  void advanceContainerBcsIdForFullyCoveredRound(KeyValueContainer container, boolean allRepairedBlocksCovered,
-      long maxAdoptedBcsId) throws IOException {
-    if (!allRepairedBlocksCovered || maxAdoptedBcsId <= container.getContainerData().getBlockCommitSequenceId()) {
+  void advanceContainerBcsIdForFullyCoveredRound(KeyValueContainer container, ContainerDiffReport diffReport,
+      boolean allRepairedBlocksCovered, long maxAdoptedBcsId) throws IOException {
+    if (!allRepairedBlocksCovered || diffReport.getNumUnhealthyChunksFiltered() > 0
+        || maxAdoptedBcsId <= container.getContainerData().getBlockCommitSequenceId()) {
       return;
     }
     blockManager.updateContainerBcsId(container, maxAdoptedBcsId);

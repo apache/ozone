@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -322,7 +323,8 @@ public class TestReconcileChunksPerBlockHoleBcsId {
     // repaired block in the round ended fully covered, mirroring reconcileContainerInternal.
     assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
         "per-block repair must not touch the container BCSID");
-    handler.advanceContainerBcsIdForFullyCoveredRound(container, true, PEER_BCSID);
+    handler.advanceContainerBcsIdForFullyCoveredRound(container, new ContainerDiffReport(CONTAINER_ID), true,
+        PEER_BCSID);
     assertEquals(PEER_BCSID, container.getContainerData().getBlockCommitSequenceId(),
         "container BCSID must advance to the peer value (" + PEER_BCSID + ") after a fully covered round");
   }
@@ -368,9 +370,49 @@ public class TestReconcileChunksPerBlockHoleBcsId {
         "container BCSID must not advance past the incomplete block");
     // The round-end advancement is suppressed as well, because the round left block 1 partially repaired --
     // this mirrors reconcileContainerInternal accumulating coverage across the per-block repairs of one round.
-    handler.advanceContainerBcsIdForFullyCoveredRound(container, false, PEER_BCSID);
+    handler.advanceContainerBcsIdForFullyCoveredRound(container, new ContainerDiffReport(CONTAINER_ID), false,
+        PEER_BCSID);
     assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
         "round-end container BCSID advancement must be suppressed when any block in the round stayed partial");
+  }
+
+  @Test
+  public void filteredOnlyBlockMustSuppressRoundContainerAdvancement() throws Exception {
+    // Round two of the trailing-unhealthy scenario: round one recovered the chunk at CHUNK_LEN, so the
+    // local block now holds chunks 0-1 and only the peer's unhealthy trailing chunk still differs.
+    // reportChunkIfHealthy drops that chunk from the diff, the block vanishes from the repair report
+    // entirely, and no partial repair can dirty the round anymore. The round-end advancement must still
+    // stay suppressed, or a clean sibling block would advance the container past the invisible block's
+    // missing data.
+    ContainerProtos.ChunkInfo chunk0 = chunkProto("chunk0", 0, (byte) 'a');
+    ContainerProtos.ChunkInfo chunk1 = chunkProto("peer-chunk", CHUNK_LEN, (byte) 'b');
+    ContainerProtos.ChunkInfo chunk2 = chunkProto("peer-chunk-2", 2L * CHUNK_LEN, (byte) 'c');
+
+    ContainerMerkleTreeWriter localTree = new ContainerMerkleTreeWriter();
+    localTree.addChunks(LOCAL_ID, true, chunk0, chunk1);
+    ContainerMerkleTreeWriter peerTree = new ContainerMerkleTreeWriter();
+    peerTree.addChunks(LOCAL_ID, true, chunk0, chunk1);
+    peerTree.addChunks(LOCAL_ID, false, chunk2);
+
+    ContainerDiffReport report = handler.getChecksumManager().diff(checksumInfo(localTree), checksumInfo(peerTree));
+    // The block's only difference was filtered as unhealthy, so no repair will run for it this round...
+    assertNull(report.getMissingChunks().get(LOCAL_ID));
+    // ...and the drop is recorded on the report as the round's only evidence that the diff was incomplete.
+    assertEquals(1, report.getNumUnhealthyChunksFiltered());
+
+    // A sibling block repairs cleanly in the same round and adopts the peer's block BCSID 99.
+    long completeBlockId = 2L;
+    ContainerProtos.ChunkInfo completeChunk0 = chunkProto("complete-0", 0, (byte) 'b');
+    installMockedPeerStream(peerBlockDataWithChunks(completeBlockId, PEER_BCSID, completeChunk0), 0);
+    handler.reconcileChunksPerBlock(container, peerPipeline, dnClient, completeBlockId,
+        Collections.singletonList(chunkMerkleTree(0)),
+        new ContainerMerkleTreeWriter(), ByteBuffer.allocate(CHUNK_LEN));
+
+    // Round end: every repaired block was covered, but the diff dropped an unhealthy chunk, so the diff
+    // was not a complete account of what the peer's tree lists.
+    handler.advanceContainerBcsIdForFullyCoveredRound(container, report, true, PEER_BCSID);
+    assertEquals(LOCAL_BCSID, container.getContainerData().getBlockCommitSequenceId(),
+        "container BCSID must not advance when the diff filtered an unrepairable unhealthy chunk");
   }
 
   /**
