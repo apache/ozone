@@ -382,7 +382,11 @@ public final class OzoneManagerDoubleBuffer {
   TransactionInfo persistIfNewer(TransactionInfo candidate) throws IOException {
     synchronized (transactionInfoLock) {
       final Table<String, TransactionInfo> table = omMetadataManager.getTransactionInfoTable();
-      final TransactionInfo stored = table.get(TRANSACTION_INFO_KEY);
+      // Skip the table cache, as TransactionInfo.readTransactionInfo does for this same key. The
+      // value this compares against is written by a batch commit, which does not populate the
+      // cache; reading through the cache would risk comparing against a stale value and writing
+      // the lower index anyway, which is the whole defect.
+      final TransactionInfo stored = table.getSkipCache(TRANSACTION_INFO_KEY);
       afterTransactionInfoRead.run();
       if (stored != null && stored.compareTo(candidate) >= 0) {
         return stored;
