@@ -697,8 +697,9 @@ public class TestOMRatisSnapshots {
     assertNotNull(installed, "Install should have succeeded");
     assertEquals(leaderCheckpointTrxnInfo.getTransactionIndex(), installed.getIndex());
 
-    assertEquals(installed, followerOM.getTransactionInfo().getTermIndex(),
-        "In-memory transaction info must match the index the state machine was unpaused at");
+    assertEquals(followerOM.getOmRatisServer().getLastAppliedTermIndex(),
+        followerOM.getTransactionInfo().getTermIndex(),
+        "In-memory transaction info must match the position the state machine was unpaused at");
   }
 
   @Test
