@@ -463,9 +463,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(HDDSVersion.deserialize(datanodeDetailsProto.getCurrentVersion()));
-    } else {
-      // fallback to version 1 if not present
-      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
     }
     return builder;
   }
@@ -722,7 +719,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private HDDSVersion initialVersion = HDDSVersion.DEFAULT_VERSION;
-    private HDDSVersion currentVersion = HDDSVersion.SOFTWARE_VERSION;
+    private HDDSVersion currentVersion = HDDSVersion.DEFAULT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use
