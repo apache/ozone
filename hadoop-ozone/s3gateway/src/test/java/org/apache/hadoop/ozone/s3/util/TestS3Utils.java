@@ -189,4 +189,24 @@ public class TestS3Utils {
     assertDoesNotThrow(() -> S3Utils.validateContentMD5(md5Base64, md5Hex, "test-resource"));
   }
 
+  @ParameterizedTest
+  @MethodSource("contentEncodingProvider")
+  public void testNormalizeContentEncoding(String input, String expected) {
+    assertEquals(expected, S3Utils.normalizeContentEncoding(input));
+  }
+
+  private static Stream<Arguments> contentEncodingProvider() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of("", null),
+        Arguments.of("gzip", "gzip"),
+        Arguments.of("deflate, gzip", "deflate, gzip"),
+        Arguments.of("gzip, aws-chunked", "gzip"),
+        Arguments.of("aws-chunked, gzip", "gzip"),
+        Arguments.of("aws-chunked", null),
+        Arguments.of("aws-chunked, aws-chunked", null),
+        Arguments.of("gzip, AWS-CHUNKED", "gzip"),
+        Arguments.of("Aws-Chunked", null));
+  }
+
 }

@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -76,6 +77,14 @@ public class TestHddsUtils {
     // Malformed host:port input is rejected, matching getHostPort().
     assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.getHostName("a:b"));
+  }
+
+  @Test
+  void testGetHostPort() {
+    assertEquals(OptionalInt.of(9876), HddsUtils.getHostPort("0.0.0.0:9876"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("localhost:9862"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("[2001:db8::1]:9862"));
+    assertEquals(OptionalInt.empty(), HddsUtils.getHostPort("localhost"));
   }
 
   @Test

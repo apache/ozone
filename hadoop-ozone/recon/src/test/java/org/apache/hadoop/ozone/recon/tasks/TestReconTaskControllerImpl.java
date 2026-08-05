@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -813,11 +814,22 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     verify(mockCheckpointedManager, times(1)).close();
   }
 
-  /**
-   * Helper method for getting a mocked Task.
-   * @param taskName name of the task.
-   * @return instance of reconOmTask.
-   */
+  @Test
+  public void testCreateOMCheckpointThrowsWhenCheckpointNull() throws Exception {
+    // getStore().getCheckpoint() returns null when RocksDB fails to snapshot an
+    // incomplete/corrupt on-disk OM DB; createOMCheckpoint must surface this as an
+    // IOException so the caller handles it gracefully instead of NPE-ing.
+    ReconOMMetadataManager omMetadataManager = mock(ReconOMMetadataManager.class);
+    DBStore dbStore = mock(DBStore.class);
+    when(omMetadataManager.getStore()).thenReturn(dbStore);
+    File tempDir = Paths.get(System.getProperty("java.io.tmpdir"), "recon-test").toFile();
+    when(dbStore.getDbLocation()).thenReturn(tempDir);
+    when(dbStore.getCheckpoint(anyString(), any(Boolean.class))).thenReturn(null);
+
+    ReconTaskControllerImpl controller = (ReconTaskControllerImpl) reconTaskController;
+    assertThrows(IOException.class, () -> controller.createOMCheckpoint(omMetadataManager));
+  }
+
   private ReconOmTask getMockTask(String taskName) {
     ReconOmTask reconOmTaskMock = mock(ReconOmTask.class);
     when(reconOmTaskMock.getTaskName()).thenReturn(taskName);

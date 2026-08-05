@@ -129,6 +129,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -252,6 +253,35 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertTrue(s3Client.doesBucketExist(bucketName));
     assertTrue(s3Client.doesBucketExistV2(bucketName));
     assertTrue(isBucketEmpty(b));
+  }
+
+  /**
+   * s3-tests: test_bucket_create_exists.
+   */
+  @Test
+  public void testCreateBucketAlreadyOwnedByYou() {
+    final String bucketName = getBucketName("owned-by-you");
+    s3Client.createBucket(bucketName);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.createBucket(bucketName));
+    assertEquals(409, ase.getStatusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(), ase.getErrorCode());
+  }
+
+  @Test
+  public void testCreateBucketAlreadyExistsDifferentOwner() throws IOException {
+    final String bucketName = getBucketName("other-owner");
+    final String otherOwner = "other-s3-owner";
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setOwner(otherOwner).build());
+    }
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.createBucket(bucketName));
+    assertEquals(409, ase.getStatusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(), ase.getErrorCode());
   }
 
   @Test
@@ -1338,6 +1368,26 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
   }
 
+  /**
+   * Adapted from ceph s3-tests test_object_read_unreadable.
+   */
+  @Test
+  public void testGetObjectUnreadableKey() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'},
+        StandardCharsets.ISO_8859_1);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(bucketName, unreadableKey));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getCode(), ase.getErrorCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), ase.getErrorMessage());
+  }
+
   static Stream<Arguments> onlyTagKeyCasesV1() {
     Map<String, String> fooBarEmptyBar = new HashMap<>();
     fooBarEmptyBar.put("foo", "bar");
@@ -1635,6 +1685,30 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(404, ase.getStatusCode());
     assertEquals("NoSuchBucket", ase.getErrorCode());
+  }
+
+  @Test
+  public void testListObjectsV2FetchOwner() {
+    final String bucketName = getBucketName("fetch-owner");
+    final String keyName = getKeyName("obj");
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
+
+    ListObjectsV2Result defaultResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName));
+    assertThat(defaultResponse.getObjectSummaries()).isNotEmpty();
+    assertNull(defaultResponse.getObjectSummaries().get(0).getOwner());
+
+    ListObjectsV2Result falseResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName).withFetchOwner(false));
+    assertNull(falseResponse.getObjectSummaries().get(0).getOwner());
+
+    ListObjectsV2Result trueResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName).withFetchOwner(true));
+    Owner owner = trueResponse.getObjectSummaries().get(0).getOwner();
+    assertNotNull(owner);
+    assertNotNull(owner.getDisplayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, owner.getId());
   }
 
   @Test
@@ -2106,8 +2180,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     // Test delete lifecycle for a bucket, while doesn't have lifecycle
     assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
-    assertThrows(AmazonServiceException.class,
-        () -> s3Client.deleteBucketLifecycleConfiguration(bucketName));
+    // Idempotent delete: no exception expected even without an existing config
+    s3Client.deleteBucketLifecycleConfiguration(bucketName);
 
     // First create a lifecycle configuration
     BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();

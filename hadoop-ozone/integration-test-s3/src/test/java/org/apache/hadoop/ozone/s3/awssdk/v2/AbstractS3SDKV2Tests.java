@@ -48,6 +48,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -231,6 +233,37 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     if (s3AsyncClient != null) {
       s3AsyncClient.close();
     }
+  }
+
+  /**
+   * s3-tests: test_bucket_create_exists.
+   */
+  @Test
+  public void testCreateBucketAlreadyOwnedByYou() {
+    final String bucketName = getBucketName("owned-by-you");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(),
+        exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testCreateBucketAlreadyExistsDifferentOwner() throws IOException {
+    final String bucketName = getBucketName("other-owner");
+    final String otherOwner = "other-s3-owner";
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setOwner(otherOwner).build());
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(),
+        exception.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -586,6 +619,25 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
                     .plusSeconds(60))));
 
     assertEquals(304, exception.statusCode());
+  }
+
+  /**
+   * Adapted from ceph s3-tests test_object_read_unreadable.
+   */
+  @Test
+  public void testGetObjectUnreadableKey() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'},
+        StandardCharsets.ISO_8859_1);
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(unreadableKey)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), exception.awsErrorDetails().errorMessage());
   }
 
   @Test
@@ -1076,6 +1128,30 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .map(S3Object::key)
         .collect(Collectors.toList());
     assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
+  }
+
+  @Test
+  public void testListObjectsV2FetchOwner() {
+    final String bucketName = getBucketName("fetch-owner");
+    final String keyName = getKeyName("obj");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("x"));
+
+    ListObjectsV2Response defaultResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).build());
+    assertThat(defaultResponse.contents()).isNotEmpty();
+    assertNull(defaultResponse.contents().get(0).owner());
+
+    ListObjectsV2Response falseResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(false).build());
+    assertNull(falseResponse.contents().get(0).owner());
+
+    ListObjectsV2Response trueResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(true).build());
+    assertNotNull(trueResponse.contents().get(0).owner());
+    assertNotNull(trueResponse.contents().get(0).owner().displayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, trueResponse.contents().get(0).owner().id());
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {
@@ -3146,6 +3222,110 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
+    }
+  }
+
+  static Stream<Arguments> standardObjectHeaderContentEncodingCases() {
+    return Stream.of(
+        Arguments.of("gzip", "gzip"),
+        Arguments.of("deflate, gzip", "deflate, gzip"),
+        Arguments.of("gzip, aws-chunked", "gzip"),
+        Arguments.of("aws-chunked, gzip", "gzip"),
+        Arguments.of("aws-chunked", null),
+        Arguments.of("aws-chunked, aws-chunked", null));
+  }
+
+  /**
+   * ceph s3-tests coverage for standard object headers persisted on PUT and returned on HEAD/GET.
+   */
+  @Nested
+  class StandardObjectHeaderTests {
+
+    private static final String CONTENT = "bar";
+    private static final String CACHE_CONTROL = "public, max-age=14400";
+
+    /**
+     * s3-tests: test_object_write_cache_control.
+     */
+    @Test
+    public void testObjectWriteCacheControl() {
+      final String bucketName = getBucketName("cache-control");
+      final String keyName = getKeyName("cache-control");
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).cacheControl(CACHE_CONTROL),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(CACHE_CONTROL, head.cacheControl());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(CACHE_CONTROL, getObject.cacheControl());
+    }
+
+    /**
+     * s3-tests: test_object_write_expires.
+     */
+    @Test
+    public void testObjectWriteExpires() {
+      final String bucketName = getBucketName("expires");
+      final String keyName = getKeyName("expires");
+      final Instant expires = Instant.now().plusSeconds(6000).truncatedTo(ChronoUnit.SECONDS);
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).expires(expires),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(expires, head.expires());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(expires, getObject.expires());
+    }
+
+    /**
+     * s3-tests: test_object_content_encoding_aws_chunked.
+     */
+    @ParameterizedTest
+    @MethodSource("org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests#standardObjectHeaderContentEncodingCases")
+    public void testObjectContentEncodingAwsChunked(String requestEncoding,
+        String expectedEncoding) {
+      final String bucketName = getBucketName("content-encoding");
+      final String keyName = getKeyName("encoding");
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName)
+              .contentEncoding(requestEncoding),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(expectedEncoding, head.contentEncoding());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(expectedEncoding, getObject.contentEncoding());
+    }
+
+    @Test
+    public void testObjectWriteContentLanguageAndDisposition() {
+      final String bucketName = getBucketName("lang-disp");
+      final String keyName = getKeyName("lang-disp");
+      final String language = "en-CA";
+      final String disposition = "attachment; filename=\"test.txt\"";
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName)
+              .contentLanguage(language)
+              .contentDisposition(disposition),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(language, head.contentLanguage());
+      assertEquals(disposition, head.contentDisposition());
+
+      GetObjectResponse getObject =
+          s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(language, getObject.contentLanguage());
+      assertEquals(disposition, getObject.contentDisposition());
     }
   }
 

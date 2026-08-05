@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclReques
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDeleteRequest;
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSaveScanStateRequest;
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
@@ -347,16 +348,18 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
-    case PutBucketTagging:
-      return new S3PutBucketTaggingRequest(omRequest);
-    case DeleteBucketTagging:
-      return new S3DeleteBucketTaggingRequest(omRequest);
     case SetLifecycleConfiguration:
       return new OMLifecycleConfigurationSetRequest(omRequest);
     case DeleteLifecycleConfiguration:
       return new OMLifecycleConfigurationDeleteRequest(omRequest);
     case SetLifecycleServiceStatus:
       return new OMLifecycleSetServiceStatusRequest(omRequest);
+    case SaveLifecycleScanState:
+      return new OMLifecycleSaveScanStateRequest(omRequest);
+    case PutBucketTagging:
+      return new S3PutBucketTaggingRequest(omRequest);
+    case DeleteBucketTagging:
+      return new S3DeleteBucketTaggingRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);

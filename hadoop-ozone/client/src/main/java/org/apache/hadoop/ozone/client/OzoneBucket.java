@@ -1232,33 +1232,6 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Gets the bucketTags for this bucket.
-   * @return Tags for this bucket.
-   * @throws IOException
-   */
-  @JsonIgnore
-  public Map<String, String> getBucketTagging() throws IOException {
-    return proxy.getBucketTagging(volumeName, name);
-  }
-
-  /**
-   * Sets bucketTags on this bucket (replaces existing tag set).
-   * @param tags Tags to set on the bucket.
-   * @throws IOException
-   */
-  public void putBucketTagging(Map<String, String> tags) throws IOException {
-    proxy.putBucketTagging(volumeName, name, tags);
-  }
-
-  /**
-   * Removes all bucketTags from this bucket.
-   * @throws IOException
-   */
-  public void deleteBucketTagging() throws IOException {
-    proxy.deleteBucketTagging(volumeName, name);
-  }
-
-  /**
    * Gets the lifecycle configuration information.
    * @return OzoneLifecycleConfiguration or exception is thrown.
    * @throws IOException
@@ -1289,6 +1262,33 @@ public class OzoneBucket extends WithMetadata {
   public void deleteLifecycleConfiguration()
       throws IOException {
     proxy.deleteLifecycleConfiguration(volumeName, name);
+  }
+
+  /**
+   * Gets the bucketTags for this bucket.
+   * @return Tags for this bucket.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public Map<String, String> getBucketTagging() throws IOException {
+    return proxy.getBucketTagging(volumeName, name);
+  }
+
+  /**
+   * Sets bucketTags on this bucket (replaces existing tag set).
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    proxy.putBucketTagging(volumeName, name, tags);
+  }
+
+  /**
+   * Removes all bucketTags from this bucket.
+   * @throws IOException
+   */
+  public void deleteBucketTagging() throws IOException {
+    proxy.deleteBucketTagging(volumeName, name);
   }
 
   public void setSourcePathExist(boolean b) {
