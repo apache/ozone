@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
@@ -57,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -558,6 +561,89 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
   }
 
+  /**
+   * When the pre-install backup loop in replaceOMDBWithCheckpoint fails part way
+   * through, every item it already relocated into om.db.backup.* must be put back.
+   * Today the loop has no catch, so the items stay in the backup directory: the
+   * one that was moved first is lost, and if that item is om.db then reloadOMState
+   * silently re-creates an empty one.
+   */
+  @Test
+  public void testInstallSnapshotFailedBackupRestoresDbDir() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    // Find the inactive OM, so the checkpoint index is ahead of its applied index
+    // and canProceed lets the replacement start.
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    // Build a checkpoint whose top level holds two entries, so the backup loop
+    // performs two moves and can fail on the second.
+    DBCheckpoint leaderDbCheckpoint =
+        leaderOM.getMetadataManager().getStore().getCheckpoint(false);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    Files.createDirectory(omDbDir);
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    Files.createDirectories(leaderCheckpointLocation.resolve(OM_SNAPSHOT_DIR));
+
+    TransactionInfo leaderCheckpointTrxnInfo =
+        OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+
+    // Give the follower a matching second entry with a sentinel inside it, so the
+    // loop finds two items in the follower's metadata dir to relocate.
+    File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
+    Path followerDbDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
+    Path followerSnapshotDir = Paths.get(followerMetaDir.toString(), OM_SNAPSHOT_DIR);
+    Files.createDirectories(followerSnapshotDir);
+    Path sentinel = followerSnapshotDir.resolve("sentinel");
+    Files.write(sentinel, "keep-me".getBytes(UTF_8));
+
+    Set<String> namesBefore = topLevelNames(followerMetaDir);
+    assertThat(namesBefore).contains(OM_DB_NAME, OM_SNAPSHOT_DIR);
+    Object dbInodeBefore = getINode(followerDbDir);
+
+    // Fail the second of the two backup moves. The first has already succeeded,
+    // so the DB directory is now missing whichever item was relocated first.
+    followerOM.setCheckpointBackupInjector(new ThrowOnNthPauseFaultInjector(2,
+        "Simulated backup move failure for test"));
+    followerOM.setExitManagerForTesting(new DummyExitManager());
+    try {
+      TermIndex termIndex = followerOM.installCheckpoint(
+          leaderOMNodeId, leaderCheckpointLocation, leaderCheckpointTrxnInfo);
+      assertNull(termIndex, "Install should have been reported as failed");
+
+      // Everything present before the aborted install must still be present.
+      assertThat(topLevelNames(followerMetaDir)).containsAll(namesBefore);
+      assertTrue(Files.exists(sentinel),
+          "Sentinel under " + OM_SNAPSHOT_DIR + " was relocated and never restored");
+      assertEquals("keep-me", new String(Files.readAllBytes(sentinel), UTF_8));
+      // The original om.db must be the one still in place, not a fresh empty DB.
+      assertEquals(dbInodeBefore, getINode(followerDbDir),
+          OM_DB_NAME + " was replaced rather than restored");
+    } finally {
+      followerOM.setCheckpointBackupInjector(null);
+      cluster.setupExitManagerForTesting();
+    }
+  }
+
+  /** Top-level entries of the OM metadata dir, ignoring backup dirs the install creates. */
+  private static Set<String> topLevelNames(File metaDir) throws IOException {
+    try (Stream<Path> list = Files.list(metaDir.toPath())) {
+      return list.map(p -> p.getFileName().toString())
+          .filter(n -> !n.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX))
+          .collect(Collectors.toSet());
+    }
+  }
+
   @Test
   public void testInstallSnapshotFromLeaderFailedDownloadCleanupSucceeds()
       throws Exception {
@@ -747,6 +833,28 @@ public class TestOMRatisSnapshots {
     @Override
     public void pause() throws IOException {
       throw toThrow;
+    }
+  }
+
+  /**
+   * FaultInjector that throws IOException on the nth pause() call and lets the
+   * earlier ones through, so a loop can be failed part way rather than up front.
+   */
+  private static class ThrowOnNthPauseFaultInjector extends FaultInjector {
+    private final int failOnCall;
+    private final String message;
+    private int calls;
+
+    ThrowOnNthPauseFaultInjector(int failOnCall, String message) {
+      this.failOnCall = failOnCall;
+      this.message = message;
+    }
+
+    @Override
+    public void pause() throws IOException {
+      if (++calls == failOnCall) {
+        throw new IOException(message);
+      }
     }
   }
 }
