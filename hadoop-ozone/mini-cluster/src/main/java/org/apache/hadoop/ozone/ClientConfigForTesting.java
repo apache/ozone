@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -32,7 +31,6 @@ public final class ClientConfigForTesting {
 
   private int chunkSize = 1024 * 1024;
   private Long blockSize;
-  private Long containerSize;
   private Integer streamBufferSize;
   private Long streamBufferFlushSize;
   private Long dataStreamBufferFlushSize;
@@ -60,11 +58,6 @@ public final class ClientConfigForTesting {
 
   public ClientConfigForTesting setBlockSize(long size) {
     blockSize = toBytes(size);
-    return this;
-  }
-
-  public ClientConfigForTesting setContainerSize(long size) {
-    containerSize = toBytes(size);
     return this;
   }
 
@@ -139,9 +132,6 @@ public final class ClientConfigForTesting {
     if (blockSize == null) {
       blockSize = 2 * streamBufferMaxSize;
     }
-    if (containerSize == null) {
-      containerSize = 4 * blockSize;
-    }
   }
 
   private OzoneClientConfig getClientConfig(MutableConfigurationSource conf) {
@@ -158,14 +148,12 @@ public final class ClientConfigForTesting {
   private void set(MutableConfigurationSource conf) {
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize, StorageUnit.BYTES);
-    conf.setStorageSize(OZONE_SCM_CONTAINER_SIZE, containerSize, StorageUnit.BYTES);
   }
 
   private void setIfUnset(MutableConfigurationSource conf) {
     final String suffix = StorageUnit.BYTES.getShortName();
     conf.setIfUnset(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize + suffix);
     conf.setIfUnset(OZONE_SCM_BLOCK_SIZE, blockSize + suffix);
-    conf.setIfUnset(OZONE_SCM_CONTAINER_SIZE, containerSize + suffix);
   }
 
   private long toBytes(long value) {
