@@ -73,6 +73,11 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final Map<Long, Integer> transactionToRetryCountMap;
   // an in memory map to cache the size of each transaction sending to DN.
   private Map<Long, TxBlockInfo> txSizeMap;
+  // Maps txId to the number of blocks (localIDs) in the transaction. Used to
+  // count the number of blocks deleted when a transaction is fully completed.
+  // Populated when a transaction is prepared for sending and cleared when the
+  // transaction is removed from the log.
+  private final Map<Long, Integer> transactionToBlockCountMap;
 
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
@@ -119,6 +124,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.txSizeMap = new ConcurrentHashMap<>();
+    this.transactionToBlockCountMap = new ConcurrentHashMap<>();
     this.scmDeleteBlocksCommandStatusManager =
         new SCMDeleteBlocksCommandStatusManager(metrics);
     this.initDataDistributionData();
@@ -424,6 +430,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     scmDeleteBlocksCommandStatusManager.clear();
     transactionToDNsCommitMap.clear();
     txSizeMap.clear();
+    transactionToBlockCountMap.clear();
     try {
       initDataDistributionData();
     } catch (IOException e) {
@@ -600,10 +607,35 @@ public class SCMDeletedBlockTransactionStatusManager {
     try {
       removeTransactions(txIDsToBeDeleted);
       metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
+      metrics.incrNumBlocksDeleted(removeCompletedTransactionBlockCount(txIDsToBeDeleted));
     } catch (IOException e) {
       LOG.warn("Could not commit delete block transactions: "
           + txIDsToBeDeleted, e);
     }
+  }
+
+  /**
+   * Records the number of blocks in a transaction so that it can be counted
+   * towards the deleted blocks metric once the transaction is fully committed
+   * by all replicas and removed from the log.
+   */
+  void recordTransactionBlockCount(long txID, int blockCount) {
+    transactionToBlockCountMap.put(txID, blockCount);
+  }
+
+  /**
+   * Removes the given completed transactions from the block count map and
+   * returns the total number of blocks they contained.
+   */
+  long removeCompletedTransactionBlockCount(List<Long> txIDs) {
+    long blocks = 0;
+    for (Long txID : txIDs) {
+      Integer count = transactionToBlockCountMap.remove(txID);
+      if (count != null) {
+        blocks += count;
+      }
+    }
+    return blocks;
   }
 
   public DeletedBlocksTransactionSummary getSummary() {

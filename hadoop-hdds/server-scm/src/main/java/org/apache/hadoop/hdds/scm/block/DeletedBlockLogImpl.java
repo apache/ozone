@@ -328,6 +328,7 @@ public class DeletedBlockLogImpl
   }
 
   private void addTxToTxSizeMap(DeletedBlocksTransaction tx) {
+    transactionStatusManager.recordTransactionBlockCount(tx.getTxID(), tx.getLocalIDCount());
     if (tx.hasTotalBlockReplicatedSize()) {
       transactionStatusManager.getTxSizeMap().put(tx.getTxID(),
           new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getTxID(), tx.getContainerID(),
@@ -449,6 +450,8 @@ public class DeletedBlockLogImpl
           getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsCommitMap(txIDs);
           getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsRetryCountMap(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
+          metrics.incrNumBlocksDeleted(
+              transactionStatusManager.removeCompletedTransactionBlockCount(txIDs));
         }
       }
       return transactions;

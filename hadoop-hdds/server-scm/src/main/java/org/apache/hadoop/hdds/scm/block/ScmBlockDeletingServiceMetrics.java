@@ -88,6 +88,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of created txs which are added into DB.")
   private MutableCounterLong numBlockDeletionTransactionCreated;
 
+  @Metric(about = "The number of blocks deleted, i.e. the total number of blocks in all completed delete "
+      + "transactions that are fully committed by all replicas and removed from DB.")
+  private MutableCounterLong numBlocksDeleted;
+
   @Metric(about = "The number of skipped transactions")
   private MutableCounterLong numSkippedTransactions;
 
@@ -174,6 +178,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     this.numBlockDeletionTransactionCreated.incr(count);
   }
 
+  public void incrNumBlocksDeleted(long count) {
+    this.numBlocksDeleted.incr(count);
+  }
+
   public void incrSkippedTransaction() {
     this.numSkippedTransactions.incr();
   }
@@ -247,6 +255,14 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return numBlockDeletionTransactionCreated.value();
   }
 
+  public long getNumBlocksDeleted() {
+    return numBlocksDeleted.value();
+  }
+
+  public long getNumBlockAddedForDeletionToDN() {
+    return numBlockAddedForDeletionToDN.value();
+  }
+
   public long getNumSkippedTransactions() {
     return numSkippedTransactions.value();
   }
@@ -270,6 +286,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numBlockDeletionTransactionFailureOnDatanodes.snapshot(builder, all);
     numBlockDeletionTransactionCompleted.snapshot(builder, all);
     numBlockDeletionTransactionCreated.snapshot(builder, all);
+    numBlocksDeleted.snapshot(builder, all);
     numSkippedTransactions.snapshot(builder, all);
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
@@ -420,6 +437,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append("numBlockDeletionTransactionCreated = ").append(numBlockDeletionTransactionCreated.value()).append('\t')
         .append("numBlockDeletionTransactionCompleted = ")
         .append(numBlockDeletionTransactionCompleted.value()).append('\t')
+        .append("numBlocksDeleted = ").append(numBlocksDeleted.value()).append('\t')
         .append("numBlockDeletionCommandSent = ").append(numBlockDeletionCommandSent.value()).append('\t')
         .append("numBlockDeletionCommandSuccess = ").append(numBlockDeletionCommandSuccess.value()).append('\t')
         .append("numBlockDeletionCommandFailure = ").append(numBlockDeletionCommandFailure.value()).append('\t')

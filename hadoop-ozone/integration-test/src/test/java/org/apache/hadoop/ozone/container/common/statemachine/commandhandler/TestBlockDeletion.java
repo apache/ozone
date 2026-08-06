@@ -316,6 +316,14 @@ public class TestBlockDeletion {
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
+    // Blocks are actually deleted: each completed transaction contributes at
+    // least one block, and the number of blocks deleted cannot exceed the
+    // number of blocks sent to datanodes for deletion.
+    assertThat(metrics.getNumBlocksDeleted()).isGreaterThan(0);
+    assertThat(metrics.getNumBlocksDeleted())
+        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionCompleted());
+    assertThat(metrics.getNumBlocksDeleted())
+        .isLessThanOrEqualTo(metrics.getNumBlockAddedForDeletionToDN());
     assertEquals(metrics.getNumBlockDeletionCommandSent(), metrics.getNumCommandsDatanodeSent());
     assertEquals(metrics.getNumBlockDeletionCommandSuccess(), metrics.getNumCommandsDatanodeSuccess());
     assertEquals(metrics.getBNumBlockDeletionCommandFailure(), metrics.getNumCommandsDatanodeFailed());
