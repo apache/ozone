@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="OzoneFsShell" type="Application" factoryName="Application">
+  <configuration default="false" name="OzoneFsShell" type="Application" factoryName="Application" folderName="ozone">
     <envs>
       <env name="OZONE_CONF_DIR" value="$PROJECT_DIR$/hadoop-ozone/dev-support/intellij" />
     </envs>
