@@ -170,12 +170,12 @@ public class TestOzoneManagerRatisServer {
   @Test
   public void checkRetryCacheReturnsNullWhenCachedReplyFailed() throws Exception {
     when(ozoneManager.isTestSecureOmFlag()).thenReturn(true);
-    ClientId clientId = ClientId.randomId();
+    ClientId ratisClientId = ClientId.randomId();
     int callId = 42;
     RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(
         omRatisServer.getRaftPeerId(), omRatisServer.getRaftGroup().getGroupId());
     RaftClientReply failedReply = RaftClientReply.newBuilder()
-        .setClientId(clientId)
+        .setClientId(ratisClientId)
         .setServerId(memberId)
         .setGroupId(omRatisServer.getRaftGroup().getGroupId())
         .setCallId(callId)
@@ -185,12 +185,12 @@ public class TestOzoneManagerRatisServer {
         .build();
 
     OzoneManagerRatisServer spyServer = spy(omRatisServer);
-    injectRetryCacheEntry(spyServer, clientId, callId, failedReply);
+    injectRetryCacheEntry(spyServer, ratisClientId, callId, failedReply);
 
     Server.Call previousCall = Server.getCurCall().get();
     try {
       Server.getCurCall().set(new Server.Call(callId, 0, null, null,
-          RPC.RpcKind.RPC_BUILTIN, clientId.toByteString().toByteArray()));
+          RPC.RpcKind.RPC_BUILTIN, ratisClientId.toByteString().toByteArray()));
       assertNull(spyServer.checkRetryCache());
     } finally {
       Server.getCurCall().set(previousCall);
@@ -204,7 +204,7 @@ public class TestOzoneManagerRatisServer {
   public void checkRetryCacheReturnsOmResponseWhenCachedReplySucceeded()
       throws Exception {
     when(ozoneManager.isTestSecureOmFlag()).thenReturn(true);
-    ClientId clientId = ClientId.randomId();
+    ClientId ratisClientId = ClientId.randomId();
     int callId = 43;
     OMResponse expected = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -214,7 +214,7 @@ public class TestOzoneManagerRatisServer {
     RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(
         omRatisServer.getRaftPeerId(), omRatisServer.getRaftGroup().getGroupId());
     RaftClientReply successReply = RaftClientReply.newBuilder()
-        .setClientId(clientId)
+        .setClientId(ratisClientId)
         .setServerId(memberId)
         .setGroupId(omRatisServer.getRaftGroup().getGroupId())
         .setCallId(callId)
@@ -223,12 +223,12 @@ public class TestOzoneManagerRatisServer {
         .build();
 
     OzoneManagerRatisServer spyServer = spy(omRatisServer);
-    injectRetryCacheEntry(spyServer, clientId, callId, successReply);
+    injectRetryCacheEntry(spyServer, ratisClientId, callId, successReply);
 
     Server.Call previousCall = Server.getCurCall().get();
     try {
       Server.getCurCall().set(new Server.Call(callId, 0, null, null,
-          RPC.RpcKind.RPC_BUILTIN, clientId.toByteString().toByteArray()));
+          RPC.RpcKind.RPC_BUILTIN, ratisClientId.toByteString().toByteArray()));
       OMResponse cached = spyServer.checkRetryCache();
       assertTrue(cached.getSuccess());
       assertEquals(Status.OK, cached.getStatus());
