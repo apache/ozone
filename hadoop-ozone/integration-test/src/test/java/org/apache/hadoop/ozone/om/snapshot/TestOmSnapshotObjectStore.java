@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 /**
  * Test OmSnapshot for Object Store bucket type.
  */
-public class TestOmSnapshotObjectStore extends TestOmSnapshot {
+public class TestOmSnapshotObjectStore extends OmSnapshotTests {
 
   public TestOmSnapshotObjectStore() throws Exception {
     super(OBJECT_STORE, false, false, false, false);

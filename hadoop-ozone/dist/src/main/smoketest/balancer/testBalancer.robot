@@ -90,7 +90,7 @@ Verify Balancer Iteration
 
 Verify Balancer Iteration History
     [arguments]       ${output}
-    Should Contain                  ${output}             Iteration history list:
+    Should Contain                  ${output}             Completed iteration history:
     Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
     Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
     Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True

@@ -86,11 +86,11 @@ fi
 # memory size.
 # export OZONE_HEAPSIZE_MIN=
 
-# Extra Java runtime options for all Ozone commands. We don't support
-# IPv6 yet/still, so by default the preference is set to IPv4.
+# Extra Java runtime options for all Ozone commands. Ozone does not override
+# the JVM's IP stack preference. To force IPv4-only networking:
 # export OZONE_OPTS="-Djava.net.preferIPv4Stack=true"
-# For Kerberos debugging, an extended option set logs more information
-# export OZONE_OPTS="-Djava.net.preferIPv4Stack=true -Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
+# For Kerberos debugging, an extended option set logs more information:
+# export OZONE_OPTS="-Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
 
 # Some parts of the shell code may do special things dependent upon
 # the operating system.  We have to set this here. See the next
@@ -173,7 +173,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 
 # Extra Java runtime options for all Ozone server daemons (OM, SCM, DataNode,
-# S3 Gateway, Recon, HttpFS, CSI).  These get appended to OZONE_OPTS for such
+# S3 Gateway, Recon, HttpFS).  These get appended to OZONE_OPTS for such
 # daemons and are a convenient way to apply common options to all of them.
 # export OZONE_SERVER_OPTS=""
 
@@ -325,15 +325,6 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # and therefore may override any similar flags set in OZONE_OPTS
 #
 # export OZONE_HTTPFS_OPTS=""
-
-###
-# CSI server specific parameters
-###
-# Specify the JVM options to be used when starting the CSI server.
-# These options will be appended to the options specified as OZONE_OPTS
-# and therefore may override any similar flags set in OZONE_OPTS
-#
-# export OZONE_CSI_OPTS=""
 
 ###
 # Client and tool command specific parameters

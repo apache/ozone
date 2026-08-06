@@ -1585,8 +1585,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // start datanode protocol server
-    getDatanodeProtocolServer().start();
+    // In HA mode, defer starting the datanode protocol server until the SCM
+    // state machine has caught up with the leader's committed log entries
+    // (see SCMStateMachine#tryStartDNServerAndRefreshSafeMode). In non-HA mode
+    // there is no Ratis state machine, so start it here as before.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      getDatanodeProtocolServer().start();
+    }
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
