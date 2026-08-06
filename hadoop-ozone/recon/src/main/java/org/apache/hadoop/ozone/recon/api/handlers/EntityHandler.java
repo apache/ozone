@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
@@ -33,11 +36,15 @@ import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class for handling all entity types.
  */
 public abstract class EntityHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(EntityHandler.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
@@ -205,32 +212,77 @@ public abstract class EntityHandler {
    * @throws IOException ioEx
    */
   protected int[] getTotalFileSizeDist(long objectId) throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
-    }
-    int[] res = nsSummary.getFileSizeBucket();
-    for (long childId: nsSummary.getChildDir()) {
-      int[] subDirFileSizeDist = getTotalFileSizeDist(childId);
+    int[] res = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+    // Iterative traversal with a visited-set cycle guard. A corrupted NSSummary
+    // tree (e.g. a directory listing itself or an ancestor as a child) would
+    // otherwise recurse forever and crash Recon with a StackOverflowError.
+    Set<Long> visited = new HashSet<>();
+    Deque<Long> stack = new ArrayDeque<>();
+    stack.push(objectId);
+    visited.add(objectId);
+    boolean cycleLogged = false;
+    while (!stack.isEmpty()) {
+      NSSummary nsSummary =
+          reconNamespaceSummaryManager.getNSSummary(stack.pop());
+      if (nsSummary == null) {
+        continue;
+      }
+      int[] fileSizeBucket = nsSummary.getFileSizeBucket();
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-        res[i] += subDirFileSizeDist[i];
+        res[i] += fileSizeBucket[i];
+      }
+      for (long childId : nsSummary.getChildDir()) {
+        if (visited.add(childId)) {
+          stack.push(childId);
+        } else if (!cycleLogged) {
+          logNSSummaryCycle(childId);
+          cycleLogged = true;
+        }
       }
     }
     return res;
   }
 
   protected int getTotalDirCount(long objectId) throws IOException {
-    NSSummary nsSummary =
-        getReconNamespaceSummaryManager().getNSSummary(objectId);
-    if (nsSummary == null) {
-      return 0;
+    // Iterative traversal with a visited-set cycle guard to survive a corrupted
+    // NSSummary tree; see getTotalFileSizeDist for details. Each directory is
+    // counted at most once, so a self-referencing child cannot inflate the
+    // count or cause infinite recursion.
+    Set<Long> visited = new HashSet<>();
+    Deque<Long> stack = new ArrayDeque<>();
+    stack.push(objectId);
+    visited.add(objectId);
+    boolean cycleLogged = false;
+    while (!stack.isEmpty()) {
+      NSSummary nsSummary =
+          getReconNamespaceSummaryManager().getNSSummary(stack.pop());
+      if (nsSummary == null) {
+        continue;
+      }
+      for (long subdir : nsSummary.getChildDir()) {
+        if (visited.add(subdir)) {
+          stack.push(subdir);
+        } else if (!cycleLogged) {
+          logNSSummaryCycle(subdir);
+          cycleLogged = true;
+        }
+      }
     }
-    Set<Long> subdirs = nsSummary.getChildDir();
-    int totalCnt = subdirs.size();
-    for (long subdir : subdirs) {
-      totalCnt += getTotalDirCount(subdir);
-    }
-    return totalCnt;
+    // Exclude the starting object itself from the subdirectory count.
+    return visited.size() - 1;
+  }
+
+  /**
+   * Warn that the NSSummary tree references the same object more than once (a
+   * self/ancestor loop or shared child), which indicates the persisted
+   * NSSummary data is corrupted. The walk de-duplicates such nodes so the
+   * request still completes; this surfaces the corruption to operators. Callers
+   * invoke this at most once per walk.
+   */
+  private void logNSSummaryCycle(long objectId) {
+    LOG.warn("Detected a repeated reference to object {} while walking the " +
+        "NSSummary tree under {}; returning a de-duplicated result. The " +
+        "NSSummary data may be corrupted.", objectId, getNormalizedPath());
   }
 
   /**
