@@ -78,7 +78,7 @@
       }
     ]
   },
-  "description": "",
+  "description": "Monitors Ozone Disk Balancer progress, throughput, and idle state per datanode.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -179,7 +179,7 @@
             "uid": "${datasource}"
           },
           "expr": "sum({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"}) by (instance, storagedirectory)",
-          "legendFormat": "{{storagedirectory}}",
+          "legendFormat": "{{instance}} {{storagedirectory}}",
           "refId": "A"
         }
       ],
@@ -349,9 +349,27 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "{__name__=~\"disk_balancer_service_metrics_move_success_time_avg_time|disk_balancer_service_metrics_move_failure_time_avg_time\", instance=~\"$datanode\"}",
-          "legendFormat": "{{__name__}}",
+          "expr": "disk_balancer_service_metrics_move_success_time_avg_time{instance=~\"$datanode\"}",
+          "legendFormat": "{{instance}} success avg latency",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "disk_balancer_service_metrics_move_failure_time_avg_time{instance=~\"$datanode\"}",
+          "legendFormat": "{{instance}} failure avg latency",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "disk_balancer_service_metrics_move_success_time_num_ops{instance=~\"$datanode\"}",
+          "legendFormat": "{{instance}} moves/interval",
+          "refId": "C"
         }
       ],
       "title": "Container Migration Latency Profile (Processing Duration)",
@@ -413,7 +431,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(disk_balancer_service_metrics_success_bytes{instance=~\"$datanode\"}[1m])",
+          "expr": "rate(disk_balancer_service_metrics_success_bytes{instance=~\"$datanode\"}[$__rate_interval])",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -492,6 +511,7 @@
       "description": "A rough estimate of how many minutes are left before the balancer finishes balancing.",
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -875,8 +895,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(disk_balancer_service_metrics_idle_loop_no_available_volume_pair_count{instance=~\"$datanode\"}[15m]))",
-          "instant": true,
+          "expr": "sum(increase(disk_balancer_service_metrics_idle_loop_no_available_volume_pair_count{instance=~\"$datanode\"}[$__range]))",
+          "instant": false,
           "legendFormat": "No Suitable Volume/Container",
           "refId": "A"
         },
@@ -885,20 +905,126 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(disk_balancer_service_metrics_idle_loop_exceeds_bandwidth_count{instance=~\"$datanode\"}[15m]))",
-          "instant": true,
+          "expr": "sum(increase(disk_balancer_service_metrics_idle_loop_exceeds_bandwidth_count{instance=~\"$datanode\"}[$__range]))",
+          "instant": false,
           "legendFormat": "Throttled",
           "refId": "B"
         }
       ],
       "title": "Balancer Idle Reason",
       "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Rate of disk balancer scheduler loop iterations per second. A non-zero value confirms the balancer process is alive and iterating. If this drops to zero while the balancer is expected to run, the service may have stalled or been stopped.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "loops/sec"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 16,
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.0.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(disk_balancer_service_metrics_running_loop_count{instance=~\"$datanode\"}[$__rate_interval])",
+          "legendFormat": "{{instance}} loop rate",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Balancer Heartbeat — Scheduler Loop Rate",
+      "type": "timeseries"
     }
   ],
   "preload": false,
   "refresh": "5s",
   "schemaVersion": 42,
-  "tags": [],
+  "tags": [
+    "ozone",
+    "datanode",
+    "disk-balancer"
+  ],
   "templating": {
     "list": [
       {
