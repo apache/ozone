@@ -18,7 +18,6 @@
 import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {rest} from "msw";
 import {vi} from 'vitest';
 
 import Datanodes from '@/v2/pages/datanodes/datanodes';
@@ -26,6 +25,7 @@ import * as commonUtils from '@/utils/common';
 import {datanodeServer} from '@tests/mocks/datanodeMocks/datanodeServer';
 import {datanodeLocators, searchInputLocator} from '@tests//locators/locators';
 import {waitForDNTable} from '@tests/utils/datanodes.utils';
+import { http, HttpResponse } from 'msw';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');
@@ -41,6 +41,19 @@ vi.mock('@/v2/components/select/multiSelect.tsx', () => ({
     </select>
   ),
 }));
+
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
+  return {
+    ...actual,
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
+        ...options,
+        retryAttempts: 0,
+        retryDelay: 0,
+      }),
+  };
+});
 
 describe('Datanodes Component', () => {
   // Start and stop MSW server before and after all tests
@@ -77,8 +90,8 @@ describe('Datanodes Component', () => {
 
   test('Displays no data message if the datanodes API returns an empty array', async () => {
     datanodeServer.use(
-      rest.get('api/v1/datanodes', (req, res, ctx) => {
-        return res(ctx.status(200), ctx.json({ totalCount: 0, datanodes: [] }));
+      http.get('/api/v1/datanodes', () => {
+        return HttpResponse.json({ totalCount: 0, datanodes: [] });
       })
     );
 
@@ -171,8 +184,8 @@ describe('Datanodes Component', () => {
   test('Handles API errors gracefully by showing error message', async () => {
     // Set up MSW to return an error for the datanode API
     datanodeServer.use(
-      rest.get('api/v1/datanodes', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Internal Server Error' }));
+      http.get('/api/v1/datanodes', () => {
+        return HttpResponse.json({ error: 'Internal Server Error' }, { status: 500 });
       })
     );
 
@@ -180,7 +193,9 @@ describe('Datanodes Component', () => {
 
     // Wait for the error to be handled
     await waitFor(() =>
-      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('AxiosError: Request failed with status code 500')
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Request failed with status code 500' })
+      )
     );
   });
 });

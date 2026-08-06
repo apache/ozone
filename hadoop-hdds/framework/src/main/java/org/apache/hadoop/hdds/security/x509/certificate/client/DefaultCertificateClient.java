@@ -1395,6 +1395,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     @Override
     public void run() {
+      try {
+        renewCertificateIfNeeded();
+      } catch (RuntimeException e) {
+        // This task is scheduled at a fixed rate: an exception escaping it cancels every future
+        // execution, and the component stops renewing its certificate without any further notice.
+        getLogger().error("Certificate renewal for {} failed unexpectedly, keeping the renewal "
+            + "schedule.", component, e);
+      }
+    }
+
+    private void renewCertificateIfNeeded() {
       // Lock to protect the certificate renew process, to make sure there is
       // only one renew process is ongoing at one time.
       // Certificate renew steps:

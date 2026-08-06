@@ -61,10 +61,10 @@ class TestChunkInputStream extends InputStreamTests {
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
+  protected void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), dataLength);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -123,9 +123,9 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  private void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
+  protected void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
-    bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       BlockInputStream block0Stream =
@@ -146,9 +146,9 @@ class TestChunkInputStream extends InputStreamTests {
    * Test that ChunkInputStream buffers are released as soon as the last byte
    * of the buffer is read.
    */
-  private void testBufferRelease(BucketForTesting bucket) throws Exception {
+  protected void testBufferRelease(BucketForTesting bucket) throws Exception {
     String keyName = getNewKeyName();
-    byte[] inputData = bucket.writeRandomBytes(keyName, CHUNK_SIZE);
+    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -204,7 +204,7 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
+  protected byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
       int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     chunkInputStream.seek(offset);
@@ -228,7 +228,7 @@ class TestChunkInputStream extends InputStreamTests {
    * @param expectedBufferCapacity expected buffer capacity of unreleased
    *                               buffers
    */
-  private void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
+  protected void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
       int expectedNumBuffers, int numReleasedBuffers,
       long expectedBufferCapacity) {
     assertEquals(expectedNumBuffers, buffers.length,
