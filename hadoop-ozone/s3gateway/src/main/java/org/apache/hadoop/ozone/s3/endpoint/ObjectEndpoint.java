@@ -149,6 +149,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
         .add(new MultipartKeyHandler())
