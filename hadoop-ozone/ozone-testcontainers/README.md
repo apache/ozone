@@ -34,7 +34,7 @@ daemon and is skipped automatically when Docker is unavailable.
   `ozone-docker#49`), which runs SCM + OM + datanode + S3 Gateway in one
   container and exposes S3G on 9878.
 - Exposes `getS3Endpoint()`, `getAccessKey()`, `getSecretKey()`, `getRegion()`.
-- `OzoneContainerSmokeTest` builds an AWS SDK v2 `S3Client`
+- `TestOzoneContainer` builds an AWS SDK v2 `S3Client`
   (`endpointOverride` + `forcePathStyle` + static credentials) and runs
   create bucket / put / get / list.
 
