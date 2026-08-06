@@ -26,6 +26,7 @@
   <description>Apache Ozone Distributed Data Store Server interface</description>
 
   <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
     <!-- only generated code in this module -->
