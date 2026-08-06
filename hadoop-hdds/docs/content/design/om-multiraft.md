@@ -120,32 +120,7 @@ The bucket-to-group assignment is stored:
 
 #### 1. BucketStateMachine
 
-New state machine for multi-raft groups:
-
-```java
-public class BucketStateMachine extends BaseStateMachine {
-  private final RaftGroupId currentRaftGroupId;
-  private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final ExecutorService executorService;
-  private final RequestHandler handler;
-
-  @Override
-  public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
-    // 1. Acquire semaphore permit
-    ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
-
-    // 2. Process request asynchronously
-    CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-        () -> runCommand(request, termIndex), executorService);
-
-    // 3. Add response to double buffer
-    future.thenApply(omResponse -> {
-      ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
-      return ratisFuture;
-    });
-  }
-}
-```
+New state machine for multi-raft groups. 
 
 **Key Features**:
 - One instance per RAFT group
@@ -156,188 +131,37 @@ public class BucketStateMachine extends BaseStateMachine {
 
 #### 2. OzoneRetryInvocationHandler
 
-Handles multi-raft request routing:
+Handles multi-raft request routing. Request has a hint of the bucket path, which is used to determine the correct 
+RAFT group and leader OM node.
 
-```java
-protected Object invokeMethod(Method method, Object[] args) throws Throwable {
-  T proxy = null;
-  if (args.length == 2 && args[1] instanceof OMRequest) {
-    // Extract bucket path from OMRequest
-    String bucketPath = ((OMFailoverProxyProviderBase)proxyDescriptor.getProxyProvider())
-        .getWriteRequestBucketPath((OMRequest) args[1]);
-
-    if (bucketPath != null) {
-      // Select the correct OM proxy based on bucket's RAFT group
-      proxy = (T) ((OMFailoverProxyProviderBase) proxyDescriptor.getProxyProvider())
-          .selectProxyInfo(bucketPath);
-    }
-  }
-
-  if (proxy == null) {
-    proxy = proxyDescriptor.getProxy(); // Fallback to default
-  }
-
-  return method.invoke(proxy, args);
-}
-```
 
 #### 4. HadoopRpcOMFailoverProxyProvider
 
-Extended to support multi-raft routing:
-
-```java
-public String getWriteRequestBucketPath(OMRequest omRequest) {
-  // Extract bucket path from various request types
-  if (omRequest.hasCreateKeyRequest()) {
-    KeyArgs keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
-    return keyArgs.getVolumeName() + "/" + keyArgs.getBucketName();
-  }
-  // Similar for other request types...
-}
-
-public Object selectProxyInfo(String bucketPath) {
-  // Determine RAFT group from bucket path
-  RaftGroupId groupId = omRaftGroupManager.getRaftGroupIdForBucket(bucketPath);
-  // Return proxy pointing to current leader of that group
-  return getProxyForBucket(bucketPath);
-}
-```
+Extended to support multi-raft routing. As like as the previous one, it maintains a list of OM proxies and uses 
+the bucket path to select the correct proxy for the RAFT group leader.
 
 ### Configuration
 
 #### Core Multi-Raft Configuration
 
-```xml
-<!-- Enable multi-raft feature -->
-<property>
-  <name>ozone.om.multi.raft.bucket.enabled</name>
-  <value>true</value>
-  <description>
-    Enable multi-raft bucket metadata distribution across multiple RAFT groups.
-    When enabled, bucket metadata is partitioned across the configured number
-    of RAFT groups for improved write throughput and scalability.
-    Default: false
-  </description>
-</property>
-
-<!-- Number of RAFT groups -->
-<property>
-  <name>ozone.om.multi.raft.bucket.groups</name>
-  <value>6</value>
-  <description>
-    Number of RAFT groups for bucket metadata partitioning. Each RAFT group
-    has its own leader, followers, and log, allowing parallel write processing.
-    Recommended values: 3, 6, 12, 24 based on cluster size and load.
-    Higher values provide better parallelism but increase resource usage.
-    Default: 6
-  </description>
-</property>
-```
+1. Switch to enable multi-raft feature
+2. Number of raft groups to handle bucket write requests
 
 #### Safe Mode Configuration
 
-```xml
-<property>
-  <name>ozone.om.safemode.enabled</name>
-  <value>true</value>
-  <description>
-    Enable safe mode for OzoneManager during startup. When enabled, OM enters
-    safe mode until all RAFT groups are healthy and synchronized. In multi-raft
-    deployments, this ensures all RAFT groups are available before accepting writes.
-    Default: true
-  </description>
-</property>
-```
+Switch to enable OM safe mode (OM requests are not available until all RAFT groups are healthy)
 
 #### RAFT Group Reconciliation
 
-```xml
-<property>
-  <name>ozone.om.bucket.raft.groups.reconciler.interval</name>
-  <value>60s</value>
-  <description>
-    Interval at which the bucket RAFT groups reconciler runs. The reconciler
-    verifies the health state of all RAFT groups and recreates any unhealthy
-    or missing groups. This ensures the configured number of RAFT groups is
-    maintained and all groups are in a healthy state.
-    Default: 60s
-  </description>
-</property>
-
-<property>
-  <name>ozone.om.ratis.unhealthy.peer.timeout</name>
-  <value>30s</value>
-  <description>
-    Timeout duration to consider a RAFT peer unhealthy. If a RAFT peer
-    doesn't respond within this timeout, it's marked as unhealthy and
-    the reconciler may take corrective action.
-    Default: 30s
-  </description>
-</property>
-```
+Configuration to properties for periodic reconciliation of bucket→RAFT group assignments and health checks.
 
 #### Leadership Balancing Configuration
 
-```xml
-<property>
-  <name>ozone.om.multi.raft.bucket.group.transfer.leader.timeout</name>
-  <value>1s</value>
-  <description>
-    Timeout for transferring RAFT group leadership from one OM node to another.
-    Used by the leadership balancer to distribute RAFT group leaders evenly
-    across OM nodes for optimal resource utilization.
-    Default: 1s
-  </description>
-</property>
-
-<property>
-  <name>ozone.om.multi.raft.bucket.group.transfer.leader.initial.delay</name>
-  <value>30s</value>
-  <description>
-    Initial delay before starting the leadership balancer service. This delay
-    allows the cluster to stabilize after startup before attempting to balance
-    leadership distribution across OM nodes.
-    Default: 30s
-  </description>
-</property>
-
-<property>
-  <name>ozone.om.multi.raft.bucket.group.transfer.leader.period</name>
-  <value>60s</value>
-  <description>
-    Period at which the leadership balancer runs to redistribute RAFT group
-    leaders across OM nodes. The balancer ensures each OM node leads approximately
-    the same number of RAFT groups, preventing resource imbalance.
-    Default: 60s
-  </description>
-</property>
-```
+Bucket RAFT-groups leadership should be balanced across OM nodes. Configuration properties to control balancing frequency and thresholds.
 
 ### Leadership Balancing
 
-To prevent all RAFT groups from having leaders on the same OM node:
-
-```java
-public class OmRaftGroupsLeadershipBalancer {
-
-  /**
-   * Ensures RAFT group leaders are distributed across OM nodes.
-   * Target: Each OM node should be leader for ~equal number of groups.
-   */
-  public void balanceLeadership() {
-    Map<String, Integer> nodeToLeaderCount = getCurrentLeaderDistribution();
-
-    // If imbalance detected (max - min > threshold)
-    if (isImbalanced(nodeToLeaderCount)) {
-      // Transfer leadership from overloaded to underloaded nodes
-      for (RaftGroupId group : getOverloadedGroups()) {
-        String targetNode = selectUnderloadedNode();
-        transferLeadership(group, targetNode);
-      }
-    }
-  }
-}
-```
+It's need to prevent all RAFT groups from having leaders on the same OM node
 
 **Balancer Strategy**:
 - Runs periodically (default: every 5 minutes)
@@ -347,27 +171,7 @@ public class OmRaftGroupsLeadershipBalancer {
 
 ### Group Reconciliation
 
-Provide configured count of required bucket RAFT-groups and periodically verify a health state of the groups:
-
-```java
-public class BucketRaftGroupsReconciler {
-
-  /**
-   * Periodically verifies and corrects bucket→group assignments.
-   */
-  public void reconcile() {
-    List<RaftGroup> existingRaftGroups = (List<RaftGroup>) omRatisServer.getServer().getGroups();
-    if (existingRaftGroups.size() == 1) {
-      List<RaftGroupId> raftGroupIds = generateRaftGroups(currentMultiRaftTerm, expectedRaftGroupsCount);
-      ozoneManager.createRaftGroups(raftGroupIds.stream().map(RaftId::getUuid).collect(Collectors.toList()), true);
-    } else {
-      for (RaftGroup raftGroup : existingRaftGroups) {
-        checkHealthStateAndRecreateIfNeeded(raftGroup);
-      }
-    }
-  }
-}
-```
+Provide configured count of required bucket RAFT-groups and periodically verify a health state of the groups
 
 ## Snapshot & Install-Snapshot
 
@@ -375,7 +179,10 @@ public class BucketRaftGroupsReconciler {
 
 Ratis snapshot and install-snapshot assume a **1:1 relationship between a Raft log
 and the persisted state** it protects. The multi-raft design breaks that assumption:
-there are `N` bucket RAFT groups plus the main RAFT group, but they all apply into a
+there are `N` bucket RAFT groups plus the main RAFT group (The main RAFT group here is the one that previously handled 
+requests through RATIS alone (the group that the OM instances in HA mode worked in), 
+but for the purposes of this design document, its purpose is to only handle non-bucket
+write requests and ensure the functionality of the bucket RAFT groups.), but they all apply into a
 **single shared OM RocksDB**. This means a snapshot taken for one group, and an
 install-snapshot triggered by one group, unavoidably touch state owned by the other
 groups.
@@ -428,8 +235,8 @@ main RAFT group leader is the coordinator (it already drives cross-group concern
 as group reconciliation).
 
 **Producing a consistent checkpoint (source):**
-1. Quiesce all state machines — pause and flush the double buffers of the main SM and
-   every `BucketStateMachine`.
+1. Quiesce all state machines — pause and flush the double buffers of the main SM (the state machine 
+   that handles the main RAFT-groups transactions) and every `BucketStateMachine`.
 2. Record the **vector** of `(raftGroupId → appliedIndex)`. This is already materialized
    as the per-group `#TRANSACTIONINFO<raftGroupId>` keys.
 3. Take the RocksDB checkpoint, then resume all state machines.
@@ -477,20 +284,20 @@ is the correct near-term behavior.
 
 **Preparation Phase**:
 1. Upgrade OM nodes to version supporting multi-raft (rolling upgrade)
-2. Set `ozone.om.multi.raft.bucket.enabled=false` initially
+2. Switch off multi-raft functionality initially
 3. Verify all nodes running new version
 
 **Enablement Phase**:
 1. Stop all OM nodes gracefully
-2. Set `ozone.om.multi.raft.bucket.enabled=true`
-3. Set `ozone.om.multi.raft.bucket.groups=6`
+2. Switch on multi-raft functionality
+3. Set raft group count (default: 6)
 4. Start OM nodes
 
 ### Rollback Procedure
 
 If issues arise:
 1. Stop all OM nodes
-2. Set `ozone.om.multi.raft.bucket.enabled=false`
+2. Switch off multi-raft functionality
 3. System operates as single-raft again
 
 ## Performance Considerations
@@ -516,101 +323,6 @@ Per OM node with 6 RAFT groups:
   - 6x RAFT log caches
   - Estimated: +1-2 GB per OM node
 - **Disk I/O**: Distributed across RAFT groups (reduced contention on RocksDB)
-
-### Tuning Parameters
-
-For optimal performance, consider adjusting these parameters based on your workload:
-
-#### For High-Load Clusters
-
-```xml
-<!-- Increase unflushed transaction buffer for multi-raft -->
-<property>
-  <name>ozone.om.ratis.server.max-unflushed-transaction-count</name>
-  <value>50000</value>
-  <description>
-    Higher values allow more buffering per RAFT group, reducing backpressure
-    under high load. Monitor unflushed transaction metrics to tune this value.
-  </description>
-</property>
-
-<!-- More RAFT groups for large clusters -->
-<property>
-  <name>ozone.om.multi.raft.bucket.groups</name>
-  <value>12</value>
-  <description>
-    For clusters with 5+ OM nodes or very high write workloads, increase
-    the number of RAFT groups to improve parallelism. Ensure you have
-    sufficient CPU and memory resources on OM nodes.
-  </description>
-</property>
-
-<!-- Balance CPU vs latency -->
-<property>
-  <name>ozone.om.ratis.server.request.timeout</name>
-  <value>60s</value>
-  <description>
-    Increase timeout for clusters with high latency or slow RocksDB writes.
-    Default is 3000ms which may be too aggressive for loaded clusters.
-  </description>
-</property>
-```
-
-#### Leadership Balancing Tuning
-
-```xml
-<!-- More aggressive balancing for dynamic workloads -->
-<property>
-  <name>ozone.om.multi.raft.bucket.group.transfer.leader.period</name>
-  <value>30s</value>
-  <description>
-    Reduce period for more frequent rebalancing in clusters with frequent
-    OM node additions/removals or uneven load distribution. Default: 60s
-  </description>
-</property>
-
-<!-- Faster initial balancing -->
-<property>
-  <name>ozone.om.multi.raft.bucket.group.transfer.leader.initial.delay</name>
-  <value>10s</value>
-  <description>
-    Reduce delay for faster initial balancing after cluster startup.
-    Useful in test/dev environments. Default: 30s
-  </description>
-</property>
-```
-
-#### Reconciliation Tuning
-
-```xml
-<!-- More frequent health checks -->
-<property>
-  <name>ozone.om.bucket.raft.groups.reconciler.interval</name>
-  <value>30s</value>
-  <description>
-    Reduce interval for more frequent RAFT group health checks and faster
-    detection of unhealthy groups. Default: 60s
-  </description>
-</property>
-
-<!-- More conservative peer timeout -->
-<property>
-  <name>ozone.om.ratis.unhealthy.peer.timeout</name>
-  <value>60s</value>
-  <description>
-    Increase timeout to avoid false positives in high-latency or loaded
-    clusters. Default: 30s
-  </description>
-</property>
-```
-
-**Tuning Guidelines**:
-
-- Start with defaults and monitor metrics
-- Increase `max-unflushed-transaction-count` if you see frequent backpressure
-- Increase `bucket.groups` only if CPU utilization on OM nodes is low (< 50%)
-- Adjust balancer period based on cluster stability (stable = longer period)
-- Monitor leadership distribution via metrics to validate balancer effectiveness
 
 
 ## Monitoring and Observability
