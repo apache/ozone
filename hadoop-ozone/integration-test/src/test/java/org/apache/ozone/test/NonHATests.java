@@ -42,11 +42,11 @@ import org.apache.hadoop.ozone.client.rpc.TestContainerStateMachineStream;
 import org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks;
 import org.apache.hadoop.ozone.client.rpc.TestOzoneClientMultipartUploadWithFSO;
 import org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion;
+import org.apache.hadoop.ozone.om.OMMXBeanTests;
 import org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient;
 import org.apache.hadoop.ozone.om.TestListKeys;
 import org.apache.hadoop.ozone.om.TestListKeysWithFSO;
 import org.apache.hadoop.ozone.om.TestListStatus;
-import org.apache.hadoop.ozone.om.OMMXBeanTests;
 import org.apache.hadoop.ozone.om.TestObjectStore;
 import org.apache.hadoop.ozone.om.TestObjectStoreWithFSO;
 import org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS;
@@ -177,7 +177,9 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   @Nested
   class OMMXBean extends OMMXBeanTests {
     @Override
-    public MiniOzoneCluster cluster() { return getCluster(); }
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
   }
 
   @Nested
