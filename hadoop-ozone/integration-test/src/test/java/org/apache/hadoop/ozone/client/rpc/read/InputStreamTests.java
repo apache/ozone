@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOU
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -31,19 +32,25 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.event.Level;
 
-// TODO remove this class, set config as default in integration tests
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class InputStreamTests {
 
@@ -54,6 +61,9 @@ abstract class InputStreamTests {
   static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
   private MiniOzoneCluster cluster;
+
+  @TempDir
+  private File dir;
 
   protected MiniOzoneCluster newCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -74,7 +84,6 @@ abstract class InputStreamTests {
         conf.getObject(ReplicationManagerConfiguration.class);
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
-    setCustomizedProperties(conf);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -82,6 +91,8 @@ abstract class InputStreamTests {
         .setStreamBufferFlushSize(FLUSH_SIZE)
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
+
+    enableShortCircuitRead(dir, conf);
 
     return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(getDatanodeCount())
@@ -94,9 +105,6 @@ abstract class InputStreamTests {
 
   int getDatanodeCount() {
     return 5;
-  }
-
-  void setCustomizedProperties(OzoneConfiguration configuration) {
   }
 
   ReplicationConfig getRepConfig() {
@@ -134,5 +142,23 @@ abstract class InputStreamTests {
         }
       }
     });
+  }
+
+  protected static void enableShortCircuitRead(File dir, OzoneConfiguration configuration) {
+    useShortCircuitRead(configuration, true);
+    configuration.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+  }
+
+  protected static void useShortCircuitRead(OzoneConfiguration conf, boolean use) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setShortCircuit(use);
+    conf.setFromObject(clientConfig);
+  }
+
+  protected static void debugShortCircuitRead() {
+    GenericTestUtils.setLogLevel(XceiverClientShortCircuit.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(XceiverClientGrpc.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(LocalChunkInputStream.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
   }
 }
