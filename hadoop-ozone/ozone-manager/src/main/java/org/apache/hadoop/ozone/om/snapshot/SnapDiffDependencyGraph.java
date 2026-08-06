@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
@@ -40,8 +43,9 @@ import org.slf4j.LoggerFactory;
  *   <li>Descendant DELETE before ancestor DELETE or RENAME(source), using
  *       strict source-path prefixes when intermediate directories are omitted
  *       from the report.</li>
- *   <li>Descendant non-delete before ancestor DELETE on a strict source-path
- *       prefix.</li>
+ *   <li>Descendant RENAME or MODIFY before ancestor DELETE or RENAME(source)
+ *       on a strict source-path prefix. CREATE is omitted because its source
+ *       path is a to-snapshot path, not a from-snapshot path.</li>
  *   <li>Ancestor CREATE/RENAME(target) before descendant CREATE/RENAME/MODIFY
  *       on a strict to-snapshot path prefix.</li>
  *   <li>DELETE before CREATE/RENAME(target) that targets the same path.</li>
@@ -61,18 +65,20 @@ public final class SnapDiffDependencyGraph {
 
   private static final int INITIAL_EDGE_CAPACITY = 16;
   private static final int[] EMPTY_INT_ARRAY = new int[0];
-  // Hotspot/OpenJDK cap the largest array a little below Integer.MAX_VALUE.
-  // Node and edge counts are assumed to fit in int; the configured changed-key
-  // limit (one billion) is well below this bound.
+  private static final int MAX_CYCLE_ENTRIES_IN_MESSAGE = 16;
+  // Defensive JVM-side ceiling on the growable long[] edge buffer used during
+  // construction (see grownCapacity). Hotspot/OpenJDK cap the largest array a
+  // little below Integer.MAX_VALUE; going any higher throws OutOfMemoryError
+  // with an unhelpful message.
   private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
-  private static final char PATH_SEPARATOR = '/';
+  private static final String PATH_SEPARATOR = OM_KEY_PREFIX;
 
   private final List<SnapDiffDependencyEntry> nodes = new ArrayList<>();
 
   // Edges collected during construction, each encoded as (from << 32 | to).
   // Deduplicated and compacted into the CSR arrays below by buildCsr(), then
   // released so the graph keeps only the primitive adjacency.
-  private long[] edges = new long[INITIAL_EDGE_CAPACITY];
+  private long[] edges;
   private int edgeCount;
 
   // Compressed sparse row adjacency. The out-edges of node i are the targets
@@ -82,7 +88,7 @@ public final class SnapDiffDependencyGraph {
   private int[] inDegree;
 
   // Construction-only grouping of node ids by objectId for intra-object
-  // RENAME ordering. Released once edges are built.
+  // RENAME ordering. Only objectIds that have a RENAME entry are tracked;
   private long[] groupObjectIds;
   private int[] groupOffsets;
   private int[] groupNodes;
@@ -92,7 +98,12 @@ public final class SnapDiffDependencyGraph {
    *     matches a CREATE path, or if dependency edges form a cycle
    */
   public SnapDiffDependencyGraph(List<SnapDiffDependencyEntry> entries) {
+    Objects.requireNonNull(entries, "entries");
     nodes.addAll(entries);
+    // Size the initial edge buffer to roughly the node count so realistic
+    // graphs (edge density 3-8 per node) skip most of the doubling copies.
+    // Clamp to INITIAL_EDGE_CAPACITY so tiny inputs still allocate cheaply.
+    edges = new long[Math.max(INITIAL_EDGE_CAPACITY, nodes.size())];
     buildDependencyEdges();
     buildCsr();
   }
@@ -147,18 +158,22 @@ public final class SnapDiffDependencyGraph {
     }
 
     if (orderedEntries.size() != nodeCount) {
-      logUnresolvedNodes(orderedEntries);
-      throw new IllegalStateException(
-          "Cycle detected in snapshot diff dependency graph");
+      List<String> unresolved = collectUnresolvedNodes(orderedEntries);
+      LOG.debug("Cycle detected in snapshot diff dependency graph. "
+          + "Unresolved entries: {}", unresolved);
+      int total = unresolved.size();
+      List<String> sample = total > MAX_CYCLE_ENTRIES_IN_MESSAGE
+          ? unresolved.subList(0, MAX_CYCLE_ENTRIES_IN_MESSAGE) : unresolved;
+      throw new IllegalStateException(String.format(
+          "Cycle detected in snapshot diff dependency graph; %d unresolved "
+              + "entries (showing up to %d): %s",
+          total, MAX_CYCLE_ENTRIES_IN_MESSAGE, sample));
     }
     return orderedEntries;
   }
 
-  private void logUnresolvedNodes(
+  private List<String> collectUnresolvedNodes(
       List<SnapDiffDependencyEntry> orderedEntries) {
-    if (!LOG.isDebugEnabled()) {
-      return;
-    }
     Set<SnapDiffDependencyEntry> resolved =
         Collections.newSetFromMap(new IdentityHashMap<>());
     resolved.addAll(orderedEntries);
@@ -168,8 +183,7 @@ public final class SnapDiffDependencyGraph {
         unresolved.add(entry.getDiffType() + " " + entry.getSourcePath());
       }
     }
-    LOG.debug("Cycle detected in snapshot diff dependency graph. "
-        + "Unresolved entries: {}", unresolved);
+    return unresolved;
   }
 
   /**
@@ -271,11 +285,29 @@ public final class SnapDiffDependencyGraph {
 
   private void buildDependencyEdges() {
     // At most one object occupies a given path on a given snapshot side, so a
-    // single node id per path is sufficient (see addToPathIndex).
-    Map<String, Integer> createNodesByPath = new HashMap<>();
-    Map<String, Integer> deleteNodesByPath = new HashMap<>();
-    Map<String, Integer> renameNodesBySourcePath = new HashMap<>();
-    Map<String, Integer> renameNodesByTargetPath = new HashMap<>();
+    // single node id per path is sufficient. Count each category first
+    // so the four indexes can be pre-sized exactly.
+    int createCount = 0;
+    int deleteCount = 0;
+    int renameCount = 0;
+    for (int i = 0; i < nodes.size(); i++) {
+      DiffType diffType = nodes.get(i).getDiffType();
+      if (diffType == DiffType.DELETE) {
+        deleteCount++;
+      } else if (diffType == DiffType.CREATE) {
+        createCount++;
+      } else if (diffType == DiffType.RENAME) {
+        renameCount++;
+      }
+    }
+    Map<String, Integer> createNodesByPath =
+        new HashMap<>(expectedHashMapCapacity(createCount));
+    Map<String, Integer> deleteNodesByPath =
+        new HashMap<>(expectedHashMapCapacity(deleteCount));
+    Map<String, Integer> renameNodesBySourcePath =
+        new HashMap<>(expectedHashMapCapacity(renameCount));
+    Map<String, Integer> renameNodesByTargetPath =
+        new HashMap<>(expectedHashMapCapacity(renameCount));
 
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
       SnapDiffDependencyEntry entry = nodes.get(nodeId);
@@ -302,54 +334,79 @@ public final class SnapDiffDependencyGraph {
     addPathPrefixFromSnapshotEdges(deleteNodesByPath, renameNodesBySourcePath);
     addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath);
 
-    buildObjectIdGroups();
+    buildObjectIdGroups(renameCount);
     addIntraObjectRenameEdges();
 
     groupObjectIds = null;
     groupOffsets = null;
     groupNodes = null;
+
+    // Path strings were cached on each entry so that repeated edge-building
+    // passes did not re-decode. The graph no longer reads them once edges
+    // are built; drop the caches to reclaim per-entry heap.
+    for (int i = 0; i < nodes.size(); i++) {
+      nodes.get(i).clearPathCache();
+    }
   }
 
   /**
-   * Groups node ids by objectId into primitive arrays for intra-object RENAME
-   * ordering. objectIds are sorted and de-duplicated so the matching node ids
-   * for one objectId are the slice of {@link #groupNodes} delimited by
-   * {@link #groupOffsets}.
+   * Groups node ids by objectId, restricted to objectIds that have a RENAME
+   * entry (only those can pick up intra-object edges). The slice of
+   * {@link #groupNodes} between {@link #groupOffsets}{@code [rank]} and
+   * {@code [rank + 1]} lists the node ids for {@link #groupObjectIds}
+   * {@code [rank]}.
+   *
+   * <p>Uses a single hash-map lookup per node and no per-node binary search,
+   * so peak transient memory here is bounded by the number of nodes that
+   * belong to a renamed object rather than the full node count.
    */
-  private void buildObjectIdGroups() {
-    int nodeCount = nodes.size();
-    long[] sorted = new long[nodeCount];
-    for (int i = 0; i < nodeCount; i++) {
-      sorted[i] = nodes.get(i).getObjectId();
+  private void buildObjectIdGroups(int renameCount) {
+    if (renameCount == 0) {
+      groupObjectIds = new long[0];
+      groupOffsets = new int[1];
+      groupNodes = EMPTY_INT_ARRAY;
+      return;
     }
-    Arrays.sort(sorted);
-
+    int nodeCount = nodes.size();
+    // Rank the RENAMEd objectIds. Presize to the exact rename count; there is
+    // at most one RENAME per objectId (a second RENAME on the same id is
+    // rejected by addToPathIndex).
+    Map<Long, Integer> rankByObjectId =
+        new HashMap<>(expectedHashMapCapacity(renameCount));
+    long[] renameObjectIds = new long[renameCount];
     int uniqueCount = 0;
-    long previous = 0L;
-    for (int i = 0; i < nodeCount; i++) {
-      long objectId = sorted[i];
-      if (uniqueCount == 0 || objectId != previous) {
-        sorted[uniqueCount++] = objectId;
-        previous = objectId;
+    for (int i = 0; i < nodeCount && uniqueCount < renameCount; i++) {
+      SnapDiffDependencyEntry entry = nodes.get(i);
+      if (entry.getDiffType() == DiffType.RENAME) {
+        renameObjectIds[uniqueCount] = entry.getObjectId();
+        rankByObjectId.put(entry.getObjectId(), uniqueCount);
+        uniqueCount++;
       }
     }
-    groupObjectIds = Arrays.copyOf(sorted, uniqueCount);
+    groupObjectIds = renameObjectIds;
 
-    int[] rankByNode = new int[nodeCount];
+    // Count how many nodes belong to each renamed object.
     groupOffsets = new int[uniqueCount + 1];
+    int groupedNodeCount = 0;
     for (int i = 0; i < nodeCount; i++) {
-      int rank = Arrays.binarySearch(groupObjectIds, nodes.get(i).getObjectId());
-      rankByNode[i] = rank;
-      groupOffsets[rank + 1]++;
+      Integer rank = rankByObjectId.get(nodes.get(i).getObjectId());
+      if (rank != null) {
+        groupOffsets[rank + 1]++;
+        groupedNodeCount++;
+      }
     }
     for (int i = 0; i < uniqueCount; i++) {
       groupOffsets[i + 1] += groupOffsets[i];
     }
 
-    groupNodes = new int[nodeCount];
+    // Fill groupNodes. Sized to groupedNodeCount, not the full node count.
+    groupNodes = new int[groupedNodeCount];
     int[] fillCursor = Arrays.copyOf(groupOffsets, uniqueCount);
     for (int i = 0; i < nodeCount; i++) {
-      groupNodes[fillCursor[rankByNode[i]]++] = i;
+      Integer rank = rankByObjectId.get(nodes.get(i).getObjectId());
+      if (rank != null) {
+        groupNodes[fillCursor[rank]++] = i;
+      }
     }
   }
 
@@ -395,17 +452,33 @@ public final class SnapDiffDependencyGraph {
     }
   }
 
+  /**
+   * Converts an expected element count to the initial capacity that keeps a
+   * default-load-factor (0.75) HashMap from resizing while it fills to that
+   * count. Mirrors what JDK 19's {@code HashMap.newHashMap(int)} does, but
+   * stays on Java 8 source.
+   */
+  private static int expectedHashMapCapacity(int expectedSize) {
+    if (expectedSize <= 0) {
+      return 1;
+    }
+    // ceil(expectedSize / 0.75) with an overflow guard for large sizes.
+    long capacity = (long) expectedSize + (expectedSize + 2) / 3;
+    return capacity > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) capacity;
+  }
+
   private static void addToPathIndex(Map<String, Integer> pathIndex,
       String path, int nodeId) {
     if (path == null) {
       return;
     }
     // At most one object can occupy a path on a given snapshot side, so the
-    // first node wins. A second node on the same path indicates unexpected or
-    // duplicate diff input.
+    // first node wins. A second node on the same path indicates malformed diff
+    // input (per SnapshotDiffManager, an object appears at most once in each of
+    // the CREATE/DELETE/RENAME(source)/RENAME(target) indices).
     Integer existing = pathIndex.putIfAbsent(path, nodeId);
     if (existing != null) {
-      LOG.debug("Multiple diff entries share path '{}'; keeping node {}, "
+      LOG.warn("Multiple diff entries share path '{}'; keeping node {}, "
           + "ignoring node {}", path, existing, nodeId);
     }
   }
@@ -461,6 +534,14 @@ public final class SnapDiffDependencyGraph {
   /**
    * From-snapshot path-prefix edges. Intermediate directories may be omitted
    * from the report; ancestor ordering is derived from strict path prefixes.
+   *
+   * <p>DELETE, RENAME, and MODIFY entries all carry a from-snapshot source
+   * path (RENAME uses the pre-rename source, and MODIFY is reported at the
+   * old key path per SnapshotDiffManager). CREATE is excluded because a
+   * CREATE's source path is a to-snapshot path; to-snapshot prefixes are
+   * handled by {@link #addPathPrefixToSnapshotEdges}. Mixing the two would
+   * generate spurious edges (e.g. after DELETE A + CREATE A, a CREATE A/child
+   * would incorrectly point at DELETE A and produce a cycle).
    */
   private void addPathPrefixFromSnapshotEdges(
       Map<String, Integer> deleteNodesByPath,
@@ -483,7 +564,8 @@ public final class SnapDiffDependencyGraph {
 
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
       SnapDiffDependencyEntry entry = nodes.get(nodeId);
-      if (entry.isDelete()) {
+      DiffType diffType = entry.getDiffType();
+      if (diffType != DiffType.RENAME && diffType != DiffType.MODIFY) {
         continue;
       }
       final int fromNodeId = nodeId;
@@ -491,6 +573,11 @@ public final class SnapDiffDependencyGraph {
         Integer ancestorDeleteNodeId = deleteNodesByPath.get(ancestorPath);
         if (ancestorDeleteNodeId != null) {
           addEdge(fromNodeId, ancestorDeleteNodeId);
+        }
+        Integer ancestorRenameNodeId =
+            renameNodesBySourcePath.get(ancestorPath);
+        if (ancestorRenameNodeId != null) {
+          addEdge(fromNodeId, ancestorRenameNodeId);
         }
       });
     }

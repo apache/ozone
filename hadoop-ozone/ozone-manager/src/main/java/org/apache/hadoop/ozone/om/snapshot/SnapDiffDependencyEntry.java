@@ -114,6 +114,22 @@ public final class SnapDiffDependencyEntry {
     return getDiffType() == DiffType.DELETE;
   }
 
+  /**
+   * Releases the cached decoded path strings. The graph reads paths repeatedly
+   * while building edges, so decoding once is worthwhile during construction;
+   * once the graph is built the caches are dead weight (~40-400 bytes/entry
+   * depending on path length). Call after edge construction completes.
+   *
+   * <p>The underlying {@link DiffReportEntry} still holds the raw UTF-8 bytes,
+   * so {@link #getSourcePath()} / {@link #getTargetPath()} will re-decode
+   * on demand after this call.
+   */
+  void clearPathCache() {
+    sourcePath = null;
+    targetPath = null;
+    targetPathDecoded = false;
+  }
+
   @Override
   public boolean equals(Object other) {
     if (this == other) {
