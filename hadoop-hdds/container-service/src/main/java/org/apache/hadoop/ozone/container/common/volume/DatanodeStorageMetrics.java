@@ -77,16 +77,20 @@ public final class DatanodeStorageMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
   }
 
+  /**
+   * Metrics are computed on demand from the latest volume reports
+   * instead of maintaining cached counters.
+   */
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
     registry.snapshot(builder, all);
 
-    long capacity = 0;
-    long used = 0;
+    long capacity = 0L;
+    long used = 0L;
     for (StorageLocationReport report : volumeSet.getStorageReport()) {
-      capacity += report.getCapacity();
-      used += report.getScmUsed();
+      capacity = Math.addExact(capacity, report.getCapacity());
+      used = Math.addExact(used, report.getScmUsed());
     }
     double usedPercentage = capacity > 0 ? (100.0 * used / capacity) : 0.0;
 

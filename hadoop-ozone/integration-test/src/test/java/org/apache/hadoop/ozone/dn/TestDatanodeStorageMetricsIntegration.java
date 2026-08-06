@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.dn;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
@@ -29,6 +30,8 @@ import static org.assertj.core.data.Offset.offset;
 import java.util.HashMap;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.DUFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -58,8 +61,7 @@ public class TestDatanodeStorageMetricsIntegration {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.set("hdds.datanode.du.factory.classname",
-        "org.apache.hadoop.ozone.container.common.volume.HddsVolumeFactory");
+    conf.setClass(configKeyForClassName(), DUFactory.class, SpaceUsageCheckFactory.class);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .build();
