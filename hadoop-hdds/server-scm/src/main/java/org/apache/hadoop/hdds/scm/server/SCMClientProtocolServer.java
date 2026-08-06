@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -92,6 +93,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -105,8 +107,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -1166,14 +1170,94 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    final Map<String, String> auditMap = Collections.emptyMap();
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    final Map<String, String> auditMap = Collections.singletonMap("force", String.valueOf(force));
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
+      if (force) {
+        LOG.warn("Forcing upgrade finalization by skipping SCM peer and datanode software version checks");
+      } else {
+        validatePeerScmVersionsBeforeFinalize();
+        validateDatanodeVersionsBeforeFinalize();
+      }
       scm.getFinalizationManager().finalizeUpgrade();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.FINALIZE_SCM_UPGRADE, auditMap, ex));
       throw ex;
+    }
+  }
+
+  @Override
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
+    return HDDSVersion.SOFTWARE_VERSION;
+  }
+
+  /**
+   * Verifies that every peer SCM in the Ratis group runs the same software version as this leader
+   * before finalization begins. Rejects the finalize command if any peer reports a differing
+   * version or cannot be reached. The resulting exception propagates back to the OM (which triggered
+   * finalization) and on to the client, leaving nothing finalized.
+   */
+  private void validatePeerScmVersionsBeforeFinalize() throws SCMException {
+    List<SCMNodeDetails> peerNodes = scm.getSCMHANodeDetails().getPeerNodeDetails();
+    if (peerNodes.isEmpty()) {
+      return;
+    }
+    HDDSVersion leaderVersion = HDDSVersion.SOFTWARE_VERSION;
+    OzoneConfiguration conf = scm.getConfiguration();
+    List<String> failedPeers = new ArrayList<>();
+    for (SCMNodeDetails peer : peerNodes) {
+      String peerId = peer.getNodeId();
+      ScmNodeTarget target = new ScmNodeTarget();
+      target.setNodeId(peerId);
+      StorageContainerLocationProtocol peerClient = null;
+      try {
+        peerClient = HAUtils.getScmContainerClientForNode(conf, target);
+        HDDSVersion peerVersion = peerClient.getPeerUpgradeStatus();
+        if (!peerVersion.equals(leaderVersion)) {
+          LOG.warn("SCM peer {} is running software version {} but leader is running version {}. "
+              + "Rejecting finalize command.", peerId, peerVersion, leaderVersion);
+          failedPeers.add(peerId + " (version: " + peerVersion + ")");
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to contact SCM peer {} to check software version before finalize.", peerId, e);
+        failedPeers.add(peerId + " (unreachable: " + e.getMessage() + ")");
+      } finally {
+        IOUtils.cleanupWithLogger(LOG, peerClient);
+      }
+    }
+    if (!failedPeers.isEmpty()) {
+      throw new SCMException("Finalize rejected: the following SCM peers did not confirm matching software "
+          + "version (expected version=" + leaderVersion + "): " + String.join(", ", failedPeers),
+          ResultCodes.UNSUPPORTED_OPERATION);
+    }
+  }
+
+  /**
+   * Verifies that every healthy datanode runs the same software version as this SCM before
+   * finalization begins. Datanodes finalize only after SCM instructs them to, so this does not
+   * require them to be finalized; it requires their binaries to match SCM's software version.
+   * Rejects the finalize command if any healthy datanode reports a differing (or unknown) software
+   * version. The resulting exception propagates back to the OM (which triggered finalization) and on
+   * to the client, leaving nothing finalized.
+   */
+  private void validateDatanodeVersionsBeforeFinalize() throws SCMException {
+    NodeManager.DatanodeFinalizationCounts counts =
+        scm.getScmNodeManager().getDatanodeFinalizationCounts();
+    if (!counts.allSoftwareVersionsMatchScmVersion()) {
+      LOG.warn("Rejecting finalize command: not all {} healthy datanodes are running SCM's software "
+          + "version {}.", counts.getTotalHealthyDatanodes(), HDDSVersion.SOFTWARE_VERSION);
+      throw new SCMException("Finalize rejected: not all healthy datanodes are running the SCM software version "
+          + HDDSVersion.SOFTWARE_VERSION, ResultCodes.UNSUPPORTED_OPERATION);
     }
   }
 
