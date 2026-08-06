@@ -145,6 +145,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -527,6 +528,31 @@ public abstract class TestOmSnapshot {
     OzoneFileStatus ozoneFileStatus = writeClient.getFileStatus(keyArgs);
     assertEquals(ozoneFileStatus.getKeyInfo().getKeyName(),
         snapshotKeyPrefix + key1);
+  }
+
+  @Test
+  public void testSnapshotListStatusLightReturnsDenormalizedKeyName()
+      throws Exception {
+    String key = "light-list/" + "key-" + counter.incrementAndGet();
+    createFileKey(ozoneBucket, key);
+
+    String snapshotName = "snap-light-" + counter.incrementAndGet();
+    String snapshotKeyPrefix = createSnapshot(volumeName, bucketName,
+        snapshotName);
+    String snapshotKey = snapshotKeyPrefix + key;
+
+    OmKeyArgs keyArgs = genKeyArgs(snapshotKey);
+
+    List<OzoneFileStatus> fullStatuses =
+        writeClient.listStatus(keyArgs, false, "", 1, false);
+    List<OzoneFileStatusLight> lightStatuses =
+        writeClient.listStatusLight(keyArgs, false, "", 1, false);
+
+    assertEquals(1, fullStatuses.size());
+    assertEquals(1, lightStatuses.size());
+
+    assertEquals(snapshotKey, fullStatuses.get(0).getKeyInfo().getKeyName());
+    assertEquals(snapshotKey, lightStatuses.get(0).getKeyInfo().getKeyName());
   }
 
   @Test
