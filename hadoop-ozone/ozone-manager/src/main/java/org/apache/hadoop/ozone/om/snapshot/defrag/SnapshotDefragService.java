@@ -617,9 +617,9 @@ public class SnapshotDefragService extends BackgroundService
   /**
    * Deletes checkpoint directories left behind under {@link #tmpDefragDir} for the given source
    * RocksDB name after {@link DBStore#getCheckpoint} failed to produce a checkpoint. The checkpoint
-   * directory name is only known to
-   * {@link org.apache.hadoop.hdds.utils.db.RDBCheckpointManager}, so any leftover is located by its
-   * {@code <dbName>_} + {@code RDB_CHECKPOINT_PREFIX} naming convention rather than by an exact path.
+   * directory name is only known to {@link org.apache.hadoop.hdds.utils.db.RDBCheckpointManager},
+   * so any leftover is located by its {@code <dbName>_} + {@code RDB_CHECKPOINT_DIR_PREFIX}
+   * naming convention rather than by an exact path.
    */
   private void deletePartialCheckpointDirs(String dbName) {
     String prefix = dbName + "_" + RDB_CHECKPOINT_DIR_PREFIX;
