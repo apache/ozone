@@ -4302,7 +4302,7 @@
 
   <property>
     <name>ozone.default.storagepolicy</name>
-    <value>DISK</value>
+    <value>WARM</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Default StoragePolicy used for block allocation when a client does not
