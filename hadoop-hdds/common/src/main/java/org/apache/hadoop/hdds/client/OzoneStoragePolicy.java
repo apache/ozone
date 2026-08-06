@@ -32,6 +32,8 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   private final StorageTier creationTier;
   private final StorageTier creationFallbackTier;
 
+  private static OzoneStoragePolicy defaultPolicy = WARM;
+
   OzoneStoragePolicy(String name, StorageTier creationTier,
       StorageTier creationFallbackTier) {
     this.name = name;
@@ -91,6 +93,14 @@ public enum OzoneStoragePolicy implements StoragePolicy {
     default:
       throw new IllegalArgumentException("Error: StoragePolicyProto not found, proto=" + proto);
     }
+  }
+
+  public static OzoneStoragePolicy getDefaultPolicy() {
+    return defaultPolicy;
+  }
+
+  public static void setDefaultPolicy(OzoneStoragePolicy storagePolicy) {
+    defaultPolicy = storagePolicy;
   }
 
   @Override

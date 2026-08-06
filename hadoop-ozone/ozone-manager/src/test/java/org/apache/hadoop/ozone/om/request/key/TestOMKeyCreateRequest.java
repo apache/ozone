@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -1355,12 +1357,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean());
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean());
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =
@@ -1396,7 +1398,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     when(scmBlockLocationProtocol.allocateBlock(
             anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString()))
+            any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
@@ -1432,12 +1434,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean());
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean());
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =

@@ -163,6 +163,8 @@ message AllocateScmBlockRequestProto {
 
   optional string client = 9;
 
+  optional StoragePolicyProto storagePolicy = 10;
+  optional bool allowFallBack = 11 [default = true];
 }
 
 /**
@@ -219,6 +221,8 @@ message DeleteScmBlockResult {
 message AllocateBlockResponse {
   optional ContainerBlockID containerBlockID = 1;
   optional hadoop.hdds.Pipeline pipeline = 2;
+  optional bool isFallBack = 3;
+  optional StorageTierProto storageTier = 4;
 }
 
 /**

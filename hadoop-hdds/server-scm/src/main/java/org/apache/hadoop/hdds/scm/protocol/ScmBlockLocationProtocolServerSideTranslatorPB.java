@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -193,6 +194,12 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
+    OzoneStoragePolicy storagePolicy;
+    if (request.hasStoragePolicy()) {
+      storagePolicy = OzoneStoragePolicy.fromProto(request.getStoragePolicy());
+    } else {
+      storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
+    }
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
@@ -202,20 +209,24 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
                 request.getEcReplicationConfig()),
             request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()),
-            request.getClient());
+            request.getClient(),
+            storagePolicy,
+            request.getAllowFallBack());
 
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();
 
     if (allocatedBlocks.size() < request.getNumBlocks()) {
       throw new SCMException("Allocated " + allocatedBlocks.size() +
-          " blocks. Requested " + request.getNumBlocks() + " blocks",
-          SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
+          " blocks. Requested " + request.getNumBlocks() + " blocks. StoragePolicy " +
+          storagePolicy, SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
     for (AllocatedBlock block : allocatedBlocks) {
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));
+          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))
+          .setStorageTier(block.getStorageTier().toProto())
+          .setIsFallBack(block.isFallBack()));
     }
 
     return builder.build();

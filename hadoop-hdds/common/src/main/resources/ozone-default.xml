@@ -4301,6 +4301,18 @@
   </property>
 
   <property>
+    <name>ozone.default.storagepolicy</name>
+    <value>WARM</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default StoragePolicy used for block allocation when a client does not
+      specify a StoragePolicy. Supported values are HOT, WARM, and COLD.
+      HOT allocates blocks on SSD and falls back to DISK, WARM allocates
+      blocks on DISK, and COLD allocates blocks on ARCHIVE.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.ec.grpc.retries.enabled</name>
     <value>true</value>
     <tag>CLIENT</tag>

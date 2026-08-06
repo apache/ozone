@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -93,7 +94,8 @@ public abstract class TestSCMPipelineMetrics implements NonHATests.TestCase {
         cluster.getStorageContainerManager().getScmBlockManager()
             .allocateBlock(5,
                 RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
-                "Test", new ExcludeList());
+                "Test", new ExcludeList(),
+                OzoneStoragePolicy.getDefaultPolicy(), true);
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();
