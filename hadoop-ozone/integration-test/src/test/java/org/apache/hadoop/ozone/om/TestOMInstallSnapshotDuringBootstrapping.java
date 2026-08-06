@@ -67,7 +67,6 @@ public class TestOMInstallSnapshotDuringBootstrapping {
 
   private MiniOzoneHAClusterImpl cluster;
   private OzoneClient client;
-  private ObjectStore objectStore;
   private OzoneBucket ozoneBucket;
 
   @BeforeEach
@@ -94,7 +93,7 @@ public class TestOMInstallSnapshotDuringBootstrapping {
     cluster.waitForClusterToBeReady();
 
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
-    objectStore = client.getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     String volumeName = uniqueObjectName("volume");
     String bucketName = uniqueObjectName("bucket");
     objectStore.createVolume(volumeName);
