@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamingReadResponse;
@@ -55,6 +56,7 @@ import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -532,10 +534,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          if (readBlock.hasChunkInfoList()) {
+            verifyChecksumForReadBlock(data, checksumData, readBlock);
+          } else {
+            throw new IOException("Checksum data is missing for block " + getBlockID());
+          }
         }
         offerToQueue(readBlock);
-      } catch (Exception e) {
+      } catch (IOException | RuntimeException e) {
         // Record the failure first: the log and observer calls below must not mask it.
         setFailed(e);
         final ByteString data = readBlock.getData();
@@ -627,6 +633,47 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     @Override
     public String toString() {
       return name;
+    }
+
+    private void verifyChecksumForReadBlock(
+        ByteBuffer data, ChecksumData checksumData, ReadBlockResponseProto readBlock)
+        throws OzoneChecksumException {
+      if (!checksumData.getChecksumType().equals(ChecksumType.NONE)) {
+        int bytesPerChecksum = checksumData.getBytesPerChecksum();
+        long blockOffset = readBlock.getOffset();
+        long readLength = data.remaining();
+        long currentChunkOffset = 0;
+        int checksumIndex = 0;
+        int dataOffset = 0;
+
+        for (ContainerProtos.ChunkInfo chunk : readBlock.getChunkInfoList().getChunksList()) {
+          long chunkStart = currentChunkOffset;
+          long chunkEnd = chunkStart + chunk.getLen();
+
+          long overlapStart = Math.max(blockOffset, chunkStart);
+          long overlapEnd = Math.min(blockOffset + readLength, chunkEnd);
+
+          if (overlapStart < overlapEnd) {
+            int overlapLen = Math.toIntExact(overlapEnd - overlapStart);
+            ByteBuffer chunkData = data.duplicate();
+            chunkData.position(data.position() + dataOffset);
+            chunkData.limit(data.position() + dataOffset + overlapLen);
+
+            Checksum.verifyChecksum(chunkData, checksumData, checksumIndex);
+
+            dataOffset += overlapLen;
+
+            long offsetInChunk = overlapStart - chunkStart;
+            long endOffsetInChunk = overlapEnd - chunkStart;
+
+            int firstChecksumIndex = Math.toIntExact(offsetInChunk / bytesPerChecksum);
+            int lastChecksumIndex = Math.toIntExact((endOffsetInChunk - 1) / bytesPerChecksum);
+
+            checksumIndex += (lastChecksumIndex - firstChecksumIndex + 1);
+          }
+          currentChunkOffset += chunk.getLen();
+        }
+      }
     }
   }
 }

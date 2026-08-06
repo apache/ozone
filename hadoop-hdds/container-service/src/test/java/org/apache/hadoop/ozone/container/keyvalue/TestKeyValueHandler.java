@@ -119,6 +119,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1161,5 +1162,107 @@ public class TestKeyValueHandler {
     boolean deleteUnreferencedFile(File file) {
       return false;
     }
+  }
+
+  @Test
+  public void testGetChecksumsWithVaryingChunkSizes() {
+    int bytesPerChecksum = 1024;
+    int bytesPerChunk = 16 * 1024;
+    
+    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk1")
+        .setOffset(0)
+        .setLen(1024)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk1"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk2")
+        .setOffset(1024)
+        .setLen(10)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk2"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk3 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk3")
+        .setOffset(1034)
+        .setLen(2048)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk3-1"))
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk3-2"))
+            .build())
+        .build();
+    
+    List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2, chunk3);
+
+    // Read full block (1024 + 10 + 2048)
+    List<ByteString> checksums = KeyValueHandler.getChecksums(0, 3082, bytesPerChunk, bytesPerChecksum, chunks);
+    assertEquals(4, checksums.size());
+    assertEquals("chk1", checksums.get(0).toStringUtf8());
+    assertEquals("chk2", checksums.get(1).toStringUtf8());
+    assertEquals("chk3-1", checksums.get(2).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(3).toStringUtf8());
+    
+    // Read from offset 1024
+    checksums = KeyValueHandler.getChecksums(1024, 2058, bytesPerChunk, bytesPerChecksum, chunks);
+    assertEquals(3, checksums.size());
+    assertEquals("chk2", checksums.get(0).toStringUtf8());
+    assertEquals("chk3-1", checksums.get(1).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(2).toStringUtf8());
+
+    // Read from offset 2048
+    checksums = KeyValueHandler.getChecksums(2048, 1034, bytesPerChunk, bytesPerChecksum, chunks);
+    assertEquals(2, checksums.size());
+    assertEquals("chk3-1", checksums.get(0).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(1).toStringUtf8());
+  }
+
+  @Test
+  public void testGetChecksumsWithSmallChunks() {
+    int bytesPerChecksum = 1024;
+    int bytesPerChunk = 16 * 1024;
+    
+    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk1")
+        .setOffset(0)
+        .setLen(1)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk1"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk2")
+        .setOffset(1)
+        .setLen(1)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk2"))
+            .build())
+        .build();
+
+    List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2);
+
+    // Read full block (1 + 1 = 2 bytes)
+    List<org.apache.ratis.thirdparty.com.google.protobuf.ByteString> checksums = 
+        KeyValueHandler.getChecksums(0, 2, bytesPerChunk, bytesPerChecksum, chunks);
+    
+    // According to the bug report, this should return 2 checksums.
+    assertEquals(2, checksums.size());
+    assertEquals("chk1", checksums.get(0).toStringUtf8());
+    assertEquals("chk2", checksums.get(1).toStringUtf8());
   }
 }
