@@ -60,6 +60,8 @@ echo
 
 run rm -rf "ozone-${HDDS_VERSION}"
 run mkdir "ozone-${HDDS_VERSION}"
+# Version-independent symlink to create a stable path to compose files.
+run ln -sfn "ozone-${HDDS_VERSION}" "ozone-latest"
 run cd "ozone-${HDDS_VERSION}"
 
 run cp -p "${ROOT}/hadoop-ozone/dist/src/main/license/bin/NOTICE.txt" "NOTICE.txt"
