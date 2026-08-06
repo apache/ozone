@@ -721,8 +721,12 @@ public class OzoneContainer {
             = StorageContainerDatanodeProtocolProtos.
             NodeReportProto.newBuilder();
 
+    Map<String, Long> openCounts = getContainerSet().getOpenContainerCountsByVolume();
     for (StorageLocationReport report : reports) {
-      nrb.addStorageReport(report.getProtoBufMessage());
+      StorageContainerDatanodeProtocolProtos.StorageReportProto proto = report.getProtoBufMessage();
+      nrb.addStorageReport(proto.toBuilder()
+          .setOpenContainerCount(openCounts.getOrDefault(proto.getStorageUuid(), 0L))
+          .build());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();
