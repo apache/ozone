@@ -62,6 +62,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
@@ -74,6 +75,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -91,6 +93,7 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -167,12 +170,14 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,6 +202,9 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
+  // map temporarily carries the RandomAccessFile for short-circuit read requests
+  private final Map<String, RandomAccessFile> blockFileMap = new ConcurrentHashMap<>();
+  private OzoneContainer ozoneContainer;
   private final Clock clock;
   private final BlockInputStreamFactoryImpl blockInputStreamFactory;
 
@@ -207,7 +215,7 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          ContainerChecksumTreeManager checksumManager) {
-    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager);
+    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager, null);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -219,8 +227,10 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          Clock clock,
-                         ContainerChecksumTreeManager checksumManager) {
+                         ContainerChecksumTreeManager checksumManager,
+                         OzoneContainer ozoneContainer) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.ozoneContainer = ozoneContainer;
     this.clock = clock;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
@@ -272,7 +282,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-      Container container, ContainerCommandRequestProto msg)
+      Container container, ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
       throws StorageContainerException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     checkContainerOpen(kvContainer);
@@ -282,7 +293,7 @@ public class KeyValueHandler extends Handler {
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
 
       return chunkManager.getStreamDataChannel(kvContainer,
-          blockID, metrics);
+          blockID, putBlock, metrics);
     } else {
       throw new StorageContainerException("Malformed request.",
           ContainerProtos.Result.IO_EXCEPTION);
@@ -353,6 +364,7 @@ public class KeyValueHandler extends Handler {
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
     case StreamInit:
+    case StreamInitWithPutBlock:
       return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
@@ -830,14 +842,30 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData responseData;
+    boolean shortCircuitGranted = false;
     try {
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getGetBlock().getBlockID());
+      ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
+      BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
+      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
+        boolean domainSocketServerEnabled = ozoneContainer != null
+            && ozoneContainer.getReadDomainSocketChannel() != null
+            && ozoneContainer.getReadDomainSocketChannel().isStarted();
+        if (domainSocketServerEnabled) {
+          RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
+          Preconditions.checkState(file != null);
+          String mapKey = getBlockMapKey(request);
+          blockFileMap.put(mapKey, file);
+          shortCircuitGranted = true;
+        }
+      }
       final long numBytes = responseData.getSerializedSize();
-      metrics.incContainerBytesStats(Type.GetBlock, numBytes);
-
+      if (shortCircuitGranted) {
+        metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
+      } else {
+        metrics.incContainerBytesStats(Type.GetBlock, numBytes);
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -846,7 +874,21 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getBlockDataResponse(request, responseData);
+    return getBlockDataResponse(request, responseData, shortCircuitGranted);
+  }
+
+  @Override
+  public RandomAccessFile getBlockFile(ContainerCommandRequestProto request) throws IOException {
+    if (request.getCmdType() != Type.GetBlock) {
+      throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
+          ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    String mapKey = getBlockMapKey(request);
+    RandomAccessFile file = blockFileMap.remove(mapKey);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("File removed from blockFileMap for {}", mapKey);
+    }
+    return file;
   }
 
   /**

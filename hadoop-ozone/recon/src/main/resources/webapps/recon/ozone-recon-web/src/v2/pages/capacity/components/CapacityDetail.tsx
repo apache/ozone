@@ -50,6 +50,7 @@ type CapacityDetailProps = {
   disabledOpts?: string[];
   optsClass?: string;
   handleSelect?: React.Dispatch<React.SetStateAction<string>>
+  selectedValue?: string;
   loading: boolean;
   extra?: React.ReactNode;
 };
@@ -111,6 +112,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
     optsClass,
     dataDetails,
     handleSelect,
+    selectedValue,
     loading,
     extra
   }
@@ -149,7 +151,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
                 {selectorTitle}
                 <Select
                   showSearch
-                  defaultValue={options?.[0]?.value}
+                  value={selectedValue ?? options?.[0]?.value}
                   options={options}
                   onChange={handleSelect}
                   style={{ marginBottom: '16px' }}

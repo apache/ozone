@@ -19,15 +19,22 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
+import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,8 +45,13 @@ import java.util.function.Supplier;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
@@ -179,6 +191,54 @@ public class TestS3LifecycleConfigurationPut {
       assertEquals(HTTP_FORBIDDEN, ex.getHttpCode());
       assertEquals(ACCESS_DENIED.getCode(), ex.getCode());
     }
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationPropagatesQuotaExceeded()
+      throws Exception {
+    // QUOTA_EXCEEDED is not explicitly handled by putBucketLifecycleConfiguration.
+    // It must still surface as an OS3Exception instead of a false HTTP 200.
+    assertUnhandledOMExceptionPropagated(
+        new OMException("Quota exceeded", OMException.ResultCodes.QUOTA_EXCEEDED),
+        HTTP_FORBIDDEN, QUOTA_EXCEEDED.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationPropagatesInternalError()
+      throws Exception {
+    // An unexpected internal OM failure must be reported as InternalError (HTTP 500),
+    // not swallowed into a false HTTP 200 success.
+    assertUnhandledOMExceptionPropagated(
+        new OMException("boom", OMException.ResultCodes.INTERNAL_ERROR),
+        HTTP_INTERNAL_ERROR, INTERNAL_ERROR.getCode());
+  }
+
+  private void assertUnhandledOMExceptionPropagated(OMException omException,
+      int expectedHttpCode, String expectedErrorCode) throws Exception {
+    OzoneClient mockClient = mock(OzoneClient.class);
+    ObjectStore mockObjectStore = mock(ObjectStore.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
+    OzoneBucket mockBucket = mock(OzoneBucket.class);
+    when(mockBucket.getVolumeName()).thenReturn("s3v");
+    when(mockBucket.getName()).thenReturn("bucket1");
+    when(mockBucket.getBucketLayout()).thenReturn(BucketLayout.OBJECT_STORE);
+    doThrow(omException).when(mockBucket).setLifecycleConfiguration(any());
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
+    when(mockClient.getProxy()).thenReturn(clientProtocol);
+    when(mockObjectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
+    when(mockVolume.getBucket("bucket1")).thenReturn(mockBucket);
+
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(mockClient)
+        .build();
+    endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> endpoint.put("bucket1", onePrefix()));
+    assertEquals(expectedHttpCode, ex.getHttpCode());
+    assertEquals(expectedErrorCode, ex.getCode());
   }
 
   @Test

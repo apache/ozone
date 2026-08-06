@@ -157,17 +157,16 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   SubmitSnapshotDiff = 143;
-
   // TODO(HDDS-15497): S3 bucket tagging RPCs; handled by OM in a follow-up PR (S3G maps to PUT/GET/DELETE ?tagging).
   PutBucketTagging = 144;
   GetBucketTagging = 145;
   DeleteBucketTagging = 146;
-
   SetLifecycleConfiguration = 147;
   GetLifecycleConfiguration   = 148;
   DeleteLifecycleConfiguration = 149;
   GetLifecycleServiceStatus    = 150;
-  SetLifecycleServiceStatus     = 151;
+  SetLifecycleServiceStatus    = 151;
+  SaveLifecycleScanState       = 152;
 }
 
 enum SafeMode {
@@ -319,20 +318,18 @@ message OMRequest {
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
   optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest      = 144;
-
   // TODO: PutBucketTagging — tags in bucketArgs.tags; OM persists to BucketInfo.tags.
   optional PutBucketTaggingRequest          putBucketTaggingRequest         = 145;
   // TODO: GetBucketTagging — volume/bucket in bucketArgs; response returns tag list.
   optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
   // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
-
   optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 148;
   optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 149;
   optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 150;
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
-
+  optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
 }
 
 message OMResponse {
@@ -480,6 +477,7 @@ message OMResponse {
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 149;
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
+  optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
 }
 
 enum Status {
@@ -1443,6 +1441,7 @@ message DeleteKeyRequest {
 message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
     optional RequestSource sourceType = 2 [default = USER];
+    optional LifecycleScanState scanState = 3;
 }
 
 enum RequestSource {
@@ -1771,6 +1770,7 @@ message ServiceInfo {
 
 message MultipartInfoInitiateRequest {
     required KeyArgs keyArgs = 1;
+    optional uint32 schemaVersion = 2;
 
 }
 
@@ -2639,6 +2639,41 @@ service OzoneManagerService {
           returns(OMResponse);
 }
 
+message GetLifecycleServiceStatusRequest {
+}
+
+message GetLifecycleServiceStatusResponse {
+  required bool isEnabled = 1;
+  optional bool isSuspended = 2;
+  repeated string runningBuckets = 3;
+}
+
+message SetLifecycleServiceStatusRequest {
+  required bool suspend = 1;
+}
+
+message SetLifecycleServiceStatusResponse {
+}
+
+message LifecycleScanState {
+  optional string bucketKey = 1;  // volume/bucket
+  optional uint64 bucketObjID = 2;
+  optional uint64 lifecycleConfigurationUpdateID = 3;
+  optional uint64 scanStartTime = 4;
+  optional uint64 scanEndTime = 5;
+  optional string lastScannedKey = 6;
+  optional string lastScannedDir = 7;
+  optional string lastScannedDirKey = 8;
+  optional string lastScannedMpuKey = 9;
+}
+
+message SaveLifecycleScanStateRequest {
+  optional LifecycleScanState state = 1;
+}
+
+message SaveLifecycleScanStateResponse {
+}
+
 // TODO: S3 PutBucketTagging — bucketArgs identifies bucket; tags in bucketArgs.tags replace existing set.
 message PutBucketTaggingRequest {
   required BucketArgs bucketArgs = 1;
@@ -2667,20 +2702,4 @@ message DeleteBucketTaggingRequest {
 
 // TODO: Success response; bucket has no tags after commit.
 message DeleteBucketTaggingResponse {
-}
-
-message GetLifecycleServiceStatusRequest {
-}
-
-message GetLifecycleServiceStatusResponse {
-  required bool isEnabled = 1;
-  optional bool isSuspended = 2;
-  repeated string runningBuckets = 3;
-}
-
-message SetLifecycleServiceStatusRequest {
-  required bool suspend = 1;
-}
-
-message SetLifecycleServiceStatusResponse {
 }

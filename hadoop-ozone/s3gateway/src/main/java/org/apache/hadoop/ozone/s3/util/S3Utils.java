@@ -36,6 +36,7 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -71,6 +72,22 @@ public final class S3Utils {
   public static String s3urlEncode(String str)
       throws UnsupportedEncodingException {
     return urlEncode(str).replace("+", "%20");
+  }
+
+  /**
+   * Returns the persisted S3 {@code Content-Encoding} value, with {@code aws-chunked}
+   * removed per AWS semantics.
+   */
+  public static String normalizeContentEncoding(String contentEncoding) {
+    if (contentEncoding == null || contentEncoding.isEmpty()) {
+      return null;
+    }
+    String normalized = Arrays.stream(contentEncoding.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .filter(value -> !AWS_CHUNKED.equalsIgnoreCase(value))
+        .collect(Collectors.joining(", "));
+    return normalized.isEmpty() ? null : normalized;
   }
 
   private S3Utils() {
@@ -162,7 +179,7 @@ public final class S3Utils {
       // We are only interested on "aws-chunked"
       boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
           .map(String::trim)
-          .anyMatch(AWS_CHUNKED::equals);
+          .anyMatch(AWS_CHUNKED::equalsIgnoreCase);
       if (!containsAwsChunked) {
         OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
         ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +

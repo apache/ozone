@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,9 +78,7 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
         Pair.of(volumeName, bucketName), this);
 
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
-          IAccessAuthorizer.ACLType.ALL, resolvedBucket.realVolume(), 
-          resolvedBucket.realBucket(), null);
+      checkAclPermission(ozoneManager, resolvedBucket.realVolume(), resolvedBucket.realBucket());
     }
 
     // Update the request with resolved volume and bucket names
@@ -172,6 +171,22 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
       LOG.error("Delete lifecycle failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
       return omClientResponse;
+    }
+  }
+
+  private void checkAclPermission(OzoneManager ozoneManager, String volumeName, String bucketName)
+      throws IOException {
+    if (ozoneManager.getAccessAuthorizer().isNative()) {
+      UserGroupInformation ugi = createUGIForApi();
+      String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
+          IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
+      if (!ozoneManager.isAdmin(ugi) && !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException("Lifecycle configuration can only be deleted by cluster Admin or bucket Owner",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    } else {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
+          IAccessAuthorizer.ACLType.WRITE, volumeName, bucketName, null);
     }
   }
 

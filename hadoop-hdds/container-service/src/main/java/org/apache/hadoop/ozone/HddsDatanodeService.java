@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -96,6 +97,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -318,7 +320,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
-                  this::reconfigReplicationStreamsLimit);
+                  this::reconfigReplicationStreamsLimit)
+              .register(PER_VOLUME_STREAMS_LIMIT_KEY,
+                  this::reconfigPerVolumeStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
@@ -716,6 +720,28 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         .setPoolSize(poolSize);
     getDatanodeStateMachine().getSupervisor()
         .setReplicationMaxStreams(poolSize);
+    return value;
+  }
+
+  private String reconfigPerVolumeStreamsLimit(String value) {
+    int newSize = Integer.parseInt(value);
+    Preconditions.checkArgument(newSize >= 1,
+        PER_VOLUME_STREAMS_LIMIT_KEY + " must be at least 1 but was %s",
+        value);
+    ReplicationConfig replicationConfig =
+        getDatanodeStateMachine().getSupervisor().getReplicationConfig();
+    if (!replicationConfig.isPerVolumeEnabled()) {
+      LOG.warn("Ignoring reconfiguration of {} to {} because per-volume "
+          + "replication is disabled", PER_VOLUME_STREAMS_LIMIT_KEY, value);
+      return value;
+    }
+    try {
+      getDatanodeStateMachine().getSupervisor().setPerVolumePoolSize(newSize);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to apply per-volume replication thread pool resize to "
+          + "{}: {}", value, e.getMessage(), e);
+      throw e;
+    }
     return value;
   }
 

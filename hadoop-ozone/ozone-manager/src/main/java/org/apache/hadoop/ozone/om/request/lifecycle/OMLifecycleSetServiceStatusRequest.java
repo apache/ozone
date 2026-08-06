@@ -56,53 +56,52 @@ public class OMLifecycleSetServiceStatusRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
+
+    if (ozoneManager.getAclsEnabled()) {
+      boolean suspend = request.getSetLifecycleServiceStatusRequest().getSuspend();
+      UserGroupInformation ugi = createUGIForApi();
+      if (!ozoneManager.isAdmin(ugi)) {
+        throw new OMException("Access denied for user " + ugi + ". "
+            + "Superuser privilege is required to " + (suspend ? "suspend" : "resume") + " Lifecycle Service.",
+            OMException.ResultCodes.ACCESS_DENIED);
+      }
+    }
+
+    return request;
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     UserInfo userInfo = getOmRequest().getUserInfo();
     HashMap<String, String> auditMap = new HashMap<>();
-    IOException exception = null;
-    OMClientResponse omClientResponse;
     boolean suspend = getOmRequest().getSetLifecycleServiceStatusRequest().getSuspend();
     auditMap.put("suspend", String.valueOf(suspend));
 
-    try {
-      if (ozoneManager.getAclsEnabled()) {
-        UserGroupInformation ugi = createUGIForApi();
-        if (!ozoneManager.isAdmin(ugi)) {
-          throw new OMException("Access denied for user " + ugi + ". "
-              + "Superuser privilege is required to " + (suspend ? "suspend" : "resume") + " Lifecycle Service.",
-              OMException.ResultCodes.ACCESS_DENIED);
-        }
-      }
-
-      KeyLifecycleService keyLifecycleService = ozoneManager.getKeyManager().getKeyLifecycleService();
-      if (keyLifecycleService != null) {
-        if (suspend) {
-          keyLifecycleService.suspend();
-          LOG.info("KeyLifecycleService has been suspended by user: {}",
-              userInfo != null ? userInfo.getUserName() : "unknown");
-        } else {
-          keyLifecycleService.resume();
-          LOG.info("KeyLifecycleService resume called by user: {}",
-              userInfo != null ? userInfo.getUserName() : "unknown");
-        }
+    KeyLifecycleService keyLifecycleService = ozoneManager.getKeyManager().getKeyLifecycleService();
+    if (keyLifecycleService != null) {
+      if (suspend) {
+        keyLifecycleService.suspend();
+        LOG.info("KeyLifecycleService has been suspended by user: {}",
+            userInfo != null ? userInfo.getUserName() : "unknown");
       } else {
-        LOG.warn("KeyLifecycleService is not available");
+        keyLifecycleService.resume();
+        LOG.info("KeyLifecycleService resume called by user: {}",
+            userInfo != null ? userInfo.getUserName() : "unknown");
       }
-
-      omResponse.setSetLifecycleServiceStatusResponse(
-          SetLifecycleServiceStatusResponse.newBuilder().build());
-      omClientResponse = new OMLifecycleSetServiceStatusResponse(omResponse.build());
-    } catch (IOException ex) {
-      exception = ex;
-      LOG.error("Failed to " + (suspend ? "suspend" : "resume") + " KeyLifecycleService", ex);
-      omClientResponse = new OMLifecycleSetServiceStatusResponse(
-          createErrorOMResponse(omResponse, ex));
+    } else {
+      LOG.warn("KeyLifecycleService is not available");
     }
 
+    omResponse.setSetLifecycleServiceStatusResponse(
+        SetLifecycleServiceStatusResponse.newBuilder().build());
+    OMClientResponse omClientResponse = new OMLifecycleSetServiceStatusResponse(omResponse.build());
+
     markForAudit(auditLogger, buildAuditMessage(OMAction.SET_LIFECYCLE_SERVICE_STATUS,
-        auditMap, exception, userInfo));
+        auditMap, null, userInfo));
     return omClientResponse;
   }
 
