@@ -205,10 +205,23 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
 
+      long localID = data.getLocalID();
+
+      // PutBlock is not idempotent, so there should be only one PutBlock
+      // with the end-of-block flag set per block. (See HDDS-12007)
+      // A write reaching here is for a block that was already finalized by an eof PutBlock.
+      // Ignore it instead of corrupting the finalized block.
+      if (container.isBlockFinalizedByEof(localID)) {
+        LOG.warn("Ignoring write on block {} which has already been finalized "
+            + "by a PutBlock with the end-of-block flag set. PutBlock is not "
+            + "idempotent",
+            data.getBlockID());
+        return data.getSize();
+      }
+
       // Check if the block is present in the pendingPutBlockCache for the
       // container to determine whether the blockCount is already incremented
       // for this block in the DB or not.
-      long localID = data.getLocalID();
       boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
       boolean incrBlockCount = false;
 
@@ -278,6 +291,12 @@ public class BlockManagerImpl implements BlockManager {
         // Remove the block from the PendingPutBlockCache as there would not
         // be any more writes to this block
         container.removeFromPendingPutBlockCache(localID);
+      }
+
+      // Track the block as finalized so that any subsequent write on it can be
+      // detected and ignored, since PutBlock is not idempotent.
+      if (endOfBlock) {
+        container.addToEofBlockCache(localID);
       }
 
       if (LOG.isDebugEnabled()) {
