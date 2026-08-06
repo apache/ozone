@@ -159,7 +159,7 @@ class TestManagedRawSSTFileIterator {
   /**
    * A key and sequence used to build test SST entries.
    */
-  private static final class KeySpec {
+  private static final class KeySpec implements Comparable<KeySpec> {
     private final String key;
     private final int value;
 
@@ -174,6 +174,15 @@ class TestManagedRawSSTFileIterator {
 
     int getValue() {
       return value;
+    }
+
+    @Override
+    public int compareTo(KeySpec other) {
+      int keyComparison = key.compareTo(other.key);
+      if (keyComparison != 0) {
+        return keyComparison;
+      }
+      return Integer.compare(value, other.value);
     }
 
     @Override
