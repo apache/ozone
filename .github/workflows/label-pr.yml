@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow applies labels for PRs targeted at feature branches.
+# This workflow applies labels for PRs: branch labels for PRs targeted at
+# feature branches, and component labels based on the files changed
+# (rules in .github/labeler.yml).
 
 name: label-pull-requests
 
@@ -51,3 +53,31 @@ jobs:
           BRANCH: ${{ matrix.branch }}
           LABEL: ${{ matrix.label }}
           GH_TOKEN: ${{ github.token }}
+
+  component-labeler:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-slim
+    steps:
+      - name: "Checkout project" # provides .github/labeler.yml for the labeler action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+      - name: "List open PRs"
+        id: prs
+        run: |
+          {
+            echo 'numbers<<EOF'
+            gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1000 --json number --jq '.[].number'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: "Apply component labels"
+        uses: actions/labeler@b8dd2d9be0f68b860e7dae5dae7d772984eacd6d # v6.2.0
+        with:
+          pr-number: ${{ steps.prs.outputs.numbers }}
+          sync-labels: true
