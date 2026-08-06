@@ -2492,6 +2492,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
+      OmSnapshotInternalMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
       if (certClient != null) {
