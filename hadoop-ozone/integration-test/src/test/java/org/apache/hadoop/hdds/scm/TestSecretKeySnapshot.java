@@ -43,10 +43,10 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.AbstractKerberosTest;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.KerberosTests;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify that symmetric secret keys are correctly
  * synchronized from leader to follower during snapshot installation.
  */
-public class TestSecretKeySnapshot extends AbstractKerberosTest {
+public class TestSecretKeySnapshot extends KerberosTests {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeySnapshot.class);
   private static final long SNAPSHOT_THRESHOLD = 100;
@@ -81,27 +81,26 @@ public class TestSecretKeySnapshot extends AbstractKerberosTest {
 
   @BeforeEach
   public void init() throws Exception {
-    setConf(new OzoneConfiguration());
-    getConf().set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-
     ExitUtils.disableSystemExit();
 
     initKerberos();
-    getConf().setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
+    OzoneConfiguration conf = getConf();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
 
-    getConf().setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
-    getConf().setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    getConf().setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
-    getConf().set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
         ROTATE_CHECK_DURATION_MS + "ms");
-    getConf().set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
-    getConf().set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
-    getConf().set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_MS + "ms");
-    getConf().set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATE_CHECK_DURATION_MS + "ms");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
+    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_MS + "ms");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATE_CHECK_DURATION_MS + "ms");
 
-    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(getConf());
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder
         .setSCMServiceId("TestSecretKeySnapshot")
         .setSCMServiceId("SCMServiceId")

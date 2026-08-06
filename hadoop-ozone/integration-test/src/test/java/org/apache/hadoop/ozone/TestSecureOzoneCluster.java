@@ -147,6 +147,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.KerberosTests;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
@@ -165,7 +166,7 @@ import org.slf4j.LoggerFactory;
  * Test class to for security enabled Ozone cluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestSecureOzoneCluster extends AbstractKerberosTest {
+class TestSecureOzoneCluster extends KerberosTests {
 
   private static final String COMPONENT = "om";
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
@@ -199,16 +200,10 @@ class TestSecureOzoneCluster extends AbstractKerberosTest {
     return false;
   }
 
-  @Override
-  protected String kerberosAuthenticationValue() {
-    return "kerberos";
-  }
-
   @BeforeAll
   void setupKdc() throws Exception {
     ExitUtils.disableSystemExit();
     DefaultMetricsSystem.setMiniClusterMode(true);
-    setConf(new OzoneConfiguration());
     initKerberos();
   }
 
@@ -270,6 +265,9 @@ class TestSecureOzoneCluster extends AbstractKerberosTest {
     } finally {
       IOUtils.closeQuietly(om);
       IOUtils.closeQuietly(omClient);
+      scm = null;
+      om = null;
+      omClient = null;
     }
   }
 

@@ -77,6 +77,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.KerberosTests;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -90,7 +91,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-public class TestDelegationToken extends AbstractKerberosTest {
+public class TestDelegationToken extends KerberosTests {
 
   private static final String TEST_USER = "testUgiUser@EXAMPLE.COM";
   private static final String COMPONENT = "test";
@@ -118,11 +119,6 @@ public class TestDelegationToken extends AbstractKerberosTest {
     return false;
   }
 
-  @Override
-  protected String kerberosAuthenticationValue() {
-    return "kerberos";
-  }
-
   public static Stream<Boolean> options() {
     return Stream.of(false, true);
   }
@@ -135,24 +131,24 @@ public class TestDelegationToken extends AbstractKerberosTest {
   @BeforeEach
   public void init() {
     try {
-      setConf(new OzoneConfiguration());
-      getConf().set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+      initKerberos();
+      OzoneConfiguration conf = getConf();
+      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
-      getConf().setInt(OZONE_SCM_CLIENT_PORT_KEY,
+      conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
           getPort(OZONE_SCM_CLIENT_PORT_DEFAULT, 100));
-      getConf().setInt(OZONE_SCM_DATANODE_PORT_KEY,
+      conf.setInt(OZONE_SCM_DATANODE_PORT_KEY,
           getPort(OZONE_SCM_DATANODE_PORT_DEFAULT, 100));
-      getConf().setInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+      conf.setInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
           getPort(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, 100));
-      getConf().setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+      conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
           getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       final String path = folder.resolve("om-meta").toString();
       Path metaDirPath = Paths.get(path, "om-meta");
-      getConf().set(OZONE_METADATA_DIRS, metaDirPath.toString());
+      conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());
 
-      initKerberos();
       generateKeyPair();
     } catch (Exception e) {
       LOG.error("Failed to initialize TestSecureOzoneCluster", e);
@@ -174,10 +170,11 @@ public class TestDelegationToken extends AbstractKerberosTest {
   }
 
   private void initSCM() throws IOException {
-    SCMStorageConfig scmStore = new SCMStorageConfig(getConf());
+    OzoneConfiguration conf = getConf();
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
-    HASecurityUtils.initializeSecurity(scmStore, getConf(),
+    HASecurityUtils.initializeSecurity(scmStore, conf,
         InetAddress.getLocalHost().getHostName(), true);
     scmStore.setPrimaryScmNodeId(scmId);
     // writes the version file properties
@@ -198,8 +195,9 @@ public class TestDelegationToken extends AbstractKerberosTest {
   @ParameterizedTest
   @MethodSource("options")
   public void testDelegationToken(boolean useIp) throws Exception {
+    OzoneConfiguration conf = getConf();
     initSCM();
-    scm = HddsTestUtils.getScmSimple(getConf());
+    scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
 
     // Capture logs for assertions
@@ -210,10 +208,10 @@ public class TestDelegationToken extends AbstractKerberosTest {
 
     // Generous token lifetime so the renewal-failure cases below do not race
     // token expiry.
-    getConf().setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
+    conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
 
     // Setup secure OM for start
-    setupOm(getConf());
+    setupOm(conf);
 
     //These are two very important lines: ProtobufRpcEngine uses ClientCache
     //which caches clients until no more references. Cache key is the
@@ -239,7 +237,7 @@ public class TestDelegationToken extends AbstractKerberosTest {
 
     try {
       // Start OM
-      om.setCertClient(new CertificateClientTestImpl(getConf()));
+      om.setCertClient(new CertificateClientTestImpl(conf));
       om.setScmTopologyClient(new ScmTopologyClient(
           new ScmBlockLocationTestingClient(null, null, 0)));
       om.start();
@@ -249,7 +247,7 @@ public class TestDelegationToken extends AbstractKerberosTest {
 
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(getConf(), ugi, null),
+          OmTransportFactory.create(conf, ugi, null),
           RandomStringUtils.secure().nextAscii(5));
 
       // Assert if auth was successful via Kerberos
@@ -282,7 +280,7 @@ public class TestDelegationToken extends AbstractKerberosTest {
       // Get Om client, this time authentication should happen via Token
       testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
         omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-            OmTransportFactory.create(getConf(), testUser, null),
+            OmTransportFactory.create(conf, testUser, null),
             RandomStringUtils.secure().nextAscii(5));
         return null;
       });
@@ -310,7 +308,7 @@ public class TestDelegationToken extends AbstractKerberosTest {
       omClient.close();
       UserGroupInformation.setLoginUser(ugi);
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(getConf(), ugi, null),
+          OmTransportFactory.create(conf, ugi, null),
           RandomStringUtils.secure().nextAscii(5));
 
       // Case 5: Test success of token cancellation.
@@ -326,7 +324,7 @@ public class TestDelegationToken extends AbstractKerberosTest {
       // Get Om client, this time authentication using Token will fail as
       // token is not in cache anymore.
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(getConf(), testUser, null),
+          OmTransportFactory.create(conf, testUser, null),
           RandomStringUtils.secure().nextAscii(5));
       ex = assertThrows(OMException.class,
           () -> omClient.cancelDelegationToken(token));

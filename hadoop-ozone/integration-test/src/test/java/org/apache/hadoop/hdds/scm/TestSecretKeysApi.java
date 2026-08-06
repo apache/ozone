@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ipc_.RemoteException;
-import org.apache.hadoop.ozone.AbstractKerberosTest;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -54,6 +53,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.KerberosTests;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -67,20 +67,18 @@ import org.slf4j.LoggerFactory;
  */
 
 @InterfaceAudience.Private
-public class TestSecretKeysApi extends AbstractKerberosTest {
+public class TestSecretKeysApi extends KerberosTests {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeysApi.class);
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
   public void init() throws Exception {
-    setConf(new OzoneConfiguration());
-    getConf().set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
 
     initKerberos();
+    getConf().set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
   }
 
   @AfterEach
@@ -98,11 +96,12 @@ public class TestSecretKeysApi extends AbstractKerberosTest {
     enableBlockToken();
     // set a low rotation period, of 1s, expiry is 3s, expect 3 active keys
     // at any moment.
-    getConf().set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "100ms");
-    getConf().set(HDDS_SECRET_KEY_ROTATE_DURATION, "1s");
-    getConf().set(HDDS_SECRET_KEY_EXPIRY_DURATION, "3000ms");
-    getConf().set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "1500ms");
-    getConf().set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, "100ms");
+    OzoneConfiguration conf = getConf();
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "100ms");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1s");
+    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "3000ms");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "1500ms");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, "100ms");
 
     startCluster(3);
     SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
@@ -173,10 +172,11 @@ public class TestSecretKeysApi extends AbstractKerberosTest {
     enableBlockToken();
     // set a long duration period, so that no rotation happens during SCM
     // leader change.
-    getConf().set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "10m");
-    getConf().set(HDDS_SECRET_KEY_ROTATE_DURATION, "1d");
-    getConf().set(HDDS_SECRET_KEY_EXPIRY_DURATION, "7d");
-    getConf().set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "5d");
+    OzoneConfiguration conf = getConf();
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "10m");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1d");
+    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "7d");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "5d");
 
     startCluster(3);
     SecretKeyProtocol securityProtocol = getSecretKeyProtocol();

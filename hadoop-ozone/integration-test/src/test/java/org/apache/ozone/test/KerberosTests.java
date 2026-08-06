@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone;
+package org.apache.ozone.test;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
@@ -47,7 +47,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 /**
  * Shared MiniKdc / Kerberos setup for secure cluster integration tests (HDDS-15913).
  */
-public abstract class AbstractKerberosTest {
+public abstract class KerberosTests {
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -69,8 +69,8 @@ public abstract class AbstractKerberosTest {
     return conf;
   }
 
-  protected void setConf(OzoneConfiguration conf) {
-    this.conf = conf;
+  protected OzoneConfiguration createOzoneConfig() {
+    return new OzoneConfiguration();
   }
 
   protected File getOzoneKeytab() {
@@ -90,6 +90,9 @@ public abstract class AbstractKerberosTest {
   }
 
   protected void initKerberos() throws Exception {
+    if (conf == null) {
+      conf = createOzoneConfig();
+    }
     startMiniKdc();
     setSecureConfig();
     createCredentialsInKDC();
@@ -121,7 +124,7 @@ public abstract class AbstractKerberosTest {
     String host = InetAddress.getLocalHost().getCanonicalHostName()
         .toLowerCase();
 
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, kerberosAuthenticationValue());
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 
     String curUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(OZONE_ADMINISTRATORS, curUser);
@@ -191,9 +194,5 @@ public abstract class AbstractKerberosTest {
 
   protected boolean enableSecurityAuthorizationByDefault() {
     return true;
-  }
-
-  protected String kerberosAuthenticationValue() {
-    return KERBEROS.name();
   }
 }
