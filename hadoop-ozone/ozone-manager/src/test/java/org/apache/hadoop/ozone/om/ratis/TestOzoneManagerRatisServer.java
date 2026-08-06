@@ -224,6 +224,7 @@ public class TestOzoneManagerRatisServer {
 
     OzoneManagerRatisServer spyServer = spy(omRatisServer);
     injectRetryCacheEntry(spyServer, ratisClientId, callId, successReply);
+    doReturn(omRatisServer.getRaftPeerId()).when(spyServer).getLeaderId();
 
     Server.Call previousCall = Server.getCurCall().get();
     try {

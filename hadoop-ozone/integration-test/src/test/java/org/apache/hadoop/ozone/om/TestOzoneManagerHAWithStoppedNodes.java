@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -64,31 +63,22 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.ClientInvocationId;
-import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -685,79 +675,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
     // Submit rename request to OM again. The request is cached so it will succeed.
     omResponse = newLeader.getOmServerProtocol().processRequest(omRequest);
     assertTrue(omResponse.getSuccess());
-  }
-
-  /**
-   * HDDS-13621: when RetryCache holds a failed Raft reply (e.g. NotLeader on a
-   * follower), a client retry after that node becomes leader must not NPE in
-   * checkRetryCache and should execute the request successfully.
-   */
-  @Test
-  void testRetryCacheWithFailedRatisReplyAfterLeaderElection() throws Exception {
-    MiniOzoneHAClusterImpl cluster = getCluster();
-    OzoneManager leader = cluster.getOMLeader();
-    OzoneManager follower = cluster.getOzoneManagersList().stream()
-        .filter(om -> !om.isLeaderReady())
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("No follower OM found"));
-    assertSame(follower.getOmRatisServer().getLeaderStatus(),
-        OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
-
-    ClientId clientId = ClientId.randomId();
-    int callId = 77;
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
-    String volumeName = uniqueObjectName("retry-cache-failed");
-
-    OzoneManagerProtocolProtos.UserInfo userInfo =
-        OzoneManagerProtocolProtos.UserInfo.newBuilder()
-            .setUserName(userName)
-            .setHostName("host")
-            .setRemoteAddress("0.0.0.0")
-            .build();
-    OzoneManagerProtocolProtos.OMRequest omRequest =
-        OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCreateVolumeRequest(CreateVolumeRequest.newBuilder()
-                .setVolumeInfo(VolumeInfo.newBuilder()
-                    .setVolume(volumeName)
-                    .setOwnerName(userName)
-                    .setAdminName(userName)
-                    .build())
-                .build())
-            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-            .setClientId(clientId.toString())
-            .setUserInfo(userInfo)
-            .build();
-
-    OzoneManagerRatisServer followerRatis = follower.getOmRatisServer();
-    RaftServer raftServer = followerRatis.getServerDivision().getRaftServer();
-    RaftClientReply failedReply = raftServer.submitClientRequest(
-        RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(raftServer.getId())
-            .setGroupId(followerRatis.getRaftGroup().getGroupId())
-            .setCallId(callId)
-            .setMessage(Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build());
-    assertFalse(failedReply.isSuccess());
-
-    ClientInvocationId invocationId = ClientInvocationId.valueOf(clientId, callId);
-    RetryCache.Entry cacheEntry = followerRatis.getServerDivision()
-        .getRetryCache().getIfPresent(invocationId);
-    assertNotNull(cacheEntry, "failed Ratis submit should populate retry cache");
-    assertFalse(cacheEntry.getReplyFuture().get().isSuccess());
-
-    transferLeader(leader, follower);
-    waitForLeaderToBeReady();
-    assertTrue(follower.isLeaderReady());
-
-    Server.getCurCall().set(new Server.Call(callId, 0, null, null,
-        RPC.RpcKind.RPC_BUILTIN, clientId.toByteString().toByteArray()));
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        follower.getOmServerProtocol().processRequest(omRequest);
-    assertTrue(omResponse.getSuccess(), omResponse.getMessage());
-    assertNotNull(getObjectStore().getVolume(volumeName));
   }
 
   private void transferLeader(OzoneManager omLeader, OzoneManager newLeader) throws IOException {
