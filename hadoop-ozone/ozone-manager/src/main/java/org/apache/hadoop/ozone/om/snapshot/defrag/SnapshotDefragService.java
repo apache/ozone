@@ -604,7 +604,6 @@ public class SnapshotDefragService extends BackgroundService
           try {
             deleteDirectory(checkpointLocation);
           } catch (IOException cleanupException) {
-            snapshotMetrics.incNumSnapshotDefragFails();
             LOG.error("Failed to clean up checkpoint directory {} for snapshot: {} (ID: {}). " +
                 "Disk space may not be freed. Manual cleanup may be required.",
                 checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
