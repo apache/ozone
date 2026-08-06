@@ -593,7 +593,7 @@ public class SnapshotDefragService extends BackgroundService
             }
           }
         } catch (Exception e) {
-          throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
+          throw new IOException("Failed to prepare defrag checkpoint for snapshot: " + snapshotInfo.getSnapshotId(), e);
         }
         // This will recreate the column families in the checkpoint.
         OmMetadataManagerImpl result = createDefragCheckpointMetadataManager(checkpoint, false);
@@ -604,6 +604,7 @@ public class SnapshotDefragService extends BackgroundService
           try {
             deleteDirectory(checkpointLocation);
           } catch (IOException cleanupException) {
+            snapshotMetrics.incNumSnapshotDefragFails();
             LOG.error("Failed to clean up checkpoint directory {} for snapshot: {} (ID: {}). " +
                 "Disk space may not be freed. Manual cleanup may be required.",
                 checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
