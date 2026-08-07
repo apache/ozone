@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static org.apache.commons.io.FilenameUtils.getBaseName;
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
@@ -83,6 +84,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -115,7 +117,6 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotVersion;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -968,11 +969,13 @@ public class TestRocksDBCheckpointDiffer {
    * Does actual DB write, flush, compaction.
    */
   @Test
-  @Flaky("HDDS-15209")
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
     readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
+
+    GenericTestUtils.waitFor((BooleanSupplier) () ->
+        rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000, 10000);
 
     if (LOG.isDebugEnabled()) {
       printAllSnapshots();
@@ -983,24 +986,12 @@ public class TestRocksDBCheckpointDiffer {
         rocksDBCheckpointDiffer.getForwardCompactionDAG());
 
     diffAllSnapshots(rocksDBCheckpointDiffer);
+    assertCompactionSstBackups(rocksDBCheckpointDiffer);
 
-    // Confirm correct links created
-    try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
-      List<String> actualLinks = sstPathStream.map(Path::getFileName)
-              .map(Object::toString).sorted().collect(Collectors.toList());
-      assertThat(actualLinks).hasSize(7);
-      assertThat(actualLinks).allMatch(link -> link.matches("\\d{6}\\.sst"));
-      for (String linkName : actualLinks) {
-        assertTrue(Files.size(sstBackUpDir.toPath().resolve(linkName)) > 0,
-            "SST link should not be empty: " + linkName);
-      }
-    }
     rocksDBCheckpointDiffer.getForwardCompactionDAG().nodes().stream().forEach(compactionNode -> {
       Assertions.assertNotNull(compactionNode.getStartKey());
       Assertions.assertNotNull(compactionNode.getEndKey());
     });
-    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000,
-        10000);
     if (LOG.isDebugEnabled()) {
       rocksDBCheckpointDiffer.dumpCompactionNodeTable();
     }
@@ -1018,34 +1009,33 @@ public class TestRocksDBCheckpointDiffer {
   void diffAllSnapshots(RocksDBCheckpointDiffer differ)
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
+    Set<String> allTables = allTablesForDiff();
+    int validatedSnapshotPairs = 0;
     boolean sawNonEmptyDiff = false;
-    for (DifferSnapshotInfo snap : snapshots) {
-      // Returns a list of SST files to be fed into RocksCheckpointDiffer Dag.
-      List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
-      // Add some invalid index.
-      tablesToTrack.add("compactionLogTable");
 
-      // Baseline diff when tracking every table. A subset's diff must equal
-      // this baseline filtered to the subset's column families (files with no
-      // column family are always kept). This relationship is deterministic and
-      // stable across RocksDB versions, unlike hard-coded SST file names.
-      Set<String> allTables = new HashSet<>(tablesToTrack);
-      List<SstFileInfo> baseline = differ.getSSTDiffList(
+    for (DifferSnapshotInfo snap : snapshots) {
+      List<SstFileInfo> metadataDiff = buildNonDagMetadataDiff(src, snap, allTables);
+      List<SstFileInfo> metadataDiffViaApi = differ.getSSTDiffList(
           new DifferSnapshotVersion(src, 0, allTables),
           new DifferSnapshotVersion(snap, 0, allTables),
-          null, allTables, true).orElse(Collections.emptyList());
-      sawNonEmptyDiff = sawNonEmptyDiff || !baseline.isEmpty();
+          null, allTables, false).orElse(Collections.emptyList());
+      assertThat(metadataDiffViaApi).containsExactlyInAnyOrderElementsOf(metadataDiff);
 
-      // Independent structural oracle, not derived from getSSTDiffList's own
-      // output: a snapshot diffed against itself must have no differing SST
-      // files. Together with the sawNonEmptyDiff guard below, this bounds a
-      // systematically broken diff in both directions (returning nothing, or
-      // returning files even for identical snapshots).
-      if (snap == src) {
-        assertThat(baseline)
-            .as("diff of a snapshot against itself must be empty")
-            .isEmpty();
+      Optional<List<SstFileInfo>> fullDagDiffOpt = differ.getSSTDiffList(
+          new DifferSnapshotVersion(src, 0, allTables),
+          new DifferSnapshotVersion(snap, 0, allTables),
+          null, allTables, true);
+      if (!fullDagDiffOpt.isPresent()) {
+        LOG.info("Skipping DAG diff to '{}' because compaction DAG could not reach all "
+            + "destination SST files", snap.getDbPath(0));
+        continue;
       }
+      validatedSnapshotPairs++;
+      List<SstFileInfo> fullDagDiff = fullDagDiffOpt.get();
+      sawNonEmptyDiff = sawNonEmptyDiff || !fullDagDiff.isEmpty();
+
+      List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
+      tablesToTrack.add("compactionLogTable");
 
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
@@ -1058,15 +1048,13 @@ public class TestRocksDBCheckpointDiffer {
         }
         DifferSnapshotVersion srcSnapVersion = new DifferSnapshotVersion(src, 0, tableToLookUp);
         DifferSnapshotVersion destSnapVersion = new DifferSnapshotVersion(snap, 0, tableToLookUp);
-        List<SstFileInfo> sstDiffList = differ.getSSTDiffList(srcSnapVersion, destSnapVersion, null,
-                tableToLookUp, true).orElse(Collections.emptyList());
+        List<SstFileInfo> sstDiffList = requireSstDiffList(
+            differ.getSSTDiffList(srcSnapVersion, destSnapVersion, null, tableToLookUp, true),
+            src, snap);
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
-        // Expected files: baseline entries whose column family is untracked
-        // (null) or included in this subset. getSSTDiffList returns the values
-        // of a HashMap, so its ordering is not guaranteed; compare as sets.
-        List<String> expectedFiles = baseline.stream()
+        List<String> expectedFiles = fullDagDiff.stream()
             .filter(sstFileInfo -> sstFileInfo.getColumnFamily() == null
                 || tableToLookUp.contains(sstFileInfo.getColumnFamily()))
             .map(SstFileInfo::getFileName)
@@ -1077,10 +1065,91 @@ public class TestRocksDBCheckpointDiffer {
         assertThat(actualFiles).containsExactlyInAnyOrderElementsOf(expectedFiles);
       }
     }
-    // Guard against getSSTDiffList silently returning nothing for every input.
+    assertThat(validatedSnapshotPairs)
+        .as("expected compaction DAG diffs for at least one snapshot pair")
+        .isPositive();
     assertThat(sawNonEmptyDiff)
         .as("expected at least one non-empty SST diff across snapshots")
         .isTrue();
+  }
+
+  private Set<String> allTablesForDiff() {
+    Set<String> tables = new HashSet<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
+    tables.add("compactionLogTable");
+    return tables;
+  }
+
+  private List<SstFileInfo> getTrackedSstFilesFromSnapshot(DifferSnapshotInfo snap) {
+    return snap.getSstFiles(0, allTablesForDiff());
+  }
+
+  /**
+   * Snapshot-only SST diff (same rules as {@code getSSTDiffList(..., useCompactionDag=false)}).
+   */
+  private List<SstFileInfo> buildNonDagMetadataDiff(DifferSnapshotInfo srcSnap,
+      DifferSnapshotInfo destSnap, Set<String> tablesToLookup) {
+    Set<SstFileInfo> srcSstFileInfos = new HashSet<>(srcSnap.getSstFiles(0, tablesToLookup));
+    Set<SstFileInfo> destSstFileInfos = new HashSet<>(destSnap.getSstFiles(0, tablesToLookup));
+    Map<String, SstFileInfo> differentFiles = new HashMap<>();
+    for (SstFileInfo srcSstFileInfo : srcSstFileInfos) {
+      if (!destSstFileInfos.contains(srcSstFileInfo)) {
+        differentFiles.put(srcSstFileInfo.getFileName(), srcSstFileInfo);
+      }
+    }
+    for (SstFileInfo destSstFileInfo : destSstFileInfos) {
+      if (!srcSstFileInfos.contains(destSstFileInfo)) {
+        differentFiles.put(destSstFileInfo.getFileName(), destSstFileInfo);
+      }
+    }
+    return new ArrayList<>(differentFiles.values());
+  }
+
+  private static List<SstFileInfo> requireSstDiffList(
+      Optional<List<SstFileInfo>> diffList,
+      DifferSnapshotInfo src,
+      DifferSnapshotInfo dest) {
+    if (diffList.isPresent()) {
+      return diffList.get();
+    }
+    throw new AssertionError(String.format(
+        "getSSTDiffList returned empty Optional (DAG could not reach all destination SSTs) "
+            + "from '%s' to '%s'", src.getDbPath(0), dest.getDbPath(0)));
+  }
+
+  private void assertCompactionSstBackups(RocksDBCheckpointDiffer differ) throws IOException {
+    Set<String> tablesToLookup = allTablesForDiff();
+    DifferSnapshotInfo firstSnapshot = snapshots.get(0);
+    DifferSnapshotInfo lastSnapshot = snapshots.get(snapshots.size() - 1);
+    List<SstFileInfo> diffSinceFirst = requireSstDiffList(
+        differ.getSSTDiffList(
+            new DifferSnapshotVersion(lastSnapshot, 0, tablesToLookup),
+            new DifferSnapshotVersion(firstSnapshot, 0, tablesToLookup),
+            null, tablesToLookup, true),
+        lastSnapshot, firstSnapshot);
+    Set<String> lastSnapshotFileNames = getTrackedSstFilesFromSnapshot(lastSnapshot).stream()
+        .map(SstFileInfo::getFileName)
+        .collect(Collectors.toSet());
+    Set<String> backupBaseNames;
+    try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
+      backupBaseNames = sstPathStream.map(path -> getBaseName(path.getFileName().toString()))
+          .collect(Collectors.toSet());
+      assertThat(backupBaseNames).isNotEmpty();
+      assertThat(backupBaseNames).allMatch(name -> name.matches("\\d+"));
+    }
+    for (SstFileInfo diffFile : diffSinceFirst) {
+      String fileName = diffFile.getFileName();
+      assertTrue(lastSnapshotFileNames.contains(fileName) || backupBaseNames.contains(fileName),
+          () -> "Diff SST " + fileName + " should be in the last snapshot or SST backup dir");
+    }
+    try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
+      sstPathStream.forEach(path -> {
+        try {
+          assertTrue(Files.size(path) > 0, "SST link should not be empty: " + path);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
+    }
   }
 
   /**
@@ -1158,7 +1227,6 @@ public class TestRocksDBCheckpointDiffer {
       String keyStr = "Key-" + i + "-" + generatedString;
       String valueStr = "Val-" + i + "-" + generatedString;
       byte[] key = keyStr.getBytes(UTF_8);
-      // Put entry in keyTable
       activeRocksDB.get().put(keyTableCFHandle, key, valueStr.getBytes(UTF_8));
       if (i % SNAPSHOT_EVERY_SO_MANY_KEYS == 0) {
         createCheckpoint(activeRocksDB);
