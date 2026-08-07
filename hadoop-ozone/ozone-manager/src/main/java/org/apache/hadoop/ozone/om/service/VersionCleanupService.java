@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -65,6 +67,13 @@ public class VersionCleanupService extends BackgroundService {
   private final ClientId clientId = ClientId.randomId();
   private final int defaultMaxVersions;
   private final int versionLimitPerTask;
+  // There is no index of delete markers, so finding them walks the keyTable.
+  // The walk is bounded per run and resumes where the last one stopped, so no
+  // single run iterates an unbounded number of keys. The resume point is held
+  // in memory only: a restart or a failover just starts the walk over, which
+  // costs a pass and loses nothing.
+  private final int markerScanBudget;
+  private String markerScanStartKey;
   private final AtomicLong submittedVersionCount;
   private final AtomicLong runCount;
   private final AtomicBoolean suspended;
@@ -85,6 +94,11 @@ public class VersionCleanupService extends BackgroundService {
         OMConfigKeys.OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK,
         OMConfigKeys.OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK_DEFAULT);
 
+    this.markerScanBudget = conf.getInt(
+        OMConfigKeys.OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET,
+        OMConfigKeys.OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET_DEFAULT);
+
+    this.markerScanStartKey = null;
     this.submittedVersionCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
@@ -156,8 +170,9 @@ public class VersionCleanupService extends BackgroundService {
       long startTime = Time.monotonicNow();
       List<ObjectVersionsBucket> versionsToReclaim;
       try {
-        versionsToReclaim = keyManager.getVersionsToReclaim(defaultMaxVersions,
-            versionLimitPerTask);
+        versionsToReclaim = new ArrayList<>(keyManager.getVersionsToReclaim(
+            defaultMaxVersions, versionLimitPerTask));
+        versionsToReclaim.addAll(scanExpiredDeleteMarkers());
       } catch (IOException e) {
         LOG.error("Unable to get the object versions to reclaim, retry in "
             + "next interval", e);
@@ -166,7 +181,8 @@ public class VersionCleanupService extends BackgroundService {
 
       if (!versionsToReclaim.isEmpty()) {
         int numVersions = versionsToReclaim.stream()
-            .mapToInt(ObjectVersionsBucket::getVersionKeysCount)
+            .mapToInt(bucket -> bucket.getVersionKeysCount()
+                + bucket.getMarkerKeysCount())
             .sum();
 
         submitRequest(createRequest(versionsToReclaim));
@@ -179,6 +195,21 @@ public class VersionCleanupService extends BackgroundService {
             .incrNumObjectVersionsSentForReclaim(numVersions);
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
+    }
+
+    /**
+     * One bounded pass over the keyTable looking for keys left with only a
+     * delete marker, resuming where the previous pass stopped.
+     */
+    private List<ObjectVersionsBucket> scanExpiredDeleteMarkers()
+        throws IOException {
+      OMMetadataManager.ExpiredDeleteMarkers markers =
+          keyManager.getExpiredDeleteMarkers(markerScanStartKey,
+              markerScanBudget, versionLimitPerTask);
+      // null means the walk reached the end of the table, so the next pass
+      // starts over from the beginning.
+      markerScanStartKey = markers.getNextStartKey();
+      return markers.getMarkersPerBucket();
     }
 
     private OMRequest createRequest(

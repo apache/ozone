@@ -54,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -402,9 +403,114 @@ public class TestOmMetadataManager {
     assertEquals(expected, reclaimable.get(0).getVersionKeysList());
   }
 
+  @Test
+  public void testGetExpiredDeleteMarkers() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, null);
+
+    // only a marker left: the key is invisible and nothing else can remove it
+    addDeleteMarkerToDB(volumeName, bucketName, "expired");
+    // a marker over surviving versions still makes the key read as deleted
+    addDeleteMarkerToDB(volumeName, bucketName, "hasVersions");
+    addNoncurrentVersionsToDB(volumeName, bucketName, "hasVersions", 1);
+    // a live key is not a marker at all
+    addCurrentVersionWithTime(volumeName, bucketName, "live", 5L, Time.now());
+
+    OMMetadataManager.ExpiredDeleteMarkers markers =
+        omMetadataManager.getExpiredDeleteMarkers(null, 1000, 1000);
+
+    assertNull(markers.getNextStartKey());
+    assertEquals(1, markers.getMarkersPerBucket().size());
+    assertEquals(Collections.singletonList(
+            omMetadataManager.getOzoneKey(volumeName, bucketName, "expired")),
+        markers.getMarkersPerBucket().get(0).getMarkerKeysList());
+  }
+
+  @Test
+  public void testGetExpiredDeleteMarkersRespectsBucketSettings()
+      throws Exception {
+    // cleanup turned off on the bucket
+    addVersionedBucketToDB("vol1", "optedout", 0, null, false);
+    addDeleteMarkerToDB("vol1", "optedout", "key1");
+
+    // a bucket that never had versioning enabled cannot hold a real marker,
+    // and is not examined either way
+    omMetadataManager.getBucketTable().put(
+        omMetadataManager.getBucketKey("vol1", "unversioned"),
+        OmBucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("unversioned")
+            .setStorageType(StorageType.DISK)
+            .build());
+    addDeleteMarkerToDB("vol1", "unversioned", "key1");
+
+    assertThat(omMetadataManager.getExpiredDeleteMarkers(null, 1000, 1000)
+        .getMarkersPerBucket()).isEmpty();
+  }
+
+  /**
+   * The walk is bounded so one run cannot iterate the whole keyTable, and it
+   * resumes where it stopped so successive runs still make progress.
+   */
+  @Test
+  public void testGetExpiredDeleteMarkersResumesAfterTheScanBudget()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, null);
+    for (int i = 0; i < 5; i++) {
+      addDeleteMarkerToDB(volumeName, bucketName, "key" + i);
+    }
+
+    OMMetadataManager.ExpiredDeleteMarkers first =
+        omMetadataManager.getExpiredDeleteMarkers(null, 2, 1000);
+    assertEquals(2, first.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    assertNotNull(first.getNextStartKey());
+
+    OMMetadataManager.ExpiredDeleteMarkers second =
+        omMetadataManager.getExpiredDeleteMarkers(first.getNextStartKey(), 2,
+            1000);
+    assertEquals(2, second.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    // the second pass starts where the first stopped, so nothing is revisited
+    assertThat(second.getMarkersPerBucket().get(0).getMarkerKeysList())
+        .doesNotContainAnyElementsOf(
+            first.getMarkersPerBucket().get(0).getMarkerKeysList());
+
+    OMMetadataManager.ExpiredDeleteMarkers third =
+        omMetadataManager.getExpiredDeleteMarkers(second.getNextStartKey(), 2,
+            1000);
+    assertEquals(1, third.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    assertNull(third.getNextStartKey());
+  }
+
+  private void addDeleteMarkerToDB(String volumeName, String bucketName,
+      String keyName) throws Exception {
+    OmKeyInfo marker = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setVersionId(1L)
+        .setDeleteMarker(true)
+        .build();
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName), marker);
+  }
+
   private void addVersionedBucketToDB(String volumeName, String bucketName,
       Integer maxVersions) throws Exception {
     addVersionedBucketToDB(volumeName, bucketName, maxVersions, null);
+  }
+
+  private void addVersionedBucketToDB(String volumeName, String bucketName,
+      Integer maxVersions, Integer expirationDays, boolean markerCleanup)
+      throws Exception {
+    addVersionedBucketToDB(volumeName, bucketName, maxVersions, expirationDays);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getBucketTable().put(bucketKey,
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey).toBuilder()
+            .setExpiredDeleteMarkerCleanup(markerCleanup).build());
   }
 
   private void addVersionedBucketToDB(String volumeName, String bucketName,

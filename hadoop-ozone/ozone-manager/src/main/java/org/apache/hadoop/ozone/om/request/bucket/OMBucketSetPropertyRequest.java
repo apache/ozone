@@ -232,6 +232,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             newExpirationDays, bucketName, volumeName);
       }
 
+      Boolean newMarkerCleanup = omBucketArgs.getExpiredDeleteMarkerCleanup();
+      if (newMarkerCleanup != null) {
+        bucketInfoBuilder.setExpiredDeleteMarkerCleanup(newMarkerCleanup);
+        LOG.debug("Updating expiredDeleteMarkerCleanup to {} for bucket: {} in volume: {}",
+            newMarkerCleanup, bucketName, volumeName);
+      }
+
       //Check quotaInBytes and quotaInNamespace to update
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
@@ -450,7 +457,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
       if (propReq.hasBucketArgs()
           && (propReq.getBucketArgs().hasMaxVersions()
-              || propReq.getBucketArgs().hasNoncurrentVersionExpirationDays())) {
+              || propReq.getBucketArgs().hasNoncurrentVersionExpirationDays()
+              || propReq.getBucketArgs().hasExpiredDeleteMarkerCleanup())) {
         throw new OMException("Cluster does not have the object versioning"
             + " feature finalized yet, but the request contains version"
             + " retention settings. Rejecting the request, please finalize the"

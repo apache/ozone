@@ -77,6 +77,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final Integer noncurrentVersionExpirationDays;
   /**
+   * Whether a key left with only a delete marker is removed entirely; null
+   * means the default, which is enabled.
+   */
+  private final Boolean expiredDeleteMarkerCleanup;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -142,6 +147,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ? b.versioningStatus.toVersionEnabledFlag() : b.isVersionEnabled;
     this.maxVersions = b.maxVersions;
     this.noncurrentVersionExpirationDays = b.noncurrentVersionExpirationDays;
+    this.expiredDeleteMarkerCleanup = b.expiredDeleteMarkerCleanup;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
     this.modificationTime = b.modificationTime;
@@ -269,6 +275,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   public Integer getNoncurrentVersionExpirationDays() {
     return noncurrentVersionExpirationDays;
+  }
+
+  /**
+   * Whether a key whose only remaining version is a delete marker is removed
+   * entirely. Enabled unless the bucket turned it off: such a marker is
+   * invisible to reads and carries no versionId to address it by, so nothing
+   * other than this ever removes it.
+   * @return whether expired delete markers are cleaned up
+   */
+  public boolean isExpiredDeleteMarkerCleanupEnabled() {
+    return expiredDeleteMarkerCleanup == null || expiredDeleteMarkerCleanup;
   }
 
   /**
@@ -443,6 +460,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.NONCURRENT_VERSION_EXPIRATION_DAYS,
         this.noncurrentVersionExpirationDays != null
             ? String.valueOf(this.noncurrentVersionExpirationDays) : null);
+    auditMap.put(OzoneConsts.EXPIRED_DELETE_MARKER_CLEANUP,
+        this.expiredDeleteMarkerCleanup != null
+            ? String.valueOf(this.expiredDeleteMarkerCleanup) : null);
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
@@ -487,6 +507,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setVersioningStatus(versioningStatus)
         .setMaxVersions(maxVersions)
         .setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays)
+        .setExpiredDeleteMarkerCleanup(expiredDeleteMarkerCleanup)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setBucketEncryptionKey(bekInfo)
@@ -515,6 +536,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private BucketVersioningStatus versioningStatus;
     private Integer maxVersions;
     private Integer noncurrentVersionExpirationDays;
+    private Boolean expiredDeleteMarkerCleanup;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
     private long modificationTime;
@@ -603,6 +625,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     public Builder setNoncurrentVersionExpirationDays(Integer days) {
       if (days != null) {
         this.noncurrentVersionExpirationDays = days;
+      }
+      return this;
+    }
+
+    /** No-op when enabled is null, so that an unset value keeps the current one. */
+    public Builder setExpiredDeleteMarkerCleanup(Boolean enabled) {
+      if (enabled != null) {
+        this.expiredDeleteMarkerCleanup = enabled;
       }
       return this;
     }
@@ -767,6 +797,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (noncurrentVersionExpirationDays != null) {
       bib.setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays);
     }
+    if (expiredDeleteMarkerCleanup != null) {
+      bib.setExpiredDeleteMarkerCleanup(expiredDeleteMarkerCleanup);
+    }
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -819,6 +852,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setNoncurrentVersionExpirationDays(
             bucketInfo.hasNoncurrentVersionExpirationDays()
                 ? bucketInfo.getNoncurrentVersionExpirationDays() : null)
+        .setExpiredDeleteMarkerCleanup(
+            bucketInfo.hasExpiredDeleteMarkerCleanup()
+                ? bucketInfo.getExpiredDeleteMarkerCleanup() : null)
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
         .setUsedBytes(bucketInfo.getUsedBytes())
@@ -928,6 +964,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         versioningStatus == that.versioningStatus &&
         Objects.equals(maxVersions, that.maxVersions) &&
         Objects.equals(noncurrentVersionExpirationDays, that.noncurrentVersionExpirationDays) &&
+        Objects.equals(expiredDeleteMarkerCleanup, that.expiredDeleteMarkerCleanup) &&
         storageType == that.storageType &&
         getObjectID() == that.getObjectID() &&
         getUpdateID() == that.getUpdateID() &&
@@ -959,6 +996,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", versioningStatus=" + versioningStatus +
         ", maxVersions=" + maxVersions +
         ", noncurrentVersionExpirationDays=" + noncurrentVersionExpirationDays +
+        ", expiredDeleteMarkerCleanup=" + expiredDeleteMarkerCleanup +
         ", storageType=" + storageType +
         ", creationTime=" + creationTime +
         ", bekInfo=" + bekInfo +

@@ -398,6 +398,49 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       int limitPerTask) throws IOException;
 
   /**
+   * Result of one pass of {@link #getExpiredDeleteMarkers}: the markers found,
+   * and where the next pass should resume.
+   */
+  class ExpiredDeleteMarkers {
+    private final List<ObjectVersionsBucket> markersPerBucket;
+    private final String nextStartKey;
+
+    public ExpiredDeleteMarkers(List<ObjectVersionsBucket> markersPerBucket,
+        String nextStartKey) {
+      this.markersPerBucket = markersPerBucket;
+      this.nextStartKey = nextStartKey;
+    }
+
+    public List<ObjectVersionsBucket> getMarkersPerBucket() {
+      return markersPerBucket;
+    }
+
+    /** Where to resume, or null when the table was walked to the end. */
+    public String getNextStartKey() {
+      return nextStartKey;
+    }
+  }
+
+  /**
+   * Returns the keys whose only remaining version is a delete marker, grouped
+   * by volume and bucket. Such a key is invisible to reads and its marker
+   * carries no versionId to address it by, so nothing other than this removes
+   * it.
+   *
+   * <p>There is no index of delete markers, so this walks the keyTable. The
+   * walk is bounded by {@code scanBudget} and resumes from {@code startKey},
+   * so one run cannot iterate an unbounded number of keys and successive runs
+   * still make progress; passing a null {@code startKey} starts from the
+   * beginning.
+   *
+   * @param startKey where to resume the walk, or null to start over.
+   * @param scanBudget the maximum number of keyTable entries to examine.
+   * @param limit the maximum number of markers to return.
+   */
+  ExpiredDeleteMarkers getExpiredDeleteMarkers(String startKey, int scanBudget,
+      int limit) throws IOException;
+
+  /**
    * Returns the names of up to {@code count} MPU key whose age is greater
    * than or equal to {@code expireThreshold}.
    *

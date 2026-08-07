@@ -831,6 +831,10 @@ message BucketInfo {
     // moment the version that superseded it was committed, as S3 lifecycle's
     // NoncurrentDays is. 0 or absent means versions are retained forever.
     optional uint32 noncurrentVersionExpirationDays = 26;
+    // Whether a key whose only remaining version is a delete marker is removed
+    // entirely. Such a marker is invisible to reads and cannot be addressed by
+    // versionId, so nothing else can ever remove it. Enabled when absent.
+    optional bool expiredDeleteMarkerCleanup = 27;
 }
 
 enum BucketLayoutProto {
@@ -924,6 +928,8 @@ message BucketArgs {
     optional uint32 maxVersions = 15;
     // Days a version is retained after becoming noncurrent; 0 means forever.
     optional uint32 noncurrentVersionExpirationDays = 16;
+    // Whether keys left with only a delete marker are removed entirely.
+    optional bool expiredDeleteMarkerCleanup = 17;
 }
 
 message PrefixInfo {
@@ -1603,6 +1609,10 @@ message ObjectVersionsBucket {
   required string volumeName = 1;
   required string bucketName = 2;
   repeated string versionKeys = 3;
+  // keyTable dbKeys of keys whose only remaining version is a delete marker.
+  // These leave the keyTable rather than the versionedKeyTable, so the key
+  // disappears entirely.
+  repeated string markerKeys = 4;
 }
 
 message ReclaimObjectVersionsRequest {

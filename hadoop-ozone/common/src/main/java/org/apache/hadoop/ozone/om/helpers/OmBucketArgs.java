@@ -59,6 +59,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final Integer noncurrentVersionExpirationDays;
   /**
+   * Whether keys left with only a delete marker are removed entirely; null
+   * when not being changed.
+   */
+  private final Boolean expiredDeleteMarkerCleanup;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -90,6 +95,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.versioningStatus = b.versioningStatus;
     this.maxVersions = b.maxVersions;
     this.noncurrentVersionExpirationDays = b.noncurrentVersionExpirationDays;
+    this.expiredDeleteMarkerCleanup = b.expiredDeleteMarkerCleanup;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
@@ -148,6 +154,15 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   public Integer getNoncurrentVersionExpirationDays() {
     return noncurrentVersionExpirationDays;
+  }
+
+  /**
+   * Returns the requested expiredDeleteMarkerCleanup, or null if not being
+   * changed.
+   * @return expiredDeleteMarkerCleanup
+   */
+  public Boolean getExpiredDeleteMarkerCleanup() {
+    return expiredDeleteMarkerCleanup;
   }
 
   /**
@@ -242,6 +257,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       auditMap.put(OzoneConsts.NONCURRENT_VERSION_EXPIRATION_DAYS,
           String.valueOf(this.noncurrentVersionExpirationDays));
     }
+    if (this.expiredDeleteMarkerCleanup != null) {
+      auditMap.put(OzoneConsts.EXPIRED_DELETE_MARKER_CLEANUP,
+          String.valueOf(this.expiredDeleteMarkerCleanup));
+    }
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
@@ -282,6 +301,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private BucketVersioningStatus versioningStatus;
     private Integer maxVersions;
     private Integer noncurrentVersionExpirationDays;
+    private Boolean expiredDeleteMarkerCleanup;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
@@ -328,6 +348,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setNoncurrentVersionExpirationDays(Integer days) {
       this.noncurrentVersionExpirationDays = days;
+      return this;
+    }
+
+    public Builder setExpiredDeleteMarkerCleanup(Boolean enabled) {
+      this.expiredDeleteMarkerCleanup = enabled;
       return this;
     }
 
@@ -418,6 +443,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (noncurrentVersionExpirationDays != null) {
       builder.setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays);
     }
+    if (expiredDeleteMarkerCleanup != null) {
+      builder.setExpiredDeleteMarkerCleanup(expiredDeleteMarkerCleanup);
+    }
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
@@ -470,6 +498,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (bucketArgs.hasNoncurrentVersionExpirationDays()) {
       builder.setNoncurrentVersionExpirationDays(
           bucketArgs.getNoncurrentVersionExpirationDays());
+    }
+    if (bucketArgs.hasExpiredDeleteMarkerCleanup()) {
+      builder.setExpiredDeleteMarkerCleanup(
+          bucketArgs.getExpiredDeleteMarkerCleanup());
     }
     if (bucketArgs.hasStorageType()) {
       builder.setStorageType(StorageType.valueOf(bucketArgs.getStorageType()));

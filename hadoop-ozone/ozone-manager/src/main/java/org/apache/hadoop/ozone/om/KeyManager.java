@@ -241,6 +241,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       int limitPerTask) throws IOException;
 
   /**
+   * Returns the keys whose only remaining version is a delete marker, grouped
+   * by volume and bucket, together with where the next pass should resume.
+   *
+   * @param startKey where to resume the keyTable walk, or null to start over.
+   * @param scanBudget the maximum number of keyTable entries to examine.
+   * @param limit the maximum number of markers to return.
+   */
+  OMMetadataManager.ExpiredDeleteMarkers getExpiredDeleteMarkers(
+      String startKey, int scanBudget, int limit) throws IOException;
+
+  /**
    * Look up an existing key from the OM table and retrieve the tags from
    * the key info.
    *

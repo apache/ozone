@@ -741,6 +741,11 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK_DEFAULT =
       1000;
 
+  public static final String OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET =
+      "ozone.om.version.cleanup.marker.scan.budget";
+  public static final int OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET_DEFAULT =
+      100000;
+
   /**
    * Never constructed.
    */

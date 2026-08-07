@@ -311,6 +311,7 @@ public final class OzoneConsts {
   public static final String VERSIONING_STATUS = "versioningStatus";
   public static final String MAX_VERSIONS = "maxVersions";
   public static final String NONCURRENT_VERSION_EXPIRATION_DAYS = "noncurrentVersionExpirationDays";
+  public static final String EXPIRED_DELETE_MARKER_CLEANUP = "expiredDeleteMarkerCleanup";
   public static final String CREATION_TIME = "creationTime";
   public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";

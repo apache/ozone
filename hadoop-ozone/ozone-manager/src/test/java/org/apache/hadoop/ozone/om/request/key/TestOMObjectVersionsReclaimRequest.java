@@ -179,6 +179,108 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
     assertEquals(0L, bucketInfo.getUsedNamespace());
   }
 
+  /**
+   * A key whose only remaining version is a delete marker is invisible to
+   * reads and carries no versionId to address it by, so the whole key goes.
+   */
+  @Test
+  public void testReclaimsExpiredDeleteMarker() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    String markerKey = seedCurrentDeleteMarker();
+
+    OMObjectVersionsReclaimResponse response =
+        reclaimMarkers(500L, markerKey);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    CacheValue<OmKeyInfo> cached = omMetadataManager
+        .getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(markerKey));
+    assertNotNull(cached);
+    assertNull(cached.getCacheValue(), "the marker was not tombstoned");
+
+    // a marker holds no blocks, so nothing is queued for block reclamation
+    assertTrue(response.getKeysToDelete().isEmpty());
+    // it did hold a namespace slot of its own
+    OmBucketInfo bucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager,
+        volumeName, bucketName);
+    assertEquals(BLOCK_LENGTH, bucketInfo.getUsedBytes());
+    assertEquals(0L, bucketInfo.getUsedNamespace());
+  }
+
+  /**
+   * Removing the marker while a noncurrent version survives would promote that
+   * version back to current, resurrecting an object the user deleted.
+   */
+  @Test
+  public void testKeepsMarkerWhileAVersionSurvives() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 2L);
+    String markerKey = seedCurrentDeleteMarker();
+    seedNoncurrentVersion(100L);
+
+    OMObjectVersionsReclaimResponse response =
+        reclaimMarkers(500L, markerKey);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(markerKey)));
+    OmBucketInfo bucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager,
+        volumeName, bucketName);
+    assertEquals(2L, bucketInfo.getUsedNamespace());
+  }
+
+  /**
+   * A write since the scan makes the key's current version a real object
+   * again, so there is nothing expired to remove.
+   */
+  @Test
+  public void testSkipsMarkerSupersededSinceTheScan() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+    OmKeyInfo live = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(200L)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(objectKey, live);
+
+    OMObjectVersionsReclaimResponse response =
+        reclaimMarkers(500L, objectKey);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(objectKey)));
+    OmBucketInfo bucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager,
+        volumeName, bucketName);
+    assertEquals(1L, bucketInfo.getUsedNamespace());
+  }
+
+  private String seedCurrentDeleteMarker() throws Exception {
+    OmKeyInfo marker = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(300L)
+        .setDeleteMarker(true)
+        .build();
+    String objectKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    omMetadataManager.getKeyTable(getBucketLayout()).put(objectKey, marker);
+    return objectKey;
+  }
+
+  private OMObjectVersionsReclaimResponse reclaimMarkers(long trxnLogIndex,
+      String... markerKeys) throws Exception {
+    OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addAllMarkerKeys(Arrays.asList(markerKeys))
+        .build());
+    return (OMObjectVersionsReclaimResponse)
+        new OMObjectVersionsReclaimRequest(request)
+            .validateAndUpdateCache(ozoneManager, trxnLogIndex);
+  }
+
   private void setupVersionedBucket(long usedBytes, long usedNamespace)
       throws Exception {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);

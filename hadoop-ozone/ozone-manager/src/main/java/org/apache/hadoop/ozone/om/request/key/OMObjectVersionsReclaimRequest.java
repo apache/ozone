@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -89,7 +90,8 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
 
     long numSubmittedVersions = 0;
     for (ObjectVersionsBucket bucket : versionsPerBucket) {
-      numSubmittedVersions += bucket.getVersionKeysCount();
+      numSubmittedVersions +=
+          bucket.getVersionKeysCount() + bucket.getMarkerKeysCount();
     }
 
     OMResponse.Builder omResponse =
@@ -99,27 +101,30 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
 
     OMClientResponse omClientResponse = null;
     List<String> reclaimedVersionKeys = new ArrayList<>();
+    List<String> reclaimedMarkerKeys = new ArrayList<>();
     Map<String, RepeatedOmKeyInfo> keysToDelete = new HashMap<>();
     List<OmBucketInfo> updatedBuckets = new ArrayList<>();
     Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (ObjectVersionsBucket bucket : versionsPerBucket) {
         reclaimBucketVersions(ozoneManager, trxnLogIndex, bucket,
-            reclaimedVersionKeys, keysToDelete, updatedBuckets);
+            reclaimedVersionKeys, reclaimedMarkerKeys, keysToDelete,
+            updatedBuckets);
       }
 
       omClientResponse = new OMObjectVersionsReclaimResponse(
-          omResponse.build(), reclaimedVersionKeys, keysToDelete,
-          updatedBuckets);
+          omResponse.build(), reclaimedVersionKeys, reclaimedMarkerKeys,
+          keysToDelete, updatedBuckets);
 
+      int reclaimed = reclaimedVersionKeys.size() + reclaimedMarkerKeys.size();
       ozoneManager.getDeletionMetrics()
-          .incrNumObjectVersionsReclaimed(reclaimedVersionKeys.size());
-      auditParams.put(AUDIT_PARAM_NUM_VERSIONS,
-          String.valueOf(reclaimedVersionKeys.size()));
+          .incrNumObjectVersionsReclaimed(reclaimed);
+      auditParams.put(AUDIT_PARAM_NUM_VERSIONS, String.valueOf(reclaimed));
       AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(
           OMSystemAction.OBJECT_VERSION_CLEANUP, auditParams));
-      LOG.debug("Reclaimed {} object versions out of {} submitted.",
-          reclaimedVersionKeys.size(), numSubmittedVersions);
+      LOG.debug("Reclaimed {} object versions and {} expired delete markers "
+          + "out of {} submitted.", reclaimedVersionKeys.size(),
+          reclaimedMarkerKeys.size(), numSubmittedVersions);
     } catch (IOException ex) {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(
           OMSystemAction.OBJECT_VERSION_CLEANUP, auditParams, ex));
@@ -136,9 +141,22 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  /** Whether the key has any version left in the versionedKeyTable. */
+  private boolean hasNoncurrentVersion(OMMetadataManager omMetadataManager,
+      OmKeyInfo marker) throws IOException {
+    try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+             omMetadataManager.getVersionedKeyTable().iterator(
+                 omMetadataManager.getVersionedOzoneKeyPrefix(
+                     marker.getVolumeName(), marker.getBucketName(),
+                     marker.getKeyName()))) {
+      return versions.hasNext();
+    }
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private void reclaimBucketVersions(OzoneManager ozoneManager,
       long trxnLogIndex, ObjectVersionsBucket versionsBucket,
-      List<String> reclaimedVersionKeys,
+      List<String> reclaimedVersionKeys, List<String> reclaimedMarkerKeys,
       Map<String, RepeatedOmKeyInfo> keysToDelete,
       List<OmBucketInfo> updatedBuckets) throws IOException {
 
@@ -156,8 +174,9 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
           getBucketInfo(omMetadataManager, volumeName, bucketName);
       if (omBucketInfo == null) {
         LOG.debug("Bucket {}/{} no longer exists, skipping the {} object "
-            + "versions submitted for it.", volumeName, bucketName,
-            versionsBucket.getVersionKeysCount());
+            + "versions and {} delete markers submitted for it.", volumeName,
+            bucketName, versionsBucket.getVersionKeysCount(),
+            versionsBucket.getMarkerKeysCount());
         return;
       }
 
@@ -199,6 +218,40 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
         }
         omBucketInfo.decrUsedBytes(sumBlockLengths(version), isVersionNonEmpty);
         omBucketInfo.decrUsedNamespace(1L, isVersionNonEmpty);
+        reclaimedAny = true;
+      }
+
+      for (String markerKey : versionsBucket.getMarkerKeysList()) {
+        OmKeyInfo marker =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(markerKey);
+        if (marker == null) {
+          continue;
+        }
+        // A write since the scan supersedes the marker: the key's current
+        // version is then a real object, and there is nothing expired here.
+        if (!marker.isDeleteMarker()) {
+          continue;
+        }
+        if (trxnLogIndex < marker.getUpdateID()) {
+          LOG.warn("Transaction log index {} is smaller than the current "
+              + "updateID {} of marker {}, skipping reclamation.",
+              trxnLogIndex, marker.getUpdateID(), markerKey);
+          continue;
+        }
+        // Re-checked here and not only in the scan: removing the marker while
+        // a noncurrent version survives would make that version current again,
+        // resurrecting an object the user deleted.
+        if (hasNoncurrentVersion(omMetadataManager, marker)) {
+          continue;
+        }
+
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+            new CacheKey<>(markerKey), CacheValue.get(trxnLogIndex));
+        reclaimedMarkerKeys.add(markerKey);
+
+        // The marker holds no blocks, so it never reaches the deletedTable; it
+        // does hold a namespace slot of its own.
+        omBucketInfo.decrUsedNamespace(1L, false);
         reclaimedAny = true;
       }
 

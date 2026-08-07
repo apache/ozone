@@ -5212,4 +5212,15 @@
       The maximum number of object versions VersionCleanupService submits for reclamation in one run.
     </description>
   </property>
+  <property>
+    <name>ozone.om.version.cleanup.marker.scan.budget</name>
+    <value>100000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of keyTable entries VersionCleanupService examines in one run while looking
+      for keys left with only a delete marker. There is no index of delete markers, so they are found
+      by walking the keyTable; each run walks at most this many entries and the next one resumes where
+      it stopped, so no single run iterates the whole table.
+    </description>
+  </property>
 </configuration>

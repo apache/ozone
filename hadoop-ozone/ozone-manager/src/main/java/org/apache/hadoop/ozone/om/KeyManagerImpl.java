@@ -1092,6 +1092,12 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public OMMetadataManager.ExpiredDeleteMarkers getExpiredDeleteMarkers(
+      String startKey, int scanBudget, int limit) throws IOException {
+    return metadataManager.getExpiredDeleteMarkers(startKey, scanBudget, limit);
+  }
+
+  @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
     Objects.requireNonNull(args, "args == null");
 

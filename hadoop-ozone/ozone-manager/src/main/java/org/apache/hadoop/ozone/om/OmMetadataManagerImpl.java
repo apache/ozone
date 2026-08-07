@@ -64,6 +64,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -1628,6 +1629,91 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return reclaimable;
+  }
+
+  @Override
+  public ExpiredDeleteMarkers getExpiredDeleteMarkers(String startKey,
+      int scanBudget, int limit) throws IOException {
+    Map<String, ObjectVersionsBucket.Builder> markers = new LinkedHashMap<>();
+    // Buckets resolved during this pass. The keyTable is ordered by bucket, so
+    // in practice this holds one entry at a time, but caching by key keeps the
+    // lookup correct if that ever stops holding.
+    Map<String, OmBucketInfo> bucketCache = new HashMap<>();
+    String nextStartKey = null;
+    int scanned = 0;
+    int collected = 0;
+
+    // OBJECT_STORE and LEGACY buckets share the keyTable; only a bucket that
+    // keeps versions can hold a delete marker, and the lookup below drops the
+    // rest.
+    try (Table.KeyValueIterator<String, OmKeyInfo> keys =
+             getKeyTable(BucketLayout.OBJECT_STORE).iterator()) {
+      if (startKey != null) {
+        keys.seek(startKey);
+      }
+      while (keys.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = keys.next();
+        if (scanned >= scanBudget || collected >= limit) {
+          // Resume at this entry rather than walking the table from the start
+          // again, so that successive runs make progress.
+          nextStartKey = entry.getKey();
+          break;
+        }
+        scanned++;
+        OmKeyInfo keyInfo = entry.getValue();
+        if (!keyInfo.isDeleteMarker()) {
+          continue;
+        }
+
+        String bucketKey = getBucketKey(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
+        OmBucketInfo bucketInfo = bucketCache.get(bucketKey);
+        if (bucketInfo == null) {
+          // Read past the table cache, so that this walk and the versionedKey
+          // walk in getVersionsToReclaim judge a bucket by the same state. A
+          // bucket property changed but not yet flushed applies on the next
+          // run, which is soon enough for a background reclaimer.
+          bucketInfo = getBucketTable().getSkipCache(bucketKey);
+          if (bucketInfo == null) {
+            continue;
+          }
+          bucketCache.put(bucketKey, bucketInfo);
+        }
+        if (!bucketInfo.hasEverBeenVersioned()
+            || !bucketInfo.isExpiredDeleteMarkerCleanupEnabled()) {
+          continue;
+        }
+
+        // The marker has only expired once nothing is left under it: while a
+        // noncurrent version survives, the marker is what makes the key read
+        // as deleted, and removing it would resurrect that version.
+        if (hasNoncurrentVersion(keyInfo)) {
+          continue;
+        }
+
+        markers.computeIfAbsent(bucketKey, k ->
+            ObjectVersionsBucket.newBuilder()
+                .setVolumeName(keyInfo.getVolumeName())
+                .setBucketName(keyInfo.getBucketName()))
+            .addMarkerKeys(entry.getKey());
+        collected++;
+      }
+    }
+
+    List<ObjectVersionsBucket> result = markers.values().stream()
+        .map(ObjectVersionsBucket.Builder::build)
+        .collect(Collectors.toList());
+    return new ExpiredDeleteMarkers(result, nextStartKey);
+  }
+
+  /** Whether the key has any version left in the versionedKeyTable. */
+  private boolean hasNoncurrentVersion(OmKeyInfo keyInfo) throws IOException {
+    try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+             getVersionedKeyTable().iterator(getVersionedOzoneKeyPrefix(
+                 keyInfo.getVolumeName(), keyInfo.getBucketName(),
+                 keyInfo.getKeyName()))) {
+      return versions.hasNext();
+    }
   }
 
   /**
