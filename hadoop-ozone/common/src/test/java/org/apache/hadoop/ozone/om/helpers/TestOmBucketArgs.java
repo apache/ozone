@@ -92,6 +92,31 @@ public class TestOmBucketArgs {
   }
 
   @Test
+  public void testMaxVersionsIsSetCorrectly() {
+    OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .build();
+
+    OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
+        bucketArgs.getProtobuf());
+
+    // absent means "not being changed"
+    assertNull(argsFromProto.getMaxVersions());
+
+    bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .setMaxVersions(0)
+        .build();
+
+    argsFromProto = OmBucketArgs.getFromProtobuf(bucketArgs.getProtobuf());
+
+    // 0 means unlimited, which is a change like any other
+    assertEquals(0, argsFromProto.getMaxVersions());
+  }
+
+  @Test
   public void testDefaultReplicationConfigIsSetCorrectly() {
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setBucketName("bucket")

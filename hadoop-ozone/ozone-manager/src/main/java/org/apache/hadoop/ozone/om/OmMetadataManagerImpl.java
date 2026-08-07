@@ -134,6 +134,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -1534,6 +1535,70 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return expiredKeys;
+  }
+
+  @Override
+  public List<ObjectVersionsBucket> getVersionsToReclaim(
+      int defaultMaxVersions, int limitPerTask) throws IOException {
+    List<ObjectVersionsBucket> reclaimable = new ArrayList<>();
+    int collected = 0;
+
+    try (Table.KeyValueIterator<String, OmBucketInfo> buckets =
+             getBucketTable().iterator()) {
+      while (collected < limitPerTask && buckets.hasNext()) {
+        OmBucketInfo bucketInfo = buckets.next().getValue();
+        // Only a bucket that keeps versions has a versionedKeyTable range, and
+        // a limit of 0 means unlimited: both skip without a single seek.
+        if (!bucketInfo.hasEverBeenVersioned()) {
+          continue;
+        }
+        int maxVersions = bucketInfo.getMaxVersions() != null
+            ? bucketInfo.getMaxVersions() : defaultMaxVersions;
+        if (maxVersions <= 0) {
+          continue;
+        }
+
+        ObjectVersionsBucket.Builder bucketBuilder = null;
+        // The current version lives in the keyTable and counts toward the
+        // limit, so this is how many noncurrent versions a key may keep.
+        final int allowedNoncurrent = maxVersions - 1;
+        final String bucketPrefix = getBucketKey(bucketInfo.getVolumeName(),
+            bucketInfo.getBucketName()) + OM_KEY_PREFIX;
+        String currentKeyPrefix = null;
+        int seenInKey = 0;
+
+        try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+                 getVersionedKeyTable().iterator(bucketPrefix)) {
+          while (collected < limitPerTask && versions.hasNext()) {
+            String dbKey = versions.next().getKey();
+            // All versions of a key are contiguous and ordered newest first,
+            // so a change of prefix starts a new key and restarts the count.
+            String keyPrefix = dbKey.substring(0,
+                dbKey.indexOf(OM_VERSIONED_KEY_SEPARATOR) + 1);
+            if (!keyPrefix.equals(currentKeyPrefix)) {
+              currentKeyPrefix = keyPrefix;
+              seenInKey = 0;
+            }
+            if (seenInKey++ < allowedNoncurrent) {
+              continue;
+            }
+            if (bucketBuilder == null) {
+              bucketBuilder = ObjectVersionsBucket.newBuilder()
+                  .setVolumeName(bucketInfo.getVolumeName())
+                  .setBucketName(bucketInfo.getBucketName());
+            }
+            bucketBuilder.addVersionKeys(dbKey);
+            collected++;
+          }
+        }
+
+        if (bucketBuilder != null) {
+          reclaimable.add(bucketBuilder.build());
+        }
+      }
+    }
+
+    return reclaimable;
   }
 
   @Override

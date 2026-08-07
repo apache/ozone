@@ -67,6 +67,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final BucketVersioningStatus versioningStatus;
   /**
+   * Maximum number of versions retained per key; null when the bucket does not
+   * set one of its own and the cluster default applies.
+   */
+  private final Integer maxVersions;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -130,6 +135,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.versioningStatus = b.versioningStatus;
     this.isVersionEnabled = b.versioningStatus != null
         ? b.versioningStatus.toVersionEnabledFlag() : b.isVersionEnabled;
+    this.maxVersions = b.maxVersions;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
     this.modificationTime = b.modificationTime;
@@ -236,6 +242,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   public boolean hasEverBeenVersioned() {
     return isS3VersioningEnabled() || isS3VersioningSuspended();
+  }
+
+  /**
+   * Returns the maximum number of versions retained per key, or null when the
+   * bucket sets none of its own and the cluster default applies. 0 means
+   * unlimited. The limit counts the key's current version and its delete
+   * markers along with the noncurrent versions.
+   * @return maxVersions, or null if not set on this bucket
+   */
+  public Integer getMaxVersions() {
+    return maxVersions;
   }
 
   /**
@@ -405,6 +422,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         String.valueOf(this.isVersionEnabled));
     auditMap.put(OzoneConsts.VERSIONING_STATUS,
         this.versioningStatus != null ? this.versioningStatus.name() : null);
+    auditMap.put(OzoneConsts.MAX_VERSIONS,
+        this.maxVersions != null ? String.valueOf(this.maxVersions) : null);
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
@@ -447,6 +466,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setStorageType(storageType)
         .setIsVersionEnabled(isVersionEnabled)
         .setVersioningStatus(versioningStatus)
+        .setMaxVersions(maxVersions)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setBucketEncryptionKey(bekInfo)
@@ -473,6 +493,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private final AclListBuilder acls;
     private boolean isVersionEnabled;
     private BucketVersioningStatus versioningStatus;
+    private Integer maxVersions;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
     private long modificationTime;
@@ -545,6 +566,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       if (status != null) {
         this.versioningStatus = status;
         this.isVersionEnabled = status.toVersionEnabledFlag();
+      }
+      return this;
+    }
+
+    /** No-op when limit is null, so that an unset value keeps the current one. */
+    public Builder setMaxVersions(Integer limit) {
+      if (limit != null) {
+        this.maxVersions = limit;
       }
       return this;
     }
@@ -703,6 +732,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (versioningStatus != null) {
       bib.setVersioningStatus(versioningStatus.toProto());
     }
+    if (maxVersions != null) {
+      bib.setMaxVersions(maxVersions);
+    }
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -750,6 +782,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setVersioningStatus(bucketInfo.hasVersioningStatus()
             ? BucketVersioningStatus.fromProto(bucketInfo.getVersioningStatus())
             : null)
+        .setMaxVersions(bucketInfo.hasMaxVersions()
+            ? bucketInfo.getMaxVersions() : null)
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
         .setUsedBytes(bucketInfo.getUsedBytes())
@@ -857,6 +891,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(acls, that.acls) &&
         Objects.equals(isVersionEnabled, that.isVersionEnabled) &&
         versioningStatus == that.versioningStatus &&
+        Objects.equals(maxVersions, that.maxVersions) &&
         storageType == that.storageType &&
         getObjectID() == that.getObjectID() &&
         getUpdateID() == that.getUpdateID() &&
@@ -886,6 +921,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", acls=" + acls +
         ", isVersionEnabled=" + isVersionEnabled +
         ", versioningStatus=" + versioningStatus +
+        ", maxVersions=" + maxVersions +
         ", storageType=" + storageType +
         ", creationTime=" + creationTime +
         ", bekInfo=" + bekInfo +

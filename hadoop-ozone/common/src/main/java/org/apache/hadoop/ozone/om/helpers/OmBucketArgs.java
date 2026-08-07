@@ -50,6 +50,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final BucketVersioningStatus versioningStatus;
   /**
+   * Maximum number of versions retained per key; null when not being changed.
+   */
+  private final Integer maxVersions;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -79,6 +83,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.bucketName = b.bucketName;
     this.isVersionEnabled = b.isVersionEnabled;
     this.versioningStatus = b.versioningStatus;
+    this.maxVersions = b.maxVersions;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
@@ -120,6 +125,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   public BucketVersioningStatus getVersioningStatus() {
     return versioningStatus;
+  }
+
+  /**
+   * Returns the requested maxVersions, or null if not being changed.
+   * @return maxVersions
+   */
+  public Integer getMaxVersions() {
+    return maxVersions;
   }
 
   /**
@@ -207,6 +220,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (this.versioningStatus != null) {
       auditMap.put(OzoneConsts.VERSIONING_STATUS, this.versioningStatus.name());
     }
+    if (this.maxVersions != null) {
+      auditMap.put(OzoneConsts.MAX_VERSIONS, String.valueOf(this.maxVersions));
+    }
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
@@ -245,6 +261,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private String bucketName;
     private Boolean isVersionEnabled;
     private BucketVersioningStatus versioningStatus;
+    private Integer maxVersions;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
@@ -281,6 +298,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setVersioningStatus(BucketVersioningStatus status) {
       this.versioningStatus = status;
+      return this;
+    }
+
+    public Builder setMaxVersions(Integer limit) {
+      this.maxVersions = limit;
       return this;
     }
 
@@ -365,6 +387,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (versioningStatus != null) {
       builder.setVersioningStatus(versioningStatus.toProto());
     }
+    if (maxVersions != null) {
+      builder.setMaxVersions(maxVersions);
+    }
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
@@ -410,6 +435,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (bucketArgs.hasVersioningStatus()) {
       builder.setVersioningStatus(
           BucketVersioningStatus.fromProto(bucketArgs.getVersioningStatus()));
+    }
+    if (bucketArgs.hasMaxVersions()) {
+      builder.setMaxVersions(bucketArgs.getMaxVersions());
     }
     if (bucketArgs.hasStorageType()) {
       builder.setStorageType(StorageType.valueOf(bucketArgs.getStorageType()));

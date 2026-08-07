@@ -213,6 +213,17 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             newVersioningStatus, bucketName, volumeName);
       }
 
+      // Check maxVersions to update. It is accepted on any bucket, so that the
+      // retention limit can be set before versioning is enabled; it only takes
+      // effect once the bucket keeps versions.
+      Integer newMaxVersions = omBucketArgs.getMaxVersions();
+      if (newMaxVersions != null) {
+        OMBucketCreateRequest.validateMaxVersions(newMaxVersions);
+        bucketInfoBuilder.setMaxVersions(newMaxVersions);
+        LOG.debug("Updating maxVersions to {} for bucket: {} in volume: {}",
+            newMaxVersions, bucketName, volumeName);
+      }
+
       //Check quotaInBytes and quotaInNamespace to update
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
@@ -427,6 +438,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             + " feature finalized yet, but the request contains a bucket"
             + " versioning status. Rejecting the request, please finalize the"
             + " cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+      if (propReq.hasBucketArgs()
+          && propReq.getBucketArgs().hasMaxVersions()) {
+        throw new OMException("Cluster does not have the object versioning"
+            + " feature finalized yet, but the request contains maxVersions."
+            + " Rejecting the request, please finalize the cluster upgrade and"
+            + " then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

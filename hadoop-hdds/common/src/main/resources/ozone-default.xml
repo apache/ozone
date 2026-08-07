@@ -5177,4 +5177,39 @@
       before that id can be written again.
     </description>
   </property>
+  <property>
+    <name>ozone.om.versioning.max.versions</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of versions retained per key on a bucket that does not set maxVersions of its
+      own, counting the key's current version and its delete markers. Versions beyond the limit are
+      reclaimed oldest-first by VersionCleanupService. 0 means unlimited.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.interval</name>
+    <value>1h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Time interval of the OM VersionCleanupService, which reclaims the noncurrent object versions
+      of a key that exceed the bucket's maxVersions. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Timeout value of a VersionCleanupService run. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of object versions VersionCleanupService submits for reclamation in one run.
+    </description>
+  </property>
 </configuration>

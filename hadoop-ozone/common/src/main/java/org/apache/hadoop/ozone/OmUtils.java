@@ -320,6 +320,7 @@ public final class OmUtils {
     case RecoverLease:
     case SetTimes:
     case AbortExpiredMultiPartUploads:
+    case ReclaimObjectVersions:
     case SetSnapshotProperty:
     case QuotaRepair:
     case PutObjectTagging:
@@ -440,6 +441,7 @@ public final class OmUtils {
     case RecoverLease:
     case SetTimes:
     case AbortExpiredMultiPartUploads:
+    case ReclaimObjectVersions:
     case SetSnapshotProperty:
     case QuotaRepair:
     case PutObjectTagging:

@@ -110,6 +110,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
 
+    if (bucketInfo.hasMaxVersions()) {
+      validateMaxVersions(bucketInfo.getMaxVersions());
+    }
+
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
       try {
@@ -375,6 +379,19 @@ public class OMBucketCreateRequest extends OMClientRequest {
             + toUseNamespaceInTotal + ".",
             OMException.ResultCodes.QUOTA_EXCEEDED);
       }
+    }
+  }
+
+  /**
+   * The wire type is uint32, so a value above Integer.MAX_VALUE arrives as a
+   * negative int. 0 means unlimited; anything else has to be a usable count.
+   */
+  static void validateMaxVersions(int maxVersions) throws OMException {
+    if (maxVersions < 0) {
+      throw new OMException("maxVersions " + Integer.toUnsignedString(maxVersions)
+          + " is out of range; it must be between 0 and " + Integer.MAX_VALUE
+          + ", where 0 means unlimited.",
+          OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 

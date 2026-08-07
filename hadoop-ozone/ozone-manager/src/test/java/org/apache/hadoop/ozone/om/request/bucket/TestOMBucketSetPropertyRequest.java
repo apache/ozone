@@ -593,6 +593,132 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
             request, finalizedContext));
   }
 
+  @Test
+  public void testSetMaxVersions() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    // a bucket that never set a limit carries none, so the cluster default
+    // applies to it
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey)
+        .getMaxVersions());
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetMaxVersionsRequest(volumeName, bucketName, 5))
+        .validateAndUpdateCache(ozoneManager, 1);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(5,
+        omMetadataManager.getBucketTable().get(bucketKey).getMaxVersions());
+
+    // 0 is unlimited, and is a set value rather than a reset to the default
+    response = new OMBucketSetPropertyRequest(
+        createSetMaxVersionsRequest(volumeName, bucketName, 0))
+        .validateAndUpdateCache(ozoneManager, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(0,
+        omMetadataManager.getBucketTable().get(bucketKey).getMaxVersions());
+
+    // a request that does not carry maxVersions leaves it alone
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
+        .validateAndUpdateCache(ozoneManager, 3);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(0,
+        omMetadataManager.getBucketTable().get(bucketKey).getMaxVersions());
+  }
+
+  /**
+   * maxVersions is accepted on a bucket that is not versioned yet, so that the
+   * retention limit can be in place before versioning is enabled.
+   */
+  @Test
+  public void testSetMaxVersionsOnUnversionedBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetMaxVersionsRequest(volumeName, bucketName, 3))
+        .validateAndUpdateCache(ozoneManager, 1);
+
+    assertTrue(response.getOMResponse().getSuccess());
+    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(3, dbBucketInfo.getMaxVersions());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        dbBucketInfo.getVersioningStatus());
+  }
+
+  /**
+   * The wire type is uint32, so a value above Integer.MAX_VALUE arrives as a
+   * negative int and has to be refused rather than stored.
+   */
+  @Test
+  public void testMaxVersionsOutOfRangeRejected() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetMaxVersionsRequest(volumeName, bucketName, -1))
+        .validateAndUpdateCache(ozoneManager, 1);
+
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey)
+        .getMaxVersions());
+  }
+
+  @Test
+  public void testMaxVersionsRejectedBeforeFinalization() throws Exception {
+    OMRequest request = createSetMaxVersionsRequest(
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), 5);
+
+    OMLayoutVersionManager preFinalizedVersionManager =
+        mock(OMLayoutVersionManager.class);
+    when(preFinalizedVersionManager
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(false);
+    ValidationContext preFinalizedContext = ValidationContext.of(
+        preFinalizedVersionManager, omMetadataManager);
+
+    OMException omException = assertThrows(OMException.class,
+        () -> OMBucketSetPropertyRequest
+            .disallowSetBucketPropertyWithVersioningStatus(
+                request, preFinalizedContext));
+    assertEquals(OMException.ResultCodes
+            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omException.getResult());
+
+    OMLayoutVersionManager finalizedVersionManager =
+        mock(OMLayoutVersionManager.class);
+    when(finalizedVersionManager
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(true);
+    ValidationContext finalizedContext = ValidationContext.of(
+        finalizedVersionManager, omMetadataManager);
+    assertSame(request, OMBucketSetPropertyRequest
+        .disallowSetBucketPropertyWithVersioningStatus(
+            request, finalizedContext));
+  }
+
+  private OMRequest createSetMaxVersionsRequest(String volumeName,
+      String bucketName, int maxVersions) {
+    return OMRequest.newBuilder().setSetBucketPropertyRequest(
+        SetBucketPropertyRequest.newBuilder().setBucketArgs(
+            BucketArgs.newBuilder().setBucketName(bucketName)
+                .setVolumeName(volumeName)
+                .setMaxVersions(maxVersions).build()))
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
   private OMRequest createSetVersioningStatusRequest(String volumeName,
       String bucketName, BucketVersioningStatus status) {
     return OMRequest.newBuilder().setSetBucketPropertyRequest(

@@ -722,6 +722,25 @@ public final class OMConfigKeys {
   public static final Class<? extends VersionIdGenerator>
       OZONE_OM_VERSIONING_VERSION_ID_GENERATOR_DEFAULT = TransactionIndexVersionIdGenerator.class;
 
+  public static final String OZONE_OM_VERSIONING_MAX_VERSIONS =
+      "ozone.om.versioning.max.versions";
+  public static final int OZONE_OM_VERSIONING_MAX_VERSIONS_DEFAULT = 100;
+
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.version.cleanup.service.interval";
+  public static final String
+      OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL_DEFAULT = "1h";
+
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT =
+      "ozone.om.version.cleanup.service.timeout";
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "300s";
+
+  public static final String OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.version.cleanup.limit.per.task";
+  public static final int OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
+
   /**
    * Never constructed.
    */

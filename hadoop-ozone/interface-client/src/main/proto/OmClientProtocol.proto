@@ -162,6 +162,9 @@ enum Type {
   PutBucketTagging = 144;
   GetBucketTagging = 145;
   DeleteBucketTagging = 146;
+
+  // Submitted by VersionCleanupService to reclaim noncurrent object versions.
+  ReclaimObjectVersions = 147;
 }
 
 enum SafeMode {
@@ -321,6 +324,8 @@ message OMRequest {
   optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
   // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
+
+  optional ReclaimObjectVersionsRequest     reclaimObjectVersionsRequest     = 148;
 }
 
 message OMResponse {
@@ -463,6 +468,8 @@ message OMResponse {
   optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
   // TODO: Empty ack after OM clears BucketInfo.tags.
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
+
+  optional ReclaimObjectVersionsResponse     reclaimObjectVersionsResponse  = 147;
 }
 
 enum Status {
@@ -815,6 +822,11 @@ message BucketInfo {
     // S3-compatible object versioning status. When absent, derived from
     // isVersionEnabled (true -> VERSIONING_ENABLED, false -> UNVERSIONED).
     optional BucketVersioningStatusProto versioningStatus = 24;
+    // Maximum number of versions retained per key, counting the current
+    // version and delete markers. 0 means unlimited; when absent the cluster
+    // default applies. Versions beyond the limit are reclaimed oldest-first by
+    // VersionCleanupService.
+    optional uint32 maxVersions = 25;
 }
 
 enum BucketLayoutProto {
@@ -904,6 +916,8 @@ message BucketArgs {
     // S3-compatible object versioning status. Takes precedence over
     // isVersionEnabled when both are set.
     optional BucketVersioningStatusProto versioningStatus = 14;
+    // Maximum number of versions retained per key; 0 means unlimited.
+    optional uint32 maxVersions = 15;
 }
 
 message PrefixInfo {
@@ -1573,6 +1587,23 @@ message OpenKeyBucket {
 message OpenKey {
   required string name = 1;
   optional uint64 clientID = 2 [deprecated=true];
+}
+
+/**
+ * Noncurrent object versions of one bucket that VersionCleanupService selected
+ * for reclamation, addressed by their versionedKeyTable dbKeys.
+ */
+message ObjectVersionsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated string versionKeys = 3;
+}
+
+message ReclaimObjectVersionsRequest {
+  repeated ObjectVersionsBucket versionsPerBucket = 1;
+}
+
+message ReclaimObjectVersionsResponse {
 }
 
 message OMTokenProto {

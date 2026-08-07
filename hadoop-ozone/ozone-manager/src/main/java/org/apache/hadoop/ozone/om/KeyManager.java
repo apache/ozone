@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -225,6 +226,19 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
+
+  /**
+   * Returns the noncurrent object versions that exceed their bucket's
+   * maxVersions, oldest first, grouped by volume and bucket.
+   *
+   * @param defaultMaxVersions the limit applied to a bucket that sets none of
+   *                           its own; 0 means unlimited.
+   * @param limitPerTask the maximum number of versions to return.
+   * @return a {@link List} of {@link ObjectVersionsBucket}, the versions to
+   *         reclaim, grouped by volume and bucket.
+   */
+  List<ObjectVersionsBucket> getVersionsToReclaim(int defaultMaxVersions,
+      int limitPerTask) throws IOException;
 
   /**
    * Look up an existing key from the OM table and retrieve the tags from

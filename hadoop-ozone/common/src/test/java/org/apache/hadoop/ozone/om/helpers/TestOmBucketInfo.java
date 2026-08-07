@@ -141,6 +141,32 @@ public class TestOmBucketInfo {
   }
 
   @Test
+  public void maxVersionsProtobufConversion() {
+    // A bucket that sets no limit of its own stays distinguishable from one
+    // that set a limit explicitly, since the cluster default applies only to
+    // the former.
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .build();
+    assertNull(bucket.getMaxVersions());
+    assertFalse(bucket.getProtobuf().hasMaxVersions());
+    assertNull(OmBucketInfo.getFromProtobuf(bucket.getProtobuf())
+        .getMaxVersions());
+
+    bucket = bucket.toBuilder().setMaxVersions(5).build();
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(5, recovered.getMaxVersions());
+    assertEquals(bucket, recovered);
+
+    // 0 is "unlimited", which is a set value rather than an absent one
+    bucket = bucket.toBuilder().setMaxVersions(0).build();
+    recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(0, recovered.getMaxVersions());
+    assertTrue(bucket.getProtobuf().hasMaxVersions());
+  }
+
+  @Test
   public void protobufConversionOfBucketLink() {
     OmBucketInfo bucket = OmBucketInfo.newBuilder()
         .setBucketName("bucket")

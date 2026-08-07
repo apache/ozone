@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -376,6 +377,25 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
+
+  /**
+   * Returns the noncurrent object versions that exceed their bucket's
+   * maxVersions, oldest first, grouped by volume and bucket. The limit counts a
+   * key's current version and its delete markers along with the noncurrent
+   * ones, so a key with maxVersions {@code n} keeps at most {@code n - 1}
+   * noncurrent versions.
+   *
+   * <p>Only buckets that have ever been versioned are examined, and a bucket
+   * whose effective limit is 0 (unlimited) is skipped entirely.
+   *
+   * @param defaultMaxVersions the limit applied to a bucket that sets none of
+   *                           its own; 0 means unlimited.
+   * @param limitPerTask the maximum number of versions to return.
+   * @return a {@link List} of {@link ObjectVersionsBucket}, the versions to
+   *         reclaim, grouped by volume and bucket.
+   */
+  List<ObjectVersionsBucket> getVersionsToReclaim(int defaultMaxVersions,
+      int limitPerTask) throws IOException;
 
   /**
    * Returns the names of up to {@code count} MPU key whose age is greater
