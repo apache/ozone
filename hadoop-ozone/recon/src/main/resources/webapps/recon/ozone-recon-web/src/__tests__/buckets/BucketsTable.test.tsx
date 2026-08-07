@@ -107,6 +107,24 @@ describe('BucketsTable Replication Type column', () => {
         data={[getBucketWith('standalone-bucket', {
           type: 'STAND_ALONE',
           replicationConfig: {
+            replicationType: 'STANDALONE',
+            replicationFactor: 'ONE',
+            requiredNodes: 1
+          }
+        })]}
+      />
+    );
+
+    expect(screen.getByText('Standalone-1')).toBeInTheDocument();
+  });
+
+  test('renders the Standalone variant for the STAND_ALONE enum spelling', () => {
+    render(
+      <BucketsTable
+        {...defaultProps}
+        data={[getBucketWith('standalone-enum-bucket', {
+          type: 'STAND_ALONE',
+          replicationConfig: {
             replicationType: 'STAND_ALONE',
             replicationFactor: 'ONE',
             requiredNodes: 1

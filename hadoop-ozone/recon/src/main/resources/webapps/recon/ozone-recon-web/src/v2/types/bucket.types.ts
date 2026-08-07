@@ -38,9 +38,11 @@ export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 
 // Corresponds to the serialized org.apache.hadoop.hdds.client.RatisReplicationConfig
-// and StandaloneReplicationConfig
+// and StandaloneReplicationConfig. The latter serializes its replicationType as
+// STANDALONE, while the enum name used elsewhere is STAND_ALONE, so both spellings
+// can reach the UI.
 type BucketRatisReplicationConfig = {
-  replicationType: 'RATIS' | 'STAND_ALONE';
+  replicationType: 'RATIS' | 'STAND_ALONE' | 'STANDALONE';
   replicationFactor: string;
   requiredNodes: number;
 }

@@ -4759,7 +4759,7 @@
         "replicationConfigInfo": {
           "type": "STAND_ALONE",
           "replicationConfig": {
-            "replicationType": "STAND_ALONE",
+            "replicationType": "STANDALONE",
             "replicationFactor": "ONE",
             "requiredNodes": 1
           }
