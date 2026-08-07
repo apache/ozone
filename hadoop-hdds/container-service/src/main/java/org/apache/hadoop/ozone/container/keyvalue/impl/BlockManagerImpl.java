@@ -207,16 +207,28 @@ public class BlockManagerImpl implements BlockManager {
 
       long localID = data.getLocalID();
 
-      // PutBlock is not idempotent, so there should be only one PutBlock
-      // with the end-of-block flag set per block. (See HDDS-12007)
-      // A write reaching here is for a block that was already finalized by an eof PutBlock.
-      // Ignore it instead of corrupting the finalized block.
+      // PutBlock is not idempotent; ignore duplicate eof writes (HDDS-12007).
       if (container.isBlockFinalizedByEof(localID)) {
         LOG.warn("Ignoring write on block {} which has already been finalized "
             + "by a PutBlock with the end-of-block flag set. PutBlock is not "
             + "idempotent",
             data.getBlockID());
         return data.getSize();
+      }
+
+      // For the PutBlock that is endOfBlock and meanwhile bscId = 0, it means
+      // this PutBlock comes from data stream close without going through the
+      // Raft, thus there is no log index. In this case, we should not let
+      // 0 to overwrite previous possible PutBlocks from Ratis log that were
+      // generated during immediate flushes from the active data stream. Instead,
+      // we should load the latest bscid and reuse that id.
+      if (endOfBlock && bcsId == 0) {
+        BlockData existing = db.getStore().getBlockDataTable()
+            .get(containerData.getBlockKey(localID));
+        if (existing != null) {
+          bcsId = existing.getBlockCommitSequenceId();
+          data.setBlockCommitSequenceId(bcsId);
+        }
       }
 
       // Check if the block is present in the pendingPutBlockCache for the

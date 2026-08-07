@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UN
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.normalizeContentEncoding;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
@@ -148,6 +149,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
         .add(new MultipartKeyHandler())
@@ -272,6 +274,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
@@ -364,6 +367,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   ) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
+      validateObjectKeyUri(keyPath);
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
       throw newError(bucketName, keyPath, ex);
@@ -479,14 +483,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
 
       for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-        String headerValue = getHeaders().getHeaderString(entry.getKey());
-        String queryValue = queryParams.getFirst(entry.getValue());
-        if (queryValue != null) {
-          headerValue = queryValue;
-        }
-        if (headerValue != null) {
-          responseBuilder.header(entry.getKey(), headerValue);
-        }
+        addStoredObjectHeader(responseBuilder, keyDetails, queryParams, entry.getKey(),
+            entry.getValue());
       }
 
       addLastModifiedDate(responseBuilder, keyDetails);
@@ -524,6 +522,45 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         getHeaders().getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE);
     if (contentType != null) {
       metadata.put(HttpHeaders.CONTENT_TYPE, contentType);
+    }
+  }
+
+  /**
+   * Store standard S3 object headers from the PUT request in key metadata.
+   */
+  private void putStandardObjectHeaders(Map<String, String> metadata) {
+    for (String headerName : overrideQueryParameter.keySet()) {
+      String value = getHeaders().getHeaderString(headerName);
+      if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+        value = normalizeContentEncoding(value);
+      }
+      if (value != null) {
+        metadata.put(headerName, value);
+      }
+    }
+  }
+
+  private void addStoredObjectHeader(ResponseBuilder responseBuilder, OzoneKey key,
+      MultivaluedMap<String, String> queryParams, String headerName,
+      String responseOverrideParam) {
+    String headerValue = queryParams.getFirst(responseOverrideParam);
+    if (headerValue == null) {
+      headerValue = key.getMetadata().get(headerName);
+    }
+    if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+      headerValue = normalizeContentEncoding(headerValue);
+    }
+    if (headerValue != null) {
+      responseBuilder.header(headerName, headerValue);
+    }
+  }
+
+  private void addStoredObjectHeaders(ResponseBuilder responseBuilder, OzoneKey key) {
+    MultivaluedMap<String, String> queryParams =
+        getContext().getUriInfo().getQueryParameters();
+    for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
+      addStoredObjectHeader(responseBuilder, key, queryParams, entry.getKey(),
+          entry.getValue());
     }
   }
 
@@ -642,6 +679,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
     addEntityTagHeader(response, key);
+    addStoredObjectHeaders(response, key);
 
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
@@ -755,6 +793,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
@@ -1183,8 +1222,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
-        // REPLACE: Content-Type comes from the request, not the source.
+        // REPLACE: Content-Type and standard object headers come from the request.
         putContentType(customMetadata);
+        putStandardObjectHeaders(customMetadata);
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +

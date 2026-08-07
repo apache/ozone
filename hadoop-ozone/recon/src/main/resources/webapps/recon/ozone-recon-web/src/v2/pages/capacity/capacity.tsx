@@ -100,11 +100,20 @@ const Capacity: React.FC<object> = () => {
     return storageDistribution.data.dataNodeUsage.filter(dn => pendingHostNames.has(dn.hostName));
   }, [storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
-  // Seed selected datanode once data loads so dependent calculations work
+  // Seed selected datanode once data loads so dependent calculations work.
+  // Prefer the first available DN so the user does not land on the error card
+  // while a healthy DN exists; fall back to the first DN (surfacing the error
+  // card) only when every DN is unavailable.
   React.useEffect(() => {
     const hostNames = filteredDNs.map(dn => dn.hostName);
     if (!hostNames.includes(selectedDatanode)) {
-      setSelectedDatanode(hostNames[0] ?? "");
+      const unavailableHosts = new Set(
+        (dnPendingDeletes.data.pendingDeletionPerDataNode ?? [])
+          .filter(dn => dn.pendingBlockSize === -1)
+          .map(dn => dn.hostName)
+      );
+      const firstAvailable = hostNames.find(hostName => !unavailableHosts.has(hostName));
+      setSelectedDatanode(firstAvailable ?? hostNames[0] ?? "");
     }
   }, [filteredDNs]);
 
@@ -132,7 +141,10 @@ const Capacity: React.FC<object> = () => {
 
   const autoReload = useAutoReload(loadDataIfIdle);
 
-  const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
+  const selectedDNDetails: DataNodeUsage & {
+    pendingBlockSize: number;
+    unavailable: boolean;
+  } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
       ?? storageDistribution.data.dataNodeUsage[0];
     const dnPendingEntry = dnPendingDeletes.data.pendingDeletionPerDataNode?.find(
@@ -150,7 +162,10 @@ const Capacity: React.FC<object> = () => {
         reserved: 0
       }),
       ...dnPendingEntry,
-      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize)
+      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize),
+      // -1 is the sentinel for a DN whose pending deletion query failed (offline/unreachable).
+      // Its capacity data from the storage report may be outdated, so surface an error instead.
+      unavailable: dnPendingEntry.pendingBlockSize === -1
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
@@ -491,6 +506,7 @@ const Capacity: React.FC<object> = () => {
             downloadUrl={DN_CSV_DOWNLOAD_URL}
             onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}
+            selectedValue={selectedDatanode}
             dropdownItems={filteredDNs.map(datanode => ({
               label: (
                 <>
@@ -510,6 +526,9 @@ const Capacity: React.FC<object> = () => {
             dataDetails={[{
               title: 'USED SPACE',
               size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingBlockSize ?? 0),
+              hasError: selectedDNDetails.unavailable,
+              errorMessage: 'Datanode is unavailable; capacity data may be outdated.',
+              errorTestId: 'dn-used-space-error',
               breakdown: [{
                 label: 'PENDING DELETION',
                 value: selectedDNDetails.pendingBlockSize ?? 0,
@@ -522,6 +541,9 @@ const Capacity: React.FC<object> = () => {
             }, {
               title: 'FREE SPACE',
               size: (selectedDNDetails.remaining ?? 0) + (selectedDNDetails.committed ?? 0),
+              hasError: selectedDNDetails.unavailable,
+              errorMessage: 'Datanode is unavailable; capacity data may be outdated.',
+              errorTestId: 'dn-free-space-error',
               breakdown: [{
                 label: unusedSpaceBreakdown,
                 value: selectedDNDetails.remaining ?? 0,
