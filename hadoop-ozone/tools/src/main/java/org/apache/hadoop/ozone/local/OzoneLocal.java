@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.local;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +61,8 @@ public class OzoneLocal extends GenericCli {
   static final String ENV_OM_PORT = "OZONE_LOCAL_OM_PORT";
   static final String ENV_S3G_ENABLED = "OZONE_LOCAL_S3G_ENABLED";
   static final String ENV_S3G_PORT = "OZONE_LOCAL_S3G_PORT";
+  static final String ENV_RECON_ENABLED = "OZONE_LOCAL_RECON_ENABLED";
+  static final String ENV_RECON_PORT = "OZONE_LOCAL_RECON_PORT";
   static final String ENV_EPHEMERAL = "OZONE_LOCAL_EPHEMERAL";
   static final String ENV_STARTUP_TIMEOUT = "OZONE_LOCAL_STARTUP_TIMEOUT";
   static final String ENV_S3_ACCESS_KEY = "OZONE_LOCAL_S3_ACCESS_KEY";
@@ -86,6 +90,12 @@ public class OzoneLocal extends GenericCli {
       + LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE + "}";
   private static final String DEFAULT_S3G_PORT_VALUE = "${env:" + ENV_S3G_PORT
       + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE + "}";
+  private static final String DEFAULT_RECON_ENABLED_VALUE = "${env:"
+      + ENV_RECON_ENABLED + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE + "}";
+  private static final String DEFAULT_RECON_PORT_VALUE = "${env:"
+      + ENV_RECON_PORT + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE
+      + "}";
   private static final String DEFAULT_EPHEMERAL_VALUE = "${env:"
       + ENV_EPHEMERAL + ":-"
       + LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE + "}";
@@ -114,7 +124,7 @@ public class OzoneLocal extends GenericCli {
   }
 
   @Command(name = "run",
-      description = "Start SCM, OM, and datanodes in one local process")
+      description = "Start SCM, OM, datanodes, and optional S3 Gateway and Recon in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -140,7 +150,7 @@ public class OzoneLocal extends GenericCli {
 
     @Option(names = "--bind-host",
         defaultValue = DEFAULT_BIND_HOST_VALUE,
-        description = "Bind host for HTTP and RPC listeners")
+        description = "Bind host for HTTP and RPC listeners (use 0.0.0.0 to listen on all interfaces)")
     private String bindHost;
 
     @Option(names = "--scm-port",
@@ -164,6 +174,18 @@ public class OzoneLocal extends GenericCli {
         fallbackValue = "true",
         description = "Enable S3 Gateway")
     private boolean s3gEnabled;
+
+    @Option(names = "--recon-port",
+        defaultValue = DEFAULT_RECON_PORT_VALUE,
+        description = "Recon HTTP port (0 means auto-allocate)")
+    private int reconPort;
+
+    @Option(names = "--recon",
+        negatable = true,
+        defaultValue = DEFAULT_RECON_ENABLED_VALUE,
+        fallbackValue = "true",
+        description = "Enable Recon")
+    private boolean reconEnabled;
 
     @Option(names = "--ephemeral",
         negatable = true,
@@ -197,11 +219,56 @@ public class OzoneLocal extends GenericCli {
     public Void call() throws Exception {
       LocalOzoneClusterConfig config = resolveConfig();
       try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
-        runtime.start();
+        start(runtime);
         printSummary(runtime, config);
         awaitShutdown(runtime);
       }
       return null;
+    }
+
+    /**
+     * Starts {@code runtime}, restating a failure in a form the user can act on. Service logs are
+     * off by default for this command, so the detail goes to the log for {@code --loglevel INFO}
+     * while the message keeps {@link GenericCli}'s single-line path: an exception with no message
+     * would otherwise print a raw stack trace.
+     */
+    private void start(LocalOzoneRuntime runtime) throws Exception {
+      try {
+        runtime.start();
+      } catch (Exception ex) {
+        LOG.error("Local Ozone cluster failed to start.", ex);
+        throw new IOException("Local Ozone failed to start: " + failureMessage(ex)
+            + " Re-run with `ozone --loglevel INFO local run` for service logs,"
+            + " or add --verbose for the full stack trace.", ex);
+      } finally {
+        reportDiscardedConfig(runtime);
+      }
+    }
+
+    /**
+     * Reports configuration the local runtime had to replace. The runtime also logs each
+     * replacement, but service logging is off by default for this command, so the keys are
+     * repeated here where the user will actually see them. Reported even when startup fails:
+     * a discarded override can be the very setting the user is debugging.
+     */
+    private void reportDiscardedConfig(LocalOzoneRuntime runtime) {
+      List<String> discarded = runtime.getDiscardedUserConfigKeys();
+      if (!discarded.isEmpty()) {
+        err().println("Ignoring configured " + String.join(", ", discarded)
+            + ": ozone local requires its own values for these."
+            + " Re-run with `ozone --loglevel INFO local run` to see them.");
+      }
+    }
+
+    /** Returns the nearest message in {@code error}'s cause chain, since the outermost may be null. */
+    private static String failureMessage(Throwable error) {
+      for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+        String message = cause.getMessage();
+        if (message != null && !message.isEmpty()) {
+          return message.endsWith(".") ? message : message + ".";
+        }
+      }
+      return error.getClass().getSimpleName() + ".";
     }
 
     LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
@@ -213,6 +280,20 @@ public class OzoneLocal extends GenericCli {
       writer.println("Local Ozone is running from " + config.getDataDir());
       writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
       writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("Datanodes: " + config.getDatanodes());
+      if (config.isS3gEnabled()) {
+        writer.println("S3 endpoint: " + runtime.getS3Endpoint());
+        writer.println("Suggested local AWS settings:");
+        writer.println("AWS_ACCESS_KEY_ID=" + config.getS3AccessKey());
+        writer.println("AWS_SECRET_ACCESS_KEY=" + config.getS3SecretKey());
+        writer.println("AWS_REGION=" + config.getS3Region());
+        writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
+        writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
+        writer.println("These credentials are pre-provisioned for the local S3 Gateway.");
+      }
+      if (config.isReconEnabled()) {
+        writer.println("Recon endpoint: " + runtime.getReconEndpoint());
+      }
       writer.println("Press Ctrl+C to stop.");
       writer.flush();
     }
@@ -252,6 +333,7 @@ public class OzoneLocal extends GenericCli {
       validatePort(scmPort, "--scm-port");
       validatePort(omPort, "--om-port");
       validatePort(s3gPort, "--s3g-port");
+      validatePort(reconPort, "--recon-port");
       validateStartupTimeout();
 
       return LocalOzoneClusterConfig.builder(dataDir)
@@ -263,6 +345,8 @@ public class OzoneLocal extends GenericCli {
           .setOmPort(omPort)
           .setS3gPort(s3gPort)
           .setS3gEnabled(s3gEnabled)
+          .setReconPort(reconPort)
+          .setReconEnabled(reconEnabled)
           .setEphemeral(ephemeral)
           .setStartupTimeout(startupTimeout)
           .setS3AccessKey(s3AccessKey)
@@ -293,8 +377,11 @@ public class OzoneLocal extends GenericCli {
         try {
           return LocalOzoneClusterConfig.FormatMode.fromString(value);
         } catch (IllegalArgumentException ex) {
-          throw new CommandLine.TypeConversionException(
-              "Expected one of: if-needed, always, never.");
+          // The value can come from OZONE_LOCAL_FORMAT, so name it: the user may not realize the
+          // environment supplied it. picocli's conversion-error line names the option but not the
+          // value, so the message has to carry it.
+          throw new CommandLine.TypeConversionException("Invalid format mode '" + value
+              + "'. Expected one of: if-needed, always, never.");
         }
       }
     }
@@ -304,19 +391,29 @@ public class OzoneLocal extends GenericCli {
 
       @Override
       public Duration convert(String value) {
+        String trimmed = value.trim();
         try {
-          return Duration.parse(value.trim());
+          return Duration.parse(trimmed);
         } catch (DateTimeParseException ignored) {
-          return parseHadoopStyleDuration(value);
+          return parseHadoopStyleDuration(trimmed);
         }
       }
 
       private static Duration parseHadoopStyleDuration(String value) {
+        // TimeDurationUtil.getDuration() only warns about a missing unit and then assumes the one
+        // it is given, which would read "120" as 120 milliseconds. Reject it instead of silently
+        // interpreting the value a thousand times smaller than the user meant. Every unit suffix
+        // TimeDurationUtil accepts ends in a letter, so a trailing digit means the unit is missing.
+        if (!value.isEmpty() && Character.isDigit(value.charAt(value.length() - 1))) {
+          throw new CommandLine.TypeConversionException("Missing time unit in '" + value
+              + "'. " + durationMessage());
+        }
         try {
           return TimeDurationUtil.getDuration("--startup-timeout", value,
               TimeUnit.MILLISECONDS);
         } catch (RuntimeException ex) {
-          throw new CommandLine.TypeConversionException(durationMessage());
+          throw new CommandLine.TypeConversionException("Invalid duration '" + value
+              + "'. " + durationMessage());
         }
       }
 
