@@ -571,7 +571,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, SnapshotInfo> snapshotInfoTable = omMetadataManager.getSnapshotInfoTable();
     Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
     Table<String, String> renameTable = omMetadataManager.getSnapshotRenamedTable();
-    cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().shutdown();
+    cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().suspend();
     DirectoryDeletingService dirDeletingService = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
     // Suspend KeyDeletingService
     dirDeletingService.suspend();
@@ -659,23 +659,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     service.runPeriodicalTaskNow();
     store.deleteSnapshot(testVolumeName, testBucketName, snap1);
     cluster.getOzoneManager().awaitDoubleBufferFlush();
-    cluster.restartOzoneManager();
-    cluster.waitForClusterToBeReady();
-    cluster.getOzoneManager().awaitDoubleBufferFlush();
-    SnapshotDeletingService snapshotDeletingService =
-        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService();
-    GenericTestUtils.waitFor(() -> {
-      try {
-        snapshotDeletingService.runPeriodicalTaskNow();
-        cluster.getOzoneManager().awaitDoubleBufferFlush();
-        long currentSnapshotCount = cluster.getOzoneManager().getMetadataManager()
-            .countRowsInTable(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable());
-        return currentSnapshotCount <= initialSnapshotCount;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 100, 10000);
-    assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
+    waitForSnapshotsPurged(snapshotInfoTable, initialSnapshotCount);
     dirDeletingService.resume();
   }
 
@@ -789,6 +773,8 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     // Manual cleanup deletedDirTable for next tests
     client.getObjectStore().deleteSnapshot(volumeName, bucketName, "snap1");
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    waitForSnapshotsPurged(snapshotInfoTable, 0);
     cleanupTables();
   }
 
@@ -821,6 +807,28 @@ public class TestDirectoryDeletingServiceWithFSO {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pathCount.getAsLong() >= expectedCount,
         1000, 120000);
+  }
+
+  /**
+   * Wait until SnapshotDeletingService has purged snapshots and snapshotInfoTable
+   * reaches the expected row count.
+   */
+  private void waitForSnapshotsPurged(Table<String, SnapshotInfo> snapshotInfoTable,
+      int expectedCount) throws Exception {
+    SnapshotDeletingService snapshotDeletingService =
+        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService();
+    snapshotDeletingService.resume();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        snapshotDeletingService.runPeriodicalTaskNow();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        return cluster.getOzoneManager().getMetadataManager()
+            .countRowsInTable(snapshotInfoTable) == expectedCount;
+} catch (Exception e) {
+  throw new RuntimeException("Failed to run SnapshotDeletingService purge task", e);
+}
+    }, 1000, 120000);
+    assertTableRowCount(snapshotInfoTable, expectedCount);
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)
