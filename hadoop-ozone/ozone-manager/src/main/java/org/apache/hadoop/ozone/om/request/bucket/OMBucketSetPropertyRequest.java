@@ -224,6 +224,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             newMaxVersions, bucketName, volumeName);
       }
 
+      Integer newExpirationDays = omBucketArgs.getNoncurrentVersionExpirationDays();
+      if (newExpirationDays != null) {
+        OMBucketCreateRequest.validateNoncurrentVersionExpirationDays(newExpirationDays);
+        bucketInfoBuilder.setNoncurrentVersionExpirationDays(newExpirationDays);
+        LOG.debug("Updating noncurrentVersionExpirationDays to {} for bucket: {} in volume: {}",
+            newExpirationDays, bucketName, volumeName);
+      }
+
       //Check quotaInBytes and quotaInNamespace to update
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
@@ -441,11 +449,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
       if (propReq.hasBucketArgs()
-          && propReq.getBucketArgs().hasMaxVersions()) {
+          && (propReq.getBucketArgs().hasMaxVersions()
+              || propReq.getBucketArgs().hasNoncurrentVersionExpirationDays())) {
         throw new OMException("Cluster does not have the object versioning"
-            + " feature finalized yet, but the request contains maxVersions."
-            + " Rejecting the request, please finalize the cluster upgrade and"
-            + " then try again.",
+            + " feature finalized yet, but the request contains version"
+            + " retention settings. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

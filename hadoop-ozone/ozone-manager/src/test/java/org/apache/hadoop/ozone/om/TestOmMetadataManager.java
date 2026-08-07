@@ -301,8 +301,114 @@ public class TestOmMetadataManager {
     assertEquals(4, collected);
   }
 
+  /**
+   * A version becomes noncurrent when the version that superseded it was
+   * committed, as S3 lifecycle's NoncurrentDays does. The record itself does
+   * not carry that moment, so the scan takes it from the next-newer version -
+   * the key's current version for the newest noncurrent one.
+   */
+  @Test
+  public void testGetVersionsToReclaimExpiresFromWhenSuperseded()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 10);
+
+    long now = Time.now();
+    long longAgo = now - TimeUnit.DAYS.toMillis(30);
+    // version 1 was superseded long ago by version 2, so it is expired;
+    // version 2 was superseded just now by the current version, so it is not,
+    // even though version 2 itself is just as old as version 1
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    assertEquals(1, reclaimable.size());
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  @Test
+  public void testGetVersionsToReclaimKeepsUnexpiredVersions()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 10);
+
+    long now = Time.now();
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, now);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+
+    assertThat(omMetadataManager.getVersionsToReclaim(0, 1000)).isEmpty();
+  }
+
+  /**
+   * Expiring on a missing current version would destroy data on a broken
+   * invariant, so a key without one keeps its versions.
+   */
+  @Test
+  public void testGetVersionsToReclaimSkipsExpiryWithoutCurrentVersion()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 1);
+
+    long longAgo = Time.now() - TimeUnit.DAYS.toMillis(30);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    // no keyTable entry for key1
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    // version 1 is still expired: version 2 superseded it long ago. Only the
+    // newest one, whose superseding time is unknown, is kept.
+    assertEquals(1, reclaimable.size());
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  /** Either control on its own is enough to select a version. */
+  @Test
+  public void testGetVersionsToReclaimCombinesCountAndExpiry()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 3, 10);
+
+    long now = Time.now();
+    long longAgo = now - TimeUnit.DAYS.toMillis(30);
+    // key1 is within its count limit but version 1 expired
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+    // key2 has nothing expired but exceeds maxVersions of 3
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 1L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 2L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 3L, now);
+    addCurrentVersionWithTime(volumeName, bucketName, "key2", 4L, now);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    assertEquals(1, reclaimable.size());
+    List<String> expected = new ArrayList<>();
+    expected.addAll(versionKeys(volumeName, bucketName, "key1", 1));
+    expected.addAll(versionKeys(volumeName, bucketName, "key2", 1));
+    assertEquals(expected, reclaimable.get(0).getVersionKeysList());
+  }
+
   private void addVersionedBucketToDB(String volumeName, String bucketName,
       Integer maxVersions) throws Exception {
+    addVersionedBucketToDB(volumeName, bucketName, maxVersions, null);
+  }
+
+  private void addVersionedBucketToDB(String volumeName, String bucketName,
+      Integer maxVersions, Integer expirationDays) throws Exception {
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -312,8 +418,42 @@ public class TestOmMetadataManager {
     if (maxVersions != null) {
       builder.setMaxVersions(maxVersions);
     }
+    if (expirationDays != null) {
+      builder.setNoncurrentVersionExpirationDays(expirationDays);
+    }
     omMetadataManager.getBucketTable().put(
         omMetadataManager.getBucketKey(volumeName, bucketName), builder.build());
+  }
+
+  private void addNoncurrentVersionWithTime(String volumeName,
+      String bucketName, String keyName, long versionId,
+      long modificationTime) throws Exception {
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName,
+            versionId),
+        versionWithTime(volumeName, bucketName, keyName, versionId,
+            modificationTime));
+  }
+
+  private void addCurrentVersionWithTime(String volumeName, String bucketName,
+      String keyName, long versionId, long modificationTime) throws Exception {
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+        versionWithTime(volumeName, bucketName, keyName, versionId,
+            modificationTime));
+  }
+
+  private OmKeyInfo versionWithTime(String volumeName, String bucketName,
+      String keyName, long versionId, long modificationTime) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setVersionId(versionId)
+        .setCreationTime(modificationTime)
+        .setModificationTime(modificationTime)
+        .build();
   }
 
   private void addNoncurrentVersionsToDB(String volumeName, String bucketName,

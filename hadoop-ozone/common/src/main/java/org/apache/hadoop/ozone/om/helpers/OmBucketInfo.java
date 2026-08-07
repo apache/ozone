@@ -72,6 +72,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final Integer maxVersions;
   /**
+   * Days a version is retained after becoming noncurrent; null or 0 when
+   * versions are retained forever.
+   */
+  private final Integer noncurrentVersionExpirationDays;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -136,6 +141,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.isVersionEnabled = b.versioningStatus != null
         ? b.versioningStatus.toVersionEnabledFlag() : b.isVersionEnabled;
     this.maxVersions = b.maxVersions;
+    this.noncurrentVersionExpirationDays = b.noncurrentVersionExpirationDays;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
     this.modificationTime = b.modificationTime;
@@ -253,6 +259,16 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   public Integer getMaxVersions() {
     return maxVersions;
+  }
+
+  /**
+   * Returns the number of days a version is retained after becoming
+   * noncurrent, or null when the bucket sets none. 0 and null both mean
+   * versions are retained forever; expiration is opt-in.
+   * @return noncurrentVersionExpirationDays, or null if not set
+   */
+  public Integer getNoncurrentVersionExpirationDays() {
+    return noncurrentVersionExpirationDays;
   }
 
   /**
@@ -424,6 +440,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         this.versioningStatus != null ? this.versioningStatus.name() : null);
     auditMap.put(OzoneConsts.MAX_VERSIONS,
         this.maxVersions != null ? String.valueOf(this.maxVersions) : null);
+    auditMap.put(OzoneConsts.NONCURRENT_VERSION_EXPIRATION_DAYS,
+        this.noncurrentVersionExpirationDays != null
+            ? String.valueOf(this.noncurrentVersionExpirationDays) : null);
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
@@ -467,6 +486,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setIsVersionEnabled(isVersionEnabled)
         .setVersioningStatus(versioningStatus)
         .setMaxVersions(maxVersions)
+        .setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setBucketEncryptionKey(bekInfo)
@@ -494,6 +514,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private boolean isVersionEnabled;
     private BucketVersioningStatus versioningStatus;
     private Integer maxVersions;
+    private Integer noncurrentVersionExpirationDays;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
     private long modificationTime;
@@ -574,6 +595,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     public Builder setMaxVersions(Integer limit) {
       if (limit != null) {
         this.maxVersions = limit;
+      }
+      return this;
+    }
+
+    /** No-op when days is null, so that an unset value keeps the current one. */
+    public Builder setNoncurrentVersionExpirationDays(Integer days) {
+      if (days != null) {
+        this.noncurrentVersionExpirationDays = days;
       }
       return this;
     }
@@ -735,6 +764,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (maxVersions != null) {
       bib.setMaxVersions(maxVersions);
     }
+    if (noncurrentVersionExpirationDays != null) {
+      bib.setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays);
+    }
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -784,6 +816,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
             : null)
         .setMaxVersions(bucketInfo.hasMaxVersions()
             ? bucketInfo.getMaxVersions() : null)
+        .setNoncurrentVersionExpirationDays(
+            bucketInfo.hasNoncurrentVersionExpirationDays()
+                ? bucketInfo.getNoncurrentVersionExpirationDays() : null)
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
         .setUsedBytes(bucketInfo.getUsedBytes())
@@ -892,6 +927,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(isVersionEnabled, that.isVersionEnabled) &&
         versioningStatus == that.versioningStatus &&
         Objects.equals(maxVersions, that.maxVersions) &&
+        Objects.equals(noncurrentVersionExpirationDays, that.noncurrentVersionExpirationDays) &&
         storageType == that.storageType &&
         getObjectID() == that.getObjectID() &&
         getUpdateID() == that.getUpdateID() &&
@@ -922,6 +958,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", isVersionEnabled=" + isVersionEnabled +
         ", versioningStatus=" + versioningStatus +
         ", maxVersions=" + maxVersions +
+        ", noncurrentVersionExpirationDays=" + noncurrentVersionExpirationDays +
         ", storageType=" + storageType +
         ", creationTime=" + creationTime +
         ", bekInfo=" + bekInfo +

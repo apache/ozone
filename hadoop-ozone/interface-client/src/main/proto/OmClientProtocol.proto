@@ -827,6 +827,10 @@ message BucketInfo {
     // default applies. Versions beyond the limit are reclaimed oldest-first by
     // VersionCleanupService.
     optional uint32 maxVersions = 25;
+    // Days a version is retained after becoming noncurrent, counted from the
+    // moment the version that superseded it was committed, as S3 lifecycle's
+    // NoncurrentDays is. 0 or absent means versions are retained forever.
+    optional uint32 noncurrentVersionExpirationDays = 26;
 }
 
 enum BucketLayoutProto {
@@ -918,6 +922,8 @@ message BucketArgs {
     optional BucketVersioningStatusProto versioningStatus = 14;
     // Maximum number of versions retained per key; 0 means unlimited.
     optional uint32 maxVersions = 15;
+    // Days a version is retained after becoming noncurrent; 0 means forever.
+    optional uint32 noncurrentVersionExpirationDays = 16;
 }
 
 message PrefixInfo {

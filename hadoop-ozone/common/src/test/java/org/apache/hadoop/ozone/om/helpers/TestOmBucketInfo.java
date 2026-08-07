@@ -167,6 +167,22 @@ public class TestOmBucketInfo {
   }
 
   @Test
+  public void noncurrentVersionExpirationProtobufConversion() {
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .build();
+    // expiration is opt-in, so an unset bucket retains versions forever
+    assertNull(bucket.getNoncurrentVersionExpirationDays());
+    assertFalse(bucket.getProtobuf().hasNoncurrentVersionExpirationDays());
+
+    bucket = bucket.toBuilder().setNoncurrentVersionExpirationDays(30).build();
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(30, recovered.getNoncurrentVersionExpirationDays());
+    assertEquals(bucket, recovered);
+  }
+
+  @Test
   public void protobufConversionOfBucketLink() {
     OmBucketInfo bucket = OmBucketInfo.newBuilder()
         .setBucketName("bucket")

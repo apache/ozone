@@ -708,6 +708,65 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
             request, finalizedContext));
   }
 
+  @Test
+  public void testSetNoncurrentVersionExpirationDays() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    // expiration is opt-in: a bucket that never set it retains versions forever
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey)
+        .getNoncurrentVersionExpirationDays());
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetExpirationRequest(volumeName, bucketName, 30))
+        .validateAndUpdateCache(ozoneManager, 1);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(30, omMetadataManager.getBucketTable().get(bucketKey)
+        .getNoncurrentVersionExpirationDays());
+
+    // setting it back to 0 turns expiration off again
+    response = new OMBucketSetPropertyRequest(
+        createSetExpirationRequest(volumeName, bucketName, 0))
+        .validateAndUpdateCache(ozoneManager, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(0, omMetadataManager.getBucketTable().get(bucketKey)
+        .getNoncurrentVersionExpirationDays());
+  }
+
+  @Test
+  public void testNoncurrentVersionExpirationOutOfRangeRejected()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetExpirationRequest(volumeName, bucketName, -1))
+        .validateAndUpdateCache(ozoneManager, 1);
+
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey)
+        .getNoncurrentVersionExpirationDays());
+  }
+
+  private OMRequest createSetExpirationRequest(String volumeName,
+      String bucketName, int days) {
+    return OMRequest.newBuilder().setSetBucketPropertyRequest(
+        SetBucketPropertyRequest.newBuilder().setBucketArgs(
+            BucketArgs.newBuilder().setBucketName(bucketName)
+                .setVolumeName(volumeName)
+                .setNoncurrentVersionExpirationDays(days).build()))
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+        .setClientId(UUID.randomUUID().toString()).build();
+  }
+
   private OMRequest createSetMaxVersionsRequest(String volumeName,
       String bucketName, int maxVersions) {
     return OMRequest.newBuilder().setSetBucketPropertyRequest(

@@ -71,6 +71,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -1554,32 +1555,60 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         }
         int maxVersions = bucketInfo.getMaxVersions() != null
             ? bucketInfo.getMaxVersions() : defaultMaxVersions;
-        if (maxVersions <= 0) {
+        Integer expirationDays = bucketInfo.getNoncurrentVersionExpirationDays();
+        // Expiration is opt-in, so a bucket with neither control set has
+        // nothing to reclaim and is skipped without a single seek.
+        final boolean expires = expirationDays != null && expirationDays > 0;
+        if (maxVersions <= 0 && !expires) {
           continue;
         }
 
         ObjectVersionsBucket.Builder bucketBuilder = null;
         // The current version lives in the keyTable and counts toward the
         // limit, so this is how many noncurrent versions a key may keep.
-        final int allowedNoncurrent = maxVersions - 1;
+        // A limit of 0 is unlimited, and only expiration applies.
+        final int allowedNoncurrent =
+            maxVersions <= 0 ? Integer.MAX_VALUE : maxVersions - 1;
+        final long expiredBefore = expires
+            ? Time.now() - TimeUnit.DAYS.toMillis(expirationDays) : 0L;
         final String bucketPrefix = getBucketKey(bucketInfo.getVolumeName(),
             bucketInfo.getBucketName()) + OM_KEY_PREFIX;
         String currentKeyPrefix = null;
         int seenInKey = 0;
+        // When the version that superseded this one was committed, which is
+        // when this one became noncurrent. Only read when expiration applies.
+        long becameNoncurrentAt = 0L;
 
         try (Table.KeyValueIterator<String, OmKeyInfo> versions =
                  getVersionedKeyTable().iterator(bucketPrefix)) {
           while (collected < limitPerTask && versions.hasNext()) {
-            String dbKey = versions.next().getKey();
+            Table.KeyValue<String, OmKeyInfo> entry = versions.next();
+            String dbKey = entry.getKey();
             // All versions of a key are contiguous and ordered newest first,
             // so a change of prefix starts a new key and restarts the count.
-            String keyPrefix = dbKey.substring(0,
-                dbKey.indexOf(OM_VERSIONED_KEY_SEPARATOR) + 1);
+            int separator = dbKey.indexOf(OM_VERSIONED_KEY_SEPARATOR);
+            String keyPrefix = dbKey.substring(0, separator + 1);
             if (!keyPrefix.equals(currentKeyPrefix)) {
               currentKeyPrefix = keyPrefix;
               seenInKey = 0;
+              if (expires) {
+                // The newest noncurrent version was superseded by the key's
+                // current version, which is the one the keyTable holds.
+                becameNoncurrentAt = supersedingTime(bucketInfo,
+                    dbKey.substring(bucketPrefix.length(), separator));
+              }
             }
-            if (seenInKey++ < allowedNoncurrent) {
+
+            boolean overLimit = seenInKey++ >= allowedNoncurrent;
+            boolean expired = false;
+            if (expires) {
+              expired = becameNoncurrentAt > 0
+                  && becameNoncurrentAt <= expiredBefore;
+              // Walking a key newest first, the version just visited is the
+              // one that superseded the next one.
+              becameNoncurrentAt = entry.getValue().getModificationTime();
+            }
+            if (!overLimit && !expired) {
               continue;
             }
             if (bucketBuilder == null) {
@@ -1599,6 +1628,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return reclaimable;
+  }
+
+  /**
+   * When the key's current version was committed, which is the moment the
+   * newest noncurrent version stopped being current. Returns 0 when the key
+   * has no current version, which leaves its versions unexpired: the keyTable
+   * holds the current version of every key that still has one, so this only
+   * happens if that invariant is broken, and expiring on a broken invariant
+   * would destroy data.
+   */
+  private long supersedingTime(OmBucketInfo bucketInfo, String keyName)
+      throws IOException {
+    // S3 versioning is supported on OBJECT_STORE buckets only.
+    OmKeyInfo current = getKeyTable(BucketLayout.OBJECT_STORE).get(
+        getOzoneKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+            keyName));
+    return current == null ? 0L : current.getModificationTime();
   }
 
   @Override

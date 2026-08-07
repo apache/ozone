@@ -175,6 +175,8 @@ public class VersionCleanupService extends BackgroundService {
             + "elapsed time: {}ms", numVersions,
             Time.monotonicNow() - startTime);
         submittedVersionCount.addAndGet(numVersions);
+        ozoneManager.getDeletionMetrics()
+            .incrNumObjectVersionsSentForReclaim(numVersions);
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }

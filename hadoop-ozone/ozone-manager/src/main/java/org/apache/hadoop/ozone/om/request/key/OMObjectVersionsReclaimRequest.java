@@ -112,6 +112,8 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
           omResponse.build(), reclaimedVersionKeys, keysToDelete,
           updatedBuckets);
 
+      ozoneManager.getDeletionMetrics()
+          .incrNumObjectVersionsReclaimed(reclaimedVersionKeys.size());
       auditParams.put(AUDIT_PARAM_NUM_VERSIONS,
           String.valueOf(reclaimedVersionKeys.size()));
       AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(

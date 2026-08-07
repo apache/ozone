@@ -113,6 +113,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (bucketInfo.hasMaxVersions()) {
       validateMaxVersions(bucketInfo.getMaxVersions());
     }
+    if (bucketInfo.hasNoncurrentVersionExpirationDays()) {
+      validateNoncurrentVersionExpirationDays(
+          bucketInfo.getNoncurrentVersionExpirationDays());
+    }
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
@@ -391,6 +395,18 @@ public class OMBucketCreateRequest extends OMClientRequest {
       throw new OMException("maxVersions " + Integer.toUnsignedString(maxVersions)
           + " is out of range; it must be between 0 and " + Integer.MAX_VALUE
           + ", where 0 means unlimited.",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+  }
+
+  /** Same uint32 range check as maxVersions; 0 means versions never expire. */
+  static void validateNoncurrentVersionExpirationDays(int days)
+      throws OMException {
+    if (days < 0) {
+      throw new OMException("noncurrentVersionExpirationDays "
+          + Integer.toUnsignedString(days) + " is out of range; it must be"
+          + " between 0 and " + Integer.MAX_VALUE + ", where 0 means versions"
+          + " are retained forever.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
   }

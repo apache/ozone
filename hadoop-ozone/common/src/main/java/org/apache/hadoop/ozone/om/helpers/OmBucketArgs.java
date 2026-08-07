@@ -54,6 +54,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final Integer maxVersions;
   /**
+   * Days a version is retained after becoming noncurrent; null when not being
+   * changed.
+   */
+  private final Integer noncurrentVersionExpirationDays;
+  /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
@@ -84,6 +89,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.isVersionEnabled = b.isVersionEnabled;
     this.versioningStatus = b.versioningStatus;
     this.maxVersions = b.maxVersions;
+    this.noncurrentVersionExpirationDays = b.noncurrentVersionExpirationDays;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
@@ -133,6 +139,15 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   public Integer getMaxVersions() {
     return maxVersions;
+  }
+
+  /**
+   * Returns the requested noncurrentVersionExpirationDays, or null if not
+   * being changed.
+   * @return noncurrentVersionExpirationDays
+   */
+  public Integer getNoncurrentVersionExpirationDays() {
+    return noncurrentVersionExpirationDays;
   }
 
   /**
@@ -223,6 +238,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (this.maxVersions != null) {
       auditMap.put(OzoneConsts.MAX_VERSIONS, String.valueOf(this.maxVersions));
     }
+    if (this.noncurrentVersionExpirationDays != null) {
+      auditMap.put(OzoneConsts.NONCURRENT_VERSION_EXPIRATION_DAYS,
+          String.valueOf(this.noncurrentVersionExpirationDays));
+    }
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
@@ -262,6 +281,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private Boolean isVersionEnabled;
     private BucketVersioningStatus versioningStatus;
     private Integer maxVersions;
+    private Integer noncurrentVersionExpirationDays;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
@@ -303,6 +323,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setMaxVersions(Integer limit) {
       this.maxVersions = limit;
+      return this;
+    }
+
+    public Builder setNoncurrentVersionExpirationDays(Integer days) {
+      this.noncurrentVersionExpirationDays = days;
       return this;
     }
 
@@ -390,6 +415,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (maxVersions != null) {
       builder.setMaxVersions(maxVersions);
     }
+    if (noncurrentVersionExpirationDays != null) {
+      builder.setNoncurrentVersionExpirationDays(noncurrentVersionExpirationDays);
+    }
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
@@ -438,6 +466,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     }
     if (bucketArgs.hasMaxVersions()) {
       builder.setMaxVersions(bucketArgs.getMaxVersions());
+    }
+    if (bucketArgs.hasNoncurrentVersionExpirationDays()) {
+      builder.setNoncurrentVersionExpirationDays(
+          bucketArgs.getNoncurrentVersionExpirationDays());
     }
     if (bucketArgs.hasStorageType()) {
       builder.setStorageType(StorageType.valueOf(bucketArgs.getStorageType()));
