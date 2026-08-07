@@ -208,6 +208,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
               + "; once enabled, versioning can only be suspended.",
               OMException.ResultCodes.INVALID_REQUEST);
         }
+        rejectVersioningWhileSnapshotsExist(omMetadataManager, dbBucketInfo,
+            newVersioningStatus, volumeName, bucketName);
         bucketInfoBuilder.setVersioningStatus(newVersioningStatus);
         LOG.debug("Updating bucket versioning to {} for bucket: {} in volume: {}",
             newVersioningStatus, bucketName, volumeName);
@@ -434,6 +436,55 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
     }
     return req;
+  }
+
+  /**
+   * Rejects a transition that leaves the bucket in a versioned state while it
+   * still holds snapshots. A snapshot shares blocks with the active object
+   * store and keeps them only because KeyDeletingService refuses to reclaim
+   * what a previous snapshot references; that decision is not version-aware
+   * yet, so a noncurrent version reclaimed here could take blocks a snapshot
+   * still points at.
+   *
+   * <p>ENABLED -&gt; SUSPENDED is allowed even then: a bucket that reached a
+   * mixed state before these checks existed has to be able to stop
+   * accumulating versions. A transition to the status the bucket already has
+   * is allowed for the same reason - it creates no new coexistence, and an S3
+   * client re-sending PutBucketVersioning must not fail against a bucket that
+   * is already in that state.
+   *
+   * <p>The check is not latched: once the last snapshot is purged from the
+   * bucket, versioning can be enabled or resumed normally.
+   */
+  private void rejectVersioningWhileSnapshotsExist(
+      OMMetadataManager omMetadataManager, OmBucketInfo dbBucketInfo,
+      BucketVersioningStatus newVersioningStatus, String volumeName,
+      String bucketName) throws IOException {
+
+    BucketVersioningStatus current = dbBucketInfo.getVersioningStatus();
+    if (newVersioningStatus == BucketVersioningStatus.UNVERSIONED
+        || newVersioningStatus == current
+        || (current == BucketVersioningStatus.ENABLED
+            && newVersioningStatus == BucketVersioningStatus.SUSPENDED)) {
+      return;
+    }
+
+    // The trailing separator keeps two buckets whose names share a prefix from
+    // matching each other. A snapshot deleted but not yet purged is still in
+    // the table and still counts: it references its blocks until the purge.
+    String snapshotBucketKey = omMetadataManager.getBucketKey(volumeName,
+        bucketName) + OzoneConsts.OM_KEY_PREFIX;
+    if (OMBucketDeleteRequest.bucketContainsSnapshot(omMetadataManager,
+        snapshotBucketKey)) {
+      throw new OMException("Cannot set the object versioning status of bucket "
+          + bucketName + " to " + newVersioningStatus + " while it has"
+          + " snapshots. Snapshots and S3 object versioning cannot be used on"
+          + " the same bucket until snapshot-aware version reclamation is"
+          + " available; without it a noncurrent version reclaimed from the"
+          + " active object store would take blocks a snapshot still"
+          + " references. Delete and purge the bucket's snapshots first.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
   }
 
   @RequestFeatureValidator(
