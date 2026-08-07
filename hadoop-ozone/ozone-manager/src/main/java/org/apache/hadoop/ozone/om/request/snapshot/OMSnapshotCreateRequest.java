@@ -181,7 +181,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // check runs here rather than in preExecute so that it and the versioning
       // transition check in OMBucketSetPropertyRequest are ordered by Ratis:
       // whichever applies second sees the state the first one committed.
-      if (omBucketInfo.hasEverBeenVersioned()) {
+      if (omBucketInfo.hasEverBeenVersioned()
+          && !ozoneManager.isSnapshotVersioningCoexistenceAllowed()) {
         throw new OMException("Cannot create a snapshot of bucket "
             + bucketName + ": its object versioning status is "
             + omBucketInfo.getVersioningStatus() + ". Snapshots and S3 object"
