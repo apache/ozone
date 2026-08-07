@@ -3071,7 +3071,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return bucketInfo;
     }
     OmBucketInfo realBucket = getResolvedSourceBucket(resolvedBucket, resolvedSourceCache);
-    return bucketInfo.withOperationalPropertiesFrom(realBucket);
+    return realBucket != null
+        ? bucketInfo.withOperationalPropertiesFrom(realBucket)
+        : bucketInfo;
   }
 
   private OmBucketInfo getResolvedSourceBucket(
@@ -3085,6 +3087,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmBucketInfo cachedSource = resolvedSourceCache.get(sourceKey);
       if (cachedSource != null) {
         return cachedSource;
+      }
+    }
+    if (getAclsEnabled()) {
+      try {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(),
+            resolvedBucket.realBucket(), null);
+      } catch (OMException e) {
+        if (e.getResult() == PERMISSION_DENIED) {
+          return null;
+        }
+        throw e;
       }
     }
     OmBucketInfo realBucket = bucketManager.getBucketInfo(
