@@ -44,16 +44,17 @@ Docker is not available.
 try (OzoneContainer ozone = new OzoneContainer()) {
   ozone.start();
 
-  S3Client s3 = S3Client.builder()
+  try (S3Client s3 = S3Client.builder()
       .endpointOverride(URI.create(ozone.getS3Endpoint()))
       .credentialsProvider(StaticCredentialsProvider.create(
           AwsBasicCredentials.create(ozone.getAccessKey(), ozone.getSecretKey())))
       .region(Region.of(ozone.getRegion()))
       .forcePathStyle(true)
-      .build();
+      .build()) {
 
-  s3.createBucket(b -> b.bucket("my-bucket"));
-  // ... put / get / list objects
+    s3.createBucket(b -> b.bucket("my-bucket"));
+    // ... put / get / list objects
+  }
 }
 ```
 

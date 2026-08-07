@@ -46,28 +46,29 @@ class TestOzoneContainer {
     try (OzoneContainer ozone = new OzoneContainer()) {
       ozone.start();
 
-      S3Client s3 = S3Client.builder()
+      try (S3Client s3 = S3Client.builder()
           .endpointOverride(URI.create(ozone.getS3Endpoint()))
           .credentialsProvider(StaticCredentialsProvider.create(
               AwsBasicCredentials.create(ozone.getAccessKey(), ozone.getSecretKey())))
           .region(Region.of(ozone.getRegion()))
           .forcePathStyle(true)
-          .build();
+          .build()) {
 
-      String bucket = "test-bucket";
-      String key = "hello.txt";
-      String body = "hello ozone";
+        String bucket = "test-bucket";
+        String key = "hello.txt";
+        String body = "hello ozone";
 
-      // The container is ready (out of safe mode) after start(), so no retry.
-      s3.createBucket(b -> b.bucket(bucket));
-      s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromString(body));
+        // The container is ready (out of safe mode) after start(), so no retry.
+        s3.createBucket(b -> b.bucket(bucket));
+        s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromString(body));
 
-      ResponseBytes<GetObjectResponse> got =
-          s3.getObjectAsBytes(b -> b.bucket(bucket).key(key));
+        ResponseBytes<GetObjectResponse> got =
+            s3.getObjectAsBytes(b -> b.bucket(bucket).key(key));
 
-      assertEquals(body, got.asUtf8String());
-      assertTrue(s3.listBuckets().buckets().stream()
-          .anyMatch(b -> b.name().equals(bucket)));
+        assertEquals(body, got.asUtf8String());
+        assertTrue(s3.listBuckets().buckets().stream()
+            .anyMatch(b -> b.name().equals(bucket)));
+      }
     }
   }
 }
