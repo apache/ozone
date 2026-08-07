@@ -1835,16 +1835,55 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     assertEquals(ReplicationType.EC.name(), key.getReplicationConfig().getReplicationType().name());
   }
 
+  /**
+   * HDDS-15925: rooted OFS getFileStatus on a key path must not issue InfoBucket
+   * before GetFileStatus.
+   */
+  @Test
+  void testGetFileStatusUsesSingleOmRpc() throws Exception {
+    String keyName = "single-rpc-" + RandomStringUtils.secure().nextAlphabetic(5);
+    Path filePath = new Path(bucketPath, keyName);
+    ContractTestUtils.touch(fs, filePath);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+    long getFileStatusBefore = metrics.getNumGetFileStatus();
+
+    FileStatus status = fs.getFileStatus(filePath);
+    assertTrue(status.isFile());
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileStatus must not trigger InfoBucket");
+    assertEquals(getFileStatusBefore + 1, metrics.getNumGetFileStatus());
+
+    long getFileStatusAfterFirst = metrics.getNumGetFileStatus();
+    fs.getFileStatus(filePath);
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos());
+    assertEquals(getFileStatusAfterFirst + 1, metrics.getNumGetFileStatus());
+  }
+
   @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     fs.mkdirs(volume);
-    assertThrows(OMException.class,
-        () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
-    // Cleanup
-    fs.delete(volume, false);
+    try {
+      FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+          () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
+      assertThat(exception.getMessage()).contains("Bucket doesn't exist");
+    } finally {
+      fs.delete(volume, false);
+    }
+  }
+
+  @Test
+  void testGetFileStatusMissingFile() throws Exception {
+    Path missingFile = new Path(bucketPath, "missing-file-" +
+        RandomStringUtils.secure().nextAlphanumeric(5));
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.getFileStatus(missingFile));
+    assertThat(exception.getMessage()).contains("No such file or directory");
   }
 
   @Test
