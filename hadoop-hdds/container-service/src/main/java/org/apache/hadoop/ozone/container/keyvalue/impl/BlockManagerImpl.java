@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
@@ -295,7 +296,8 @@ public class BlockManagerImpl implements BlockManager {
 
       // Track the block as finalized so that any subsequent write on it can be
       // detected and ignored, since PutBlock is not idempotent.
-      if (endOfBlock) {
+      // Skip for RECOVERING containers, which do not maintain eofBlockCache.
+      if (endOfBlock && containerData.getState() != RECOVERING) {
         container.addToEofBlockCache(localID);
       }
 
