@@ -741,6 +741,12 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK_DEFAULT =
       1000;
 
+  public static final String
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED =
+      "ozone.om.snapshot.versioning.coexistence.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED_DEFAULT = false;
+
   public static final String OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET =
       "ozone.om.version.cleanup.marker.scan.budget";
   public static final int OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET_DEFAULT =

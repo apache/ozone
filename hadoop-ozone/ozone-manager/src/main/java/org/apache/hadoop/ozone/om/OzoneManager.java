@@ -502,6 +502,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
+  private boolean snapshotVersioningCoexistenceAllowed;
 
   private String omHostName;
 
@@ -1039,6 +1040,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     fsSnapshotEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
         OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT);
+    snapshotVersioningCoexistenceAllowed = configuration.getBoolean(
+        OMConfigKeys.OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED,
+        OMConfigKeys.OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED_DEFAULT);
+    if (snapshotVersioningCoexistenceAllowed) {
+      LOG.warn("{} is enabled. Snapshots and S3 object versioning may now be "
+          + "used on the same bucket, which is UNSAFE: version reclamation is "
+          + "not snapshot-aware yet, so reclaiming a noncurrent version can "
+          + "delete blocks a snapshot still references. This setting exists "
+          + "for testing only and must not be used on a production cluster.",
+          OMConfigKeys.OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED);
+    }
     omSnapshotManager = new OmSnapshotManager(this);
 
     // Snapshot metrics
@@ -4672,6 +4684,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isFilesystemSnapshotEnabled() {
     return fsSnapshotEnabled;
+  }
+
+  /**
+   * Whether snapshots and S3 object versioning may be used on the same bucket.
+   * Unsafe and false by default: version reclamation is not snapshot-aware
+   * yet, so reclaiming a noncurrent version can delete blocks a snapshot still
+   * references. It exists so that the integration tests for that work can be
+   * written against a real mixed-state bucket.
+   *
+   * @return true if the exclusion checks are lifted, false otherwise.
+   */
+  public boolean isSnapshotVersioningCoexistenceAllowed() {
+    return snapshotVersioningCoexistenceAllowed;
   }
 
   /**

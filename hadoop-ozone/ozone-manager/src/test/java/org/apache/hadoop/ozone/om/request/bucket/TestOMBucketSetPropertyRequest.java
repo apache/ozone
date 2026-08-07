@@ -887,6 +887,34 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertTrue(response.getOMResponse().getSuccess());
   }
 
+  /**
+   * The dev-only flag lifts the exclusion so that the integration tests for
+   * snapshot-aware version reclamation can be written against a real
+   * mixed-state bucket.
+   */
+  @Test
+  public void testVersioningAllowedWithSnapshotsUnderDevFlag()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    addSnapshotToDB(volumeName, bucketName, "snap1");
+    when(ozoneManager.isSnapshotVersioningCoexistenceAllowed())
+        .thenReturn(true);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
+        .validateAndUpdateCache(ozoneManager, 2);
+
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.ENABLED,
+        omMetadataManager.getBucketTable()
+            .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+            .getVersioningStatus());
+  }
+
   private void seedVersioningStatus(String volumeName, String bucketName,
       BucketVersioningStatus status) throws Exception {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
