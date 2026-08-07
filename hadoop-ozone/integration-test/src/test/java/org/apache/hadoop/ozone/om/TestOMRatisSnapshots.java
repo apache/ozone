@@ -288,10 +288,6 @@ public class TestOMRatisSnapshots {
     });
     List<String> newKeys = writeFuture.get();
 
-    // A write is acked once queued in the double buffer, but the applied index
-    // advances only after the buffer commits. Flush so it covers all newKeys.
-    leaderOM.awaitDoubleBufferFlush();
-
     // All newKeys writes have completed (writeFuture.get() above), so the
     // leader must already contain them.
     OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
@@ -314,14 +310,16 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
 
-    // Wait for the follower to apply everything the leader has applied; all
+    // Wait for the follower to apply everything the leader has committed; all
     // writes have completed on the leader, so after this no further snapshot
     // install (and DB reload) can occur and the follower DB reads below are
     // safe from "Rocks Database is closed" races.
-    long leaderApplied = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 30_000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -377,11 +375,6 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
-    // A write is acked once queued in the double buffer, but the applied index
-    // advances only after the buffer commits. Flush so the transaction info
-    // read below covers all keys.
-    leaderOM.awaitDoubleBufferFlush();
-
     // Get transaction Index
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -390,6 +383,12 @@ public class TestOMRatisSnapshots {
             transactionInfo.getTransactionIndex());
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
+
+    // The snapshot index above only advances on double buffer flush, so it can
+    // lag the keys written above; the commit index covers them all. Read after
+    // the snapshot index, so it is never behind it.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     OzoneManager.setTestInstallSnapshot(true);
@@ -413,12 +412,11 @@ public class TestOMRatisSnapshots {
     });
     readFuture.get();
 
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 3s
+    // The recently started OM should be lagging behind the leader OM. Wait for
+    // it to catch up, which covers the snapshot index and all the keys.
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+          >= leaderCommitted;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -487,10 +485,12 @@ public class TestOMRatisSnapshots {
 
     // Wait for the follower to finish applying in-flight transactions, so
     // that the TermIndex read below matches what installCheckpoint observes.
-    long leaderAppliedIndex = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderOM.getOmRatisServer().getServerDivision()
+        .getRaftLog().getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerRatisServer
-        .getLastAppliedTermIndex().getIndex() >= leaderAppliedIndex, 100, 10_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 10_000);
 
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
