@@ -237,6 +237,28 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     assertThat(omResponse.getMessage()).contains(sourceBucketName);
   }
 
+  /**
+   * The dev-only flag lifts the exclusion so that the integration tests for
+   * snapshot-aware version reclamation can be written against a real
+   * mixed-state bucket.
+   */
+  @Test
+  public void testCreateSnapshotAllowedOnVersionedBucketWithDevFlag()
+      throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    when(getOzoneManager().isSnapshotVersioningCoexistenceAllowed())
+        .thenReturn(true);
+    setBucketVersioningStatus(getVolumeName(), getBucketName(),
+        BucketVersioningStatus.ENABLED);
+
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest request = doPreExecute(omRequest);
+
+    assertEquals(OK, request.validateAndUpdateCache(getOzoneManager(), 1)
+        .getOMResponse().getStatus());
+  }
+
   private void setBucketVersioningStatus(String volume, String bucket,
       BucketVersioningStatus status) throws Exception {
     String bucketKey = getOmMetadataManager().getBucketKey(volume, bucket);

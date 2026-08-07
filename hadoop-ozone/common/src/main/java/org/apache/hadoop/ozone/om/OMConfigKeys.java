@@ -789,6 +789,17 @@ public final class OMConfigKeys {
       OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD_DEFAULT = "5s";
 
   /**
+   * Lifts the mutual exclusion between snapshots and object versioning on a
+   * bucket. Unsafe: a version reclaimed from the active object store can take
+   * blocks a snapshot still references. For tests only.
+   */
+  public static final String
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED =
+      "ozone.om.snapshot.versioning.coexistence.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED_DEFAULT = false;
+
+  /**
    * Never constructed.
    */
   private OMConfigKeys() {

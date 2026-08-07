@@ -216,8 +216,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
               + "; once enabled, versioning can only be suspended.",
               OMException.ResultCodes.INVALID_REQUEST);
         }
-        rejectVersioningWhileSnapshotsExist(omMetadataManager, dbBucketInfo,
-            newVersioningStatus, volumeName, bucketName);
+        rejectVersioningWhileSnapshotsExist(ozoneManager, omMetadataManager,
+            dbBucketInfo, newVersioningStatus, volumeName, bucketName);
         bucketInfoBuilder.setVersioningStatus(newVersioningStatus);
         LOG.debug("Updating bucket versioning to {} for bucket: {} in volume: {}",
             newVersioningStatus, bucketName, volumeName);
@@ -438,10 +438,15 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
    * <p>The check is not latched: once the last snapshot is purged from the
    * bucket, versioning can be enabled or resumed normally.
    */
-  private void rejectVersioningWhileSnapshotsExist(
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private void rejectVersioningWhileSnapshotsExist(OzoneManager ozoneManager,
       OMMetadataManager omMetadataManager, OmBucketInfo dbBucketInfo,
       BucketVersioningStatus newVersioningStatus, String volumeName,
       String bucketName) throws IOException {
+
+    if (ozoneManager.isSnapshotVersioningCoexistenceAllowed()) {
+      return;
+    }
 
     BucketVersioningStatus current = dbBucketInfo.getVersioningStatus();
     if (newVersioningStatus == BucketVersioningStatus.UNVERSIONED
