@@ -1,0 +1,111 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.response.key;
+
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
+
+import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+/**
+ * Response for the reclamation of noncurrent object versions that exceed their
+ * bucket's maxVersions. The versions leave the versionedKeyTable and their
+ * blocks go to the deletedTable, which is the single path through which
+ * version blocks are reclaimed: KeyDeletingService decides from there whether
+ * a snapshot still needs them.
+ */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE,
+    DELETED_TABLE, BUCKET_TABLE})
+public class OMObjectVersionsReclaimResponse extends OmKeyResponse {
+
+  private final List<String> reclaimedVersionKeys;
+  private final List<String> reclaimedMarkerKeys;
+  private final Map<String, RepeatedOmKeyInfo> keysToDelete;
+  private final List<OmBucketInfo> updatedBuckets;
+
+  public OMObjectVersionsReclaimResponse(@Nonnull OMResponse omResponse,
+      @Nonnull List<String> reclaimedVersionKeys,
+      @Nonnull List<String> reclaimedMarkerKeys,
+      @Nonnull Map<String, RepeatedOmKeyInfo> keysToDelete,
+      @Nonnull List<OmBucketInfo> updatedBuckets) {
+    super(omResponse, BucketLayout.OBJECT_STORE);
+    this.reclaimedVersionKeys = reclaimedVersionKeys;
+    this.reclaimedMarkerKeys = reclaimedMarkerKeys;
+    this.keysToDelete = keysToDelete;
+    this.updatedBuckets = updatedBuckets;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMObjectVersionsReclaimResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse, BucketLayout.OBJECT_STORE);
+    this.reclaimedVersionKeys = Collections.emptyList();
+    this.reclaimedMarkerKeys = Collections.emptyList();
+    this.keysToDelete = Collections.emptyMap();
+    this.updatedBuckets = Collections.emptyList();
+    checkStatusNotOK();
+  }
+
+  @VisibleForTesting
+  public Map<String, RepeatedOmKeyInfo> getKeysToDelete() {
+    return keysToDelete;
+  }
+
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    for (String versionKey : reclaimedVersionKeys) {
+      omMetadataManager.getVersionedKeyTable()
+          .deleteWithBatch(batchOperation, versionKey);
+    }
+
+    // An expired marker leaves the keyTable and the key disappears with it.
+    // It holds no blocks, so nothing goes to the deletedTable for it.
+    for (String markerKey : reclaimedMarkerKeys) {
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, markerKey);
+    }
+
+    for (Map.Entry<String, RepeatedOmKeyInfo> entry : keysToDelete.entrySet()) {
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+          entry.getKey(), entry.getValue());
+    }
+
+    for (OmBucketInfo omBucketInfo : updatedBuckets) {
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+              omBucketInfo.getBucketName()), omBucketInfo);
+    }
+  }
+}

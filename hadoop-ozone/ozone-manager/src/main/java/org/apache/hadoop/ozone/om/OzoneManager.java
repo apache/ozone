@@ -416,6 +416,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
+  private final VersionIdAllocator versionIdAllocator;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
   private ExecutorService edekCacheLoader = null;
 
@@ -565,6 +566,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
+    versionIdAllocator = new VersionIdAllocator(conf);
     replicationConfigValidator =
         conf.getObject(ReplicationConfigValidator.class);
 
@@ -2388,6 +2390,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Assigns the versionId of a version being committed, using the
+   * {@link org.apache.hadoop.ozone.om.helpers.VersionIdGenerator} configured
+   * for this cluster.
+   */
+  public VersionIdAllocator getVersionIdAllocator() {
+    return versionIdAllocator;
+  }
+
+  /**
    *
    * @return Gets the stored layout version from the DB meta table.
    * @throws IOException on Error.
@@ -3060,6 +3071,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setDefaultReplicationConfig(
                 realBucket.getDefaultReplicationConfig())
             .setIsVersionEnabled(realBucket.getIsVersionEnabled())
+            // Only when the real bucket actually carries a status: copying the
+            // value getVersioningStatus() derives for a legacy bucket would give
+            // the link an explicit status the real bucket does not have.
+            .setVersioningStatus(realBucket.hasVersioningStatus()
+                ? realBucket.getVersioningStatus() : null)
             .setStorageType(realBucket.getStorageType())
             .setQuotaInBytes(realBucket.getQuotaInBytes())
             .setQuotaInNamespace(realBucket.getQuotaInNamespace())

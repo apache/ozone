@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.request.key.OMObjectVersionsReclaimRequest;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -332,6 +333,8 @@ public final class OzoneManagerRatisUtils {
       return new OMEchoRPCWriteRequest(omRequest);
     case AbortExpiredMultiPartUploads:
       return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
+    case ReclaimObjectVersions:
+      return new OMObjectVersionsReclaimRequest(omRequest);
     case QuotaRepair:
       return new OMQuotaRepairRequest(omRequest);
     case PutObjectTagging:

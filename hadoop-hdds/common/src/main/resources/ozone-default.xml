@@ -5163,4 +5163,64 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
+  <property>
+    <name>ozone.om.versioning.version-id-generator</name>
+    <value>org.apache.hadoop.ozone.om.helpers.TransactionIndexVersionIdGenerator</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to assign the
+      versionId of an object version. The default uses the index of the committing transaction;
+      PinnedFirstVersionIdGenerator additionally pins the first version of every key to a reserved
+      sentinel, so that it can be referenced without listing the key's versions first.
+      The setting is cluster-wide and may be changed on a running cluster; a write whose generated
+      versionId already exists on the key is rejected, and the existing version has to be deleted
+      before that id can be written again.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.versioning.max.versions</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of versions retained per key on a bucket that does not set maxVersions of its
+      own, counting the key's current version and its delete markers. Versions beyond the limit are
+      reclaimed oldest-first by VersionCleanupService. 0 means unlimited.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.interval</name>
+    <value>1h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Time interval of the OM VersionCleanupService, which reclaims the noncurrent object versions
+      of a key that exceed the bucket's maxVersions. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Timeout value of a VersionCleanupService run. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of object versions VersionCleanupService submits for reclamation in one run.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.marker.scan.budget</name>
+    <value>100000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of keyTable entries VersionCleanupService examines in one run while looking
+      for keys left with only a delete marker. There is no index of delete markers, so they are found
+      by walking the keyTable; each run walks at most this many entries and the next one resumes where
+      it stopped, so no single run iterates the whole table.
+    </description>
+  </property>
 </configuration>

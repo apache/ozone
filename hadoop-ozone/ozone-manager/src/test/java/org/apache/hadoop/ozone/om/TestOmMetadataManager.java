@@ -46,6 +46,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -53,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,6 +86,7 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -97,6 +100,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -120,6 +124,7 @@ public class TestOmMetadataManager {
       VOLUME_TABLE,
       BUCKET_TABLE,
       KEY_TABLE,
+      VERSIONED_KEY_TABLE,
       DELETED_TABLE,
       OPEN_KEY_TABLE,
       MULTIPART_INFO_TABLE,
@@ -170,6 +175,415 @@ public class TestOmMetadataManager {
 
     assertEquals(3, transactionInfo.getTerm());
     assertEquals(250, transactionInfo.getTransactionIndex());
+  }
+
+  @Test
+  public void testVersionedOzoneKeyOrdering() {
+    String prefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key");
+    assertEquals("/vol/buck/key\0", prefix);
+
+    // newer versions (larger versionId) must sort before older ones, and all
+    // versioned keys must sort under the key's prefix
+    String v1 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 1L);
+    String v2 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 42L);
+    String v3 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", Long.MAX_VALUE - 1);
+    assertThat(v3).startsWith(prefix).isLessThan(v2);
+    assertThat(v2).startsWith(prefix).isLessThan(v1);
+
+    // fixed-width suffix: identical length regardless of versionId magnitude
+    assertEquals(v1.length(), v3.length());
+  }
+
+  @Test
+  public void testVersionedOzoneKeyIsolatedFromNestedKeys() {
+    // OBJECT_STORE key names contain '/' verbatim, so "key" and "key/001" are two
+    // unrelated keys. Every version of "key" must sort under "key"'s prefix and
+    // ahead of anything belonging to "key/001", otherwise a prefix seek for the
+    // newest noncurrent version of "key" would land on a version of "key/001".
+    String prefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key");
+    String nestedPrefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key/001");
+    assertThat(nestedPrefix).doesNotStartWith(prefix);
+
+    String oldest = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 1L);
+    String nestedNewest =
+        omMetadataManager.getVersionedOzoneKey("vol", "buck", "key/001", Long.MAX_VALUE - 1);
+    assertThat(oldest).isLessThan(nestedNewest);
+
+    // the nested key's own current entry in keyTable also sorts after all of them
+    assertThat(oldest).isLessThan(omMetadataManager.getOzoneKey("vol", "buck", "key/001"));
+  }
+
+  @Test
+  public void testGetVersionsToReclaimAppliesTheBucketLimit() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 3);
+    // versions 1..5, all noncurrent; the current version lives in the keyTable
+    // and counts toward the limit, so a limit of 3 keeps 2 noncurrent ones
+    addNoncurrentVersionsToDB(volumeName, bucketName, "key1", 1, 2, 3, 4, 5);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(100, 1000);
+
+    assertEquals(1, reclaimable.size());
+    ObjectVersionsBucket bucket = reclaimable.get(0);
+    assertEquals(volumeName, bucket.getVolumeName());
+    assertEquals(bucketName, bucket.getBucketName());
+    // versions 1, 2 and 3 go and 4 and 5 stay; the scan walks a key newest
+    // first, so the doomed ones come back in descending versionId order
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 3, 2, 1),
+        bucket.getVersionKeysList());
+  }
+
+  @Test
+  public void testGetVersionsToReclaimCountsEachKeySeparately()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 2);
+    addNoncurrentVersionsToDB(volumeName, bucketName, "key1", 1, 2, 3);
+    // a key within its limit contributes nothing, and does not carry the
+    // running count of the previous key into its own
+    addNoncurrentVersionsToDB(volumeName, bucketName, "key2", 7);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(100, 1000);
+
+    assertEquals(1, reclaimable.size());
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 2, 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  @Test
+  public void testGetVersionsToReclaimSkipsUnlimitedAndUnversioned()
+      throws Exception {
+    // 0 means unlimited, on the bucket itself and as the cluster default
+    addVersionedBucketToDB("vol1", "unlimited", 0);
+    addNoncurrentVersionsToDB("vol1", "unlimited", "key1", 1, 2, 3);
+
+    addVersionedBucketToDB("vol1", "clusterdefault", null);
+    addNoncurrentVersionsToDB("vol1", "clusterdefault", "key1", 1, 2, 3);
+
+    // a bucket that never had versioning enabled is not examined at all
+    omMetadataManager.getBucketTable().put(
+        omMetadataManager.getBucketKey("vol1", "unversioned"),
+        OmBucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("unversioned")
+            .setStorageType(StorageType.DISK)
+            .setMaxVersions(1)
+            .build());
+    addNoncurrentVersionsToDB("vol1", "unversioned", "key1", 1, 2, 3);
+
+    assertThat(omMetadataManager.getVersionsToReclaim(0, 1000)).isEmpty();
+
+    // the cluster default applies only to the bucket that sets no limit
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(1, 1000);
+    assertEquals(1, reclaimable.size());
+    assertEquals("clusterdefault", reclaimable.get(0).getBucketName());
+    assertEquals(versionKeys("vol1", "clusterdefault", "key1", 3, 2, 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  @Test
+  public void testGetVersionsToReclaimHonoursTheTaskLimit() throws Exception {
+    String volumeName = "vol1";
+    addVersionedBucketToDB(volumeName, "buck1", 1);
+    addNoncurrentVersionsToDB(volumeName, "buck1", "key1", 1, 2, 3);
+    addVersionedBucketToDB(volumeName, "buck2", 1);
+    addNoncurrentVersionsToDB(volumeName, "buck2", "key1", 1, 2, 3);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(100, 4);
+
+    int collected = reclaimable.stream()
+        .mapToInt(ObjectVersionsBucket::getVersionKeysCount).sum();
+    assertEquals(4, collected);
+  }
+
+  /**
+   * A version becomes noncurrent when the version that superseded it was
+   * committed, as S3 lifecycle's NoncurrentDays does. The record itself does
+   * not carry that moment, so the scan takes it from the next-newer version -
+   * the key's current version for the newest noncurrent one.
+   */
+  @Test
+  public void testGetVersionsToReclaimExpiresFromWhenSuperseded()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 10);
+
+    long now = Time.now();
+    long longAgo = now - TimeUnit.DAYS.toMillis(30);
+    // version 1 was superseded long ago by version 2, so it is expired;
+    // version 2 was superseded just now by the current version, so it is not,
+    // even though version 2 itself is just as old as version 1
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    assertEquals(1, reclaimable.size());
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  @Test
+  public void testGetVersionsToReclaimKeepsUnexpiredVersions()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 10);
+
+    long now = Time.now();
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, now);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+
+    assertThat(omMetadataManager.getVersionsToReclaim(0, 1000)).isEmpty();
+  }
+
+  /**
+   * Expiring on a missing current version would destroy data on a broken
+   * invariant, so a key without one keeps its versions.
+   */
+  @Test
+  public void testGetVersionsToReclaimSkipsExpiryWithoutCurrentVersion()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, 1);
+
+    long longAgo = Time.now() - TimeUnit.DAYS.toMillis(30);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    // no keyTable entry for key1
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    // version 1 is still expired: version 2 superseded it long ago. Only the
+    // newest one, whose superseding time is unknown, is kept.
+    assertEquals(1, reclaimable.size());
+    assertEquals(versionKeys(volumeName, bucketName, "key1", 1),
+        reclaimable.get(0).getVersionKeysList());
+  }
+
+  /** Either control on its own is enough to select a version. */
+  @Test
+  public void testGetVersionsToReclaimCombinesCountAndExpiry()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 3, 10);
+
+    long now = Time.now();
+    long longAgo = now - TimeUnit.DAYS.toMillis(30);
+    // key1 is within its count limit but version 1 expired
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 1L, longAgo);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key1", 2L, longAgo);
+    addCurrentVersionWithTime(volumeName, bucketName, "key1", 3L, now);
+    // key2 has nothing expired but exceeds maxVersions of 3
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 1L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 2L, now);
+    addNoncurrentVersionWithTime(volumeName, bucketName, "key2", 3L, now);
+    addCurrentVersionWithTime(volumeName, bucketName, "key2", 4L, now);
+
+    List<ObjectVersionsBucket> reclaimable =
+        omMetadataManager.getVersionsToReclaim(0, 1000);
+
+    assertEquals(1, reclaimable.size());
+    List<String> expected = new ArrayList<>();
+    expected.addAll(versionKeys(volumeName, bucketName, "key1", 1));
+    expected.addAll(versionKeys(volumeName, bucketName, "key2", 1));
+    assertEquals(expected, reclaimable.get(0).getVersionKeysList());
+  }
+
+  @Test
+  public void testGetExpiredDeleteMarkers() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, null);
+
+    // only a marker left: the key is invisible and nothing else can remove it
+    addDeleteMarkerToDB(volumeName, bucketName, "expired");
+    // a marker over surviving versions still makes the key read as deleted
+    addDeleteMarkerToDB(volumeName, bucketName, "hasVersions");
+    addNoncurrentVersionsToDB(volumeName, bucketName, "hasVersions", 1);
+    // a live key is not a marker at all
+    addCurrentVersionWithTime(volumeName, bucketName, "live", 5L, Time.now());
+
+    OMMetadataManager.ExpiredDeleteMarkers markers =
+        omMetadataManager.getExpiredDeleteMarkers(null, 1000, 1000);
+
+    assertNull(markers.getNextStartKey());
+    assertEquals(1, markers.getMarkersPerBucket().size());
+    assertEquals(Collections.singletonList(
+            omMetadataManager.getOzoneKey(volumeName, bucketName, "expired")),
+        markers.getMarkersPerBucket().get(0).getMarkerKeysList());
+  }
+
+  @Test
+  public void testGetExpiredDeleteMarkersRespectsBucketSettings()
+      throws Exception {
+    // cleanup turned off on the bucket
+    addVersionedBucketToDB("vol1", "optedout", 0, null, false);
+    addDeleteMarkerToDB("vol1", "optedout", "key1");
+
+    // a bucket that never had versioning enabled cannot hold a real marker,
+    // and is not examined either way
+    omMetadataManager.getBucketTable().put(
+        omMetadataManager.getBucketKey("vol1", "unversioned"),
+        OmBucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("unversioned")
+            .setStorageType(StorageType.DISK)
+            .build());
+    addDeleteMarkerToDB("vol1", "unversioned", "key1");
+
+    assertThat(omMetadataManager.getExpiredDeleteMarkers(null, 1000, 1000)
+        .getMarkersPerBucket()).isEmpty();
+  }
+
+  /**
+   * The walk is bounded so one run cannot iterate the whole keyTable, and it
+   * resumes where it stopped so successive runs still make progress.
+   */
+  @Test
+  public void testGetExpiredDeleteMarkersResumesAfterTheScanBudget()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "buck1";
+    addVersionedBucketToDB(volumeName, bucketName, 0, null);
+    for (int i = 0; i < 5; i++) {
+      addDeleteMarkerToDB(volumeName, bucketName, "key" + i);
+    }
+
+    OMMetadataManager.ExpiredDeleteMarkers first =
+        omMetadataManager.getExpiredDeleteMarkers(null, 2, 1000);
+    assertEquals(2, first.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    assertNotNull(first.getNextStartKey());
+
+    OMMetadataManager.ExpiredDeleteMarkers second =
+        omMetadataManager.getExpiredDeleteMarkers(first.getNextStartKey(), 2,
+            1000);
+    assertEquals(2, second.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    // the second pass starts where the first stopped, so nothing is revisited
+    assertThat(second.getMarkersPerBucket().get(0).getMarkerKeysList())
+        .doesNotContainAnyElementsOf(
+            first.getMarkersPerBucket().get(0).getMarkerKeysList());
+
+    OMMetadataManager.ExpiredDeleteMarkers third =
+        omMetadataManager.getExpiredDeleteMarkers(second.getNextStartKey(), 2,
+            1000);
+    assertEquals(1, third.getMarkersPerBucket().get(0).getMarkerKeysCount());
+    assertNull(third.getNextStartKey());
+  }
+
+  private void addDeleteMarkerToDB(String volumeName, String bucketName,
+      String keyName) throws Exception {
+    OmKeyInfo marker = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setVersionId(1L)
+        .setDeleteMarker(true)
+        .build();
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName), marker);
+  }
+
+  private void addVersionedBucketToDB(String volumeName, String bucketName,
+      Integer maxVersions) throws Exception {
+    addVersionedBucketToDB(volumeName, bucketName, maxVersions, null);
+  }
+
+  private void addVersionedBucketToDB(String volumeName, String bucketName,
+      Integer maxVersions, Integer expirationDays, boolean markerCleanup)
+      throws Exception {
+    addVersionedBucketToDB(volumeName, bucketName, maxVersions, expirationDays);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getBucketTable().put(bucketKey,
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey).toBuilder()
+            .setExpiredDeleteMarkerCleanup(markerCleanup).build());
+  }
+
+  private void addVersionedBucketToDB(String volumeName, String bucketName,
+      Integer maxVersions, Integer expirationDays) throws Exception {
+    OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setStorageType(StorageType.DISK)
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setVersioningStatus(BucketVersioningStatus.ENABLED);
+    if (maxVersions != null) {
+      builder.setMaxVersions(maxVersions);
+    }
+    if (expirationDays != null) {
+      builder.setNoncurrentVersionExpirationDays(expirationDays);
+    }
+    omMetadataManager.getBucketTable().put(
+        omMetadataManager.getBucketKey(volumeName, bucketName), builder.build());
+  }
+
+  private void addNoncurrentVersionWithTime(String volumeName,
+      String bucketName, String keyName, long versionId,
+      long modificationTime) throws Exception {
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName,
+            versionId),
+        versionWithTime(volumeName, bucketName, keyName, versionId,
+            modificationTime));
+  }
+
+  private void addCurrentVersionWithTime(String volumeName, String bucketName,
+      String keyName, long versionId, long modificationTime) throws Exception {
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+        versionWithTime(volumeName, bucketName, keyName, versionId,
+            modificationTime));
+  }
+
+  private OmKeyInfo versionWithTime(String volumeName, String bucketName,
+      String keyName, long versionId, long modificationTime) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setVersionId(versionId)
+        .setCreationTime(modificationTime)
+        .setModificationTime(modificationTime)
+        .build();
+  }
+
+  private void addNoncurrentVersionsToDB(String volumeName, String bucketName,
+      String keyName, long... versionIds) throws Exception {
+    for (long versionId : versionIds) {
+      OmKeyInfo version = new OmKeyInfo.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+          .setVersionId(versionId)
+          .build();
+      omMetadataManager.getVersionedKeyTable().put(
+          omMetadataManager.getVersionedOzoneKey(volumeName, bucketName,
+              keyName, versionId), version);
+    }
+  }
+
+  private List<String> versionKeys(String volumeName, String bucketName,
+      String keyName, long... versionIds) {
+    return Arrays.stream(versionIds)
+        .mapToObj(versionId -> omMetadataManager.getVersionedOzoneKey(
+            volumeName, bucketName, keyName, versionId))
+        .collect(Collectors.toList());
   }
 
   @Test

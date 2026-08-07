@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -52,6 +53,133 @@ public class TestOmBucketInfo {
 
     assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void legacyFlagDoesNotImplyAnS3VersioningStatus() {
+    // Records written before the versioningStatus field existed deserialize
+    // unchanged and keep carrying the legacy flag alone. The legacy flag
+    // selects the in-record block version list, which is a different feature
+    // from S3 versioning, so it must not be promoted to a status.
+    OzoneManagerProtocolProtos.BucketInfo oldRecord =
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("bucket")
+            .setIsVersionEnabled(false)
+            .setStorageType(HddsProtos.StorageTypeProto.DISK)
+            .build();
+    OmBucketInfo bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertFalse(bucket.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        bucket.getVersioningStatus());
+    assertFalse(bucket.getIsVersionEnabled());
+    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+
+    oldRecord = oldRecord.toBuilder().setIsVersionEnabled(true).build();
+    bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertFalse(bucket.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        bucket.getVersioningStatus());
+    assertTrue(bucket.getIsVersionEnabled());
+    // the absent status survives the round trip, so a re-serialized legacy
+    // record is still distinguishable from an S3-versioned one
+    assertFalse(bucket.getProtobuf().hasVersioningStatus());
+    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void versioningStatusProtobufConversion() {
+    // SUSPENDED is not representable by the legacy flag alone, so it must
+    // survive a proto round trip via the new field.
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setVersioningStatus(BucketVersioningStatus.SUSPENDED)
+        .build();
+    assertFalse(bucket.getIsVersionEnabled());
+
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        recovered.getVersioningStatus());
+    assertFalse(recovered.getIsVersionEnabled());
+    assertEquals(bucket, recovered);
+  }
+
+  @Test
+  public void builderKeepsVersioningStatusAndLegacyFlagInSync() {
+    OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1");
+
+    // no status set at all
+    assertFalse(builder.build().hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        builder.build().getVersioningStatus());
+
+    // the legacy flag sets only itself: no status is derived from it
+    builder.setIsVersionEnabled(true);
+    assertFalse(builder.build().hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        builder.build().getVersioningStatus());
+    assertTrue(builder.build().getIsVersionEnabled());
+
+    // an explicit status is authoritative and drives the legacy flag
+    builder.setVersioningStatus(BucketVersioningStatus.SUSPENDED);
+    assertTrue(builder.build().hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
+    assertFalse(builder.build().getIsVersionEnabled());
+
+    // ENABLED shows up as true to clients that only know the legacy flag
+    builder.setVersioningStatus(BucketVersioningStatus.ENABLED);
+    assertTrue(builder.build().getIsVersionEnabled());
+
+    // a null status is a no-op (records without the new field)
+    builder.setVersioningStatus(null);
+    assertEquals(BucketVersioningStatus.ENABLED,
+        builder.build().getVersioningStatus());
+  }
+
+  @Test
+  public void maxVersionsProtobufConversion() {
+    // A bucket that sets no limit of its own stays distinguishable from one
+    // that set a limit explicitly, since the cluster default applies only to
+    // the former.
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .build();
+    assertNull(bucket.getMaxVersions());
+    assertFalse(bucket.getProtobuf().hasMaxVersions());
+    assertNull(OmBucketInfo.getFromProtobuf(bucket.getProtobuf())
+        .getMaxVersions());
+
+    bucket = bucket.toBuilder().setMaxVersions(5).build();
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(5, recovered.getMaxVersions());
+    assertEquals(bucket, recovered);
+
+    // 0 is "unlimited", which is a set value rather than an absent one
+    bucket = bucket.toBuilder().setMaxVersions(0).build();
+    recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(0, recovered.getMaxVersions());
+    assertTrue(bucket.getProtobuf().hasMaxVersions());
+  }
+
+  @Test
+  public void noncurrentVersionExpirationProtobufConversion() {
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .build();
+    // expiration is opt-in, so an unset bucket retains versions forever
+    assertNull(bucket.getNoncurrentVersionExpirationDays());
+    assertFalse(bucket.getProtobuf().hasNoncurrentVersionExpirationDays());
+
+    bucket = bucket.toBuilder().setNoncurrentVersionExpirationDays(30).build();
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(30, recovered.getNoncurrentVersionExpirationDays());
+    assertEquals(bucket, recovered);
   }
 
   @Test

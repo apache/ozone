@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -171,6 +172,24 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return DB key as String.
    */
   String getOzoneKey(String volume, String bucket, String key);
+
+  /**
+   * Given a volume, bucket, key and versionId, return the corresponding
+   * versionedKeyTable DB key: the versionId is appended as fixed-width hex of
+   * (Long.MAX_VALUE - versionId), so all versions of a key are adjacent and
+   * ordered newest first.
+   */
+  String getVersionedOzoneKey(String volume, String bucket, String key, long versionId);
+
+  /**
+   * Prefix under which all noncurrent versions of the given key are stored in
+   * the versionedKeyTable. The key name is separated from the versionId suffix
+   * by OM_VERSIONED_KEY_SEPARATOR rather than OM_KEY_PREFIX, so that a key's
+   * versions stay contiguous under this prefix and sort before any key nested
+   * under it: seeking this prefix yields exactly that key's versions, newest
+   * first.
+   */
+  String getVersionedOzoneKeyPrefix(String volume, String bucket, String key);
 
   /**
    * Get DB key for a key or prefix in an FSO bucket given existing
@@ -360,6 +379,68 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
 
   /**
+   * Returns the noncurrent object versions that exceed their bucket's
+   * maxVersions, oldest first, grouped by volume and bucket. The limit counts a
+   * key's current version and its delete markers along with the noncurrent
+   * ones, so a key with maxVersions {@code n} keeps at most {@code n - 1}
+   * noncurrent versions.
+   *
+   * <p>Only buckets that have ever been versioned are examined, and a bucket
+   * whose effective limit is 0 (unlimited) is skipped entirely.
+   *
+   * @param defaultMaxVersions the limit applied to a bucket that sets none of
+   *                           its own; 0 means unlimited.
+   * @param limitPerTask the maximum number of versions to return.
+   * @return a {@link List} of {@link ObjectVersionsBucket}, the versions to
+   *         reclaim, grouped by volume and bucket.
+   */
+  List<ObjectVersionsBucket> getVersionsToReclaim(int defaultMaxVersions,
+      int limitPerTask) throws IOException;
+
+  /**
+   * Result of one pass of {@link #getExpiredDeleteMarkers}: the markers found,
+   * and where the next pass should resume.
+   */
+  class ExpiredDeleteMarkers {
+    private final List<ObjectVersionsBucket> markersPerBucket;
+    private final String nextStartKey;
+
+    public ExpiredDeleteMarkers(List<ObjectVersionsBucket> markersPerBucket,
+        String nextStartKey) {
+      this.markersPerBucket = markersPerBucket;
+      this.nextStartKey = nextStartKey;
+    }
+
+    public List<ObjectVersionsBucket> getMarkersPerBucket() {
+      return markersPerBucket;
+    }
+
+    /** Where to resume, or null when the table was walked to the end. */
+    public String getNextStartKey() {
+      return nextStartKey;
+    }
+  }
+
+  /**
+   * Returns the keys whose only remaining version is a delete marker, grouped
+   * by volume and bucket. Such a key is invisible to reads and its marker
+   * carries no versionId to address it by, so nothing other than this removes
+   * it.
+   *
+   * <p>There is no index of delete markers, so this walks the keyTable. The
+   * walk is bounded by {@code scanBudget} and resumes from {@code startKey},
+   * so one run cannot iterate an unbounded number of keys and successive runs
+   * still make progress; passing a null {@code startKey} starts from the
+   * beginning.
+   *
+   * @param startKey where to resume the walk, or null to start over.
+   * @param scanBudget the maximum number of keyTable entries to examine.
+   * @param limit the maximum number of markers to return.
+   */
+  ExpiredDeleteMarkers getExpiredDeleteMarkers(String startKey, int scanBudget,
+      int limit) throws IOException;
+
+  /**
    * Returns the names of up to {@code count} MPU key whose age is greater
    * than or equal to {@code expireThreshold}.
    *
@@ -404,6 +485,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
 
   Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
+
+  /**
+   * Returns the versionedKeyTable holding noncurrent object versions
+   * (including noncurrent delete markers) of versioning-enabled buckets.
+   *
+   * @return versionedKeyTable.
+   */
+  Table<String, OmKeyInfo> getVersionedKeyTable();
 
   /**
    * Returns the FileTable.
