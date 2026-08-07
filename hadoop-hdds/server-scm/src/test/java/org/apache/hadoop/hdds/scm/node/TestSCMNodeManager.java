@@ -771,16 +771,17 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmDetectStaleAndDeadNode()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException,
+      TimeoutException {
     final int interval = 100;
     final int nodeCount = 10;
 
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
         MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, interval, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
 
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
@@ -790,28 +791,20 @@ public class TestSCMNodeManager {
       DatanodeDetails staleNode = HddsTestUtils.createRandomDatanodeAndRegister(
           nodeManager);
 
-      // Heartbeat once
+      // Heartbeat the stale node once; it ages into stale then dead while the
+      // other nodes are kept alive.
       nodeManager.processHeartbeat(staleNode);
 
-      // Heartbeat all other nodes.
-      for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
-      }
+      // Keep the good nodes alive until the stale node moves into stale state.
+      GenericTestUtils.waitFor(() -> {
+        for (DatanodeDetails dn : nodeList) {
+          nodeManager.processHeartbeat(dn);
+        }
+        return nodeManager.getNodeCount(NodeStatus.inServiceStale()) == 1;
+      }, interval, 10 * 1000);
 
-      // Wait for 2 seconds .. and heartbeat good nodes again.
-      Thread.sleep(2 * 1000);
-
-      for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
-      }
-
-      // Wait for 2 seconds, wait a total of 4 seconds to make sure that the
-      // node moves into stale state.
-      Thread.sleep(2 * 1000);
       List<DatanodeDetails> staleNodeList =
           nodeManager.getNodes(NodeStatus.inServiceStale());
-      assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceStale()),
-          "Expected to find 1 stale node");
       assertEquals(1, staleNodeList.size(),
           "Expected to find 1 stale node");
       assertEquals(staleNode.getID(), staleNodeList.get(0).getID(),
@@ -822,23 +815,21 @@ public class TestSCMNodeManager {
           nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
               .get(HddsProtos.NodeState.STALE.name()).intValue());
 
-      Thread.sleep(1000);
-      // heartbeat good nodes again.
-      for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
-      }
+      // Keep the good nodes alive until the stale node moves into dead state.
+      GenericTestUtils.waitFor(() -> {
+        for (DatanodeDetails dn : nodeList) {
+          nodeManager.processHeartbeat(dn);
+        }
+        return nodeManager.getNodeCount(NodeStatus.inServiceDead()) == 1;
+      }, interval, 10 * 1000);
 
-      //  6 seconds is the dead window for this test , so we wait a total of
-      // 7 seconds to make sure that the node moves into dead state.
-      Thread.sleep(2 * 1000);
-
-      // the stale node has been removed
+      // the stale node has moved on to dead
       staleNodeList = nodeManager.getNodes(NodeStatus.inServiceStale());
       nodeCounts = nodeManager.getNodeCount();
       assertEquals(0, nodeManager.getNodeCount(NodeStatus.inServiceStale()),
-          "Expected to find 1 stale node");
+          "Expected to find 0 stale node");
       assertEquals(0, staleNodeList.size(),
-          "Expected to find 1 stale node");
+          "Expected to find 0 stale node");
       assertEquals(0,
           nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
               .get(HddsProtos.NodeState.STALE.name()).intValue());
@@ -866,21 +857,22 @@ public class TestSCMNodeManager {
    */
   @Test
   void testScmHandleJvmPause() throws Exception {
-    final int healthCheckInterval = 200; // milliseconds
-    final int heartbeatInterval = 1; // seconds
-    final int staleNodeInterval = 3; // seconds
-    final int deadNodeInterval = 6; // seconds
+    final int healthCheckInterval = 100; // milliseconds
+    final int heartbeatInterval = 100; // milliseconds
+    final int staleNodeInterval = 1000; // milliseconds
+    // Keep the dead window large so the stale node does not race into dead.
+    final int deadNodeInterval = 10000; // milliseconds
     ScheduledFuture schedFuture;
 
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         healthCheckInterval, MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-        heartbeatInterval, SECONDS);
+        heartbeatInterval, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
-        staleNodeInterval, SECONDS);
+        staleNodeInterval, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL,
-        deadNodeInterval, SECONDS);
+        deadNodeInterval, MILLISECONDS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails node1 =
@@ -912,7 +904,7 @@ public class TestSCMNodeManager {
 
       // Step 1 : stop health check process (simulate JVM pause)
       nodeManager.pauseHealthCheck();
-      Thread.sleep(MILLISECONDS.convert(staleNodeInterval, SECONDS));
+      Thread.sleep(staleNodeInterval);
 
       // Step 2 : resume health check
       assertEquals(0, nodeManager.getSkippedHealthChecks(),
@@ -933,8 +925,12 @@ public class TestSCMNodeManager {
       // Step 5 : heartbeat for node1
       nodeManager.processHeartbeat(node1);
 
-      // Step 6 : wait for health check process to run
-      Thread.sleep(1000);
+      // Step 6 : wait for node2 (not heartbeated) to transition to STALE while
+      // node1 (just heartbeated) stays HEALTHY.
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1
+              && nodeManager.getNodeCount(NodeStatus.inServiceStale()) == 1,
+          healthCheckInterval, staleNodeInterval);
 
       // Step 7 : node2 should transition to STALE
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
@@ -1236,9 +1232,9 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100,
         MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
 
 
     /**
@@ -1263,10 +1259,11 @@ public class TestSCMNodeManager {
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
       /**
-       * Cluster state: Quiesced: We are going to sleep for 3 seconds. Which
-       * means that no node is heartbeating. All nodes should move to Stale.
+       * Cluster state: Quiesced: We are going to sleep past the 1 second stale
+       * interval. Which means that no node is heartbeating. All nodes should
+       * move to Stale.
        */
-      Thread.sleep(3 * 1000);
+      Thread.sleep(1000);
       assertEquals(3, nodeManager.getAllNodes().size());
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
 
@@ -1275,21 +1272,21 @@ public class TestSCMNodeManager {
        * Cluster State : Move healthy node back to healthy state, move other 2
        * nodes to Stale State.
        *
-       * We heartbeat healthy node after 1 second and let other 2 nodes elapse
-       * the 3 second windows.
+       * We heartbeat healthy node partway through and let other 2 nodes elapse
+       * the 1 second stale window.
        */
 
       nodeManager.processHeartbeat(healthyNode);
       nodeManager.processHeartbeat(staleNode);
       nodeManager.processHeartbeat(deadNode);
 
-      Thread.sleep(1500);
+      Thread.sleep(500);
       nodeManager.processHeartbeat(healthyNode);
-      Thread.sleep(2 * 1000);
+      Thread.sleep(667);
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
 
-      // 3.5 seconds from last heartbeat for the stale and deadNode. So those
+      // ~1.17 seconds from last heartbeat for the stale and deadNode. So those
       //  2 nodes must move to Stale state and the healthy node must
       // remain in the healthy State.
       List<DatanodeDetails> healthyList = nodeManager.getNodes(
@@ -1307,13 +1304,13 @@ public class TestSCMNodeManager {
 
       nodeManager.processHeartbeat(healthyNode);
       nodeManager.processHeartbeat(staleNode);
-      Thread.sleep(1500);
+      Thread.sleep(500);
       nodeManager.processHeartbeat(healthyNode);
-      Thread.sleep(2 * 1000);
+      Thread.sleep(667);
 
-      // 3.5 seconds have elapsed for stale node, so it moves into Stale.
-      // 7 seconds have elapsed for dead node, so it moves into dead.
-      // 2 Seconds have elapsed for healthy node, so it stays in healthy state.
+      // ~1.17 seconds have elapsed for stale node, so it moves into Stale.
+      // ~2.33 seconds have elapsed for dead node, so it moves into dead.
+      // ~0.67 seconds have elapsed for healthy node, so it stays healthy.
       healthyList = nodeManager.getNodes((NodeStatus.inServiceHealthy()));
       List<DatanodeDetails> staleList =
           nodeManager.getNodes(NodeStatus.inServiceStale());
@@ -1416,9 +1413,9 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100,
         MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
 
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
@@ -1431,17 +1428,17 @@ public class TestSCMNodeManager {
 
       Runnable healthyNodeTask = () -> {
         try {
-          // 2 second heartbeat makes these nodes stay healthy.
-          heartbeatNodeSet(nodeManager, healthyNodeList, 2 * 1000);
+          // Sub-stale heartbeat keeps these nodes healthy.
+          heartbeatNodeSet(nodeManager, healthyNodeList, 600);
         } catch (InterruptedException ignored) {
         }
       };
 
       Runnable staleNodeTask = () -> {
         try {
-          // 4 second heartbeat makes these nodes go to stale and back to
-          // healthy again.
-          heartbeatNodeSet(nodeManager, staleNodeList, 4 * 1000);
+          // Heartbeat between the stale and dead windows makes these nodes go
+          // to stale and back to healthy again.
+          heartbeatNodeSet(nodeManager, staleNodeList, 1500);
         } catch (InterruptedException ignored) {
         }
       };
@@ -1462,7 +1459,7 @@ public class TestSCMNodeManager {
       thread2.setDaemon(true);
       thread2.start();
 
-      Thread.sleep(10 * 1000);
+      Thread.sleep(4 * 1000);
 
       // Assert all healthy nodes are healthy now, this has to be a greater
       // than check since Stale nodes can be healthy when we check the state.
@@ -1510,11 +1507,11 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100,
         MILLISECONDS);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1,
-        SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3 * 1000,
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6 * 1000,
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
+        MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2000,
         MILLISECONDS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
@@ -1525,7 +1522,7 @@ public class TestSCMNodeManager {
 
       Runnable healthyNodeTask = () -> {
         try {
-          heartbeatNodeSet(nodeManager, healthyList, 2 * 1000);
+          heartbeatNodeSet(nodeManager, healthyList, 600);
         } catch (InterruptedException ignored) {
 
         }
@@ -1533,7 +1530,7 @@ public class TestSCMNodeManager {
 
       Runnable staleNodeTask = () -> {
         try {
-          heartbeatNodeSet(nodeManager, staleList, 4 * 1000);
+          heartbeatNodeSet(nodeManager, staleList, 1500);
         } catch (InterruptedException ignored) {
         }
       };
@@ -1545,7 +1542,7 @@ public class TestSCMNodeManager {
       Thread thread2 = new Thread(staleNodeTask);
       thread2.setDaemon(true);
       thread2.start();
-      Thread.sleep(3 * 1000);
+      Thread.sleep(1000);
 
       GenericTestUtils.waitFor(() -> findNodes(nodeManager, staleCount, STALE),
           500, 20 * 1000);
