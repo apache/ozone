@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -53,8 +54,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests OMBucketSetPropertyRequest class which handles OMSetBucketProperty
@@ -636,6 +640,152 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
         createSetVersioningStatusRequest(UUID.randomUUID().toString(),
             UUID.randomUUID().toString(), BucketVersioningStatus.SUSPENDED))
         .preExecute(ozoneManager));
+  }
+
+  /**
+   * The full transition matrix while the bucket holds snapshots. Anything that
+   * lands the bucket in a versioned state is refused, because a noncurrent
+   * version reclaimed from the active object store could take blocks a
+   * snapshot still references. ENABLED -&gt; SUSPENDED is the exception: a
+   * bucket that reached a mixed state before these checks existed has to be
+   * able to stop accumulating versions.
+   */
+  @CsvSource({
+      "UNVERSIONED, ENABLED,   false",
+      "UNVERSIONED, SUSPENDED, false",
+      "SUSPENDED,   ENABLED,   false",
+      "ENABLED,     SUSPENDED, true",
+      "ENABLED,     ENABLED,   true",
+      "SUSPENDED,   SUSPENDED, true",
+  })
+  @ParameterizedTest
+  public void testVersioningTransitionsWhileSnapshotsExist(
+      BucketVersioningStatus from, BucketVersioningStatus to, boolean allowed)
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    seedVersioningStatus(volumeName, bucketName, from);
+    addSnapshotToDB(volumeName, bucketName, "snap1");
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName, to))
+        .validateAndUpdateCache(ozoneManager, 2);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    if (allowed) {
+      assertTrue(response.getOMResponse().getSuccess());
+      assertEquals(to, omMetadataManager.getBucketTable().get(bucketKey)
+          .getVersioningStatus());
+    } else {
+      assertFalse(response.getOMResponse().getSuccess());
+      assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+          response.getOMResponse().getStatus());
+      assertThat(response.getOMResponse().getMessage())
+          .contains("while it has snapshots");
+      // the bucket is left as it was
+      assertEquals(from, omMetadataManager.getBucketTable().get(bucketKey)
+          .getVersioningStatus());
+    }
+  }
+
+  /** Without snapshots the same transitions are all allowed. */
+  @CsvSource({
+      "UNVERSIONED, ENABLED",
+      "UNVERSIONED, SUSPENDED",
+      "SUSPENDED,   ENABLED",
+  })
+  @ParameterizedTest
+  public void testVersioningTransitionsWithoutSnapshots(
+      BucketVersioningStatus from, BucketVersioningStatus to) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    seedVersioningStatus(volumeName, bucketName, from);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName, to))
+        .validateAndUpdateCache(ozoneManager, 2);
+
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(to, omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getVersioningStatus());
+  }
+
+  /**
+   * A snapshot that was deleted but not yet purged still references the blocks
+   * it captured, so it has to keep the bucket out of a versioned state. It is
+   * still in the snapshotInfoTable until the purge, which is what the check
+   * looks at; this pins that, since moving the chain removal earlier would
+   * silently weaken it.
+   */
+  @Test
+  public void testDeletedButUnpurgedSnapshotStillBlocksVersioning()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    SnapshotInfo snapshotInfo = addSnapshotToDB(volumeName, bucketName, "snap1");
+    snapshotInfo.setSnapshotStatus(
+        SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    omMetadataManager.getSnapshotInfoTable()
+        .put(snapshotInfo.getTableKey(), snapshotInfo);
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
+        .validateAndUpdateCache(ozoneManager, 2);
+
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        response.getOMResponse().getStatus());
+  }
+
+  /**
+   * Two buckets whose names share a prefix must not see each other's
+   * snapshots.
+   */
+  @Test
+  public void testSnapshotOfAnotherBucketDoesNotBlockVersioning()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    // a bucket whose name starts with the first one's name
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName + "-other",
+        omMetadataManager);
+    addSnapshotToDB(volumeName, bucketName + "-other", "snap1");
+
+    OMClientResponse response = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
+        .validateAndUpdateCache(ozoneManager, 2);
+
+    assertTrue(response.getOMResponse().getSuccess());
+  }
+
+  private void seedVersioningStatus(String volumeName, String bucketName,
+      BucketVersioningStatus status) throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey)
+        .toBuilder().setVersioningStatus(status).build();
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        CacheValue.get(1L, bucketInfo));
+    omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+  }
+
+  private SnapshotInfo addSnapshotToDB(String volumeName, String bucketName,
+      String snapshotName) throws Exception {
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
+        bucketName, snapshotName, UUID.randomUUID(), Time.now());
+    omMetadataManager.getSnapshotInfoTable()
+        .put(snapshotInfo.getTableKey(), snapshotInfo);
+    return snapshotInfo;
   }
 
   private void withLifecycleService(boolean enabled) {
