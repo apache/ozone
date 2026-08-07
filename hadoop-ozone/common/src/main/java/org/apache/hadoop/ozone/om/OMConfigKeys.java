@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.TransactionIndexVersionIdGenerator;
+import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -714,6 +716,41 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_VERSIONING_VERSION_ID_GENERATOR =
+      "ozone.om.versioning.version-id-generator";
+  public static final Class<? extends VersionIdGenerator>
+      OZONE_OM_VERSIONING_VERSION_ID_GENERATOR_DEFAULT = TransactionIndexVersionIdGenerator.class;
+
+  public static final String OZONE_OM_VERSIONING_MAX_VERSIONS =
+      "ozone.om.versioning.max.versions";
+  public static final int OZONE_OM_VERSIONING_MAX_VERSIONS_DEFAULT = 100;
+
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.version.cleanup.service.interval";
+  public static final String
+      OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL_DEFAULT = "1h";
+
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT =
+      "ozone.om.version.cleanup.service.timeout";
+  public static final String OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "300s";
+
+  public static final String OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.version.cleanup.limit.per.task";
+  public static final int OZONE_OM_VERSION_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
+
+  public static final String
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED =
+      "ozone.om.snapshot.versioning.coexistence.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_VERSIONING_COEXISTENCE_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET =
+      "ozone.om.version.cleanup.marker.scan.budget";
+  public static final int OZONE_OM_VERSION_CLEANUP_MARKER_SCAN_BUDGET_DEFAULT =
+      100000;
 
   /**
    * Never constructed.

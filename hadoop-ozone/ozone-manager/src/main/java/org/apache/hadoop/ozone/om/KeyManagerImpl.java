@@ -58,6 +58,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
@@ -178,8 +182,10 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.service.VersionCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -220,6 +226,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
+  private BackgroundService versionCleanupService;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private CompactionService compactionService;
 
@@ -359,6 +366,20 @@ public class KeyManagerImpl implements KeyManager {
           serviceInterval, TimeUnit.MILLISECONDS, serviceTimeout,
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
+    }
+
+    if (versionCleanupService == null) {
+      long serviceInterval = configuration.getTimeDuration(
+          OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL,
+          OZONE_OM_VERSION_CLEANUP_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT,
+          OZONE_OM_VERSION_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      versionCleanupService = new VersionCleanupService(serviceInterval,
+          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
+      versionCleanupService.start();
     }
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
@@ -512,6 +533,10 @@ public class KeyManagerImpl implements KeyManager {
       multipartUploadCleanupService.shutdown();
       multipartUploadCleanupService = null;
     }
+    if (versionCleanupService != null) {
+      versionCleanupService.shutdown();
+      versionCleanupService = null;
+    }
     if (compactionService != null) {
       compactionService.shutdown();
       compactionService = null;
@@ -601,14 +626,30 @@ public class KeyManagerImpl implements KeyManager {
               bucketLayout);
 
       if (bucketLayout.isFileSystemOptimized()) {
+        if (args.addressesVersion()) {
+          throw new OMException("Object versioning is only supported on "
+              + BucketLayout.OBJECT_STORE + " buckets",
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName, bucketLayout);
+        if (args.addressesVersion()) {
+          value = getAddressedVersion(args, volumeName, bucketName, keyName,
+              value);
+        }
         if (value != null) {
           // For Legacy & OBS buckets, any key is a file by default. This is to
           // keep getKeyInfo compatible with OFS clients.
           value.setFile(true);
         }
+      }
+      if (value != null && value.isDeleteMarker()) {
+        // Addressing a delete marker by version is answered with 405 by S3,
+        // while a request that lands on a current marker is a plain 404.
+        throw new OMException("Key: " + keyName + " is a delete marker",
+            args.addressesVersion()
+                ? ResultCodes.KEY_IS_DELETE_MARKER : ResultCodes.KEY_NOT_FOUND);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -659,6 +700,48 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager
         .getKeyTable(bucketLayout)
         .get(keyBytes);
+  }
+
+  /**
+   * Resolves the version addressed by {@code args} for a key whose current
+   * version is {@code current}. The current version is checked first, so a
+   * request naming the current version costs no extra read; otherwise the
+   * version is looked up in the versionedKeyTable.
+   *
+   * @param current the key's current version, or null when the key has none
+   * @return the addressed version, or null when it does not exist
+   */
+  private OmKeyInfo getAddressedVersion(OmKeyArgs args, String volumeName,
+      String bucketName, String keyName, OmKeyInfo current) throws IOException {
+    if (args.isNullVersion()) {
+      if (current != null && current.isNullVersionRecord()) {
+        return current;
+      }
+      // The null version carries a normally generated versionId, so it can only
+      // be found by scanning the key's versions. The scan is bounded by the
+      // number of versions the key has and stops at the first match, since a key
+      // has at most one null version.
+      String prefix = metadataManager
+          .getVersionedOzoneKeyPrefix(volumeName, bucketName, keyName);
+      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+               metadataManager.getVersionedKeyTable().iterator(prefix)) {
+        while (versions.hasNext()) {
+          OmKeyInfo version = versions.next().getValue();
+          if (version.isNullVersionRecord()) {
+            return version;
+          }
+        }
+      }
+      return null;
+    }
+
+    long versionId = args.getVersionId();
+    if (current != null && current.getVersionId() != null
+        && current.getVersionId() == versionId) {
+      return current;
+    }
+    return metadataManager.getVersionedKeyTable().get(metadataManager
+        .getVersionedOzoneKey(volumeName, bucketName, keyName, versionId));
   }
 
   /**
@@ -999,6 +1082,19 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
     return metadataManager.getExpiredMultipartUploads(expireThreshold,
         maxParts);
+  }
+
+  @Override
+  public List<ObjectVersionsBucket> getVersionsToReclaim(
+      int defaultMaxVersions, int limitPerTask) throws IOException {
+    return metadataManager.getVersionsToReclaim(defaultMaxVersions,
+        limitPerTask);
+  }
+
+  @Override
+  public OMMetadataManager.ExpiredDeleteMarkers getExpiredDeleteMarkers(
+      String startKey, int scanBudget, int limit) throws IOException {
+    return metadataManager.getExpiredDeleteMarkers(startKey, scanBudget, limit);
   }
 
   @Override

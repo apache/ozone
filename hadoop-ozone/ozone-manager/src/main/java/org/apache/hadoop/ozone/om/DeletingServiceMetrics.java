@@ -70,6 +70,15 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numKeysPurged;
   @Metric("Total no. of rename entries purged")
   private MutableGaugeLong numRenameEntriesPurged;
+  /*
+   * Object version reclamation metrics. The submitted and reclaimed counts
+   * differ by the versions that were permanently deleted or promoted between
+   * VersionCleanupService selecting them and the request being applied.
+   */
+  @Metric("Total no. of object versions sent for reclamation")
+  private MutableGaugeLong numObjectVersionsSentForReclaim;
+  @Metric("Total no. of object versions reclaimed")
+  private MutableGaugeLong numObjectVersionsReclaimed;
 
   /*
    * Key deletion metrics in the last 24 hours.
@@ -196,6 +205,14 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysSentForPurge(long keysPurge) {
     this.numKeysSentForPurge.incr(keysPurge);
+  }
+
+  public void incrNumObjectVersionsSentForReclaim(long versions) {
+    this.numObjectVersionsSentForReclaim.incr(versions);
+  }
+
+  public void incrNumObjectVersionsReclaimed(long versions) {
+    this.numObjectVersionsReclaimed.incr(versions);
   }
 
   public void incrNumDirPurged(long dirPurged) {

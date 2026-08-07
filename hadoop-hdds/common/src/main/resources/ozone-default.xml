@@ -5163,4 +5163,83 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
+  <property>
+    <name>ozone.om.versioning.version-id-generator</name>
+    <value>org.apache.hadoop.ozone.om.helpers.TransactionIndexVersionIdGenerator</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to assign the
+      versionId of an object version. The default uses the index of the committing transaction;
+      PinnedFirstVersionIdGenerator additionally pins the first version of every key to a reserved
+      sentinel, so that it can be referenced without listing the key's versions first.
+      The setting is cluster-wide and may be changed on a running cluster; a write whose generated
+      versionId already exists on the key is rejected, and the existing version has to be deleted
+      before that id can be written again.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.versioning.max.versions</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of versions retained per key on a bucket that does not set maxVersions of its
+      own, counting the key's current version and its delete markers. Versions beyond the limit are
+      reclaimed oldest-first by VersionCleanupService. 0 means unlimited.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.interval</name>
+    <value>1h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Time interval of the OM VersionCleanupService, which reclaims the noncurrent object versions
+      of a key that exceed the bucket's maxVersions. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Timeout value of a VersionCleanupService run. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of object versions VersionCleanupService submits for reclamation in one run.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.versioning.coexistence.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      UNSAFE, FOR TESTING ONLY. Do not enable on a production cluster.
+
+      When false, the default, OM refuses to create a snapshot of a bucket that has S3 object
+      versioning enabled or suspended, and refuses to enable or resume versioning on a bucket that
+      still has snapshots. The two features cannot be combined safely yet: a snapshot shares blocks
+      with the active object store and keeps them only because key reclamation skips what a previous
+      snapshot references, and that lookup is not version-aware, so reclaiming a noncurrent version
+      can delete blocks a snapshot still points at.
+
+      Setting this to true lifts those checks so that the integration tests for snapshot-aware
+      version reclamation can be written against a real mixed-state bucket. On such a bucket, data
+      loss is possible.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.version.cleanup.marker.scan.budget</name>
+    <value>100000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of keyTable entries VersionCleanupService examines in one run while looking
+      for keys left with only a delete marker. There is no index of delete markers, so they are found
+      by walking the keyTable; each run walks at most this many entries and the next one resumes where
+      it stopped, so no single run iterates the whole table.
+    </description>
+  </property>
 </configuration>

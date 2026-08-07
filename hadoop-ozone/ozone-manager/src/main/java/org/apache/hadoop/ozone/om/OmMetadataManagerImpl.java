@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_VERSIONED_KEY_SEPARATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
@@ -63,6 +64,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -70,6 +72,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -133,6 +136,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -159,6 +163,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmVolumeArgs> volumeTable;
   private Table<String, OmBucketInfo> bucketTable;
   private Table<String, OmKeyInfo> keyTable;
+  private Table<String, OmKeyInfo> versionedKeyTable;
 
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
@@ -377,6 +382,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Table<String, OmKeyInfo> getVersionedKeyTable() {
+    return versionedKeyTable;
+  }
+
+  @Override
   public Table<String, OmKeyInfo> getFileTable() {
     return fileTable;
   }
@@ -494,6 +504,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     volumeTable = initializer.get(OMDBDefinition.VOLUME_TABLE_DEF, cacheType);
     bucketTable = initializer.get(OMDBDefinition.BUCKET_TABLE_DEF, cacheType);
     keyTable = initializer.get(OMDBDefinition.KEY_TABLE_DEF);
+    versionedKeyTable = initializer.get(OMDBDefinition.VERSIONED_KEY_TABLE_DEF);
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
     multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
@@ -647,6 +658,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
     return builder.toString();
+  }
+
+  @Override
+  public String getVersionedOzoneKey(String volume, String bucket, String key, long versionId) {
+    return getVersionedOzoneKeyPrefix(volume, bucket, key)
+        + String.format("%016x", Long.MAX_VALUE - versionId);
+  }
+
+  @Override
+  public String getVersionedOzoneKeyPrefix(String volume, String bucket, String key) {
+    return getOzoneKey(volume, bucket, key) + OM_VERSIONED_KEY_SEPARATOR;
   }
 
   @Override
@@ -1515,6 +1537,200 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return expiredKeys;
+  }
+
+  @Override
+  public List<ObjectVersionsBucket> getVersionsToReclaim(
+      int defaultMaxVersions, int limitPerTask) throws IOException {
+    List<ObjectVersionsBucket> reclaimable = new ArrayList<>();
+    int collected = 0;
+
+    try (Table.KeyValueIterator<String, OmBucketInfo> buckets =
+             getBucketTable().iterator()) {
+      while (collected < limitPerTask && buckets.hasNext()) {
+        OmBucketInfo bucketInfo = buckets.next().getValue();
+        // Only a bucket that keeps versions has a versionedKeyTable range, and
+        // a limit of 0 means unlimited: both skip without a single seek.
+        if (!bucketInfo.hasEverBeenVersioned()) {
+          continue;
+        }
+        int maxVersions = bucketInfo.getMaxVersions() != null
+            ? bucketInfo.getMaxVersions() : defaultMaxVersions;
+        Integer expirationDays = bucketInfo.getNoncurrentVersionExpirationDays();
+        // Expiration is opt-in, so a bucket with neither control set has
+        // nothing to reclaim and is skipped without a single seek.
+        final boolean expires = expirationDays != null && expirationDays > 0;
+        if (maxVersions <= 0 && !expires) {
+          continue;
+        }
+
+        ObjectVersionsBucket.Builder bucketBuilder = null;
+        // The current version lives in the keyTable and counts toward the
+        // limit, so this is how many noncurrent versions a key may keep.
+        // A limit of 0 is unlimited, and only expiration applies.
+        final int allowedNoncurrent =
+            maxVersions <= 0 ? Integer.MAX_VALUE : maxVersions - 1;
+        final long expiredBefore = expires
+            ? Time.now() - TimeUnit.DAYS.toMillis(expirationDays) : 0L;
+        final String bucketPrefix = getBucketKey(bucketInfo.getVolumeName(),
+            bucketInfo.getBucketName()) + OM_KEY_PREFIX;
+        String currentKeyPrefix = null;
+        int seenInKey = 0;
+        // When the version that superseded this one was committed, which is
+        // when this one became noncurrent. Only read when expiration applies.
+        long becameNoncurrentAt = 0L;
+
+        try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+                 getVersionedKeyTable().iterator(bucketPrefix)) {
+          while (collected < limitPerTask && versions.hasNext()) {
+            Table.KeyValue<String, OmKeyInfo> entry = versions.next();
+            String dbKey = entry.getKey();
+            // All versions of a key are contiguous and ordered newest first,
+            // so a change of prefix starts a new key and restarts the count.
+            int separator = dbKey.indexOf(OM_VERSIONED_KEY_SEPARATOR);
+            String keyPrefix = dbKey.substring(0, separator + 1);
+            if (!keyPrefix.equals(currentKeyPrefix)) {
+              currentKeyPrefix = keyPrefix;
+              seenInKey = 0;
+              if (expires) {
+                // The newest noncurrent version was superseded by the key's
+                // current version, which is the one the keyTable holds.
+                becameNoncurrentAt = supersedingTime(bucketInfo,
+                    dbKey.substring(bucketPrefix.length(), separator));
+              }
+            }
+
+            boolean overLimit = seenInKey++ >= allowedNoncurrent;
+            boolean expired = false;
+            if (expires) {
+              expired = becameNoncurrentAt > 0
+                  && becameNoncurrentAt <= expiredBefore;
+              // Walking a key newest first, the version just visited is the
+              // one that superseded the next one.
+              becameNoncurrentAt = entry.getValue().getModificationTime();
+            }
+            if (!overLimit && !expired) {
+              continue;
+            }
+            if (bucketBuilder == null) {
+              bucketBuilder = ObjectVersionsBucket.newBuilder()
+                  .setVolumeName(bucketInfo.getVolumeName())
+                  .setBucketName(bucketInfo.getBucketName());
+            }
+            bucketBuilder.addVersionKeys(dbKey);
+            collected++;
+          }
+        }
+
+        if (bucketBuilder != null) {
+          reclaimable.add(bucketBuilder.build());
+        }
+      }
+    }
+
+    return reclaimable;
+  }
+
+  @Override
+  public ExpiredDeleteMarkers getExpiredDeleteMarkers(String startKey,
+      int scanBudget, int limit) throws IOException {
+    Map<String, ObjectVersionsBucket.Builder> markers = new LinkedHashMap<>();
+    // Buckets resolved during this pass. The keyTable is ordered by bucket, so
+    // in practice this holds one entry at a time, but caching by key keeps the
+    // lookup correct if that ever stops holding.
+    Map<String, OmBucketInfo> bucketCache = new HashMap<>();
+    String nextStartKey = null;
+    int scanned = 0;
+    int collected = 0;
+
+    // OBJECT_STORE and LEGACY buckets share the keyTable; only a bucket that
+    // keeps versions can hold a delete marker, and the lookup below drops the
+    // rest.
+    try (Table.KeyValueIterator<String, OmKeyInfo> keys =
+             getKeyTable(BucketLayout.OBJECT_STORE).iterator()) {
+      if (startKey != null) {
+        keys.seek(startKey);
+      }
+      while (keys.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = keys.next();
+        if (scanned >= scanBudget || collected >= limit) {
+          // Resume at this entry rather than walking the table from the start
+          // again, so that successive runs make progress.
+          nextStartKey = entry.getKey();
+          break;
+        }
+        scanned++;
+        OmKeyInfo keyInfo = entry.getValue();
+        if (!keyInfo.isDeleteMarker()) {
+          continue;
+        }
+
+        String bucketKey = getBucketKey(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
+        OmBucketInfo bucketInfo = bucketCache.get(bucketKey);
+        if (bucketInfo == null) {
+          // Read past the table cache, so that this walk and the versionedKey
+          // walk in getVersionsToReclaim judge a bucket by the same state. A
+          // bucket property changed but not yet flushed applies on the next
+          // run, which is soon enough for a background reclaimer.
+          bucketInfo = getBucketTable().getSkipCache(bucketKey);
+          if (bucketInfo == null) {
+            continue;
+          }
+          bucketCache.put(bucketKey, bucketInfo);
+        }
+        if (!bucketInfo.hasEverBeenVersioned()
+            || !bucketInfo.isExpiredDeleteMarkerCleanupEnabled()) {
+          continue;
+        }
+
+        // The marker has only expired once nothing is left under it: while a
+        // noncurrent version survives, the marker is what makes the key read
+        // as deleted, and removing it would resurrect that version.
+        if (hasNoncurrentVersion(keyInfo)) {
+          continue;
+        }
+
+        markers.computeIfAbsent(bucketKey, k ->
+            ObjectVersionsBucket.newBuilder()
+                .setVolumeName(keyInfo.getVolumeName())
+                .setBucketName(keyInfo.getBucketName()))
+            .addMarkerKeys(entry.getKey());
+        collected++;
+      }
+    }
+
+    List<ObjectVersionsBucket> result = markers.values().stream()
+        .map(ObjectVersionsBucket.Builder::build)
+        .collect(Collectors.toList());
+    return new ExpiredDeleteMarkers(result, nextStartKey);
+  }
+
+  /** Whether the key has any version left in the versionedKeyTable. */
+  private boolean hasNoncurrentVersion(OmKeyInfo keyInfo) throws IOException {
+    try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+             getVersionedKeyTable().iterator(getVersionedOzoneKeyPrefix(
+                 keyInfo.getVolumeName(), keyInfo.getBucketName(),
+                 keyInfo.getKeyName()))) {
+      return versions.hasNext();
+    }
+  }
+
+  /**
+   * When the key's current version was committed, which is the moment the
+   * newest noncurrent version stopped being current. Returns 0 when the key
+   * has no current version, which leaves its versions unexpired: the keyTable
+   * holds the current version of every key that still has one, so this only
+   * happens if that invariant is broken, and expiring on a broken invariant
+   * would destroy data.
+   */
+  private long supersedingTime(OmBucketInfo bucketInfo, String keyName)
+      throws IOException {
+    // S3 versioning is supported on OBJECT_STORE buckets only.
+    OmKeyInfo current = getKeyTable(BucketLayout.OBJECT_STORE).get(
+        getOzoneKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+            keyName));
+    return current == null ? 0L : current.getModificationTime();
   }
 
   @Override

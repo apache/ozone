@@ -15,26 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit;
+package org.apache.hadoop.ozone.om.helpers;
+
+import com.google.common.base.Preconditions;
 
 /**
- * Enum to define Audit Action types for system audit in OzoneManager. This will in addition to OMAction
- * as present for request.
+ * Uses the index of the committing transaction as the versionId, the default
+ * generator. Holds no allocator state, so a version costs no read or write
+ * beyond the commit itself.
  */
-public enum OMSystemAction implements AuditAction {
-  STARTUP,
-  LEADER_CHANGE,
-  OPEN_KEY_CLEANUP,
-  OBJECT_VERSION_CLEANUP,
-  DB_CHECKPOINT_INSTALL,
-  DIRECTORY_DELETION,
-  KEY_DELETION,
-  SNAPSHOT_MOVE_TABLE_KEYS,
-  SNAPSHOT_PURGE,
-  SNAPSHOT_SET_PROPERTY;
+public class TransactionIndexVersionIdGenerator implements VersionIdGenerator {
 
   @Override
-  public String getAction() {
-    return this.toString();
+  public long generateVersionId(long transactionLogIndex, boolean hasCurrentVersion) {
+    Preconditions.checkArgument(transactionLogIndex > FIRST_VERSION_ID,
+        "Transaction index " + transactionLogIndex
+            + " is a reserved versionId, expected greater than " + FIRST_VERSION_ID);
+    return transactionLogIndex;
   }
 }

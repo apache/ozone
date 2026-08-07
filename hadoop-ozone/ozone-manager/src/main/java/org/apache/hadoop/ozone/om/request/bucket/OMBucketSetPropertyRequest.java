@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -174,10 +176,69 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       //Check Versioning to update
       Boolean versioning = omBucketArgs.getIsVersionEnabled();
+      BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
       if (versioning != null) {
+        // Apply the legacy flag on its own; setVersioningStatus below overrides
+        // it when a status is also being set.
         bucketInfoBuilder.setIsVersionEnabled(versioning);
-        LOG.debug("Updating bucket versioning for bucket: {} in volume: {}",
-            bucketName, volumeName);
+      }
+      if (newVersioningStatus == null && versioning != null
+          && dbBucketInfo.hasVersioningStatus()) {
+        // Legacy flag from an older client against a bucket that already has an
+        // S3 versioning status: keep the two consistent. Disabling maps to
+        // SUSPENDED, since the S3 state machine forbids returning to
+        // UNVERSIONED once versioning has been enabled.
+        //
+        // On a bucket without a status the flag is left alone: it selects the
+        // legacy in-record block version list, and an old client must not be
+        // able to opt a bucket into S3 versioning semantics.
+        newVersioningStatus = versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
+      }
+      if (newVersioningStatus != null) {
+        if (dbBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+          throw new OMException("S3 object versioning is only supported on "
+              + BucketLayout.OBJECT_STORE + " buckets, but bucket " + bucketName
+              + " has layout " + dbBucketInfo.getBucketLayout() + ".",
+              OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+        if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
+          throw new OMException("Bucket versioning cannot be changed from "
+              + dbBucketInfo.getVersioningStatus() + " to " + newVersioningStatus
+              + "; once enabled, versioning can only be suspended.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+        rejectVersioningWhileSnapshotsExist(ozoneManager, omMetadataManager,
+            dbBucketInfo, newVersioningStatus, volumeName, bucketName);
+        bucketInfoBuilder.setVersioningStatus(newVersioningStatus);
+        LOG.debug("Updating bucket versioning to {} for bucket: {} in volume: {}",
+            newVersioningStatus, bucketName, volumeName);
+      }
+
+      // Check maxVersions to update. It is accepted on any bucket, so that the
+      // retention limit can be set before versioning is enabled; it only takes
+      // effect once the bucket keeps versions.
+      Integer newMaxVersions = omBucketArgs.getMaxVersions();
+      if (newMaxVersions != null) {
+        OMBucketCreateRequest.validateMaxVersions(newMaxVersions);
+        bucketInfoBuilder.setMaxVersions(newMaxVersions);
+        LOG.debug("Updating maxVersions to {} for bucket: {} in volume: {}",
+            newMaxVersions, bucketName, volumeName);
+      }
+
+      Integer newExpirationDays = omBucketArgs.getNoncurrentVersionExpirationDays();
+      if (newExpirationDays != null) {
+        OMBucketCreateRequest.validateNoncurrentVersionExpirationDays(newExpirationDays);
+        bucketInfoBuilder.setNoncurrentVersionExpirationDays(newExpirationDays);
+        LOG.debug("Updating noncurrentVersionExpirationDays to {} for bucket: {} in volume: {}",
+            newExpirationDays, bucketName, volumeName);
+      }
+
+      Boolean newMarkerCleanup = omBucketArgs.getExpiredDeleteMarkerCleanup();
+      if (newMarkerCleanup != null) {
+        bucketInfoBuilder.setExpiredDeleteMarkerCleanup(newMarkerCleanup);
+        LOG.debug("Updating expiredDeleteMarkerCleanup to {} for bucket: {} in volume: {}",
+            newMarkerCleanup, bucketName, volumeName);
       }
 
       //Check quotaInBytes and quotaInNamespace to update
@@ -371,6 +432,93 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Rejects a transition that leaves the bucket in a versioned state while it
+   * still holds snapshots. A snapshot shares blocks with the active object
+   * store and keeps them only because KeyDeletingService refuses to reclaim
+   * what a previous snapshot references; that decision is not version-aware
+   * yet, so a noncurrent version reclaimed here could take blocks a snapshot
+   * still points at.
+   *
+   * <p>ENABLED -&gt; SUSPENDED is allowed even then: a bucket that reached a
+   * mixed state before these checks existed has to be able to stop
+   * accumulating versions. A transition to the status the bucket already has
+   * is allowed for the same reason - it creates no new coexistence, and an S3
+   * client re-sending PutBucketVersioning must not fail against a bucket that
+   * is already in that state.
+   *
+   * <p>The check is not latched: once the last snapshot is purged from the
+   * bucket, versioning can be enabled or resumed normally.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private void rejectVersioningWhileSnapshotsExist(OzoneManager ozoneManager,
+      OMMetadataManager omMetadataManager, OmBucketInfo dbBucketInfo,
+      BucketVersioningStatus newVersioningStatus, String volumeName,
+      String bucketName) throws IOException {
+
+    if (ozoneManager.isSnapshotVersioningCoexistenceAllowed()) {
+      return;
+    }
+
+    BucketVersioningStatus current = dbBucketInfo.getVersioningStatus();
+    if (newVersioningStatus == BucketVersioningStatus.UNVERSIONED
+        || newVersioningStatus == current
+        || (current == BucketVersioningStatus.ENABLED
+            && newVersioningStatus == BucketVersioningStatus.SUSPENDED)) {
+      return;
+    }
+
+    // The trailing separator keeps two buckets whose names share a prefix from
+    // matching each other. A snapshot deleted but not yet purged is still in
+    // the table and still counts: it references its blocks until the purge.
+    String snapshotBucketKey = omMetadataManager.getBucketKey(volumeName,
+        bucketName) + OzoneConsts.OM_KEY_PREFIX;
+    if (OMBucketDeleteRequest.bucketContainsSnapshot(omMetadataManager,
+        snapshotBucketKey)) {
+      throw new OMException("Cannot set the object versioning status of bucket "
+          + bucketName + " to " + newVersioningStatus + " while it has"
+          + " snapshots. Snapshots and S3 object versioning cannot be used on"
+          + " the same bucket until snapshot-aware version reclamation is"
+          + " available; without it a noncurrent version reclaimed from the"
+          + " active object store would take blocks a snapshot still"
+          + " references. Delete and purge the bucket's snapshots first.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithVersioningStatus(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)) {
+      SetBucketPropertyRequest propReq =
+          req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && propReq.getBucketArgs().hasVersioningStatus()) {
+        throw new OMException("Cluster does not have the object versioning"
+            + " feature finalized yet, but the request contains a bucket"
+            + " versioning status. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+      if (propReq.hasBucketArgs()
+          && (propReq.getBucketArgs().hasMaxVersions()
+              || propReq.getBucketArgs().hasNoncurrentVersionExpirationDays()
+              || propReq.getBucketArgs().hasExpiredDeleteMarkerCleanup())) {
+        throw new OMException("Cluster does not have the object versioning"
+            + " feature finalized yet, but the request contains version"
+            + " retention settings. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

@@ -225,13 +225,22 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     }
   }
 
-  private boolean bucketContainsSnapshot(OMMetadataManager omMetadataManager,
+  /**
+   * Whether the bucket has any snapshot. A snapshot that was deleted but not
+   * yet purged is still in the table, so it counts as present: it keeps
+   * referencing the blocks it captured until the purge removes it.
+   *
+   * @param snapshotBucketKey the bucket key with a trailing '/', so that two
+   *                          buckets whose names share a prefix do not match
+   *                          each other.
+   */
+  static boolean bucketContainsSnapshot(OMMetadataManager omMetadataManager,
       String snapshotBucketKey) throws IOException {
     return bucketContainsSnapshotInCache(omMetadataManager, snapshotBucketKey)
         || bucketContainsSnapshotInTable(omMetadataManager, snapshotBucketKey);
   }
 
-  private boolean bucketContainsSnapshotInTable(
+  private static boolean bucketContainsSnapshotInTable(
       OMMetadataManager omMetadataManager, String snapshotBucketKey)
       throws IOException {
     try (
@@ -246,7 +255,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     return false;
   }
 
-  private boolean bucketContainsSnapshotInCache(
+  private static boolean bucketContainsSnapshotInCache(
       OMMetadataManager omMetadataManager, String snapshotBucketKey) {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> cacheIter =
         omMetadataManager.getSnapshotInfoTable().cacheIterator();

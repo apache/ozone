@@ -162,6 +162,9 @@ enum Type {
   PutBucketTagging = 144;
   GetBucketTagging = 145;
   DeleteBucketTagging = 146;
+
+  // Submitted by VersionCleanupService to reclaim noncurrent object versions.
+  ReclaimObjectVersions = 147;
 }
 
 enum SafeMode {
@@ -321,6 +324,8 @@ message OMRequest {
   optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
   // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
+
+  optional ReclaimObjectVersionsRequest     reclaimObjectVersionsRequest     = 148;
 }
 
 message OMResponse {
@@ -463,6 +468,8 @@ message OMResponse {
   optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
   // TODO: Empty ack after OM clears BucketInfo.tags.
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
+
+  optional ReclaimObjectVersionsResponse     reclaimObjectVersionsResponse  = 147;
 }
 
 enum Status {
@@ -598,6 +605,10 @@ enum Status {
     ETAG_NOT_AVAILABLE = 100;
 
     ATOMIC_WRITE_CONFLICT = 101;
+
+    // The addressed version exists but is a delete marker. Distinct from
+    // KEY_NOT_FOUND: the S3 Gateway maps it to 405, not 404.
+    KEY_IS_DELETE_MARKER = 102;
 }
 
 /**
@@ -808,12 +819,39 @@ message BucketInfo {
     optional uint64 snapshotUsedNamespace = 22;
     // TODO: S3 bucket tags persisted in OM DB; set by PutBucketTagging, read by GetBucketTagging.
     repeated hadoop.hdds.KeyValue tags = 23;
+    // S3-compatible object versioning status. When absent, derived from
+    // isVersionEnabled (true -> VERSIONING_ENABLED, false -> UNVERSIONED).
+    optional BucketVersioningStatusProto versioningStatus = 24;
+    // Maximum number of versions retained per key, counting the current
+    // version and delete markers. 0 means unlimited; when absent the cluster
+    // default applies. Versions beyond the limit are reclaimed oldest-first by
+    // VersionCleanupService.
+    optional uint32 maxVersions = 25;
+    // Days a version is retained after becoming noncurrent, counted from the
+    // moment the version that superseded it was committed, as S3 lifecycle's
+    // NoncurrentDays is. 0 or absent means versions are retained forever.
+    optional uint32 noncurrentVersionExpirationDays = 26;
+    // Whether a key whose only remaining version is a delete marker is removed
+    // entirely. Such a marker is invisible to reads and cannot be addressed by
+    // versionId, so nothing else can ever remove it. Enabled when absent.
+    optional bool expiredDeleteMarkerCleanup = 27;
 }
 
 enum BucketLayoutProto {
     LEGACY = 1;
     FILE_SYSTEM_OPTIMIZED = 2;
     OBJECT_STORE = 3;
+}
+
+/**
+ * S3-compatible bucket versioning state machine:
+ * UNVERSIONED -> VERSIONING_ENABLED <-> VERSIONING_SUSPENDED.
+ * Once enabled, a bucket can never return to UNVERSIONED.
+ */
+enum BucketVersioningStatusProto {
+    UNVERSIONED = 1;
+    VERSIONING_ENABLED = 2;
+    VERSIONING_SUSPENDED = 3;
 }
 
 /**
@@ -883,6 +921,15 @@ message BucketArgs {
     optional BucketEncryptionInfoProto bekInfo = 12;
     // TODO: Tag payload for PutBucketTagging only.
     repeated hadoop.hdds.KeyValue tags = 13;
+    // S3-compatible object versioning status. Takes precedence over
+    // isVersionEnabled when both are set.
+    optional BucketVersioningStatusProto versioningStatus = 14;
+    // Maximum number of versions retained per key; 0 means unlimited.
+    optional uint32 maxVersions = 15;
+    // Days a version is retained after becoming noncurrent; 0 means forever.
+    optional uint32 noncurrentVersionExpirationDays = 16;
+    // Whether keys left with only a delete marker are removed entirely.
+    optional bool expiredDeleteMarkerCleanup = 17;
 }
 
 message PrefixInfo {
@@ -1124,6 +1171,14 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // S3-compatible object versioning: addresses one specific version of the key
+    // instead of its current version. nullVersion selects the key's null version
+    // slot, which cannot be addressed by id because a null version carries a
+    // normally generated versionId like any other version. At most one of the
+    // two may be set.
+    optional uint64 versionId = 25;
+    optional bool nullVersion = 26;
 }
 
 message KeyLocation {
@@ -1217,6 +1272,15 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // S3-compatible object versioning fields. versionId identifies an object
+  // version: assigned once from the committing transaction's index when the
+  // version is created, then frozen. A delete marker is a record with
+  // isDeleteMarker set and no data blocks. isNullVersion marks the single
+  // overwritable "null version" slot per key (writes while versioning is
+  // suspended, or objects that predate enabling versioning).
+    optional uint64 versionId = 23;
+    optional bool isDeleteMarker = 24;
+    optional bool isNullVersion = 25;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1535,6 +1599,27 @@ message OpenKeyBucket {
 message OpenKey {
   required string name = 1;
   optional uint64 clientID = 2 [deprecated=true];
+}
+
+/**
+ * Noncurrent object versions of one bucket that VersionCleanupService selected
+ * for reclamation, addressed by their versionedKeyTable dbKeys.
+ */
+message ObjectVersionsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated string versionKeys = 3;
+  // keyTable dbKeys of keys whose only remaining version is a delete marker.
+  // These leave the keyTable rather than the versionedKeyTable, so the key
+  // disappears entirely.
+  repeated string markerKeys = 4;
+}
+
+message ReclaimObjectVersionsRequest {
+  repeated ObjectVersionsBucket versionsPerBucket = 1;
+}
+
+message ReclaimObjectVersionsResponse {
 }
 
 message OMTokenProto {
