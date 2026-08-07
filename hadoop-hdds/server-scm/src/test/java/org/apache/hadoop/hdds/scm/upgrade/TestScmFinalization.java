@@ -53,6 +53,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -231,8 +233,19 @@ public class TestScmFinalization {
 
     // Execute upgrade finalization, then check that events happened in the
     // correct order.
-    StatusAndMessages status =
-        manager.finalizeUpgrade(UUID.randomUUID().toString());
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(UpgradeFinalizer.class);
+    StatusAndMessages status;
+    try {
+      status = manager.finalizeUpgrade(UUID.randomUUID().toString());
+      String finalizationCompleteLog =
+          "SCM Finalization has crossed checkpoint FINALIZATION_COMPLETE";
+      assertEquals(
+          initialCheckpoint != FinalizationCheckpoint.FINALIZATION_COMPLETE,
+          logCapturer.getOutput().contains(finalizationCompleteLog));
+    } finally {
+      logCapturer.stopCapturing();
+    }
     assertEquals(getStatusFromCheckpoint(initialCheckpoint).status(),
         status.status());
 
